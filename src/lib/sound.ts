@@ -39,8 +39,30 @@ export function soundPieces(run: Run, total: number): SoundPiece[] {
   return main ? [{ ...main, id: "s1", at: 0, end: total }] : [];
 }
 
-/** Where sound i stops: its own end, the next sound's start, or the end of the video, whichever comes first. */
-export const pieceEnd = (pieces: SoundPiece[], i: number, total: number) => Math.min(pieces[i].end ?? total, i + 1 < pieces.length ? pieces[i + 1].at : total, total);
+export const rowOf = (p: SoundPiece) => p.row ?? 0;
+
+/** Where sound i stops: its own end, the next sound on the same row, or the end of the video, whichever comes first. */
+export function pieceEnd(pieces: SoundPiece[], i: number, total: number) {
+  const p = pieces[i];
+  const next = pieces.filter((q, j) => j !== i && rowOf(q) === rowOf(p) && q.at > p.at).reduce((m, q) => Math.min(m, q.at), total);
+  return Math.min(p.end ?? total, next, total);
+}
+
+/** How far sound i can stretch on its row without running into its neighbours: [earliest start, latest end]. */
+export function rowBounds(pieces: SoundPiece[], i: number, total: number): [number, number] {
+  const p = pieces[i];
+  let lo = 0;
+  let hi = total;
+  pieces.forEach((q, j) => {
+    if (j === i || rowOf(q) !== rowOf(p)) return;
+    if (q.at < p.at) lo = Math.max(lo, pieceEnd(pieces, j, total));
+    else hi = Math.min(hi, q.at);
+  });
+  return [lo, hi];
+}
+
+/** The rows in use, top to bottom. */
+export const soundRows = (pieces: SoundPiece[]) => [...new Set(pieces.map(rowOf))].sort((a, b) => a - b);
 
 /** Is any sound playing at video time t? (If not, the video's own sound is heard.) */
 export const soundAtTime = (pieces: SoundPiece[], t: number, total: number) => pieces.some((p, i) => t >= p.at && t < pieceEnd(pieces, i, total));

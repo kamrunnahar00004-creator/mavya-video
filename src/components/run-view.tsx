@@ -8,7 +8,7 @@ import { analyzeVideo } from "@/lib/analyze";
 import { CHARACTERS, characterById } from "@/lib/characters";
 import { FONT_CHOICES, fontCss, fontLabel, loadFonts } from "@/lib/studio-data";
 import { ADJUST_ROWS, type Adjust, type AdjustRow, type Motion, NO_ADJUST, fullAdjust, isAdjusted, keyAt, motionAt, moveKey, panBy, setMotion, speedOf, toggleKey, videoStyle } from "@/lib/adjust";
-import { audioLength, pieceEnd, refSoundSrc, soundName, soundPieces } from "@/lib/sound";
+import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundPieces, soundRows } from "@/lib/sound";
 import type { Song } from "@/app/api/songs/route";
 import { type Seg, cutOutTexts, demoClips, retimeTexts, shotList, timeline } from "@/lib/edit";
 import { STYLE_GROUPS, STYLE_PRESETS, autoSecond, stylePreset } from "@/lib/text-styles";
@@ -1359,7 +1359,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
   const [draft, setDraft] = useState<{ id: string; at: number; end: number } | null>(null);
   const [guide, setGuide] = useState<number | null>(null);
   const span = (p: SoundPiece, i: number): [number, number] => (draft?.id === p.id ? [draft.at, draft.end] : [p.at, pieceEnd(pieces, i, total)]);
-  const underPlayhead = pieces.find((p, i) => t > p.at + 0.25 && t < pieceEnd(pieces, i, total) - 0.25);
+  const underPlayhead = pieces.some((p, i) => t > p.at + 0.25 && t < pieceEnd(pieces, i, total) - 0.25);
 
   function seek(e: React.PointerEvent) {
     const rect = area.current?.getBoundingClientRect();
@@ -1383,10 +1383,9 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
     const p = pieces[i];
     const [a0, b0] = [p.at, pieceEnd(pieces, i, total)];
     const size = b0 - a0;
-    const lo = i > 0 ? pieceEnd(pieces, i - 1, total) : 0;
-    const hi = i + 1 < pieces.length ? pieces[i + 1].at : total;
+    const [lo, hi] = rowBounds(pieces, i, total);
     const tol = (12 / rect.width) * total;
-    const points = [0, total, t, lo, hi, ...segs.map((x) => x.offset)];
+    const points = [0, total, t, lo, hi, ...segs.map((x) => x.offset), ...pieces.flatMap((q, j) => (j === i ? [] : [q.at, pieceEnd(pieces, j, total)]))];
     const snapA = magnet(points, tol);
     const snapB = magnet(points, tol);
     const sx = e.clientX;
@@ -1423,11 +1422,10 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
     if (!rect) return;
     const p = pieces[i];
     const [a0, b0] = [p.at, pieceEnd(pieces, i, total)];
-    const lo = i > 0 ? pieceEnd(pieces, i - 1, total) : 0;
-    const hi = i + 1 < pieces.length ? pieces[i + 1].at : total;
+    const [lo, hi] = rowBounds(pieces, i, total);
     const tol = (12 / rect.width) * total;
     // Magnet: clip edges, the playhead, the start / end, and the neighbouring sounds' edges (so they connect).
-    const points = [0, total, t, lo, hi, ...segs.map((x) => x.offset)];
+    const points = [0, total, t, lo, hi, ...segs.map((x) => x.offset), ...pieces.flatMap((q, j) => (j === i ? [] : [q.at, pieceEnd(pieces, j, total)]))];
     const sx = e.clientX;
     let next: [number, number] = [a0, b0];
     const snapEdge = magnet(points, tol);
@@ -1503,21 +1501,28 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
             ))}
           </div>
         )}
-        {/* 3. the sound line */}
+        {/* 3. the sounds: one row each (like the texts); pieces cut with Split stay on their row */}
+        {pieces.length === 0 && (
+          <div className="relative mt-1 flex h-9 items-center rounded-md bg-raised/70 px-2 text-[10.5px] font-semibold text-soft" onPointerDown={seek}>
+            No sound yet
+          </div>
+        )}
+        {soundRows(pieces).map((row) => (
         <div
+          key={row}
           className="relative mt-1 h-9 cursor-pointer rounded-md bg-raised/70"
           onPointerDown={(e) => {
             onSelect(null);
             seek(e);
           }}
         >
-          {pieces.length === 0 && <span className="absolute inset-0 flex items-center px-2 text-[10.5px] font-semibold text-soft">No sound yet</span>}
           {pieces.map((p, i) => {
+            if (rowOf(p) !== row) return null;
             const [a, b] = span(p, i);
             const on = p.id === selected;
-            // Touching the sound before / after: square corners there, so the two read as one connected strip.
-            const joinL = i > 0 && Math.abs(span(pieces[i - 1], i - 1)[1] - a) < 0.01;
-            const joinR = i + 1 < pieces.length && Math.abs(span(pieces[i + 1], i + 1)[0] - b) < 0.01;
+            // Touching the sound before / after on this row: square corners there, so the two read as one connected strip.
+            const joinL = pieces.some((q, j) => j !== i && rowOf(q) === row && Math.abs(span(q, j)[1] - a) < 0.01);
+            const joinR = pieces.some((q, j) => j !== i && rowOf(q) === row && Math.abs(span(q, j)[0] - b) < 0.01);
             const handle = "absolute inset-y-0 z-10 flex w-3 cursor-ew-resize touch-none items-center justify-center bg-ink";
             return (
               <div
@@ -1549,6 +1554,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
             );
           })}
         </div>
+        ))}
         <div className="pointer-events-none absolute bottom-0 top-0 z-20 w-0.5 rounded bg-text" style={{ left: pct(t) }} />
         {guide !== null && <div className="pointer-events-none absolute -bottom-1 -top-1 z-30 w-px -translate-x-1/2 bg-accent" style={{ left: pct(guide) }} />}
       </div>
@@ -1640,10 +1646,11 @@ function SoundStep({ run, source, segs, texts, videoLen, onPieces }: {
     const sound = { kind, src, name, refId, start: 0, length: round1(length) };
     if (changing && sel) put(pieces.map((p) => (p.id === sel.id ? { ...p, ...sound } : p)));
     else {
-      // A new sound: the first covers the whole video; later ones fill [at, end], cutting a sound they start inside.
+      // A new sound on its own row: the first covers the whole video; "+ Sound" runs from the playhead to the end.
       const span = adding ?? { at: 0, end: videoLen };
-      const piece: SoundPiece = { id: uid(), volume: 100, ...sound, at: span.at, end: span.end };
-      put([...pieces.map((p, i) => (p.at < span.at && pieceEnd(pieces, i, videoLen) > span.at ? { ...p, end: span.at } : p)), piece]);
+      const row = pieces.length ? Math.max(...pieces.map(rowOf)) + 1 : 0;
+      const piece: SoundPiece = { id: uid(), volume: 100, ...sound, at: span.at, end: span.end, row };
+      put([...pieces, piece]);
       setSelId(piece.id);
     }
     setAdding(null);
@@ -1671,7 +1678,8 @@ function SoundStep({ run, source, segs, texts, videoLen, onPieces }: {
 
   /** ✂ at the playhead: the sound under it becomes two pieces that play on as one. */
   function split(t: number) {
-    const i = pieces.findIndex((p, j) => t > p.at + 0.25 && t < pieceEnd(pieces, j, videoLen) - 0.25);
+    const under = (j: number) => t > pieces[j].at + 0.25 && t < pieceEnd(pieces, j, videoLen) - 0.25;
+    const i = selIndex >= 0 && under(selIndex) ? selIndex : pieces.findIndex((_, j) => under(j));
     if (i < 0) return;
     const p = pieces[i];
     const at = Math.round(t * 1000) / 1000;
@@ -1680,13 +1688,10 @@ function SoundStep({ run, source, segs, texts, videoLen, onPieces }: {
     setSelId(second.id);
   }
 
-  /** + Add sound at the playhead: fills until the next sound (or the end); the chooser opens. */
+  /** + Sound at the playhead: a new row from there to the end of the video; the chooser opens. */
   function addAt(t: number) {
     const at = Math.round(Math.min(t, videoLen - 0.5) * 1000) / 1000;
-    const next = pieces.find((p) => p.at > at + 0.05);
-    const end = next ? next.at : videoLen;
-    if (end - at < 0.5) return;
-    setAdding({ at, end });
+    setAdding({ at, end: videoLen });
     setChanging(false);
     setSelId(null);
   }

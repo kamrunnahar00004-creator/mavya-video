@@ -33,6 +33,7 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/runs/[id]"
         ...(typeof s.refId === "string" ? { refId: s.refId } : {}),
         at: num(s.at, 0, 3600, 0),
         ...(typeof s.end === "number" ? { end: num(s.end, 0, 3600, 0) } : {}),
+        ...(typeof s.row === "number" ? { row: Math.round(num(s.row, 0, 20, 0)) } : {}),
         start: num(s.start, 0, 3600, 0),
         volume: num(s.volume, 0, 100, 100),
         ...(typeof s.length === "number" ? { length: num(s.length, 0, 3600, 0) } : {}),

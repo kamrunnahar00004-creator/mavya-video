@@ -298,9 +298,11 @@ export type SoundPiece = {
   src: string;
   name: string;
   refId?: string;
-  /** Video time where this sound starts playing, and where it stops (default: where the next sound starts, or the end). */
+  /** Video time where this sound starts playing, and where it stops (default: where the next sound on its row starts, or the end). */
   at: number;
   end?: number;
+  /** Its row on the sound line (like text rows). Pieces cut from one sound with Split share a row; rows can overlap in time and play together. */
+  row?: number;
   /** Where inside the sound it starts (which part plays). */
   start: number;
   /** 0..100 */
