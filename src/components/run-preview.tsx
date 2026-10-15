@@ -317,8 +317,10 @@ export function claimPlayback(who: string) {
 export function usePlaybackClaims(who: string, setPlaying: (v: boolean) => void) {
   useEffect(() => {
     const on = (e: Event) => (e as CustomEvent<string>).detail !== who && setPlaying(false);
+    const hide = () => { if (document.hidden) setPlaying(false); };
     window.addEventListener(PLAY_EVENT, on);
-    return () => window.removeEventListener(PLAY_EVENT, on);
+    document.addEventListener("visibilitychange", hide);
+    return () => { window.removeEventListener(PLAY_EVENT, on); document.removeEventListener("visibilitychange", hide); };
   }, [who, setPlaying]);
 }
 

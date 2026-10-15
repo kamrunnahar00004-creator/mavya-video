@@ -29,8 +29,16 @@ export function videoLength(mediaId: string): Promise<number | null> {
   return new Promise((resolve) => {
     const v = document.createElement("video");
     v.preload = "metadata";
-    v.onloadedmetadata = () => resolve(Number.isFinite(v.duration) ? v.duration : null);
-    v.onerror = () => resolve(null);
+    const finish = (value: number | null) => {
+      clearTimeout(timer);
+      v.onloadedmetadata = v.onerror = null;
+      v.removeAttribute("src");
+      v.load();
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), 15000);
+    v.onloadedmetadata = () => finish(Number.isFinite(v.duration) ? v.duration : null);
+    v.onerror = () => finish(null);
     v.src = `/api/media/${mediaId}`;
   });
 }
@@ -77,9 +85,10 @@ export function patchRun(id: string, patch: Partial<Run>): Promise<Run | null> {
   });
 }
 
-if (typeof window !== "undefined") window.addEventListener("pagehide", () => {
+export function flushRunSaves() {
   for (const id of pendingSaves.keys()) flushRun(id);
-});
+}
+if (typeof window !== "undefined") window.addEventListener("pagehide", flushRunSaves);
 
 const DEFAULT_SUGGESTION: Record<Slot["role"], string> = {
   hook: "Reaction to camera, big text on screen",

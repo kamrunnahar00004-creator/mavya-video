@@ -13,7 +13,7 @@ import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundP
 import type { Song } from "@/app/api/songs/route";
 import { type Seg, cutOutTexts, demoClips, retimeTexts, runSteps, shotList, timeline } from "@/lib/edit";
 import { STYLE_GROUPS, STYLE_PRESETS, autoSecond, stylePreset } from "@/lib/text-styles";
-import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
+import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, flushRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { PLATFORM_LABEL, commentCta, fmtTime, fmtViews, isLikelyBoosted, type Asset, type DemoClip, type Frame, type Reference, type SoundPiece, type Run, type TextLayer, type TextPos } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
 import { LibraryPanel } from "@/components/library-panel";
@@ -138,13 +138,18 @@ export function RunView() {
     [id]
   );
 
-  useEffect(() => () => {
-    const dirty = saveTimer.current || adjustTimer.current;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    if (adjustTimer.current) clearTimeout(adjustTimer.current);
-    saveTimer.current = adjustTimer.current = null;
-    const cur = runRef.current;
-    if (dirty && cur?.id === id) void patchRun(id, { hook: cur.hook, demo: cur.demo, texts: runTexts(cur), project: null });
+  useEffect(() => {
+    const flush = () => {
+      const dirty = saveTimer.current || adjustTimer.current;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (adjustTimer.current) clearTimeout(adjustTimer.current);
+      saveTimer.current = adjustTimer.current = null;
+      const cur = runRef.current;
+      if (dirty && cur?.id === id) void patchRun(id, { hook: cur.hook, demo: cur.demo, texts: runTexts(cur), project: null });
+      flushRunSaves();
+    };
+    window.addEventListener("pagehide", flush);
+    return () => { window.removeEventListener("pagehide", flush); flush(); };
   }, [id]);
 
   if (missing) {
@@ -1912,6 +1917,17 @@ function SoundPart({ src, length, start, span, onChange }: { src: string; length
     <div>
       <div
         ref={box}
+        role="slider"
+        tabIndex={movable ? 0 : -1}
+        aria-label="Song part"
+        aria-valuemin={0}
+        aria-valuemax={Math.max(0, total - win)}
+        aria-valuenow={from}
+        onKeyDown={(e) => {
+          if (!movable || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+          e.preventDefault(); e.stopPropagation();
+          onChange(e.key === "Home" ? 0 : e.key === "End" ? total - win : Math.max(0, Math.min(total - win, from + (e.key === "ArrowRight" ? 0.1 : -0.1))));
+        }}
         onPointerDown={drag}
         title={movable ? "Drag to choose which part plays" : undefined}
         className={`relative flex h-14 touch-none select-none items-center gap-[2px] ${movable ? "cursor-grab active:cursor-grabbing" : ""}`}
@@ -2684,10 +2700,17 @@ function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, 
           ))}
           <span
             role="slider"
+            tabIndex={0}
             aria-label="Trim start"
             aria-valuemin={0}
             aria-valuemax={len}
             aria-valuenow={a}
+            onKeyDown={(e) => {
+              if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+              e.preventDefault(); e.stopPropagation();
+              const next = Math.max(0, Math.min(b - 0.5, round1(a + (e.key === "ArrowRight" ? 0.1 : -0.1))));
+              onRange([next, b], next);
+            }}
             onPointerDown={(e) => track(e, (v) => { const x = round1(Math.min(v, b - 0.5)); onRange([x, b], x); })}
             className={`${handle} rounded-l-md`}
             style={{ left: pct(a) }}
@@ -2696,10 +2719,17 @@ function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, 
           </span>
           <span
             role="slider"
+            tabIndex={0}
             aria-label="Trim end"
             aria-valuemin={0}
             aria-valuemax={len}
             aria-valuenow={b}
+            onKeyDown={(e) => {
+              if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+              e.preventDefault(); e.stopPropagation();
+              const next = Math.min(len, Math.max(a + 0.5, round1(b + (e.key === "ArrowRight" ? 0.1 : -0.1))));
+              onRange([a, next], next);
+            }}
             onPointerDown={(e) => track(e, (v) => { const x = round1(Math.max(v, a + 0.5)); onRange([a, x], x); })}
             className={`${handle} -translate-x-full rounded-r-md`}
             style={{ left: pct(b) }}

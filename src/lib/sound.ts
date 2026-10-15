@@ -19,8 +19,16 @@ export function audioLength(src: string): Promise<number | null> {
   return new Promise((resolve) => {
     const a = document.createElement("audio");
     a.preload = "metadata";
-    a.onloadedmetadata = () => resolve(Number.isFinite(a.duration) ? a.duration : null);
-    a.onerror = () => resolve(null);
+    const finish = (value: number | null) => {
+      clearTimeout(timer);
+      a.onloadedmetadata = a.onerror = null;
+      a.removeAttribute("src");
+      a.load();
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), 15000);
+    a.onloadedmetadata = () => finish(Number.isFinite(a.duration) ? a.duration : null);
+    a.onerror = () => finish(null);
     a.src = src;
   });
 }
