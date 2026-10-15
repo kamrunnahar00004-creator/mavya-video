@@ -55,7 +55,7 @@ function Title({ run, editing, onEdit, onRename, className }: { run: Run; editin
         if (e.key === "Enter") done(true);
         if (e.key === "Escape") done(false);
       }}
-      className={`w-full min-w-0 rounded-md border border-accent bg-panel px-1.5 py-0.5 outline-none ${className ?? ""}`}
+      className={`-mx-1.5 box-border block h-[1.55em] w-[calc(100%+0.75rem)] min-w-0 rounded-md border border-accent bg-panel px-1.5 py-0 leading-none outline-none ${className ?? ""}`}
     />
   );
 }
@@ -205,7 +205,7 @@ export function RunsList() {
                     <div className="absolute right-2 top-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">{actions(r, true)}</div>
                   </div>
                   <Title run={r} editing={editing === r.id} onEdit={(on) => setEditing(on ? r.id : null)} onRename={(t) => void rename(r, t)} className="mt-2.5 text-[14.5px] font-semibold group-hover:text-accent" />
-                  <div className="text-[13px] text-soft">{fmtDate(r.createdAt)}</div>
+                  <div className="mt-1 text-[13px] text-soft">{fmtDate(r.createdAt)}</div>
                 </Link>
               );
             })}
