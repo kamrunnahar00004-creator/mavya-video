@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, Diamond, Download, Eye, Film, FolderOpen, Heart, Link as LinkIcon, Loader2, Music, Pause, Play, Plus, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, Diamond, Download, Eye, Film, FolderOpen, Heart, Link as LinkIcon, ListOrdered, Loader2, Music, Pause, PenLine, Play, Plus, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X } from "lucide-react";
 import { analyzeVideo } from "@/lib/analyze";
 import { CHARACTERS, characterById } from "@/lib/characters";
 import { FONT_CHOICES, fontCss, fontLabel, loadFonts } from "@/lib/studio-data";
@@ -397,23 +397,21 @@ export function RunView() {
               ) : (
                 // One box: the library is the main path; upload and describe open right below, on the same page.
                 <div className="rounded-2xl border border-line bg-panel">
-                  <div className="flex items-center gap-3 px-4 py-3 text-[13.5px] text-soft">
+                  <div className="flex flex-wrap items-center gap-2.5 p-4">
                     <button type="button" onClick={() => setPickerOpen(true)} className="btn-primary px-4 py-2.5 text-[14px]">
                       Browse hooks
                     </button>
-                    or
-                    {(["upload", "describe"] as const).map((m, i) => (
-                      <span key={m} className="flex items-center gap-3">
-                        {i > 0 && <span aria-hidden>·</span>}
-                        <button
-                          type="button"
-                          aria-pressed={hook.source === m}
-                          onClick={() => save({ hook: { ...hook, source: hook.source === m ? undefined : m } })}
-                          className={`font-semibold underline-offset-4 hover:underline ${hook.source === m ? "text-accent underline" : "text-muted hover:text-accent"}`}
-                        >
-                          {m === "upload" ? "Upload a video" : "Describe your own"}
-                        </button>
-                      </span>
+                    {(["upload", "describe"] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        aria-pressed={hook.source === m}
+                        onClick={() => save({ hook: { ...hook, source: hook.source === m ? undefined : m } })}
+                        className={optionBtn(hook.source === m)}
+                      >
+                        {m === "upload" ? <Upload className="h-4 w-4" /> : <PenLine className="h-4 w-4" />}
+                        {m === "upload" ? "Upload a video" : "Describe your own"}
+                      </button>
                     ))}
                   </div>
                   {hook.source === "upload" && (
@@ -684,23 +682,15 @@ function CharacterStep({ face, mode, onMode, onFace }: { face: Hook["face"] | nu
 
   return (
     <div className="rounded-2xl border border-line bg-panel">
-      <div className="flex items-center gap-3 px-4 py-3 text-[13.5px] text-soft">
+      <div className="flex flex-wrap items-center gap-2.5 p-4">
         <button type="button" onClick={() => setBrowsing(true)} className="btn-primary px-4 py-2.5 text-[14px]">
           Browse characters
         </button>
-        or
-        {(["upload", "describe"] as const).map((m, i) => (
-          <span key={m} className="flex items-center gap-3">
-            {i > 0 && <span aria-hidden>·</span>}
-            <button
-              type="button"
-              aria-pressed={mode === m}
-              onClick={() => onMode(mode === m ? undefined : m)}
-              className={`font-semibold underline-offset-4 hover:underline ${mode === m ? "text-accent underline" : "text-muted hover:text-accent"}`}
-            >
-              {m === "upload" ? "Upload a photo" : "Describe your character"}
-            </button>
-          </span>
+        {(["upload", "describe"] as const).map((m) => (
+          <button key={m} type="button" aria-pressed={mode === m} onClick={() => onMode(mode === m ? undefined : m)} className={optionBtn(mode === m)}>
+            {m === "upload" ? <Upload className="h-4 w-4" /> : <PenLine className="h-4 w-4" />}
+            {m === "upload" ? "Upload a photo" : "Describe your character"}
+          </button>
         ))}
       </div>
 
@@ -847,6 +837,23 @@ function CharacterBrowser({ current, onPick, onClose }: { current: Hook["face"] 
 
 /** The run's starting hook text (see store.createRun); replaced by the stolen hook's text on generate. */
 const DEFAULT_HOOK_TEXT = "How is this tool even legal?";
+
+/**
+ * A sticky magnet for timeline drags: an edge snaps to the nearest point within `tol`, and once it has snapped
+ * it holds there until pulled clearly away (2.2 x tol), so it "stops for a while" like a real magnet.
+ */
+function magnet(points: number[], tol: number) {
+  let stuck: number | null = null;
+  return (v: number): number | null => {
+    if (stuck !== null && Math.abs(v - stuck) <= tol * 2.2) return stuck;
+    stuck = points.reduce<number | null>((best, q) => (Math.abs(q - v) <= tol && (best === null || Math.abs(q - v) < Math.abs(best - v)) ? q : best), null);
+    return stuck;
+  };
+}
+
+/** The outlined button next to a step's main button (the other ways to do the step); violet when its panel is open. */
+const optionBtn = (on: boolean) =>
+  `flex items-center gap-1.5 rounded-lg border px-3.5 py-2.5 text-[14px] font-semibold ${on ? "border-accent bg-accent-tint text-accent" : "border-line-strong bg-panel text-text hover:border-accent hover:text-accent"}`;
 
 /** Step 3: the hook clip, in the shared clip editor. Before generating, the video box shows the inputs and a Generate button.
  * Generation is a stand-in (a sample clip) until the Runway API is connected. */
@@ -1380,7 +1387,8 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
     const hi = i + 1 < pieces.length ? pieces[i + 1].at : total;
     const tol = (12 / rect.width) * total;
     const points = [0, total, t, lo, hi, ...segs.map((x) => x.offset)];
-    const snap = (v: number) => points.reduce<number | null>((best, q) => (Math.abs(q - v) <= tol && (best === null || Math.abs(q - v) < Math.abs(best - v)) ? q : best), null);
+    const snapA = magnet(points, tol);
+    const snapB = magnet(points, tol);
     const sx = e.clientX;
     let moved = false;
     let next: [number, number] = [a0, b0];
@@ -1388,8 +1396,8 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
       if (!moved && Math.abs(ev.clientX - sx) < 3) return;
       moved = true;
       const raw = a0 + ((ev.clientX - sx) / rect.width) * total;
-      const sa = snap(raw);
-      const sb = snap(raw + size);
+      const sa = snapA(raw);
+      const sb = snapB(raw + size);
       let a = sa !== null && (sb === null || Math.abs(sa - raw) <= Math.abs(sb - raw - size)) ? sa : sb !== null ? sb - size : raw;
       a = Math.max(lo, Math.min(hi - size, a));
       setGuide(sa !== null && a === sa ? sa : sb !== null && a === sb - size ? sb : null);
@@ -1422,9 +1430,10 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
     const points = [0, total, t, lo, hi, ...segs.map((x) => x.offset)];
     const sx = e.clientX;
     let next: [number, number] = [a0, b0];
+    const snapEdge = magnet(points, tol);
     const move = (ev: PointerEvent) => {
       const raw = (edge === "left" ? a0 : b0) + ((ev.clientX - sx) / rect.width) * total;
-      const snapped = points.reduce<number | null>((best, q) => (Math.abs(q - raw) <= tol && (best === null || Math.abs(q - raw) < Math.abs(best - raw)) ? q : best), null);
+      const snapped = snapEdge(raw);
       const v = snapped ?? raw;
       next = edge === "left" ? [Math.max(lo, Math.min(b0 - 0.5, v)), b0] : [a0, Math.min(hi, Math.max(a0 + 0.5, v))];
       const moved = edge === "left" ? next[0] : next[1];
@@ -1688,7 +1697,7 @@ function SoundStep({ run, source, segs, texts, videoLen, onPieces }: {
   }
 
   // Three ways to pick a sound, stacked to fit the narrow column: the main one full width, the other two side by side.
-  const secondary = "flex items-center justify-center gap-1.5 rounded-md border border-line-strong bg-panel px-3 py-2.5 text-[13.5px] font-semibold text-text hover:border-accent hover:text-accent";
+  const secondary = `${optionBtn(false)} justify-center`;
   const chooser = (
     <div className="space-y-2.5 rounded-2xl border border-line bg-panel p-4">
       {(adding || changing) && (
@@ -2109,13 +2118,14 @@ function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, onRenam
   if (!mode) {
     return (
       <div className="rounded-2xl border border-line bg-panel">
-        <div className="flex items-center gap-3 px-4 py-3 text-[13.5px] text-soft">
+        <div className="flex flex-wrap items-center gap-2.5 p-4">
           <label className={`btn-primary cursor-pointer px-4 py-2.5 text-[14px] ${busy ? "pointer-events-none opacity-60" : ""}`}>
-            {busy === "single" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Upload your demo"}
+            {busy === "single" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            Upload your demo
             <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => void takeMany(e.target.files).then(() => (e.target.value = ""))} />
           </label>
-          or
-          <button type="button" onClick={onClips} className="font-semibold text-muted underline-offset-4 hover:text-accent hover:underline">
+          <button type="button" onClick={onClips} className={optionBtn(false)}>
+            <ListOrdered className="h-4 w-4" />
             Build it clip by clip
           </button>
         </div>
@@ -2538,13 +2548,14 @@ function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, 
     // Snap (like CapCut) to the clip's start and end, the playhead, and other texts' edges, within 8px.
     const tol = (12 / rect.width) * len;
     const points = [0, len, t, ...texts.filter((o) => o.id !== x.id).flatMap((o) => [o.start, o.end])];
-    const snap = (v: number) => points.reduce<number | null>((best, p) => (Math.abs(p - v) <= tol && (best === null || Math.abs(p - v) < Math.abs(best - v)) ? p : best), null);
+    const snap = magnet(points, tol);
+    const snapEnd = magnet(points, tol);
     const move = (ev: PointerEvent) => {
       const d = ((ev.clientX - sx) / rect.width) * len;
       if (mode === "move") {
         const raw = start + d;
         const a = snap(raw);
-        const b = snap(raw + size);
+        const b = snapEnd(raw + size);
         const ns = a !== null && (b === null || Math.abs(a - raw) <= Math.abs(b - raw - size)) ? a : b !== null ? b - size : round1(raw);
         const clamped = Math.max(0, Math.min(len - size, ns));
         setGuide(a !== null && clamped === a ? a : b !== null && clamped === b - size ? b : null);
