@@ -75,6 +75,13 @@ export function RunPreview({ run, source, texts }: { run: Run; source: Reference
             role="button"
             tabIndex={0}
             aria-label={playing ? "Pause" : "Play"}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              e.preventDefault();
+              e.stopPropagation();
+              if (!playing) claimPlayback("phone");
+              setPlaying((p) => !p);
+            }}
             onClick={() => {
               if (!playing) claimPlayback("phone");
               setPlaying((p) => !p);
@@ -139,7 +146,11 @@ export function RunPreview({ run, source, texts }: { run: Run; source: Reference
         >
           {playing ? <Pause className="h-3.5 w-3.5" fill="currentColor" /> : <Play className="ml-0.5 h-3.5 w-3.5" fill="currentColor" />}
         </button>
-        <div ref={bar} onPointerDown={scrub} className="relative h-6 min-w-0 flex-1 cursor-pointer touch-none">
+        <div ref={bar} role="slider" tabIndex={0} aria-label="Preview time" aria-valuemin={0} aria-valuemax={total} aria-valuenow={time} onKeyDown={(e) => {
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+          e.preventDefault(); e.stopPropagation(); setPlaying(false);
+          setT(e.key === "Home" ? 0 : e.key === "End" ? total - 0.01 : Math.max(0, Math.min(total - 0.01, time + (e.key === "ArrowRight" ? 0.1 : -0.1))));
+        }} onPointerDown={scrub} className="relative h-6 min-w-0 flex-1 cursor-pointer touch-none focus-visible:outline-2 focus-visible:outline-accent">
           <div className="absolute inset-x-0 top-1/2 flex h-1.5 -translate-y-1/2 gap-[2px] overflow-hidden rounded-full">
             {segs.map((x) => (
               <span key={x.id} className="h-full bg-line" style={{ width: `${(x.len / total) * 100}%` }} />

@@ -34,9 +34,9 @@ export function mainSound(run: Run): PartSound | null {
 
 /** The sound line in time order. Runs with a single `sound` read as one sound over the whole video. */
 export function soundPieces(run: Run, total: number): SoundPiece[] {
-  if (run.sounds?.length) return [...run.sounds].sort((a, b) => a.at - b.at);
+  if (run.sounds) return [...run.sounds].sort((a, b) => a.at - b.at);
   const main = mainSound(run);
-  return main ? [{ ...main, id: "s1", at: 0, end: total }] : [];
+  return main ? [{ ...main, id: "s1", at: run.sound?.at ?? 0, end: run.sound?.end ?? total }] : [];
 }
 
 export const rowOf = (p: SoundPiece) => p.row ?? 0;

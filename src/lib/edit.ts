@@ -1,6 +1,6 @@
 import type { Adjust } from "@/lib/adjust";
 import { speedOf } from "@/lib/adjust";
-import { round1 } from "@/lib/client";
+const roundTime = (n: number) => Math.round(n * 1000) / 1000;
 import type { DemoClip, Reference, Run, TextLayer } from "@/lib/types";
 
 /**
@@ -71,15 +71,17 @@ export function retimeTexts(texts: TextLayer[], offset: number, from: Window, to
   const oldLen = Math.max(0.1, from.end - from.start) / from.speed;
   const newLen = Math.max(0.1, to.end - to.start) / to.speed;
   const map = (x: number) => {
-    if (x <= offset + 0.05) return x;
-    if (x >= offset + oldLen - 0.05) return x - oldLen + newLen;
+    if (x < offset - 0.05) return x;
+    if (Math.abs(x - offset) <= 0.05) return offset;
+    if (Math.abs(x - (offset + oldLen)) <= 0.05) return offset + newLen;
+    if (x > offset + oldLen) return x - oldLen + newLen;
     const file = from.start + (x - offset) * from.speed;
     return offset + Math.max(0, Math.min(newLen, (file - to.start) / to.speed));
   };
   return texts.map((t) => {
-    const start = round1(map(t.start));
-    let end = round1(map(t.end));
-    if (end - start < 0.3) end = round1(start + 0.3);
+    const start = roundTime(map(t.start));
+    let end = roundTime(map(t.end));
+    if (end - start < 0.3) end = roundTime(start + 0.3);
     return { ...t, start, end };
   });
 }
@@ -90,8 +92,8 @@ export function cutOutTexts(texts: TextLayer[], offset: number, len: number): Te
   for (const t of texts) {
     if (t.start >= offset - 0.05 && t.end <= offset + len + 0.05 && t.id !== "hook") continue;
     const map = (x: number) => (x <= offset ? x : x >= offset + len ? x - len : offset);
-    const start = round1(map(t.start));
-    const end = round1(Math.max(start + 0.3, map(t.end)));
+    const start = roundTime(map(t.start));
+    const end = roundTime(Math.max(start + 0.3, map(t.end)));
     out.push({ ...t, start, end });
   }
   return out;
@@ -114,6 +116,6 @@ export function shotList(source: Reference | null): Omit<DemoClip, "id">[] {
 export function runSteps(run: Run): boolean[] {
   const h = run.hook;
   const hasDemo = demoClips(run).some((c) => c.mediaId);
-  const hasSound = Boolean(run.sound) || Boolean(run.sounds?.length);
+  const hasSound = run.sounds ? run.sounds.length > 0 : Boolean(run.sound);
   return [Boolean(run.sourceRefId) || Boolean(h.source === "describe" && h.describeReady && h.describe?.trim()), Boolean(h.face), Boolean(h.generated), hasDemo, hasSound];
 }

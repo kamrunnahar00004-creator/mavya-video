@@ -1,16 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, Diamond, Download, Eye, Film, FolderOpen, Heart, Link as LinkIcon, ListOrdered, Loader2, Music, Pause, PenLine, Play, Plus, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X } from "lucide-react";
+import { waveform } from "@/lib/waveform";
 import { analyzeVideo } from "@/lib/analyze";
 import { CHARACTERS, characterById } from "@/lib/characters";
 import { FONT_CHOICES, fontCss, fontLabel, loadFonts } from "@/lib/studio-data";
 import { ADJUST_ROWS, type Adjust, type AdjustRow, type Motion, NO_ADJUST, fullAdjust, isAdjusted, keyAt, motionAt, moveKey, panBy, setMotion, speedOf, toggleKey, videoStyle } from "@/lib/adjust";
 import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundPieces, soundRows } from "@/lib/sound";
 import type { Song } from "@/app/api/songs/route";
-import { type Seg, cutOutTexts, demoClips, retimeTexts, shotList, timeline } from "@/lib/edit";
+import { type Seg, cutOutTexts, demoClips, retimeTexts, runSteps, shotList, timeline } from "@/lib/edit";
 import { STYLE_GROUPS, STYLE_PRESETS, autoSecond, stylePreset } from "@/lib/text-styles";
 import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { PLATFORM_LABEL, commentCta, fmtTime, fmtViews, isLikelyBoosted, type Asset, type DemoClip, type Frame, type Reference, type SoundPiece, type Run, type TextLayer, type TextPos } from "@/lib/types";
@@ -64,7 +65,7 @@ export function RunView() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([fetch(`/api/runs/${id}`), fetch("/api/references")])
+    Promise.all([fetch(`/api/runs/${id}`), fetch("/api/references?view=studio")])
       .then(async ([r, rs]) => {
         if (!r.ok) throw new Error("missing");
         const runData = (await r.json()) as Run;
@@ -95,10 +96,16 @@ export function RunView() {
 
   /** Text edits from the preview: applied live, saved shortly after (coalesced). */
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const liveTexts = useCallback((fn: (t: TextLayer[]) => TextLayer[]) => setRun((r) => (r ? { ...r, texts: fn(runTexts(r)) } : r)), []);
+  const liveTexts = useCallback((fn: (t: TextLayer[]) => TextLayer[]) => setRun((r) => {
+    if (!r) return r;
+    const texts = fn(runTexts(r));
+    const h = texts.find((x) => x.id === "hook");
+    return { ...r, texts, hook: h ? { ...r.hook, text: h.text } : r.hook };
+  }), []);
   const commitTexts = useCallback(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
+      saveTimer.current = null;
       const cur = runRef.current;
       if (!cur) return;
       const texts = runTexts(cur);
@@ -123,12 +130,22 @@ export function RunView() {
       });
       if (adjustTimer.current) clearTimeout(adjustTimer.current);
       adjustTimer.current = setTimeout(() => {
+        adjustTimer.current = null;
         const cur = runRef.current;
         if (cur) void patchRun(id, { hook: cur.hook, demo: cur.demo, texts: runTexts(cur), project: null });
       }, 250);
     },
     [id]
   );
+
+  useEffect(() => () => {
+    const dirty = saveTimer.current || adjustTimer.current;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    if (adjustTimer.current) clearTimeout(adjustTimer.current);
+    saveTimer.current = adjustTimer.current = null;
+    const cur = runRef.current;
+    if (dirty && cur?.id === id) void patchRun(id, { hook: cur.hook, demo: cur.demo, texts: runTexts(cur), project: null });
+  }, [id]);
 
   if (missing) {
     return (
@@ -184,7 +201,7 @@ export function RunView() {
   const segs = timeline(run, source);
   const videoLen = segs.reduce((t, x) => t + x.len, 0);
   const hasDemo = demoClips(run).some((c) => c.mediaId);
-  const stepDone = [Boolean(source) || Boolean(hook.source === "describe" && hook.describeReady && hook.describe?.trim()), Boolean(hook.face), Boolean(hook.generated), hasDemo, soundPieces(run, videoLen).length > 0];
+  const stepDone = runSteps(run);
   const current = stepDone.findIndex((d) => !d) + 1 || stepDone.length; // 1-based; all done = last step
   // The open step: the user's choice, else the first unfinished one. Finishing a step clears the choice (moves on).
   const openSteps = picked ?? [current];
@@ -264,6 +281,8 @@ export function RunView() {
     if (now && placeholder) {
       // First demo video: texts on the "Your demo" placeholder land on it (a text over the whole placeholder covers the whole clip).
       nextTexts = retimeTexts(nextTexts, now.offset, { start: placeholder.start, end: placeholder.end, speed: 1 }, { start: 0, end: now.len, speed: 1 });
+    } else if (now && old) {
+      nextTexts = retimeTexts(nextTexts, old.offset, { start: old.start, end: old.end, speed: speedOf(old.adjust) }, { start: now.start, end: now.end, speed: speedOf(now.adjust) });
     } else if (now) {
       const by = now.len - (old?.len ?? 0);
       nextTexts = nextTexts.map((t) => (t.start >= now.offset - 0.05 ? { ...t, start: round1(t.start + by), end: round1(t.end + by) } : t.end > now.offset + 0.05 && !old ? { ...t, end: round1(t.end + by) } : t));
@@ -352,7 +371,7 @@ export function RunView() {
       </header>
 
       {pickerOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/40 p-6" onClick={() => setPickerOpen(false)}>
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-40 flex items-center justify-center bg-ink/40 p-6" onClick={() => setPickerOpen(false)}>
           <div className="fade-in flex h-full max-h-[880px] w-full max-w-[1180px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_64px_rgba(15,23,42,0.25)]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 pt-5">
               <h2 className="text-[18px] font-extrabold tracking-tight">Choose a hook</h2>
@@ -585,7 +604,7 @@ export function RunView() {
       </div>
 
       {libraryOpen && (
-        <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setLibraryOpen(false)}>
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-40 bg-black/20" onClick={() => setLibraryOpen(false)}>
           <div className="absolute bottom-3 right-3 top-3" onClick={(e) => e.stopPropagation()}>
             <LibraryPanel
               open
@@ -774,7 +793,7 @@ function CharacterBrowser({ current, onPick, onClose }: { current: Hook["face"] 
   }, [viewing, onClose]);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/40 p-6" onClick={onClose}>
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-40 flex items-center justify-center bg-ink/40 p-6" onClick={onClose}>
       <div className="fade-in flex h-full max-h-[880px] w-full max-w-[1180px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_64px_rgba(15,23,42,0.25)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 pt-5">
           <h2 className="text-[18px] font-extrabold tracking-tight">Choose your character</h2>
@@ -809,7 +828,7 @@ function CharacterBrowser({ current, onPick, onClose }: { current: Hook["face"] 
       </div>
 
       {shown && viewing !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-6" onClick={(e) => { e.stopPropagation(); setViewing(null); }}>
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-6" onClick={(e) => { e.stopPropagation(); setViewing(null); }}>
           <button type="button" aria-label="Previous" onClick={(e) => { e.stopPropagation(); setViewing((viewing - 1 + CHARACTERS.length) % CHARACTERS.length); }} className="absolute left-6 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-3 text-ink hover:bg-white">
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -1006,6 +1025,7 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
   const live = Boolean(seg.src && seg.editable && !cover);
   const panned = useRef(false);
   const [full, setFull] = useState(false);
+  const [fullT, setFullT] = useState(0);
   // Player times are relative to the clip's start (0 = first kept frame), in on-screen seconds.
   const base = seg.start;
   const fileLen = Math.max(0.5, seg.end - seg.start);
@@ -1021,7 +1041,21 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
   }
   const [r0, r1] = sel ?? [0, len];
   const vref = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(true);
+  const [playing, setPlaying] = useState(false);
+  usePlaybackClaims(`clip:${seg.id}`, setPlaying);
+  useEffect(() => {
+    const video = vref.current;
+    if (video) video.volume = fullAdjust(seg.adjust).volume / 100;
+  }, [seg.adjust, version]);
+  useEffect(() => {
+    const video = vref.current;
+    if (!video || !playing) return;
+    const observer = new IntersectionObserver(([entry]) => { if (!entry.isIntersecting) setPlaying(false); });
+    observer.observe(video);
+    const hide = () => { if (document.hidden) setPlaying(false); };
+    document.addEventListener("visibilitychange", hide);
+    return () => { observer.disconnect(); document.removeEventListener("visibilitychange", hide); };
+  }, [playing]);
   const [t, setT] = useState(0);
   const seek = useCallback((rel: number) => {
     const v = vref.current;
@@ -1045,7 +1079,7 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
+    return () => { cancelAnimationFrame(raf); v.pause(); };
   }, [playing, live, base, len, speed, r0, r1, version]);
   useEffect(() => {
     if (!playing) vref.current?.pause();
@@ -1106,13 +1140,13 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
                   onClick={() => {
                     if (!panned.current) setFull(true);
                   }}
-                  onKeyDown={(e) => e.key === "Enter" && setFull(true)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setFull(true); } }}
                   aria-label="Play full screen"
                   title={zoomed ? "Drag to move the picture" : undefined}
                   className={`absolute inset-0 overflow-hidden ${zoomed ? "cursor-grab touch-none active:cursor-grabbing" : "cursor-zoom-in"}`}
                 >
                   <WarmthFilter adjust={seg.adjust} />
-                  <video ref={vref} key={`${seg.src}|${version ?? ""}`} src={seg.src} muted playsInline onLoadedMetadata={() => seek(r0)} className="absolute inset-0 h-full w-full object-cover" style={look} />
+                  <video ref={vref} key={`${seg.src}|${version ?? ""}`} src={seg.src} muted={!playing} playsInline onLoadedMetadata={() => seek(r0)} className="absolute inset-0 h-full w-full object-cover" style={look} />
                   {local.filter((x) => x.text.trim() && t >= x.start - 0.05 && t <= x.end + 0.05).map((x) => <TextOverlay key={x.id} x={x} onMove={(pos) => onPatch(x.id, pos)} />)}
                 </div>
               ) : null)}
@@ -1123,7 +1157,7 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
             <ClipControls
               label={seg.label}
               playing={playing}
-              onPlay={() => setPlaying((x) => !x)}
+              onPlay={() => { if (!playing) claimPlayback(`clip:${seg.id}`); setPlaying((x) => !x); }}
               t={t}
               len={len}
               range={[r0, r1]}
@@ -1198,11 +1232,11 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
       )}
 
       {full && live && seg.src && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-6" onClick={() => setFull(false)}>
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-6" onClick={() => setFull(false)}>
           <div className="fade-in relative aspect-[9/16] h-[min(86vh,900px)] overflow-hidden rounded-2xl bg-black shadow-[0_24px_64px_rgba(0,0,0,0.35)] [container-type:size]" onClick={(e) => e.stopPropagation()}>
             <WarmthFilter adjust={seg.adjust} />
-            <TrimmedVideo src={seg.src} start={base} end={base + fileLen} rate={speed} adjust={seg.adjust} />
-            {local.filter((x) => x.text.trim()).map((x) => <TextOverlay key={x.id} x={x} onMove={(pos) => onPatch(x.id, pos)} />)}
+            <TrimmedVideo src={seg.src} start={base} end={base + fileLen} rate={speed} adjust={seg.adjust} onTime={(at) => setFullT((at - base) / speed)} />
+            {local.filter((x) => x.text.trim() && fullT >= x.start && fullT < x.end).map((x) => <TextOverlay key={x.id} x={x} onMove={(pos) => onPatch(x.id, pos)} />)}
           </div>
           <button type="button" aria-label="Close" onClick={() => setFull(false)} className="absolute right-6 top-6 rounded-full bg-white/90 p-2 text-ink hover:bg-white">
             <X className="h-5 w-5" />
@@ -1230,6 +1264,7 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   onUndo: () => void;
   onRedo: () => void;
 }) {
+  const scope = useRef<HTMLDivElement>(null);
   const total = Math.max(0.5, segs.reduce((a, x) => a + x.len, 0));
   const [t, setT] = useState(0);
   // Starts paused; pressing play here pauses the phone preview (one sound at a time).
@@ -1261,7 +1296,8 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (!el || !scope.current?.contains(el)) return;
+      if (e.defaultPrevented || el?.closest('input, textarea, select, button, a, [contenteditable], [role="dialog"], [aria-modal="true"]') || document.querySelector('[role="dialog"], [aria-modal="true"]')) return;
       const k = keys.current;
       const mod = e.ctrlKey || e.metaKey;
       if (e.code === "Space") {
@@ -1286,7 +1322,9 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   }, [total]);
 
   return (
-    <div className="space-y-4">
+    <div ref={scope} tabIndex={-1} onPointerDownCapture={(e) => {
+      if (!(e.target as HTMLElement).closest('input, textarea, select, button, a, [contenteditable]')) scope.current?.focus({ preventScroll: true });
+    }} className="space-y-4 outline-none">
       <div className="grid grid-cols-[300px_minmax(0,1fr)] items-start gap-4">
       <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl border border-line bg-[#14121f] [container-type:size]">
         {seg.src ? (
@@ -1528,14 +1566,24 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
               <div
                 key={p.id}
                 role="button"
+                tabIndex={0}
                 aria-label={`Sound: ${p.name}`}
                 aria-pressed={on}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onSelect(p.id); }
+                  if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                    e.preventDefault(); e.stopPropagation();
+                    const [lo, hi] = rowBounds(pieces, i, total);
+                    const next = Math.max(lo, Math.min(hi - (b - a), a + (e.key === "ArrowRight" ? 0.1 : -0.1)));
+                    onMove(p.id, next, next + b - a);
+                  }
+                }}
                 onPointerDown={(e) => {
                   e.stopPropagation();
                   onSelect(p.id);
                   moveSound(e, i);
                 }}
-                className={`absolute inset-y-0 flex cursor-grab touch-none items-center gap-1.5 overflow-hidden rounded-md px-4 text-[10.5px] font-bold active:cursor-grabbing ${joinL ? "rounded-l-none" : ""} ${joinR ? "rounded-r-none border-r border-white" : ""} ${on ? "bg-soundtrack text-white" : "bg-soundtrack-tint text-soundtrack hover:bg-[#f3cfe6]"}`}
+                className={`absolute inset-y-0 flex cursor-grab touch-none items-center gap-1.5 overflow-hidden rounded-md px-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent text-[10.5px] font-bold active:cursor-grabbing ${joinL ? "rounded-l-none" : ""} ${joinR ? "rounded-r-none border-r border-white" : ""} ${on ? "bg-soundtrack text-white" : "bg-soundtrack-tint text-soundtrack hover:bg-[#f3cfe6]"}`}
                 style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})` }}
               >
                 <Music className="h-3.5 w-3.5 shrink-0" />
@@ -1820,20 +1868,8 @@ function SoundPart({ src, length, start, span, onChange }: { src: string; length
     let alive = true;
     (async () => {
       try {
-        const buf = await (await fetch(src)).arrayBuffer();
-        const ctx = new AudioContext();
-        const audio = await ctx.decodeAudioData(buf);
-        void ctx.close();
-        const data = audio.getChannelData(0);
-        const step = Math.floor(data.length / BARS);
-        const out: number[] = [];
-        for (let i = 0; i < BARS; i++) {
-          let sum = 0;
-          for (let j = i * step; j < (i + 1) * step; j += 16) sum += Math.abs(data[j]);
-          out.push(sum / (step / 16));
-        }
-        const max = Math.max(...out, 0.0001);
-        if (alive) setPeaks(out.map((v) => 0.15 + 0.85 * (v / max)));
+        const values = await waveform(src, BARS);
+        if (alive) setPeaks(values);
       } catch {
         if (alive) setPeaks(Array.from({ length: BARS }, (_, i) => 0.35 + 0.3 * Math.abs(Math.sin(i * 0.7))));
       }
@@ -1967,7 +2003,7 @@ function SongBrowser({ busyId, onClose, onUse }: { busyId: number | null; onClos
     setPlaying(song.id);
   }
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/40 p-6" onClick={onClose}>
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-40 flex items-center justify-center bg-ink/40 p-6" onClick={onClose}>
       <div className="fade-in flex h-[min(760px,90vh)] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_64px_rgba(15,23,42,0.25)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 pt-4">
           <h2 className="text-[18px] font-extrabold tracking-tight">Choose a song</h2>
@@ -2445,12 +2481,18 @@ function TextRow({ t, placeholder, onPatch, onAdd, onRemove }: { t: TextLayer; p
 }
 
 /** A clip that plays only between start and end (seconds), looping. */
-function TrimmedVideo({ src, start, end, muted = false, adjust, rate = 1 }: { src: string; start: number; end: number; muted?: boolean; adjust?: Partial<Adjust>; rate?: number }) {
+function TrimmedVideo({ src, start, end, muted = false, adjust, rate = 1, onTime }: { src: string; start: number; end: number; muted?: boolean; adjust?: Partial<Adjust>; rate?: number; onTime?: (at: number) => void }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const who = useId();
+  const [playing, setPlaying] = useState(true);
+  usePlaybackClaims(who, setPlaying);
+  useEffect(() => { if (!muted) claimPlayback(who); }, [who, muted]);
+  useEffect(() => { if (!playing) ref.current?.pause(); }, [playing]);
+  useEffect(() => { if (ref.current) ref.current.volume = fullAdjust(adjust).volume / 100; }, [adjust]);
   const style = videoStyle(adjust, start);
   // Keyframed zoom / position: follow the video's own clock.
   useEffect(() => {
-    if (!fullAdjust(adjust).keys.length) return;
+    if (!playing || !fullAdjust(adjust).keys.length) return;
     let raf = 0;
     const frame = () => {
       const v = ref.current;
@@ -2459,20 +2501,20 @@ function TrimmedVideo({ src, start, end, muted = false, adjust, rate = 1 }: { sr
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [adjust]);
+  }, [adjust, playing]);
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
     v.playbackRate = rate;
     if (v.currentTime < start || v.currentTime > end) v.currentTime = start;
-    void v.play().catch(() => undefined);
+    if (playing) void v.play().catch(() => undefined);
     const tick = () => {
       if (v.currentTime >= end || v.currentTime < start) v.currentTime = start;
     };
     v.addEventListener("timeupdate", tick);
     return () => v.removeEventListener("timeupdate", tick);
-  }, [start, end, rate]);
-  return <video ref={ref} src={src} autoPlay muted={muted} loop playsInline className="absolute inset-0 h-full w-full object-cover" style={style} />;
+  }, [start, end, rate, playing]);
+  return <video ref={ref} src={src} autoPlay={playing} muted={muted} loop playsInline onTimeUpdate={(e) => onTime?.(e.currentTarget.currentTime)} className="absolute inset-0 h-full w-full object-cover" style={style} />;
 }
 
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${(sec % 60).toFixed(1).padStart(4, "0")}`;
@@ -2628,7 +2670,12 @@ function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, 
             <span
               key={k.i}
               role="button"
+              tabIndex={0}
               aria-label={`Keyframe at ${k.at.toFixed(1)}s`}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onSeek(k.at); }
+                if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); onKeyMove(k.i, Math.max(0, Math.min(len, k.at + (e.key === "ArrowRight" ? 0.1 : -0.1)))); }
+              }}
               title="Click to jump, drag to move"
               onPointerDown={(e) => dragKey(e, k)}
               className={`absolute top-1/2 z-20 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 cursor-pointer touch-none rounded-[2px] border-[1.5px] border-ink ${Math.abs(k.at - t) < 0.06 ? "bg-ink" : "bg-white"}`}
@@ -3217,7 +3264,7 @@ function HookPreview({ r, onClose, onUse }: { r: Reference; onClose: () => void;
   ].filter((s) => s.value);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" onClick={onClose}>
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" onClick={onClose}>
       <div className="fade-in flex max-h-[94vh] w-full max-w-[880px] overflow-hidden rounded-2xl bg-panel shadow-[0_24px_64px_rgba(0,0,0,0.35)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex w-[400px] shrink-0 justify-center bg-raised">
           <iframe src={embedUrl(r) ?? undefined} title={r.title} className="h-[min(760px,94vh)] w-[400px] border-0" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />

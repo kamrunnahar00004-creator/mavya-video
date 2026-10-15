@@ -46,10 +46,40 @@ export async function clipFromAsset(asset: { mediaId: string; name: string; kind
   return { mediaId: asset.mediaId, name: asset.name, kind: asset.kind, offset: 0, length: asset.kind === "video" ? await videoLength(asset.mediaId) : null };
 }
 
-export async function patchRun(id: string, patch: Partial<Run>): Promise<Run | null> {
-  const res = await fetch(`/api/runs/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
-  return res.ok ? ((await res.json()) as Run) : null;
+type PendingSave = { patch: Partial<Run>; timer: ReturnType<typeof setTimeout>; done: ((run: Run | null) => void)[] };
+const pendingSaves = new Map<string, PendingSave>();
+const saveChains = new Map<string, Promise<Run | null>>();
+
+function flushRun(id: string) {
+  const pending = pendingSaves.get(id);
+  if (!pending) return;
+  clearTimeout(pending.timer);
+  pendingSaves.delete(id);
+  const operation = (saveChains.get(id) ?? Promise.resolve(null)).then(async () => {
+    try {
+      const res = await fetch(`/api/runs/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(pending.patch), keepalive: true });
+      return res.ok ? ((await res.json()) as Run) : null;
+    } catch { return null; }
+  });
+  saveChains.set(id, operation);
+  void operation.then((run) => {
+    pending.done.forEach((resolve) => resolve(run));
+    if (saveChains.get(id) === operation) saveChains.delete(id);
+  });
 }
+
+/** Keep live edits immediate, merge input bursts, and send writes in order per run. */
+export function patchRun(id: string, patch: Partial<Run>): Promise<Run | null> {
+  return new Promise((resolve) => {
+    const previous = pendingSaves.get(id);
+    if (previous) clearTimeout(previous.timer);
+    pendingSaves.set(id, { patch: { ...previous?.patch, ...patch }, done: [...(previous?.done ?? []), resolve], timer: setTimeout(() => flushRun(id), 250) });
+  });
+}
+
+if (typeof window !== "undefined") window.addEventListener("pagehide", () => {
+  for (const id of pendingSaves.keys()) flushRun(id);
+});
 
 const DEFAULT_SUGGESTION: Record<Slot["role"], string> = {
   hook: "Reaction to camera, big text on screen",
