@@ -340,7 +340,7 @@ export function RunView() {
 
   return (
     <div className="card flex h-full flex-col overflow-hidden">
-      <header className="flex items-center gap-3 border-b border-line px-5 py-3">
+      <header className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3">
         <Link href="/studio" className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-muted hover:bg-raised hover:text-text">
           <ArrowLeft className="h-4 w-4" />
           Videos
@@ -391,8 +391,8 @@ export function RunView() {
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_400px]">
-        <div className="min-h-0 overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:grid xl:grid-cols-[minmax(0,1fr)_400px] xl:overflow-hidden">
+        <div className="shrink-0 xl:min-h-0 xl:overflow-y-auto">
           <div className="mx-auto max-w-[760px] divide-y divide-line px-8">
             <Block n={1} title="Steal a hook that already works" done={stepDone[0]} open={openSteps.includes(1)} summary={stepSummary[0]} onToggle={() => toggleStep(1)}>
               {!source && hook.source === "describe" && hook.describeReady && hook.describe?.trim() ? (
@@ -603,7 +603,7 @@ export function RunView() {
           </div>
         </div>
 
-        <aside className="flex min-h-0 flex-col items-center justify-center overflow-y-auto border-l border-line bg-raised p-6">
+        <aside className="flex shrink-0 flex-col items-center justify-center border-l border-line bg-raised p-6 xl:min-h-0 xl:overflow-y-auto">
           <RunPreview run={run} source={source} texts={texts} />
         </aside>
       </div>
@@ -1132,9 +1132,9 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
   const span: [number, number] = [round1(offset), round1(offset + len)];
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-[300px_minmax(0,1fr)] items-start gap-4">
-        <div className="space-y-2">
+    <div className="@container space-y-3">
+      <div className="grid grid-cols-1 items-start gap-4 @min-[600px]:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="w-full max-w-[300px] space-y-2">
           <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl border border-line bg-raised [container-type:size]">
             {cover ??
               (live && seg.src ? (
@@ -1329,9 +1329,9 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   return (
     <div ref={scope} tabIndex={-1} onPointerDownCapture={(e) => {
       if (!(e.target as HTMLElement).closest('input, textarea, select, button, a, [contenteditable]')) scope.current?.focus({ preventScroll: true });
-    }} className="space-y-4 outline-none">
-      <div className="grid grid-cols-[300px_minmax(0,1fr)] items-start gap-4">
-      <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl border border-line bg-[#14121f] [container-type:size]">
+    }} className="@container space-y-4 outline-none">
+      <div className="grid grid-cols-1 items-start gap-4 @min-[600px]:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="relative aspect-[9/16] w-full max-w-[300px] overflow-hidden rounded-2xl border border-line bg-[#14121f] [container-type:size]">
         {seg.src ? (
           <>
             <WarmthFilter adjust={seg.editable ? seg.adjust : null} />
