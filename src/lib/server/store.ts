@@ -33,27 +33,38 @@ function kindOf(mime: string): Asset["kind"] {
   return mime.startsWith("image/") ? "image" : mime.startsWith("audio/") ? "audio" : "video";
 }
 
+let cached: { stamp: string; db: Db } | null = null;
 async function readDb(): Promise<Db> {
   try {
+    const info = await stat(DB_FILE);
+    const stamp = `${info.mtimeMs}:${info.ctimeMs}:${info.size}`;
+    if (cached?.stamp === stamp) return cached.db;
     const db = JSON.parse(await readFile(DB_FILE, "utf8")) as Partial<Db>;
-    return { references: db.references ?? [], runs: db.runs ?? [], assets: db.assets ?? [] };
-  } catch {
-    return { references: [], runs: [], assets: [] };
+    if (!Array.isArray(db.references) || !Array.isArray(db.runs) || !Array.isArray(db.assets)) throw new Error("Invalid local database");
+    const result = { references: db.references, runs: db.runs, assets: db.assets };
+    cached = { stamp, db: result };
+    return result;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { references: [], runs: [], assets: [] };
+    throw error;
   }
 }
 
 let writing: Promise<void> = Promise.resolve();
 async function writeDb(update: (db: Db) => void): Promise<void> {
   // Serialize writes so two requests never interleave on db.json.
-  writing = writing.then(async () => {
+  const operation = writing.then(async () => {
     await mkdir(DATA_DIR, { recursive: true });
-    const db = await readDb();
+    // Never mutate the cached snapshot before the atomic replacement succeeds.
+    const db = structuredClone(await readDb());
     update(db);
     const tmp = `${DB_FILE}.tmp`;
     await writeFile(tmp, JSON.stringify(db, null, 2));
     await rename(tmp, DB_FILE);
+    cached = null;
   });
-  await writing;
+  writing = operation.catch(() => undefined);
+  await operation;
 }
 
 const newest = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);

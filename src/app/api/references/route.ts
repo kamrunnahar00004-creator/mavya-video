@@ -6,9 +6,17 @@ import type { Platform } from "@/lib/types";
 const PLATFORMS = new Set<Platform>(["tiktok", "instagram", "youtube", "other"]);
 const pick = <T extends readonly string[]>(list: T, v: unknown) => (typeof v === "string" && (list as readonly string[]).includes(v) ? v : undefined);
 
-export async function GET() {
+export async function GET(request: Request) {
   await connection();
-  return Response.json(await listReferences());
+  const refs = await listReferences();
+  const view = new URL(request.url).searchParams.get("view");
+  if (view === "covers") return Response.json(refs.map((r) => ({ id: r.id, thumbUrl: r.analysis?.segments[0]?.thumb ?? r.thumbUrl })));
+  if (view === "studio") {
+    // Curation history and model explanations never appear in the studio.
+    const keys = ["id", "title", "platform", "sourceUrl", "views", "mediaId", "mime", "createdAt", "analysis", "owner", "niche", "hookStyle", "thumbUrl", "author", "likes", "comments", "caption", "summary", "recipe", "postedAt", "pending", "review", "followers"] as const;
+    return Response.json(refs.map((r) => ({ ...Object.fromEntries(keys.map((k) => [k, r[k]])), ai: r.ai ? { style: r.ai.style } : undefined })));
+  }
+  return Response.json(refs);
 }
 
 /** Add a video file as a reference. `owner: "curated"` puts it in the hook library (curator only). */

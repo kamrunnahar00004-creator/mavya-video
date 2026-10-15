@@ -80,7 +80,7 @@ export function RunsList() {
       .then((r) => r.json())
       .then((data: Run[]) => alive && setRuns(data))
       .catch(() => alive && setRuns([]));
-    fetch("/api/references")
+    fetch("/api/references?view=covers")
       .then((r) => r.json())
       .then((data: Reference[]) => alive && setRefs(Object.fromEntries(data.map((x) => [x.id, x]))))
       .catch(() => undefined);
