@@ -1,30 +1,37 @@
 @import "tailwindcss";
 
 /*
- * Design system matched to hooked.so's live tokens (extracted from their CSS):
- * Satoshi type, slate text, cool light canvas, white cards with #e1e2ec
- * hairlines, solid violet primary with a 2px ink border and hard offset shadow,
- * yellow as the secondary accent. No gradient buttons.
+ * Mavya studio. Neutral off-white ground, true-black ink, one accent (Mavya violet, the founder's pick)
+ * only on the main action and the active state.
+ * The primary button keeps its ink border and hard shadow (brand signature); everything else is flat.
+ * Cool greys with a faint violet cast, so the accent belongs to them.
+ * One analogous family around the violet: blue on its cool side, magenta on its warm side.
+ * Timeline tracks use them, like an editor: video in ink, text in blue, sound in magenta.
+ * Red only for errors and deleting.
  */
 :root {
-  --bg: #f2f3f8;
+  --bg: #f3f3f8;
   --panel: #ffffff;
-  --raised: #f6f6fb;
-  --hover: #e8eaf4;
-  --line: #e1e2ec;
-  --line-strong: #cdceda;
-  --text: #0f172a;
-  --muted: #475569;
-  --soft: #94a3b8;
+  --raised: #f7f7fb;
+  --hover: #ebeaf3;
+  --line: #e3e2ec;
+  --line-strong: #cfcedb;
+  --text: #15121f;
+  --muted: #4d4a5e;
+  --soft: #928fa6;
   --accent: #7b4cfa;
-  --accent-hover: #6d28d9;
-  --accent-active: #5b21b6;
+  --accent-hover: #6d3ef0;
+  --accent-active: #5b2fd6;
   --accent-ink: #ffffff;
-  --accent-tint: #7b4cfa1a;
-  --accent-line: #7b4cfa73;
-  --ink: #14101f;
+  --accent-tint: #7b4cfa17;
+  --accent-line: #7b4cfa66;
+  --ink: #15121f;
   --deep: #2e1065;
   --yellow: #ffc700;
+  --text-track: #2a5bd7;
+  --text-track-tint: #e2ebfd;
+  --sound-track: #b02f86;
+  --sound-track-tint: #f9e3f1;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -46,6 +53,10 @@
   --color-ink: var(--ink);
   --color-deep: var(--deep);
   --color-yellow: var(--yellow);
+  --color-texttrack: var(--text-track);
+  --color-texttrack-tint: var(--text-track-tint);
+  --color-soundtrack: var(--sound-track);
+  --color-soundtrack-tint: var(--sound-track-tint);
   --font-sans: var(--font-satoshi);
   --font-mono: var(--font-geist-mono);
 }
@@ -92,7 +103,7 @@ input[type="range"] {
   outline-offset: 2px;
 }
 
-/* Hooked's primary: solid violet, 2px ink border, hard offset shadow that presses in. */
+/* Primary action (the founder's signature): violet, 2px ink border, hard offset shadow that presses in. */
 @utility btn-primary {
   display: inline-flex;
   align-items: center;
@@ -102,7 +113,7 @@ input[type="range"] {
   border: 2px solid var(--ink);
   background: var(--accent);
   color: #ffffff;
-  font-weight: 600;
+  font-weight: 700;
   box-shadow: 3px 3px 0 var(--ink);
   transition: transform 100ms ease-out, box-shadow 100ms ease-out, background 150ms ease-out;
   &:hover {
@@ -123,7 +134,6 @@ input[type="range"] {
   border-radius: 16px;
   border: 1px solid var(--line);
   background: var(--panel);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 /* Two stacked range inputs act as one start/end slider; only the thumbs take clicks. */
@@ -138,7 +148,6 @@ input[type="range"] {
   border-radius: 999px;
   background: #ffffff;
   border: 2px solid var(--ink);
-  box-shadow: 2px 2px 0 var(--ink);
   cursor: grab;
 }
 .range-thumb::-moz-range-thumb {
@@ -171,7 +180,7 @@ input[type="range"] {
   to { background-position: 200% 0; }
 }
 .shimmer {
-  background: linear-gradient(90deg, #eceef5 0%, #f6f6fb 50%, #eceef5 100%);
+  background: linear-gradient(90deg, #ebeaf3 0%, #f7f7fb 50%, #ebeaf3 100%);
   background-size: 200% 100%;
   animation: shimmer 1.2s linear infinite;
 }

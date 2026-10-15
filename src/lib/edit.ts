@@ -109,3 +109,11 @@ export function shotList(source: Reference | null): Omit<DemoClip, "id">[] {
     { label: "The result", target: 2, camera: "Slow push in", steps: ["Scroll the finished result", "End on the best part"], text: "how is this free 😭" },
   ];
 }
+
+/** The five steps of a video, done or not, in order (the run page and the videos grid both use this). */
+export function runSteps(run: Run): boolean[] {
+  const h = run.hook;
+  const hasDemo = demoClips(run).some((c) => c.mediaId);
+  const hasSound = Boolean(run.sound) || Boolean(run.sounds?.length);
+  return [Boolean(run.sourceRefId) || Boolean(h.source === "describe" && h.describeReady && h.describe?.trim()), Boolean(h.face), Boolean(h.generated), hasDemo, hasSound];
+}

@@ -161,7 +161,7 @@ export function RunView() {
     const nextTexts = base && !keep && stolen ? texts.map((x) => (x.id === "hook" ? { ...x, text: stolen } : x)) : texts;
     save({
       sourceRefId: ref.id,
-      title: run.title === "Untitled run" ? ref.title : run.title,
+      title: run.title === "Untitled run" || run.title === "Untitled video" ? (ref.author ? `Hook from @${ref.author}` : "Untitled video") : run.title,
       hook: { ...hook, source: from, start: seg?.start ?? 0, end: seg?.end ?? 3, clip: hook.face ? null : hook.clip, text: keep || !stolen ? hook.text : stolen },
       texts: nextTexts,
     });
@@ -191,10 +191,10 @@ export function RunView() {
   const toggleStep = (n: number) => setPicked(openSteps.includes(n) ? openSteps.filter((x) => x !== n) : [...openSteps, n]);
   const faceName = hook.face?.kind === "character" ? characterById(hook.face.id)?.name : hook.face?.kind === "photo" ? "Your photo" : hook.face?.kind === "described" ? hook.face.text : undefined;
   const stepSummary = [
-    source?.title ?? (hook.source === "describe" && hook.describeReady ? hook.describe : undefined),
+    (source ? (source.author ? `Hook from @${source.author}` : source.title) : undefined) ?? (hook.source === "describe" && hook.describeReady ? hook.describe : undefined),
     faceName,
     hook.generated ? "Hook ready" : undefined,
-    hasDemo ? (run.demo.mode === "clips" ? `${demoClips(run).filter((c) => c.mediaId).length} clips` : "Demo added") : undefined,
+    hasDemo ? (run.demo.mode === "clips" ? `${demoClips(run).filter((c) => c.mediaId).length} ${demoClips(run).filter((c) => c.mediaId).length === 1 ? "clip" : "clips"}` : "Demo added") : undefined,
     soundPieces(run, videoLen).length > 1 ? `${soundPieces(run, videoLen).length} sounds` : soundPieces(run, videoLen)[0]?.name,
   ];
 
@@ -319,9 +319,9 @@ export function RunView() {
       <header className="flex items-center gap-3 border-b border-line px-5 py-3">
         <Link href="/studio" className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-muted hover:bg-raised hover:text-text">
           <ArrowLeft className="h-4 w-4" />
-          Runs
+          Videos
         </Link>
-        <TitleInput value={run.title} onSave={(title) => save({ title })} />
+        <TitleInput value={run.title === "Untitled run" ? "Untitled video" : run.title} onSave={(title) => save({ title })} />
         <button type="button" onClick={() => setLibraryOpen(true)} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-muted hover:bg-raised hover:text-text">
           <FolderOpen className="h-4 w-4" />
           My files
@@ -333,10 +333,21 @@ export function RunView() {
             await fetch(`/api/runs/${run.id}`, { method: "DELETE" });
             router.push("/studio");
           }}
-          className="rounded-lg p-2 text-soft hover:bg-red-500/10 hover:text-red-500"
-          aria-label="Delete run"
+          className="rounded-lg p-2 text-soft hover:bg-raised hover:text-text"
+          aria-label="Delete video"
+          title="Delete video"
         >
           <Trash2 className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          disabled={!ready}
+          title={ready ? undefined : "Generate the hook and add a demo first"}
+          onClick={() => setToast("Rendering is not connected yet.")}
+          className="btn-primary ml-1 px-4 py-2 text-[14px]"
+        >
+          <Download className="h-4 w-4" />
+          Export
         </button>
       </header>
 
@@ -507,9 +518,15 @@ export function RunView() {
                 run={run}
                 segs={segs}
                 renderEditor={clipEditor}
-                onFiles={addVideos}
+                onFiles={async (files) => {
+                  setPicked((p) => Array.from(new Set([...(p ?? openSteps), 4])));
+                  await addVideos(files);
+                }}
                 onClips={() => save({ demo: { ...run.demo, mode: "clips", clips: shotList(source).map((x) => ({ ...x, id: uid() })) } })}
-                onUpload={(cid, f) => fillClip(cid, f)}
+                onUpload={async (cid, f) => {
+                  setPicked((p) => Array.from(new Set([...(p ?? openSteps), 4])));
+                  await fillClip(cid, f);
+                }}
                 onRename={(cid, label) => save({ demo: { ...run.demo, clips: demoClips(run).map((c) => (c.id === cid ? { ...c, label } : c)) } })}
                 onDelete={deleteClip}
                 onReset={resetDemo}
@@ -564,14 +581,8 @@ export function RunView() {
           </div>
         </div>
 
-        <aside className="flex min-h-0 flex-col items-center gap-4 overflow-y-auto border-l border-line bg-raised/50 p-6">
+        <aside className="flex min-h-0 flex-col items-center justify-center overflow-y-auto border-l border-line bg-raised p-6">
           <RunPreview run={run} source={source} texts={texts} />
-          <div className="w-full max-w-[300px]">
-            <button type="button" disabled={!ready} onClick={() => setToast("Rendering is not connected yet.")} className="btn-primary w-full py-3 text-[15px]">
-              <Download className="h-4 w-4" />
-              Export video
-            </button>
-          </div>
         </aside>
       </div>
 
@@ -790,7 +801,7 @@ function CharacterBrowser({ current, onPick, onClose }: { current: Hook["face"] 
                   key={c.id}
                   type="button"
                   onClick={() => setViewing(i)}
-                  className={`group relative aspect-[3/4] overflow-hidden rounded-xl border-2 transition-[border-color,box-shadow] ${on ? "border-ink shadow-[3px_3px_0_var(--ink)]" : "border-transparent hover:border-ink hover:shadow-[3px_3px_0_var(--ink)]"}`}
+                  className={`group relative aspect-[3/4] overflow-hidden rounded-xl border-2 transition-[border-color,box-shadow] ${on ? "border-accent" : "border-transparent hover:border-line-strong"}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={c.thumb} alt={c.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover object-top" />
@@ -814,7 +825,7 @@ function CharacterBrowser({ current, onPick, onClose }: { current: Hook["face"] 
           </button>
           <div className="fade-in flex max-h-full flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={shown.src} alt={shown.name} className="max-h-[calc(100vh-160px)] rounded-2xl border-2 border-ink object-contain shadow-[6px_6px_0_var(--ink)]" />
+            <img src={shown.src} alt={shown.name} className="max-h-[calc(100vh-160px)] rounded-2xl object-contain shadow-[0_24px_64px_rgba(0,0,0,0.35)]" />
             <div className="flex items-center gap-3">
               <span className="text-[18px] font-extrabold text-white">{shown.name}</span>
               <button type="button" onClick={() => onPick(shown.id)} className="btn-primary px-5 py-2.5 text-[14px]">
@@ -931,7 +942,7 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
                 void generate(fix);
               }}
               onKeyDown={(e) => e.key === "Escape" && setRegen(false)}
-              className="fade-in absolute inset-x-2 top-11 z-30 rounded-xl border-2 border-ink bg-panel p-2 shadow-[4px_4px_0_var(--ink)]"
+              className="fade-in absolute inset-x-2 top-11 z-30 rounded-xl border border-line bg-panel p-2 shadow-[0_12px_32px_rgba(0,0,0,0.18)]"
             >
               <textarea
                 autoFocus
@@ -1181,7 +1192,7 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
 
       {full && live && seg.src && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-6" onClick={() => setFull(false)}>
-          <div className="fade-in relative aspect-[9/16] h-[min(86vh,900px)] overflow-hidden rounded-2xl border-2 border-ink bg-black shadow-[6px_6px_0_var(--ink)] [container-type:size]" onClick={(e) => e.stopPropagation()}>
+          <div className="fade-in relative aspect-[9/16] h-[min(86vh,900px)] overflow-hidden rounded-2xl bg-black shadow-[0_24px_64px_rgba(0,0,0,0.35)] [container-type:size]" onClick={(e) => e.stopPropagation()}>
             <WarmthFilter adjust={seg.adjust} />
             <TrimmedVideo src={seg.src} start={base} end={base + fileLen} rate={speed} adjust={seg.adjust} />
             {local.filter((x) => x.text.trim()).map((x) => <TextOverlay key={x.id} x={x} onMove={(pos) => onPatch(x.id, pos)} />)}
@@ -1437,7 +1448,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
         <button type="button" onClick={onPlay} title="Play / pause (Space)" className="btn-primary h-7 w-7 rounded-full p-0" aria-label={playing ? "Pause" : "Play"}>
           {playing ? <Pause className="h-3.5 w-3.5" fill="currentColor" /> : <Play className="ml-0.5 h-3.5 w-3.5" fill="currentColor" />}
         </button>
-        <span className="whitespace-nowrap font-mono text-[11.5px] tabular-nums text-muted">
+        <span className="whitespace-nowrap text-[12.5px] tabular-nums text-muted">
           {clock(t)} / {clock(total)}
         </span>
         <div className="ml-auto flex items-center">
@@ -1463,7 +1474,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
             <div
               key={x.id}
               title={x.label}
-              className={`flex min-w-0 items-center border-white px-1.5 ${i ? "border-l-2" : ""} ${x.id === "hook" ? "bg-accent text-accent-ink" : !x.src ? "bg-hover text-soft" : i % 2 ? "bg-[#dcdcea] text-text" : "bg-[#cfcfe2] text-text"}`}
+              className={`flex min-w-0 items-center border-white px-1.5 ${i ? "border-l-2" : ""} ${x.id === "hook" ? "bg-[#221d33] text-white" : !x.src ? "bg-hover text-soft" : i % 2 ? "bg-[#dfdde9] text-text" : "bg-[#d2d0df] text-text"}`}
               style={{ width: pct(x.len) }}
             >
               <span className="truncate">{x.id === "hook" ? "Hook" : x.src ? x.label : "Demo"}</span>
@@ -1475,7 +1486,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
           <div className="mt-1 space-y-1">
             {texts.map((x) => (
               <div key={x.id} className="relative h-5 cursor-pointer rounded-md bg-raised/70" onPointerDown={seek}>
-                <div className="absolute inset-y-0 flex items-center gap-1 overflow-hidden rounded-md bg-accent-tint px-1.5 text-[10px] font-semibold text-accent" style={{ left: pct(x.start), width: `calc(${pct(x.end)} - ${pct(x.start)})` }}>
+                <div className="absolute inset-y-0 flex items-center gap-1 overflow-hidden rounded-md bg-texttrack-tint px-1.5 text-[10px] font-semibold text-texttrack" style={{ left: pct(x.start), width: `calc(${pct(x.end)} - ${pct(x.start)})` }}>
                   <Type className="h-3 w-3 shrink-0" />
                   <span className="truncate">{x.text}</span>
                 </div>
@@ -1510,7 +1521,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
                   onSelect(p.id);
                   moveSound(e, i);
                 }}
-                className={`absolute inset-y-0 flex cursor-grab touch-none items-center gap-1.5 overflow-hidden rounded-md px-4 text-[10.5px] font-bold active:cursor-grabbing ${joinL ? "rounded-l-none" : ""} ${joinR ? "rounded-r-none border-r border-white" : ""} ${on ? "bg-accent text-accent-ink" : "bg-accent-tint text-accent hover:bg-[#e2d8ff]"}`}
+                className={`absolute inset-y-0 flex cursor-grab touch-none items-center gap-1.5 overflow-hidden rounded-md px-4 text-[10.5px] font-bold active:cursor-grabbing ${joinL ? "rounded-l-none" : ""} ${joinR ? "rounded-r-none border-r border-white" : ""} ${on ? "bg-soundtrack text-white" : "bg-soundtrack-tint text-soundtrack hover:bg-[#f3cfe6]"}`}
                 style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})` }}
               >
                 <Music className="h-3.5 w-3.5 shrink-0" />
@@ -1676,51 +1687,42 @@ function SoundStep({ run, source, segs, texts, videoLen, onPieces }: {
     put(pieces.map((p) => (p.id === id ? { ...p, start: Math.max(0, round1(p.start + (at - p.at))), at, end } : p)));
   }
 
+  // Three ways to pick a sound, stacked to fit the narrow column: the main one full width, the other two side by side.
+  const secondary = "flex items-center justify-center gap-1.5 rounded-md border border-line-strong bg-panel px-3 py-2.5 text-[13.5px] font-semibold text-text hover:border-accent hover:text-accent";
   const chooser = (
-    <div className="rounded-2xl border border-line bg-panel">
+    <div className="space-y-2.5 rounded-2xl border border-line bg-panel p-4">
       {(adding || changing) && (
-        <div className="px-4 pt-3 text-[13px] font-semibold text-soft">
-          {adding ? `New sound from ${fmtTime(adding.at)} to ${fmtTime(adding.end)}` : `Change "${sel?.name ?? "sound"}"`}
-        </div>
-      )}
-      <div className="flex flex-wrap items-center gap-3 px-4 py-3 text-[13.5px] text-soft">
-        {hookSrc ? (
-          <>
-            <button type="button" disabled={Boolean(busy)} onClick={() => source && void pick("hook", hookSrc, soundName(source), source.id)} className="btn-primary px-4 py-2.5 text-[14px] disabled:opacity-60">
-              {busy === "hook" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Use the hook's sound"}
-            </button>
-            or
-            <button type="button" onClick={() => setBrowsing(true)} className="font-semibold text-muted underline-offset-4 hover:text-accent hover:underline">
-              Browse songs
-            </button>
-            <span aria-hidden>·</span>
-          </>
-        ) : (
-          <>
-            <button type="button" onClick={() => setBrowsing(true)} className="btn-primary px-4 py-2.5 text-[14px]">
-              Browse songs
-            </button>
-            or
-          </>
-        )}
-        <label className={`cursor-pointer font-semibold text-muted underline-offset-4 hover:text-accent hover:underline ${busy ? "pointer-events-none opacity-60" : ""}`}>
-          {busy === "upload" ? "Uploading..." : "Upload your own"}
-          <input type="file" accept="audio/*,video/*" className="hidden" onChange={(e) => void upload(e.target.files?.[0]).then(() => (e.target.value = ""))} />
-        </label>
-        {(adding || changing) && (
+        <div className="flex items-center justify-between">
+          <span className="text-[13.5px] font-semibold text-muted">{adding ? `New sound from ${fmtTime(adding.at)} to ${fmtTime(adding.end)}` : `Change "${sel?.name ?? "sound"}"`}</span>
           <button
             type="button"
             onClick={() => {
               setAdding(null);
               setChanging(false);
             }}
-            className="ml-auto rounded-lg px-2 py-1.5 text-[13px] font-semibold text-soft hover:text-text"
+            className="rounded-md px-2 py-1 text-[13px] font-semibold text-soft hover:bg-raised hover:text-text"
           >
             Cancel
           </button>
-        )}
+        </div>
+      )}
+      {hookSrc && (
+        <button type="button" disabled={Boolean(busy)} onClick={() => source && void pick("hook", hookSrc, soundName(source), source.id)} className="btn-primary w-full px-4 py-2.5 text-[14px] disabled:opacity-60">
+          {busy === "hook" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Use the hook's sound"}
+        </button>
+      )}
+      <div className="grid grid-cols-2 gap-2.5">
+        <button type="button" onClick={() => setBrowsing(true)} className={hookSrc ? secondary : `btn-primary px-3 py-2.5 text-[13.5px]`}>
+          <Music className="h-4 w-4" />
+          Browse songs
+        </button>
+        <label className={`${secondary} cursor-pointer ${busy ? "pointer-events-none opacity-60" : ""}`}>
+          {busy === "upload" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          {busy === "upload" ? "Uploading..." : "Upload your own"}
+          <input type="file" accept="audio/*,video/*" className="hidden" onChange={(e) => void upload(e.target.files?.[0]).then(() => (e.target.value = ""))} />
+        </label>
       </div>
-      {error && <p className="border-t border-line px-4 py-2.5 text-[13px] font-semibold text-red-600">{error}</p>}
+      {error && <p className="text-[13px] font-semibold text-red-600">{error}</p>}
     </div>
   );
 
@@ -1734,7 +1736,7 @@ function SoundStep({ run, source, segs, texts, videoLen, onPieces }: {
       ) : sel ? (
       <div className="rounded-2xl border border-line bg-panel">
         <div className="flex items-center gap-3 px-4 py-3.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-tint text-accent">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-soundtrack-tint text-soundtrack">
             <Music className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
@@ -1865,10 +1867,10 @@ function SoundPart({ src, length, start, span, onChange }: { src: string; length
         className={`relative flex h-14 touch-none select-none items-center gap-[2px] ${movable ? "cursor-grab active:cursor-grabbing" : ""}`}
       >
         {(peaks ?? Array.from({ length: BARS }, () => 0.2)).map((h, i) => (
-          <span key={i} className={`flex-1 rounded-full ${inWin(i) ? "bg-accent" : "bg-accent/20"}`} style={{ height: `${h * 100}%` }} />
+          <span key={i} className={`flex-1 rounded-full ${inWin(i) ? "bg-soundtrack" : "bg-soundtrack/20"}`} style={{ height: `${h * 100}%` }} />
         ))}
         {/* the part that plays */}
-        <span className="pointer-events-none absolute inset-y-0 rounded-lg border-2 border-accent" style={{ left: `${(from / total) * 100}%`, width: `${(win / total) * 100}%` }} />
+        <span className="pointer-events-none absolute inset-y-0 rounded-lg border-2 border-soundtrack" style={{ left: `${(from / total) * 100}%`, width: `${(win / total) * 100}%` }} />
       </div>
       <div className="mt-1.5 flex justify-between text-[13px] tabular-nums text-soft">
         <span>
@@ -2303,9 +2305,9 @@ function AdvancedSettings({ value, disabled, onChange, motion, keyOn, onMotion, 
                       step={r.step}
                       value={r.key === "zoom" ? Math.round(n) : n}
                       onChange={(e) => set(r.key, Number(e.target.value))}
-                      className={`w-14 rounded-lg border border-line bg-raised py-1 text-center font-mono text-[12.5px] tabular-nums outline-none focus:border-accent ${r.key === "speed" ? "pl-1 pr-3.5" : "px-2"}`}
+                      className={`w-14 rounded-lg border border-line bg-raised py-1 text-center text-[13px] tabular-nums outline-none focus:border-accent ${r.key === "speed" ? "pl-1 pr-3.5" : "px-2"}`}
                     />
-                    {r.key === "speed" && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[12px] text-soft">x</span>}
+                    {r.key === "speed" && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[12.5px] text-soft">x</span>}
                   </span>
                   {r.key === "zoom" ? (
                     <button
@@ -2573,7 +2575,7 @@ function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, 
         <button type="button" onClick={onPlay} className="btn-primary h-7 w-7 rounded-full p-0" aria-label={playing ? "Pause" : "Play"}>
           {playing ? <Pause className="h-3.5 w-3.5" fill="currentColor" /> : <Play className="ml-0.5 h-3.5 w-3.5" fill="currentColor" />}
         </button>
-        <span className="font-mono text-[11.5px] tabular-nums text-muted">
+        <span className="text-[12.5px] tabular-nums text-muted">
           {clock(t)} / {clock(len)}
         </span>
         <div className="ml-auto flex items-center gap-1">
@@ -2603,7 +2605,7 @@ function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, 
         </div>
         <div className="relative h-9 cursor-pointer overflow-hidden rounded-md bg-[repeating-linear-gradient(135deg,var(--raised),var(--raised)_4px,var(--line)_4px,var(--line)_6px)]" onPointerDown={(e) => track(e, onSeek)}>
           {/* kept part */}
-          <div className="absolute inset-y-0 flex items-center bg-accent px-4 text-[10.5px] font-bold text-accent-ink" style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})` }}>
+          <div className="absolute inset-y-0 flex items-center bg-[#221d33] px-4 text-[10.5px] font-bold text-white" style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})` }}>
             <span className="truncate">{label}</span>
           </div>
           {keys.map((k) => (
@@ -2649,16 +2651,16 @@ function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, 
                 <div
                   onPointerDown={(e) => dragText(e, x, "move")}
                   title="Drag to move. Drag the ends to make it longer or shorter."
-                  className={`group absolute inset-y-0 flex cursor-grab touch-none items-center gap-1 overflow-hidden rounded-md bg-accent-tint px-3.5 text-[10.5px] font-semibold text-accent active:cursor-grabbing ${x.start <= 0.05 && x.end >= len - 0.05 ? "ring-1 ring-inset ring-accent" : ""}`}
+                  className={`group absolute inset-y-0 flex cursor-grab touch-none items-center gap-1 overflow-hidden rounded-md bg-texttrack-tint px-3.5 text-[10.5px] font-semibold text-texttrack active:cursor-grabbing ${x.start <= 0.05 && x.end >= len - 0.05 ? "ring-1 ring-inset ring-texttrack" : ""}`}
                   style={{ left: pct(Math.min(x.start, len)), width: pct(Math.max(0, Math.min(x.end, len) - Math.min(x.start, len))) }}
                 >
                   <Type className="h-3 w-3 shrink-0" />
                   <span className="truncate">{x.text.trim() || (i === 0 ? "Hook text" : "More text")}</span>
                   {/* Clear end caps (purple, unlike the clip trimmer's black ones) so the start and end are easy to grab and to line up. */}
-                  <span aria-label="Text start" onPointerDown={(e) => dragText(e, x, "left")} className="absolute inset-y-0 left-0 flex w-2.5 cursor-ew-resize touch-none items-center justify-center rounded-l-md bg-accent">
+                  <span aria-label="Text start" onPointerDown={(e) => dragText(e, x, "left")} className="absolute inset-y-0 left-0 flex w-2.5 cursor-ew-resize touch-none items-center justify-center rounded-l-md bg-texttrack">
                     <span className="h-2.5 w-px rounded-full bg-white" />
                   </span>
-                  <span aria-label="Text end" onPointerDown={(e) => dragText(e, x, "right")} className="absolute inset-y-0 right-0 flex w-2.5 cursor-ew-resize touch-none items-center justify-center rounded-r-md bg-accent">
+                  <span aria-label="Text end" onPointerDown={(e) => dragText(e, x, "right")} className="absolute inset-y-0 right-0 flex w-2.5 cursor-ew-resize touch-none items-center justify-center rounded-r-md bg-texttrack">
                     <span className="h-2.5 w-px rounded-full bg-white" />
                   </span>
                 </div>
@@ -2699,7 +2701,7 @@ function GenerateProgress({ photo, who, startedAt, estimate }: { photo: string |
       <div className="absolute inset-x-3 bottom-3 rounded-xl bg-black/70 p-3 text-white backdrop-blur-sm">
         <div className="flex items-baseline justify-between gap-2">
           <span key={stage} className="fade-in text-[13px] font-bold">{stage}</span>
-          <span className="font-mono text-[12px] tabular-nums text-white/80">{clock}</span>
+          <span className="text-[12.5px] tabular-nums text-white/80">{clock}</span>
         </div>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15">
           <div className="h-full rounded-full bg-accent transition-[width] duration-200" style={{ width: `${progress * 100}%` }} />
@@ -2844,7 +2846,7 @@ function Block({ n, title, done, children, open = true, summary, onToggle }: { n
   return (
     <section className={open ? "space-y-4 py-6" : "py-4"}>
       <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-3 text-left">
-        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${done ? "bg-emerald-500 text-white" : open ? "bg-accent-tint text-accent" : "bg-raised text-soft"}`}>
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${done ? "bg-accent text-white" : open ? "bg-accent-tint text-accent" : "bg-raised text-soft"}`}>
           {done ? <Check className="h-4 w-4" strokeWidth={3} /> : n}
         </span>
         <h2 className={`shrink-0 text-[17px] font-extrabold tracking-tight ${open || done ? "text-text" : "text-soft"}`}>{title}</h2>
@@ -3103,7 +3105,7 @@ function HookCard({ r, busy, disabled, onPick }: { r: Reference; busy: boolean; 
       disabled={disabled}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className="group relative aspect-[9/16] overflow-hidden rounded-xl border-2 border-transparent bg-ink text-left transition-[border-color,box-shadow] hover:border-ink hover:shadow-[4px_4px_0_var(--ink)] disabled:opacity-60"
+      className="group relative aspect-[9/16] overflow-hidden rounded-xl bg-ink text-left outline-2 outline-offset-2 outline-transparent transition-[outline-color] hover:outline-accent disabled:opacity-60"
     >
       {r.mediaId && hover ? (
         <video src={`/api/media/${r.mediaId}`} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover" />
@@ -3133,7 +3135,7 @@ function HookCard({ r, busy, disabled, onPick }: { r: Reference; busy: boolean; 
         </div>
       </div>
       <span className="absolute inset-x-2 top-2 flex justify-center opacity-0 transition-opacity group-hover:opacity-100">
-        <span className="rounded-md border-2 border-ink bg-white px-2 py-0.5 text-[11.5px] font-bold text-ink">{busy ? "Loading..." : !r.mediaId && embedUrl(r) ? "Preview" : "Use this hook"}</span>
+        <span className="rounded-md bg-white px-2 py-0.5 text-[11.5px] font-bold text-ink">{busy ? "Loading..." : !r.mediaId && embedUrl(r) ? "Preview" : "Use this hook"}</span>
       </span>
     </button>
   );
@@ -3200,7 +3202,7 @@ function HookPreview({ r, onClose, onUse }: { r: Reference; onClose: () => void;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" onClick={onClose}>
-      <div className="fade-in flex max-h-[94vh] w-full max-w-[880px] overflow-hidden rounded-2xl border-2 border-ink bg-panel shadow-[6px_6px_0_var(--ink)]" onClick={(e) => e.stopPropagation()}>
+      <div className="fade-in flex max-h-[94vh] w-full max-w-[880px] overflow-hidden rounded-2xl bg-panel shadow-[0_24px_64px_rgba(0,0,0,0.35)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex w-[400px] shrink-0 justify-center bg-raised">
           <iframe src={embedUrl(r) ?? undefined} title={r.title} className="h-[min(760px,94vh)] w-[400px] border-0" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
         </div>
@@ -3366,7 +3368,7 @@ function HookTiming({ duration, start, end, onChange }: { duration: number; star
           />
         ))}
       </div>
-      <div className="mt-1 flex justify-between font-mono text-[11.5px] text-muted">
+      <div className="mt-1 flex justify-between text-[12px] tabular-nums text-muted">
         <span>{fmtTime(start)}</span>
         <span>{fmtTime(end)}</span>
       </div>

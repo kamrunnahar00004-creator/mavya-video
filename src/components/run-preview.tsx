@@ -364,7 +364,7 @@ export function TextOverlay({ x, onMove }: { x: TextLayer; onMove?: (p: { x?: nu
       )}
       {badge &&
         createPortal(
-          <span role="status" className="pointer-events-none fixed z-[100] rounded-md bg-ink px-1.5 py-0.5 font-mono text-[11.5px] font-bold tabular-nums text-white shadow" style={{ left: badge.left + 14, top: badge.top + 14 }}>
+          <span role="status" className="pointer-events-none fixed z-[100] rounded-md bg-ink px-1.5 py-0.5 text-[11.5px] font-bold tabular-nums text-white shadow" style={{ left: badge.left + 14, top: badge.top + 14 }}>
             Size {sizeLabel(badge.size)}
           </span>,
           document.body
