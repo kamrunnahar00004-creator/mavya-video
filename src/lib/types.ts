@@ -243,12 +243,8 @@ export type Run = {
     volume: number;
     length?: number;
   } | null;
-  /** Older split-sound runs (2026-10-15 only): the first piece is read as the main song. */
+  /** Current sound rows and split pieces. An explicit empty array means no sound. */
   sounds?: SoundPiece[];
-  /** Step 5: parts of the video (by timeline id: "hook" or a demo clip id) that play their own song instead of the main one. */
-  partSounds?: Record<string, PartSound>;
-  /** Step 5: parts with no music: "voice" plays the clip's own sound (someone talking), "mute" is silent. */
-  partModes?: Record<string, "voice" | "mute">;
   /** On-screen texts with timing. The one with id "hook" mirrors hook.text. Absent on older runs. */
   texts?: TextLayer[];
   /** Editor state. Older runs may hold the slot-based Project; the editor rebuilds those. */

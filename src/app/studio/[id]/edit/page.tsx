@@ -1,10 +1,7 @@
-import { Suspense } from "react";
-import { EditorLoader } from "@/components/editor-loader";
+import { redirect } from "next/navigation";
 
-export default function EditPage() {
-  return (
-    <Suspense fallback={null}>
-      <EditorLoader />
-    </Suspense>
-  );
+/** Old bookmarks open the shared clip editor in the run's five-step studio. */
+export default async function EditPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  redirect(`/studio/${id}`);
 }

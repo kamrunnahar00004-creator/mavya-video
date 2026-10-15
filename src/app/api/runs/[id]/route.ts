@@ -1,5 +1,6 @@
 import { deleteRun, getRun, updateRun } from "@/lib/server/store";
 import type { Run } from "@/lib/types";
+import { validRunPatch } from "@/lib/server/run-validation";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/runs/[id]">) {
   const { id } = await ctx.params;
@@ -11,13 +12,14 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/runs/[id]">
 export async function PATCH(request: Request, ctx: RouteContext<"/api/runs/[id]">) {
   const { id } = await ctx.params;
   const body = (await request.json().catch(() => null)) as Partial<Run> | null;
+  if (!validRunPatch(body)) return Response.json({ error: "Invalid run sections" }, { status: 400 });
   if (!body) return Response.json({ error: "Bad request" }, { status: 400 });
   const patch: Partial<Omit<Run, "id" | "createdAt">> = {};
   if (typeof body.title === "string") patch.title = body.title.trim().slice(0, 140) || "Untitled run";
   if (body.sourceRefId === null || typeof body.sourceRefId === "string") patch.sourceRefId = body.sourceRefId;
   if (body.hook && typeof body.hook === "object") patch.hook = body.hook;
   if (body.demo && typeof body.demo === "object") patch.demo = body.demo;
-  if (Array.isArray(body.texts)) patch.texts = body.texts.slice(0, 30);
+  if (Array.isArray(body.texts)) patch.texts = body.texts;
   if (body.project === null || (body.project && typeof body.project === "object")) patch.project = body.project;
   if (Array.isArray(body.sounds)) {
     const num = (v: unknown, lo: number, hi: number, d: number) => (typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
@@ -38,28 +40,6 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/runs/[id]"
         volume: num(s.volume, 0, 100, 100),
         ...(typeof s.length === "number" ? { length: num(s.length, 0, 3600, 0) } : {}),
       }));
-  }
-  if (body.partSounds && typeof body.partSounds === "object") {
-    const num = (v: unknown, lo: number, hi: number, d: number) => (typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
-    const out: NonNullable<Run["partSounds"]> = {};
-    for (const [key, s] of Object.entries(body.partSounds).slice(0, 40)) {
-      if (!/^[A-Za-z0-9_-]{1,40}$/.test(key) || !s || typeof s.src !== "string" || !/^\/api\/(media|sounds)\/[A-Za-z0-9._-]+$/.test(s.src) || !["hook", "song", "upload"].includes(s.kind)) continue;
-      out[key] = {
-        kind: s.kind,
-        src: s.src,
-        name: String(s.name ?? "").slice(0, 120),
-        ...(typeof s.refId === "string" ? { refId: s.refId } : {}),
-        start: num(s.start, 0, 3600, 0),
-        volume: num(s.volume, 0, 100, 100),
-        ...(typeof s.length === "number" ? { length: num(s.length, 0, 3600, 0) } : {}),
-      };
-    }
-    patch.partSounds = out;
-  }
-  if (body.partModes && typeof body.partModes === "object") {
-    const out: NonNullable<Run["partModes"]> = {};
-    for (const [key, m] of Object.entries(body.partModes).slice(0, 40)) if (/^[A-Za-z0-9_-]{1,40}$/.test(key) && (m === "voice" || m === "mute")) out[key] = m;
-    patch.partModes = out;
   }
   if (body.sound === null) patch.sound = null;
   else if (body.sound && typeof body.sound === "object") {
