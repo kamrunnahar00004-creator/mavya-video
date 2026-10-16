@@ -1225,6 +1225,24 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
     return () => { observer.disconnect(); document.removeEventListener("visibilitychange", hide); };
   }, [playing]);
   const [t, setT] = useState(0);
+  const historyKeyFor = (parts: Part[]) => JSON.stringify([seg.src, version, parts]);
+  const partsKey = historyKeyFor(seg.parts);
+  const [historyKey, setHistoryKey] = useState(partsKey);
+  if (historyKey !== partsKey) {
+    // Another editor or a replacement file invalidates this editor's local Cut history.
+    setHistoryKey(partsKey);
+    setUndo([]);
+    setPick(null);
+    setDraft(null);
+    setPlaying(false);
+    setT(0);
+  }
+  useEffect(() => {
+    if (playing) return;
+    const here = fileAt(seg, Math.min(t, seg.len));
+    piece.current = here.i;
+    if (vref.current && Math.abs(vref.current.currentTime - here.file) > 0.04) vref.current.currentTime = here.file;
+  }, [seg, t, playing]);
   const seek = useCallback((rel: number) => {
     const { file, i } = fileAt(segRef.current, rel);
     piece.current = i;
@@ -1277,7 +1295,8 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
   const herePart = seg.parts[here.i];
   const canCut = (fileT - herePart.start) / speed > 0.2 && (herePart.end - fileT) / speed > 0.2;
   const change = (next: Part[]) => {
-    setUndo((u) => [...u, seg.parts]);
+    setHistoryKey(historyKeyFor(next));
+    setUndo((u) => [...u.slice(-49), seg.parts]);
     onParts(next);
   };
   const removePiece = () => {
@@ -1407,6 +1426,7 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
               onUndo={() => {
                 const last = undo[undo.length - 1];
                 if (!last) return;
+                setHistoryKey(historyKeyFor(last));
                 setUndo((u) => u.slice(0, -1));
                 onParts(last);
                 setDraft(null);
