@@ -26,6 +26,9 @@ export type Seg = {
   len: number;
 };
 
+/** Where a demo clip's video plays from: its own file, or its upload; null while it has no video yet. */
+export const clipSrc = (c: DemoClip): string | null => c.src ?? (c.mediaId ? `/api/media/${c.mediaId}` : null);
+
 /** Demo clips of a run; older runs with a single demo clip read as one clip. */
 export function demoClips(run: Run): DemoClip[] {
   if (run.demo.clips) return run.demo.clips;
@@ -45,10 +48,10 @@ export function timeline(run: Run, source: Reference | null): Seg[] {
       ? { id: "hook", label: "Hook", src: hookSrc, seconds: h.generated.seconds, start: h.start ?? 0, end: h.end ?? h.generated.seconds, adjust: h.adjust, editable: true }
       : { id: "hook", label: "Hook", src: hookSrc, seconds: h.end ?? 3, start: h.clip ? 0 : (h.start ?? 0), end: h.clip ? Math.max(0.5, (h.end ?? 3) - (h.start ?? 0)) : (h.end ?? 3), editable: false },
   ];
-  const clips = demoClips(run).filter((c) => c.mediaId);
+  const clips = demoClips(run).filter((c) => clipSrc(c));
   clips.forEach((c, i) => {
     const seconds = c.seconds ?? 3;
-    segs.push({ id: c.id, label: clips.length > 1 ? `${i + 1}. ${c.label}` : c.label, src: `/api/media/${c.mediaId}`, seconds, start: c.start ?? 0, end: c.end ?? seconds, adjust: c.adjust, editable: true });
+    segs.push({ id: c.id, label: clips.length > 1 ? `${i + 1}. ${c.label}` : c.label, src: clipSrc(c), seconds, start: c.start ?? 0, end: c.end ?? seconds, adjust: c.adjust, editable: true });
   });
   if (!clips.length) segs.push({ id: "placeholder", label: "Demo", src: null, seconds: 3, start: 0, end: 3, editable: false });
   let at = 0;
@@ -115,7 +118,7 @@ export function shotList(source: Reference | null): Omit<DemoClip, "id">[] {
 /** The five steps of a video, done or not, in order (the run page and the videos grid both use this). */
 export function runSteps(run: Run): boolean[] {
   const h = run.hook;
-  const hasDemo = demoClips(run).some((c) => c.mediaId);
+  const hasDemo = demoClips(run).some((c) => clipSrc(c));
   const hasSound = run.sounds ? run.sounds.length > 0 : Boolean(run.sound);
   return [Boolean(run.sourceRefId) || Boolean(h.source === "describe" && h.describeReady && h.describe?.trim()), Boolean(h.face), Boolean(h.generated), hasDemo, hasSound];
 }

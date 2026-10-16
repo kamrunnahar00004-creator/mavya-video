@@ -34,7 +34,7 @@ function hook(v: unknown): boolean {
 function demo(v: unknown): boolean {
   if (!object(v) || !nullable(v.clip, clip) || !["none", "laptop", "overlay"].includes(String(v.frame))) return false;
   return optional(v.clips, (cs) => Array.isArray(cs) && cs.length <= 100 && cs.every((c) => {
-    if (!object(c) || !string(c.id) || !string(c.label) || !optional(c.mediaId, mediaId) || !optional(c.adjust, adjust)) return false;
+    if (!object(c) || !string(c.id) || !string(c.label) || !optional(c.mediaId, mediaId) || !optional(c.src, localVideo) || !optional(c.adjust, adjust)) return false;
     for (const key of ["name", "hint", "camera", "text"]) if (!optional(c[key], string)) return false;
     for (const key of ["seconds", "start", "end", "target"]) if (!optional(c[key], number)) return false;
     return optional(c.steps, (s) => Array.isArray(s) && s.every(string)) && !(typeof c.start === "number" && typeof c.end === "number" && c.end <= c.start);

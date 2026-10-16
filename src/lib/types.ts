@@ -266,6 +266,8 @@ export type DemoClip = {
   /** Suggested on-screen length, seconds. */
   target?: number;
   mediaId?: string;
+  /** A video that is not an upload (e.g. the generated hook's file, when the hook was cut in two). */
+  src?: string;
   name?: string;
   /** File length; start / end trim it. */
   seconds?: number;

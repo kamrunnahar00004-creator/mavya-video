@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, Copy, Diamond, Download, Eye, Film, FolderOpen, Heart, Link as LinkIcon, ListOrdered, Loader2, Music, Pause, PenLine, Play, Plus, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, Copy, Diamond, Download, Eye, Film, FolderOpen, GripVertical, Heart, Link as LinkIcon, ListOrdered, Loader2, Music, Pause, PenLine, Play, Plus, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X } from "lucide-react";
 import { waveform } from "@/lib/waveform";
 import { analyzeVideo } from "@/lib/analyze";
 import { CHARACTERS, characterById } from "@/lib/characters";
@@ -11,7 +11,7 @@ import { FONT_CHOICES, fontCss, fontLabel, loadFonts } from "@/lib/studio-data";
 import { ADJUST_ROWS, type Adjust, type AdjustRow, type Motion, NO_ADJUST, fullAdjust, isAdjusted, keyAt, motionAt, moveKey, panBy, setMotion, speedOf, toggleKey, videoStyle } from "@/lib/adjust";
 import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundPieces, soundRows } from "@/lib/sound";
 import type { Song } from "@/app/api/songs/route";
-import { type Seg, cutOutTexts, demoClips, retimeTexts, runSteps, shotList, timeline } from "@/lib/edit";
+import { type Seg, clipSrc, cutOutTexts, demoClips, retimeTexts, runSteps, shotList, timeline } from "@/lib/edit";
 import { STYLE_GROUPS, STYLE_PRESETS, autoSecond, stylePreset } from "@/lib/text-styles";
 import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, flushRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { PLATFORM_LABEL, commentCta, fmtTime, fmtViews, isLikelyBoosted, type Asset, type DemoClip, type Frame, type Reference, type SoundPiece, type Run, type TextLayer, type TextPos } from "@/lib/types";
@@ -172,7 +172,7 @@ export function RunView() {
 
   const source = refs.find((r) => r.id === run.sourceRefId) ?? null;
   const hook = run.hook;
-  const ready = Boolean(hook.generated) && demoClips(run).some((c) => c.mediaId);
+  const ready = Boolean(hook.generated) && demoClips(run).some((c) => clipSrc(c));
   const texts = runTexts(run);
   const pickHook = (ref: Reference, from: HookSource = "library") => {
     const seg = ref.analysis?.segments.find((s) => s.role === "hook");
@@ -205,7 +205,7 @@ export function RunView() {
   };
   const segs = timeline(run, source);
   const videoLen = segs.reduce((t, x) => t + x.len, 0);
-  const hasDemo = demoClips(run).some((c) => c.mediaId);
+  const hasDemo = demoClips(run).some((c) => clipSrc(c));
   const stepDone = runSteps(run);
   const current = stepDone.findIndex((d) => !d) + 1 || stepDone.length; // 1-based; all done = last step
   // The open step: the user's choice, else the first unfinished one. Finishing a step clears the choice (moves on).
@@ -216,7 +216,7 @@ export function RunView() {
     (source ? (source.author ? `Hook from @${source.author}` : source.title) : undefined) ?? (hook.source === "describe" && hook.describeReady ? hook.describe : undefined),
     faceName,
     hook.generated ? "Hook ready" : undefined,
-    hasDemo ? (run.demo.mode === "clips" ? `${demoClips(run).filter((c) => c.mediaId).length} ${demoClips(run).filter((c) => c.mediaId).length === 1 ? "clip" : "clips"}` : "Demo added") : undefined,
+    hasDemo ? (run.demo.mode === "clips" ? `${demoClips(run).filter((c) => clipSrc(c)).length} ${demoClips(run).filter((c) => clipSrc(c)).length === 1 ? "clip" : "clips"}` : "Demo added") : undefined,
     soundPieces(run, videoLen).length > 1 ? `${soundPieces(run, videoLen).length} sounds` : soundPieces(run, videoLen)[0]?.name,
   ];
 
@@ -261,12 +261,32 @@ export function RunView() {
     if (clipId === "hook") save({ hook: { ...hook, start, end }, texts: nextTexts });
     else save({ demo: { ...run.demo, clips: demoClips(run).map((c) => (c.id === clipId ? { ...c, start, end } : c)) }, texts: nextTexts });
   };
+  /** ✂ Cut at the playhead (file time `at`): the clip becomes two clips that play on as before. Nothing is deleted. */
+  const splitClip = (clipId: string, at: number) => {
+    const seg = segs.find((x) => x.id === clipId);
+    if (!seg || at <= seg.start + 0.2 || at >= seg.end - 0.2) return;
+    const cut = Math.round(at * 1000) / 1000;
+    const clips = demoClips(run);
+    if (clipId === "hook") {
+      // The hook keeps its first part; the second part becomes the first demo clip (same generated file).
+      if (!hook.generated) return;
+      const second: DemoClip = { id: uid(), label: "Hook (2)", src: hook.generated.src, name: "Hook", seconds: hook.generated.seconds, start: cut, end: seg.end, adjust: hook.adjust };
+      save({ hook: { ...hook, end: cut }, demo: { ...run.demo, mode: run.demo.mode ?? (clips.length ? undefined : "clips"), clips: [second, ...clips] } });
+      return;
+    }
+    const i = clips.findIndex((c) => c.id === clipId);
+    if (i < 0) return;
+    const c = clips[i];
+    const second: DemoClip = { ...c, id: uid(), label: `${c.label} (2)`, start: cut, end: c.end ?? c.seconds };
+    save({ demo: { ...run.demo, mode: clips.length + 1 > 1 ? "clips" : run.demo.mode, clips: [...clips.slice(0, i), { ...c, end: cut }, second, ...clips.slice(i + 1)] } });
+  };
   const clipEditor = (seg: Seg) => (
     <ClipEditor
       key={seg.id}
       seg={seg}
       texts={texts}
       onTrim={(start, end) => trimClip(seg.id, start, end)}
+      onSplit={(at) => splitClip(seg.id, at)}
       onAdjust={(a) => liveAdjust(seg.id, a)}
       onPatch={patchText}
       onAdd={addText}
@@ -337,10 +357,29 @@ export function RunView() {
     const nextTexts = placeholder ? retimeTexts(runTexts(cur), placeholder.offset, { start: placeholder.start, end: placeholder.end, speed: 1 }, { start: 0, end: demoLen, speed: 1 }) : runTexts(cur);
     save({ demo: nextRun.demo, texts: nextTexts });
   };
+  /** Move a demo clip to position `to`. Texts that sit on that clip (or any moved clip) go with it; texts across several clips keep their time. */
+  const moveClip = (clipId: string, to: number) => {
+    const clips = demoClips(run);
+    const from = clips.findIndex((c) => c.id === clipId);
+    if (from < 0 || to < 0 || to >= clips.length || to === from) return;
+    const next = [...clips];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    const before = timeline(run, null);
+    const after = timeline({ ...run, demo: { ...run.demo, clips: next } }, null);
+    const nextTexts = texts.map((x) => {
+      const home = before.find((g) => g.id !== "hook" && g.id !== "placeholder" && x.start >= g.offset - 0.01 && x.end <= g.offset + g.len + 0.01);
+      const now = home && after.find((g) => g.id === home.id);
+      if (!home || !now) return x;
+      const d = now.offset - home.offset;
+      return d ? { ...x, start: Math.round((x.start + d) * 1000) / 1000, end: Math.round((x.end + d) * 1000) / 1000 } : x;
+    });
+    save({ demo: { ...run.demo, mode: run.demo.mode ?? "clips", clips: next }, texts: nextTexts });
+  };
   const deleteClip = (clipId: string) => {
     const seg = segs.find((x) => x.id === clipId);
     const clips = demoClips(run).filter((c) => c.id !== clipId);
-    const lastVideo = Boolean(seg) && !clips.some((c) => c.mediaId);
+    const lastVideo = Boolean(seg) && !clips.some((c) => clipSrc(c));
     save({ demo: { ...run.demo, clips }, texts: !seg ? texts : lastVideo ? demoToPlaceholder(texts) : cutOutTexts(texts, seg.offset, seg.len) });
   };
   const resetDemo = () => {
@@ -544,6 +583,7 @@ export function RunView() {
                 onAdd={addText}
                 onAdjust={(a) => liveAdjust("hook", a)}
                 onTrim={(start, end) => trimClip("hook", start, end)}
+                onSplit={(at) => splitClip("hook", at)}
                 onApplyAll={applyTextToAll}
                 onRemove={removeText}
               />
@@ -565,6 +605,7 @@ export function RunView() {
                 }}
                 onRename={(cid, label) => save({ demo: { ...run.demo, clips: demoClips(run).map((c) => (c.id === cid ? { ...c, label } : c)) } })}
                 onDelete={deleteClip}
+                onMove={moveClip}
                 onReset={resetDemo}
               />
             </Block>
@@ -901,7 +942,7 @@ const optionBtn = (on: boolean) =>
 
 /** Step 3: the hook clip, in the shared clip editor. Before generating, the video box shows the inputs and a Generate button.
  * Generation is a stand-in (a sample clip) until the Runway API is connected. */
-function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, onRemove, onTrim, onAdjust, onApplyAll }: {
+function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, onRemove, onTrim, onSplit, onAdjust, onApplyAll }: {
   run: Run;
   source: Reference | null;
   seg: Seg;
@@ -911,6 +952,7 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
   onAdd: (afterId: string | null, window: [number, number]) => void;
   onRemove: (id: string) => void;
   onTrim: (start: number, end: number) => void;
+  onSplit?: (at: number) => void;
   onAdjust: (a: Partial<Adjust>) => void;
   onApplyAll?: (id: string) => void;
 }) {
@@ -963,6 +1005,7 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
       texts={texts}
       cover={cover}
       onTrim={onTrim}
+      onSplit={onSplit}
       onAdjust={onAdjust}
       onPatch={onPatch}
       onAdd={onAdd}
@@ -1033,7 +1076,7 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
  * (play, trim + Cut + Undo, text bars, zoom keyframes), Advanced settings, the text rows, and full screen.
  * Times on the player are on-screen seconds from the clip's start; texts are stored on the whole timeline.
  */
-function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder = "Text", onTrim, onAdjust, onPatch, onAdd, onRemove, onApplyAll }: {
+function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder = "Text", onTrim, onSplit, onAdjust, onPatch, onAdd, onRemove, onApplyAll }: {
   seg: Seg;
   /** Changes when the clip's file is replaced (reloads the video). */
   version?: string;
@@ -1044,6 +1087,8 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
   overlay?: React.ReactNode;
   firstTextPlaceholder?: string;
   onTrim: (start: number, end: number) => void;
+  /** Cut the clip in two at file time `at`. */
+  onSplit?: (at: number) => void;
   onAdjust: (a: Partial<Adjust>) => void;
   onPatch: (id: string, patch: Partial<TextLayer>) => void;
   onAdd: (afterId: string | null, window: [number, number]) => void;
@@ -1195,15 +1240,22 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
                 setPlaying(false);
                 seek(edge);
               }}
+              onRangeEnd={(v) => {
+                // Trimming applies as soon as the handle is let go (Undo brings it back).
+                setSel(null);
+                if (v[0] <= 0.01 && v[1] >= len - 0.01) return;
+                setUndo((u) => [...u, [base, base + fileLen]]);
+                onTrim(round1(base + v[0] * speed), round1(base + v[1] * speed));
+                setT(0);
+              }}
               onSeek={(rel) => {
                 setPlaying(false);
                 seek(rel);
               }}
+              canCut={Boolean(onSplit) && t > 0.2 && t < len - 0.2}
               onCut={() => {
-                setUndo((u) => [...u, [base, base + fileLen]]);
-                onTrim(round1(base + r0 * speed), round1(base + r1 * speed));
-                setSel(null);
-                setT(0);
+                setPlaying(false);
+                onSplit?.(base + t * speed);
               }}
               texts={local}
               onTiming={(tid, patch) =>
@@ -1526,9 +1578,9 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
           {clock(t)} / {clock(total)}
         </span>
         <div className="ml-auto flex items-center">
-          <button type="button" disabled={!underPlayhead} onClick={onSplit} title="Split the sound at the playhead (S)" className="flex items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-1 text-[12px] font-bold text-text hover:bg-raised hover:text-accent disabled:text-soft disabled:hover:bg-transparent">
+          <button type="button" disabled={!underPlayhead} onClick={onSplit} title="Cut the sound in two at the playhead (S)" className="flex items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-1 text-[12px] font-bold text-text hover:bg-raised hover:text-accent disabled:text-soft disabled:hover:bg-transparent">
             <Scissors className="h-3.5 w-3.5" />
-            Split
+            Cut
           </button>
           <button type="button" onClick={onAdd} title="Add a sound at the playhead" className="flex items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-1 text-[12px] font-bold text-text hover:bg-raised hover:text-accent">
             <Plus className="h-3.5 w-3.5" />
@@ -2138,7 +2190,7 @@ function ShotBrief({ clip }: { clip: DemoClip }) {
 }
 
 /** Step 4: one finished demo video, or a shot list filmed clip by clip. Every clip opens in the same ClipEditor as the hook. */
-function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, onRename, onDelete, onReset }: {
+function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, onRename, onDelete, onMove, onReset }: {
   run: Run;
   segs: Seg[];
   renderEditor: (seg: Seg) => React.ReactNode;
@@ -2148,9 +2200,14 @@ function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, onRenam
   onUpload: (id: string, f: File) => Promise<void>;
   onRename: (id: string, label: string) => void;
   onDelete: (id: string) => void;
+  /** Move a clip to a new position (0-based). */
+  onMove: (id: string, to: number) => void;
   onReset: () => void;
 }) {
   const clips = demoClips(run);
+  // Reordering: the clip being dragged, and where it would land (index to insert before).
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropAt, setDropAt] = useState<number | null>(null);
   const mode = run.demo.mode ?? (clips.length ? "single" : undefined);
   const [busy, setBusy] = useState<string | null>(null); // clip id (or "single") being uploaded
   const [openId, setOpenId] = useState<string | null>(null);
@@ -2221,11 +2278,58 @@ function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, onRenam
         const seg = segs.find((s) => s.id === c.id);
         const open = openId === c.id && Boolean(seg);
         return (
-          <div key={c.id} className={`rounded-2xl border bg-panel ${open ? "border-line-strong" : "border-line"}`}>
-            <div className="flex items-center gap-4 px-4 py-3.5">
-              {c.mediaId ? (
+          <div
+            key={c.id}
+            onDragOver={(e) => {
+              if (!dragId) return;
+              e.preventDefault();
+              const r = e.currentTarget.getBoundingClientRect();
+              setDropAt(e.clientY < r.top + r.height / 2 ? i : i + 1);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (dragId && dropAt !== null) {
+                const from = clips.findIndex((x) => x.id === dragId);
+                onMove(dragId, dropAt > from ? dropAt - 1 : dropAt);
+              }
+              setDragId(null);
+              setDropAt(null);
+            }}
+            className={`relative rounded-2xl border bg-panel ${open ? "border-line-strong" : "border-line"} ${dragId === c.id ? "opacity-40" : ""}`}
+          >
+            {/* where the dragged clip will land */}
+            {dragId && dropAt === i && <span className="pointer-events-none absolute -top-[7px] left-2 right-2 h-[3px] rounded-full bg-accent" />}
+            {dragId && dropAt === i + 1 && i === clips.length - 1 && <span className="pointer-events-none absolute -bottom-[7px] left-2 right-2 h-[3px] rounded-full bg-accent" />}
+            <div className="flex items-center gap-3 py-3.5 pl-1.5 pr-4">
+              {clips.length > 1 && (
+                <button
+                  type="button"
+                  draggable
+                  aria-label={`Move clip ${i + 1}`}
+                  title="Drag to reorder (or use the arrow keys)"
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", c.id);
+                    const row = e.currentTarget.closest("[class*='rounded-2xl']");
+                    if (row instanceof HTMLElement) e.dataTransfer.setDragImage(row, 24, 24);
+                    setDragId(c.id);
+                  }}
+                  onDragEnd={() => {
+                    setDragId(null);
+                    setDropAt(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowUp" && i > 0) { e.preventDefault(); onMove(c.id, i - 1); }
+                    if (e.key === "ArrowDown" && i < clips.length - 1) { e.preventDefault(); onMove(c.id, i + 1); }
+                  }}
+                  className="flex h-9 w-6 shrink-0 cursor-grab items-center justify-center rounded-md text-soft hover:bg-raised hover:text-text active:cursor-grabbing"
+                >
+                  <GripVertical className="h-4 w-4" />
+                </button>
+              )}
+              {clipSrc(c) ? (
                 <button type="button" onClick={() => setOpenId(open ? null : c.id)} aria-label={open ? "Close clip" : "Edit clip"} className="relative shrink-0">
-                  <video src={`/api/media/${c.mediaId}#t=0.5`} muted preload="metadata" className="h-[56px] w-[32px] rounded-md bg-ink object-cover" />
+                  <video src={`${clipSrc(c)}#t=0.5`} muted preload="metadata" className="h-[56px] w-[32px] rounded-md bg-ink object-cover" />
                   <span className="absolute -left-1.5 -top-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-accent text-[10.5px] font-black text-white">{i + 1}</span>
                 </button>
               ) : (
@@ -2257,7 +2361,7 @@ function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, onRenam
                   <div className="mt-0.5 truncate text-[13px] leading-5 text-soft">{c.hint}</div>
                 ) : null}
               </div>
-              {c.mediaId ? (
+              {clipSrc(c) ? (
                 <>
                   <label title="Replace video" aria-label="Replace video" className={`flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted hover:bg-raised hover:text-accent ${busy ? "pointer-events-none opacity-60" : ""}`}>
                     {busy === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />}
@@ -2577,7 +2681,7 @@ const clock = (sec: number) => `${Math.floor(sec / 60)}:${(sec % 60).toFixed(1).
 
 /** Player bar under the generated hook, styled like the preview strip: play/pause, time, ruler,
  *  the clip with drag handles on both ends, a playhead, Cut (removes what is outside) and Undo. */
-function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, onCut, texts, onTiming, keys, onKeyMove, canUndo, onUndo }: {
+function ClipControls({ label, playing, onPlay, t, len, range, onRange, onRangeEnd, onSeek, onCut, canCut, texts, onTiming, keys, onKeyMove, canUndo, onUndo }: {
   label: string;
   playing: boolean;
   onPlay: () => void;
@@ -2585,8 +2689,11 @@ function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, 
   len: number;
   range: [number, number];
   onRange: (v: [number, number], edge: number) => void;
+  /** A trim handle was let go (or nudged with the keyboard): apply this range. */
+  onRangeEnd: (v: [number, number]) => void;
   onSeek: (t: number) => void;
   onCut: () => void;
+  canCut: boolean;
   texts: TextLayer[];
   onTiming: (id: string, p: { start?: number; end?: number }) => void;
   /** Zoom keyframes: i = index in time order, at = on-screen seconds. */
@@ -2599,8 +2706,7 @@ function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, 
   const [guide, setGuide] = useState<number | null>(null); // snap line while dragging a text
   const [a, b] = range;
   const pct = (v: number) => `${(v / len) * 100}%`;
-  const trimmed = a > 0.05 || b < len - 0.05;
-  function track(e: React.PointerEvent, on: (sec: number) => void) {
+  function track(e: React.PointerEvent, on: (sec: number) => void, done?: () => void) {
     e.preventDefault();
     e.stopPropagation();
     const rect = area.current?.getBoundingClientRect();
@@ -2611,6 +2717,7 @@ function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, 
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      done?.();
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -2694,15 +2801,15 @@ function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, 
         </span>
         <div className="ml-auto flex items-center gap-1">
           {canUndo && (
-            <button type="button" onClick={onUndo} title="Undo cut" aria-label="Undo cut" className="rounded-lg p-1.5 text-muted hover:bg-raised hover:text-text">
+            <button type="button" onClick={onUndo} title="Undo trim" aria-label="Undo trim" className="rounded-lg p-1.5 text-muted hover:bg-raised hover:text-text">
               <Undo2 className="h-4 w-4" />
             </button>
           )}
           <button
             type="button"
-            disabled={!trimmed}
+            disabled={!canCut}
             onClick={onCut}
-            title="Drag the ends of the clip, then cut"
+            title="Cut the clip in two at the playhead"
             className="flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-[12px] font-bold text-text hover:border-accent hover:text-accent disabled:border-transparent disabled:text-soft"
           >
             <Scissors className="h-3.5 w-3.5" />
@@ -2750,8 +2857,12 @@ function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, 
               e.preventDefault(); e.stopPropagation();
               const next = Math.max(0, Math.min(b - 0.5, round1(a + (e.key === "ArrowRight" ? 0.1 : -0.1))));
               onRange([next, b], next);
+              onRangeEnd([next, b]);
             }}
-            onPointerDown={(e) => track(e, (v) => { const x = round1(Math.min(v, b - 0.5)); onRange([x, b], x); })}
+            onPointerDown={(e) => {
+              let last: [number, number] = [a, b];
+              track(e, (v) => { const x = round1(Math.min(v, b - 0.5)); last = [x, b]; onRange(last, x); }, () => onRangeEnd(last));
+            }}
             className={`${handle} rounded-l-md`}
             style={{ left: pct(a) }}
           >
@@ -2769,8 +2880,12 @@ function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, 
               e.preventDefault(); e.stopPropagation();
               const next = Math.min(len, Math.max(a + 0.5, round1(b + (e.key === "ArrowRight" ? 0.1 : -0.1))));
               onRange([a, next], next);
+              onRangeEnd([a, next]);
             }}
-            onPointerDown={(e) => track(e, (v) => { const x = round1(Math.max(v, a + 0.5)); onRange([a, x], x); })}
+            onPointerDown={(e) => {
+              let last: [number, number] = [a, b];
+              track(e, (v) => { const x = round1(Math.max(v, a + 0.5)); last = [a, x]; onRange(last, x); }, () => onRangeEnd(last));
+            }}
             className={`${handle} -translate-x-full rounded-r-md`}
             style={{ left: pct(b) }}
           >
