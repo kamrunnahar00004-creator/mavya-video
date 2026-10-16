@@ -94,6 +94,33 @@ async function main() {
     assert.equal(calls.length, 2); assert.equal(calls[1].title, 'last'); assert.equal(calls[1].texts[0].text, 'hello');
     assert.equal(maxConcurrent, 1);
   } finally { global.fetch = fetchBefore; }
-  console.log('PASS: sound migration, millisecond timing, malformed sections, storage recovery/concurrency, byte ranges, coalesced saves');
+  const documentBefore = global.document;
+  let drawings = 0, retained = 0;
+  const videos = [];
+  class FrameVideo extends EventTarget {
+    constructor() { super(); this.readyState=0; this.duration=10; this.videoWidth=640; this.videoHeight=480; this.time=0; this.source=''; this.listeners=new Map(); }
+    addEventListener(name, fn) { super.addEventListener(name,fn); if(!this.listeners.has(name))this.listeners.set(name,new Set());this.listeners.get(name).add(fn); }
+    removeEventListener(name, fn) { super.removeEventListener(name,fn); this.listeners.get(name)?.delete(fn); }
+    set src(value) { this.source=value;retained++;queueMicrotask(()=>{if(value.includes('missing')){this.error={};this.dispatchEvent(new Event('error'));}else{this.readyState=2;this.dispatchEvent(new Event('loadedmetadata'));this.dispatchEvent(new Event('loadeddata'));}}); }
+    set currentTime(value) { this.time=value;queueMicrotask(()=>this.dispatchEvent(new Event('seeked'))); }
+    get currentTime() { return this.time; }
+    pause() {}
+    load() {}
+    removeAttribute(name) { if(name==='src'&&this.source){this.source='';retained--;} }
+  }
+  global.document={createElement(tag){if(tag==='video'){const v=new FrameVideo();videos.push(v);return v;}return {getContext:()=>({drawImage(){drawings++;}}),toDataURL:()=> 'frame'+drawings};}};
+  try {
+    const {frameAt}=load('lib/filmstrip.ts');
+    const first=frameAt('one',0);assert.equal(frameAt('one',0),first);assert.ok(await first);
+    assert.ok(await frameAt('one',0.0001));assert.equal(drawings,1);
+    for(let i=1;i<280;i++) await frameAt('one',i/100);
+    await frameAt('one',0);assert.equal(drawings,281);
+    for(let i=0;i<16;i++) await frameAt('file'+i,0);
+    assert.ok(retained<=8);
+    const started=Date.now();assert.deepEqual(await Promise.all(Array.from({length:6},(_,i)=>frameAt('missing',i))),Array(6).fill(null));
+    assert.ok(Date.now()-started<500);
+    assert.ok(videos.every(v=>[...v.listeners.values()].every(set=>set.size===0)));
+  } finally { global.document=documentBefore; }
+  console.log('PASS: sound migration, piece/gap timing, malformed sections, storage recovery/concurrency, byte ranges, coalesced saves, bounded filmstrip cleanup');
 }
 main().catch(e => { console.error(e); process.exitCode = 1; });

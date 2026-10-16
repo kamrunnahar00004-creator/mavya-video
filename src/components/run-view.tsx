@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, ClipboardPaste, Copy, Diamond, Download, Eye, Film, FolderOpen, GripVertical, Heart, Link as LinkIcon, ListOrdered, Loader2, Magnet, Music, Pause, PenLine, Play, Plus, Redo2, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
+import { frameAt } from "@/lib/filmstrip";
 import { waveform } from "@/lib/waveform";
 import { analyzeVideo } from "@/lib/analyze";
 import { CHARACTERS, characterById } from "@/lib/characters";
@@ -1682,80 +1683,23 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   );
 }
 
-/* Frames for the timeline's clip strips (like CapCut): grabbed in the browser from the clip's own file,
- * one hidden video per file, one seek at a time, kept as small JPEGs for the session. */
-const frameCache = new Map<string, Promise<string | null>>();
-const frameQueue = new Map<string, Promise<unknown>>();
-const framePlayers = new Map<string, HTMLVideoElement>();
-
-function grabFrame(src: string, t: number): Promise<string | null> {
-  let v = framePlayers.get(src);
-  if (!v) {
-    v = document.createElement("video");
-    v.muted = true;
-    v.preload = "auto";
-    v.src = src;
-    framePlayers.set(src, v);
-  }
-  const video = v;
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(null), 8000);
-    const draw = () => {
-      clearTimeout(timer);
-      try {
-        const c = document.createElement("canvas");
-        c.width = 64;
-        c.height = 114;
-        const g = c.getContext("2d");
-        if (!g || !video.videoWidth) return resolve(null);
-        // Cover-crop to 9:16, like the video on screen.
-        const scale = Math.max(c.width / video.videoWidth, c.height / video.videoHeight);
-        const sw = c.width / scale;
-        const sh = c.height / scale;
-        g.drawImage(video, (video.videoWidth - sw) / 2, (video.videoHeight - sh) / 2, sw, sh, 0, 0, c.width, c.height);
-        resolve(c.toDataURL("image/jpeg", 0.6));
-      } catch {
-        resolve(null);
-      }
-    };
-    const seek = () => {
-      video.addEventListener("seeked", draw, { once: true });
-      video.currentTime = Math.max(0, Math.min(t, (video.duration || t + 0.1) - 0.05));
-    };
-    video.addEventListener("error", () => resolve(null), { once: true });
-    if (video.readyState >= 1) seek();
-    else video.addEventListener("loadedmetadata", seek, { once: true });
-  });
-}
-
-/** The frame of `src` at `t` seconds (cached; frames of one file are grabbed in order). */
-function frameAt(src: string, t: number): Promise<string | null> {
-  const key = `${src}@${t}`;
-  let p = frameCache.get(key);
-  if (!p) {
-    const prev = frameQueue.get(src) ?? Promise.resolve();
-    p = prev.then(() => grabFrame(src, t));
-    frameQueue.set(src, p.catch(() => null));
-    frameCache.set(key, p);
-  }
-  return p;
-}
-
 /** A row of frames from `src` at these file times, filling its parent (behind the label). */
 function Filmstrip({ src, times, frame }: { src: string; times: number[]; frame: number }) {
   const key = times.join(",");
-  const [urls, setUrls] = useState<Record<string, string>>({});
+  const [frames, setFrames] = useState<{ key: string; urls: Record<string, string> }>({ key: "", urls: {} });
+  const requestKey = `${src}|${key}`;
+  const urls = frames.key === requestKey ? frames.urls : {};
   useEffect(() => {
     let alive = true;
     for (const t of key.split(",").map(Number)) {
       void frameAt(src, t).then((url) => {
-        if (alive && url) setUrls((u) => (u[`${src}@${t}`] === url ? u : { ...u, [`${src}@${t}`]: url }));
+        if (alive && url) setFrames((previous) => ({ key: requestKey, urls: { ...(previous.key === requestKey ? previous.urls : {}), [`${src}@${t}`]: url } }));
       });
     }
     return () => {
       alive = false;
     };
-  }, [src, key]);
+  }, [src, key, requestKey]);
   return (
     <span aria-hidden className="pointer-events-none absolute inset-0 flex overflow-hidden">
       {times.map((t, i) => {
