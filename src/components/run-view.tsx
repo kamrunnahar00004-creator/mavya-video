@@ -48,7 +48,7 @@ export function RunView() {
   const router = useRouter();
   const [run, setRun] = useState<Run | null>(null);
   const [refs, setRefs] = useState<Reference[] | null>(null);
-  const [missing, setMissing] = useState(false);
+  const [missing, setMissing] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   /** Steps the user opened or closed by hand (undefined = follow progress: just the current step). */
@@ -77,7 +77,7 @@ export function RunView() {
         setRun(runData);
         setRefs(refData);
       })
-      .catch(() => alive && setMissing(true));
+      .catch(() => alive && setMissing(id));
     return () => {
       alive = false;
     };
@@ -91,7 +91,7 @@ export function RunView() {
 
   const save = useCallback(
     (patch: Partial<Run>) => {
-      setRun((r) => (r ? { ...r, ...patch, project: null } : r));
+      setRun((r) => (r?.id === id ? { ...r, ...patch, project: null } : r));
       void patchRun(id, { ...patch, project: null });
     },
     [id]
@@ -155,7 +155,7 @@ export function RunView() {
     return () => { window.removeEventListener("pagehide", flush); flush(); };
   }, [id]);
 
-  if (missing) {
+  if (missing === id) {
     return (
       <div className="card flex h-full flex-col items-center justify-center gap-3 text-muted">
         Run not found
@@ -165,7 +165,7 @@ export function RunView() {
       </div>
     );
   }
-  if (!run || !refs) {
+  if (!run || run.id !== id || !refs) {
     return (
       <div className="card flex h-full items-center justify-center text-soft">
         <Loader2 className="h-5 w-5 animate-spin" />
@@ -323,6 +323,7 @@ export function RunView() {
     const c = await clipFromFile(file);
     setLibraryKey((k) => k + 1);
     const cur = runRef.current ?? run;
+    if (cur.id !== id) return;
     const seconds = round1(c.length ?? 3);
     const list = startClips ?? demoClips(cur);
     const clips = list.map((x) => (x.id === clipId ? { ...x, src: undefined, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds, parts: undefined, adjust: undefined } : x));
@@ -358,6 +359,7 @@ export function RunView() {
   /** Puts demo clips in before demo clip `at` (default: the end). Texts from there on move later by their length. */
   const insertClips = (added: DemoClip[], at?: number) => {
     const cur = runRef.current ?? run;
+    if (cur.id !== id) return;
     // A single demo turning into clips: "Your demo" becomes "Clip 1".
     const before = demoClips(cur).map((c) => (added.length && c.label === "Your demo" ? { ...c, label: "Clip 1" } : c));
     const pos = at === undefined ? before.length : Math.max(0, Math.min(before.length, at));
