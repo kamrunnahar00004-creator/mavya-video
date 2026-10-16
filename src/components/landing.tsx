@@ -1,9 +1,15 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Download, Film, FolderOpen, Music, Play, Type } from "lucide-react";
 import { CHARACTERS, characterById } from "@/lib/characters";
 import { PlanCards } from "@/components/plan-cards";
 import { StickyCta } from "@/components/sticky-cta";
+import { LoopVideo } from "@/components/loop-video";
+
+/** A character's landing clip, if one was dropped in public/landing/<id>.mp4 (short, muted, 480p); else its photo shows. */
+const clipFor = (id: string) => (existsSync(path.join(process.cwd(), "public", "landing", `${id}.mp4`)) ? `/landing/${id}.mp4` : null);
 
 /* Our own material only: the synthetic AI characters and the app's UI. No creator's video appears on this page. */
 
@@ -66,7 +72,7 @@ function Phone({ id, text, className = "" }: { id: string; text: string; classNa
   return (
     <div className={`relative w-[200px] shrink-0 rounded-[34px] bg-ink p-[6px] shadow-[0_30px_60px_-24px_rgba(21,18,31,0.55)] ${className}`}>
       <div className="relative aspect-[9/19.5] overflow-hidden rounded-[28px] bg-[#14121f]">
-        {c && <Image src={c.src} alt="" fill sizes="200px" className="object-cover" />}
+        {c && (clipFor(id) ? <LoopVideo src={clipFor(id) ?? ""} poster={c.src} className="absolute inset-0 h-full w-full object-cover" /> : <Image src={c.src} alt="" fill sizes="200px" className="object-cover" />)}
         <span className="absolute left-1/2 top-2.5 h-4 w-16 -translate-x-1/2 rounded-full bg-black" />
         <p className="absolute inset-x-3 top-[17%] text-center font-[family-name:var(--font-montserrat)] text-[17px] font-black leading-tight text-white [-webkit-text-stroke:4px_#000] [paint-order:stroke_fill]">
           {text}
@@ -135,7 +141,7 @@ export function Landing() {
         <div className="flex w-max animate-[marquee_60s_linear_infinite] gap-4 hover:[animation-play-state:paused]">
           {[...STRIP, ...STRIP].map((h, i) => (
             <div key={i} className={`relative aspect-[9/16] w-[150px] shrink-0 overflow-hidden rounded-2xl border border-line bg-raised ${i % 2 ? "rotate-2" : "-rotate-2"}`}>
-              <Image src={characterById(h.id)?.src ?? ""} alt="" fill sizes="150px" className="object-cover" />
+              {clipFor(h.id) ? <LoopVideo src={clipFor(h.id) ?? ""} poster={characterById(h.id)?.src ?? ""} className="absolute inset-0 h-full w-full object-cover" /> : <Image src={characterById(h.id)?.src ?? ""} alt="" fill sizes="150px" className="object-cover" />}
               <p className="absolute inset-x-2 top-[16%] text-center font-[family-name:var(--font-montserrat)] text-[13px] font-black leading-tight text-white [-webkit-text-stroke:3px_#000] [paint-order:stroke_fill]">{h.text}</p>
             </div>
           ))}
