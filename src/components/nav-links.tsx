@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clapperboard, Flame } from "lucide-react";
+import { Clapperboard, CreditCard, Flame } from "lucide-react";
 
 const NAV = [
   { href: "/studio", label: "Videos", icon: Clapperboard },
   { href: "/library", label: "Viral library", icon: Flame },
+  { href: "/billing", label: "Billing", icon: CreditCard },
 ];
 
 function Links({ pathname }: { pathname: string | null }) {

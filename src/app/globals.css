@@ -200,3 +200,18 @@ input[type="range"] {
     animation: none;
   }
 }
+
+/* Landing: the strip of hooks under the hero moves sideways (the list is doubled, so -50% loops seamlessly). */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[marquee_60s_linear_infinite\] {
+    animation: none;
+  }
+}

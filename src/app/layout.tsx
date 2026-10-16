@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Anton, Bebas_Neue, Geist, Geist_Mono, Montserrat, Permanent_Marker, Poppins } from "next/font/google";
-import { AppShell } from "@/components/app-shell";
 import "./globals.css";
 
 // UI type: Satoshi (Fontshare, free for commercial use), self-hosted.
@@ -24,8 +23,8 @@ const marker = Permanent_Marker({ variable: "--font-marker", subsets: ["latin"],
 const poppins = Poppins({ variable: "--font-poppins", subsets: ["latin"], weight: ["600", "800"] });
 
 export const metadata: Metadata = {
-  title: "Mavya Studio",
-  description: "Hook + demo videos for founders.",
+  title: "Mavya: viral hook + demo videos",
+  description: "Steal hooks that already went viral, put an AI character in them, add your product demo. Make 100 videos a day.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -33,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${fonts} h-full antialiased`}>
       <body className="h-full">
-        <AppShell>{children}</AppShell>
+        {children}
       </body>
     </html>
   );
