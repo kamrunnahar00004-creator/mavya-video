@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, Diamond, Download, Eye, Film, FolderOpen, Heart, Link as LinkIcon, ListOrdered, Loader2, Music, Pause, PenLine, Play, Plus, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, Copy, Diamond, Download, Eye, Film, FolderOpen, Heart, Link as LinkIcon, ListOrdered, Loader2, Music, Pause, PenLine, Play, Plus, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X } from "lucide-react";
 import { waveform } from "@/lib/waveform";
 import { analyzeVideo } from "@/lib/analyze";
 import { CHARACTERS, characterById } from "@/lib/characters";
@@ -228,11 +228,23 @@ export function RunView() {
   const addText = (afterId: string | null, [ws, we]: [number, number], text = "") => {
     liveTexts((t) => {
       const i = afterId ? t.findIndex((x) => x.id === afterId) : -1;
-      const base = t[i] ?? t[t.length - 1];
+      // Same look and spot as the subtitle it follows (the row's own "+", else the one before it in the video).
+      const base = t[i] ?? lookBefore(t, ws);
+      // Only nudge it down when it would sit on top of that subtitle at the same time.
+      const overlaps = base && base.start < we - 0.01 && base.end > ws + 0.01;
       const item: TextLayer = base
-        ? { ...base, id: uid(), text, start: ws, end: we, y: Math.min(90, base.y + 12) }
+        ? { ...base, id: uid(), text, start: ws, end: we, y: overlaps ? Math.min(90, base.y + 12) : base.y }
         : { id: uid(), text, start: ws, end: we, x: 50, y: TEXT_Y.top, size: 4.6, font: "Arial", color: "#ffffff", style: "outline" };
       return i >= 0 ? [...t.slice(0, i + 1), item, ...t.slice(i + 1)] : [...t, item];
+    });
+    commitTexts();
+  };
+  /** "Apply to all": every subtitle takes this one's look and position (font, colours, style, size, x, y). */
+  const applyTextToAll = (tid: string) => {
+    liveTexts((t) => {
+      const src = t.find((x) => x.id === tid);
+      if (!src) return t;
+      return t.map((x) => (x.id === tid ? x : { ...x, font: src.font, color: src.color, style: src.style, second: src.second, size: src.size, x: src.x, y: src.y }));
     });
     commitTexts();
   };
@@ -259,13 +271,14 @@ export function RunView() {
       onPatch={patchText}
       onAdd={addText}
       onRemove={removeText}
+      onApplyAll={applyTextToAll}
     />
   );
 
   /* ----- Step 4: demo clips ----- */
-  /** A text over one clip in the same look and spot as the hook text (off screen by then), so the video keeps one text style. */
+  /** A text over one clip in the same look and spot as the subtitle before it in the video, so the video keeps one text style. */
   const textOver = (all: TextLayer[], text: string, at: number, len: number): TextLayer => {
-    const look = all.find((x) => x.id === "hook") ?? all[0];
+    const look = lookBefore(all, at);
     const span = { start: round1(at), end: round1(at + len) };
     return look ? { ...look, id: uid(), text, ...span } : { id: uid(), text, ...span, x: 50, y: TEXT_Y.top, size: 4.6, font: "Arial", color: "#ffffff", style: "outline" };
   };
@@ -531,6 +544,7 @@ export function RunView() {
                 onAdd={addText}
                 onAdjust={(a) => liveAdjust("hook", a)}
                 onTrim={(start, end) => trimClip("hook", start, end)}
+                onApplyAll={applyTextToAll}
                 onRemove={removeText}
               />
             </Block>
@@ -875,13 +889,19 @@ function magnet(points: number[], tol: number) {
   };
 }
 
+/** The subtitle that starts last at or before time `at` (the one a new subtitle copies its look from); else the first. */
+function lookBefore(texts: TextLayer[], at: number): TextLayer | undefined {
+  const before = texts.filter((x) => x.start <= at + 0.01).sort((a, b) => b.start - a.start);
+  return before[0] ?? texts[0];
+}
+
 /** The outlined button next to a step's main button (the other ways to do the step); violet when its panel is open. */
 const optionBtn = (on: boolean) =>
   `flex items-center gap-1.5 rounded-lg border px-3.5 py-2.5 text-[14px] font-semibold ${on ? "border-accent bg-accent-tint text-accent" : "border-line-strong bg-panel text-text hover:border-accent hover:text-accent"}`;
 
 /** Step 3: the hook clip, in the shared clip editor. Before generating, the video box shows the inputs and a Generate button.
  * Generation is a stand-in (a sample clip) until the Runway API is connected. */
-function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, onRemove, onTrim, onAdjust }: {
+function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, onRemove, onTrim, onAdjust, onApplyAll }: {
   run: Run;
   source: Reference | null;
   seg: Seg;
@@ -892,6 +912,7 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
   onRemove: (id: string) => void;
   onTrim: (start: number, end: number) => void;
   onAdjust: (a: Partial<Adjust>) => void;
+  onApplyAll?: (id: string) => void;
 }) {
   const hook = run.hook;
   const [busy, setBusy] = useState(false);
@@ -946,6 +967,7 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
       onPatch={onPatch}
       onAdd={onAdd}
       onRemove={onRemove}
+      onApplyAll={onApplyAll}
       firstTextPlaceholder="Hook text"
       overlay={
         <>
@@ -1011,7 +1033,7 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
  * (play, trim + Cut + Undo, text bars, zoom keyframes), Advanced settings, the text rows, and full screen.
  * Times on the player are on-screen seconds from the clip's start; texts are stored on the whole timeline.
  */
-function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder = "Text", onTrim, onAdjust, onPatch, onAdd, onRemove }: {
+function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder = "Text", onTrim, onAdjust, onPatch, onAdd, onRemove, onApplyAll }: {
   seg: Seg;
   /** Changes when the clip's file is replaced (reloads the video). */
   version?: string;
@@ -1026,6 +1048,8 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
   onPatch: (id: string, patch: Partial<TextLayer>) => void;
   onAdd: (afterId: string | null, window: [number, number]) => void;
   onRemove: (id: string) => void;
+  /** Give every subtitle in the video this one's look and position. */
+  onApplyAll?: (id: string) => void;
 }) {
   const live = Boolean(seg.src && seg.editable && !cover);
   const panned = useRef(false);
@@ -1226,7 +1250,7 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
       {mine.length > 0 ? (
         <div className="space-y-2">
           {mine.map((x, i) => (
-            <TextRow key={x.id} t={x} placeholder={i === 0 ? firstTextPlaceholder : "More text"} onPatch={(patch) => onPatch(x.id, patch)} onAdd={() => onAdd(x.id, span)} onRemove={() => onRemove(x.id)} />
+            <TextRow key={x.id} t={x} placeholder={i === 0 ? firstTextPlaceholder : "More text"} onPatch={(patch) => onPatch(x.id, patch)} onAdd={() => onAdd(x.id, span)} onRemove={() => onRemove(x.id)} onApplyAll={onApplyAll && texts.length > 1 ? () => onApplyAll(x.id) : undefined} />
           ))}
         </div>
       ) : (
@@ -2405,8 +2429,9 @@ function AdvancedSettings({ value, disabled, onChange, motion, keyOn, onMotion, 
 }
 
 /** One on-screen text: field, emoji, ▾ for font / color / style, and + / delete. */
-function TextRow({ t, placeholder, onPatch, onAdd, onRemove }: { t: TextLayer; placeholder: string; onPatch: (p: Partial<TextLayer>) => void; onAdd: () => void; onRemove: () => void }) {
+function TextRow({ t, placeholder, onPatch, onAdd, onRemove, onApplyAll }: { t: TextLayer; placeholder: string; onPatch: (p: Partial<TextLayer>) => void; onAdd: () => void; onRemove: () => void; onApplyAll?: () => void }) {
   const [open, setOpen] = useState(false);
+  const [applied, setApplied] = useState(false);
   const textInput = useRef<HTMLInputElement>(null);
   return (
     <div className="rounded-2xl border border-line bg-panel">
@@ -2489,6 +2514,21 @@ function TextRow({ t, placeholder, onPatch, onAdd, onRemove }: { t: TextLayer; p
             <Menu title={stylePreset(t.style).second} label={<span className="block h-5 w-5 rounded-full border border-line-strong" style={{ background: t.second ?? autoSecond(t.color) }} />}>
               {(close) => <ColorGrid value={t.second ?? autoSecond(t.color)} onPick={(c, done) => { onPatch({ second: c }); if (done) close(); }} />}
             </Menu>
+          )}
+          {onApplyAll && (
+            <button
+              type="button"
+              title="Give every text in the video this look and position"
+              onClick={() => {
+                onApplyAll();
+                setApplied(true);
+                setTimeout(() => setApplied(false), 1800);
+              }}
+              className="ml-auto flex items-center gap-1.5 rounded-lg border border-line-strong bg-panel px-3 py-1.5 text-[13px] font-semibold text-text hover:border-accent hover:text-accent"
+            >
+              {applied ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4" />}
+              {applied ? "Applied" : "Apply to all"}
+            </button>
           )}
         </div>
       )}
@@ -2739,7 +2779,7 @@ function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, 
         </div>
         {texts.length > 0 && (
           <div className="mt-1 space-y-1">
-            {texts.map((x, i) => (
+            {texts.map((x) => (
               <div key={x.id} className="relative h-6 rounded-md bg-raised/70" onPointerDown={(e) => track(e, onSeek)}>
                 <div
                   onPointerDown={(e) => dragText(e, x, "move")}
@@ -2748,7 +2788,7 @@ function ClipControls({ label, playing, onPlay, t, len, range, onRange, onSeek, 
                   style={{ left: pct(Math.min(x.start, len)), width: pct(Math.max(0, Math.min(x.end, len) - Math.min(x.start, len))) }}
                 >
                   <Type className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{x.text.trim() || (i === 0 ? "Hook text" : "More text")}</span>
+                  <span className="truncate">{x.text.trim() || (x.id === "hook" ? "Hook text" : "Text")}</span>
                   {/* Clear end caps (purple, unlike the clip trimmer's black ones) so the start and end are easy to grab and to line up. */}
                   <span aria-label="Text start" onPointerDown={(e) => dragText(e, x, "left")} className="absolute inset-y-0 left-0 flex w-2.5 cursor-ew-resize touch-none items-center justify-center rounded-l-md bg-texttrack">
                     <span className="h-2.5 w-px rounded-full bg-white" />
