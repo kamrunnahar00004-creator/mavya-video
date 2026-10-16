@@ -19,7 +19,7 @@ import { AvatarPlaceholder } from "@/components/frames";
 export function RunPreview({ run, source, texts }: { run: Run; source: Reference | null; texts: TextLayer[] }) {
   const hook = run.hook;
   const segs = timeline(run, source);
-  const total = round1(videoLength(segs));
+  const total = videoLength(segs);
 
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -154,7 +154,7 @@ export function RunPreview({ run, source, texts }: { run: Run; source: Reference
         }} onPointerDown={scrub} className="relative h-6 min-w-0 flex-1 cursor-pointer touch-none focus-visible:outline-2 focus-visible:outline-accent">
           <div className="absolute inset-x-0 top-1/2 flex h-1.5 -translate-y-1/2 gap-[2px] overflow-hidden rounded-full">
             {segs.map((x) => (
-              <span key={x.id} className="h-full bg-line" style={{ width: `${(x.len / total) * 100}%` }} />
+              <span key={x.id} className="absolute h-full bg-line" style={{ left: `${(x.offset / total) * 100}%`, width: `${(x.len / total) * 100}%` }} />
             ))}
           </div>
           <div className="pointer-events-none absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-accent" style={{ width: `${(time / total) * 100}%` }} />

@@ -1516,7 +1516,7 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   onRedo: () => void;
 }) {
   const scope = useRef<HTMLDivElement>(null);
-  const total = Math.max(0.5, videoLength(segs));
+  const total = Math.max(0.001, videoLength(segs));
   const [t, setT] = useState(0);
   // Starts paused; pressing play here pauses the phone preview (one sound at a time).
   const [playing, setPlaying] = useState(false);
@@ -2049,13 +2049,13 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
             {clipMove && clipMove.at !== null && <span className="pointer-events-none absolute -bottom-1 -top-1 z-40 w-[3px] -translate-x-1/2 rounded-full bg-accent" style={{ left: pct(clipMove.at ?? 0) }} />}
           </div>
         ) : (
-        <div className="flex h-7 cursor-pointer overflow-hidden rounded-md text-[10.5px] font-bold" onPointerDown={seek}>
+        <div className="relative h-7 cursor-pointer overflow-hidden rounded-md text-[10.5px] font-bold" onPointerDown={seek}>
           {segs.map((x, i) => (
             <div
               key={x.id}
               title={x.label}
-              className={`flex min-w-0 items-center border-white px-1.5 ${i ? "border-l-2" : ""} ${x.id === "hook" ? "bg-[#221d33] text-white" : !x.src ? "bg-hover text-soft" : i % 2 ? "bg-[#dfdde9] text-text" : "bg-[#d2d0df] text-text"}`}
-              style={{ width: pct(x.len) }}
+              className={`absolute inset-y-0 flex min-w-0 items-center border-white px-1.5 ${i ? "border-l-2" : ""} ${x.id === "hook" ? "bg-[#221d33] text-white" : !x.src ? "bg-hover text-soft" : i % 2 ? "bg-[#dfdde9] text-text" : "bg-[#d2d0df] text-text"}`}
+              style={{ left: pct(x.offset), width: pct(x.len) }}
             >
               <span className="truncate">{x.id === "hook" ? "Hook" : x.src ? x.label : "Demo"}</span>
             </div>
@@ -2916,6 +2916,13 @@ function SongBrowser({ busyId, onClose, onUse }: { busyId: number | null; onClos
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState<number | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
+  const who = useId();
+  const stop = useCallback(() => {
+    const a = audio.current;
+    if (a) { a.pause(); a.onended = null; a.removeAttribute("src"); a.load(); audio.current = null; }
+    setPlaying(null);
+  }, []);
+  usePlaybackClaims(who, stop);
   useEffect(() => () => audio.current?.pause(), []);
   // Top songs on open; search 350ms after typing stops.
   useEffect(() => {
@@ -2941,15 +2948,14 @@ function SongBrowser({ busyId, onClose, onUse }: { busyId: number | null; onClos
     };
   }, [q, tab]);
   function toggle(song: Song) {
-    audio.current?.pause();
-    if (playing === song.id) {
-      setPlaying(null);
-      return;
-    }
+    const same = playing === song.id;
+    stop();
+    if (same) return;
+    claimPlayback(who);
     const a = new Audio(song.preview);
-    a.onended = () => setPlaying(null);
-    void a.play().catch(() => setPlaying(null));
+    a.onended = () => { if (audio.current === a) stop(); };
     audio.current = a;
+    void a.play().catch(() => { if (audio.current === a) stop(); });
     setPlaying(song.id);
   }
   return (
@@ -3533,7 +3539,7 @@ function TrimmedVideo({ src, parts, muted = false, adjust, rate = 1, onTime }: {
   useEffect(() => {
     const v = ref.current;
     const ps = JSON.parse(key) as [number, number][];
-    if (!v || !ps.length) return;
+    if (!v || !ps.length || !playing) return;
     v.playbackRate = rate;
     let i = ps.findIndex(([a, b]) => v.currentTime >= a - 0.01 && v.currentTime < b);
     if (i < 0) {
@@ -3554,7 +3560,7 @@ function TrimmedVideo({ src, parts, muted = false, adjust, rate = 1, onTime }: {
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
+    return () => { cancelAnimationFrame(raf); v.pause(); };
   }, [key, rate, playing]);
   return <video ref={ref} src={src} autoPlay={playing} muted={muted} loop playsInline className="absolute inset-0 h-full w-full object-cover" style={style} />;
 }
