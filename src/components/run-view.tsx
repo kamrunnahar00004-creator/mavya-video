@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, Copy, Diamond, Download, Eye, Film, FolderOpen, GripVertical, Heart, Link as LinkIcon, ListOrdered, Loader2, Music, Pause, PenLine, Play, Plus, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, Copy, Diamond, Download, Eye, Film, FolderOpen, GripVertical, Heart, Link as LinkIcon, ListOrdered, Loader2, Music, Pause, PenLine, Play, Plus, Redo2, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
 import { waveform } from "@/lib/waveform";
 import { analyzeVideo } from "@/lib/analyze";
 import { CHARACTERS, characterById } from "@/lib/characters";
@@ -57,6 +57,8 @@ export function RunView() {
   const [reading, setReading] = useState(false);
   const [libraryKey, setLibraryKey] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
+  /** The full editor (Edit under the phone) is open. */
+  const [editing, setEditing] = useState(false);
   const runRef = useRef<Run | null>(null);
 
   useEffect(() => {
@@ -634,6 +636,17 @@ export function RunView() {
 
         <aside className="flex shrink-0 flex-col items-center justify-center border-l border-line bg-raised p-6 xl:min-h-0 xl:overflow-y-auto">
           <RunPreview run={run} source={source} texts={texts} />
+          <button
+            type="button"
+            onClick={() => {
+              claimPlayback("editor");
+              setEditing(true);
+            }}
+            className={`${optionBtn(false)} mt-4`}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Edit video
+          </button>
         </aside>
       </div>
 
@@ -653,6 +666,27 @@ export function RunView() {
             />
           </div>
         </div>
+      )}
+
+      {editing && (
+        <VideoEditor
+          run={run}
+          source={source}
+          segs={segs}
+          texts={texts}
+          videoLen={videoLen}
+          onClose={() => setEditing(false)}
+          onRestore={(x) => save({ hook: x.hook, demo: x.demo, texts: x.texts, sounds: x.sounds, sound: null })}
+          onParts={setParts}
+          onDeleteClip={deleteClip}
+          onAddVideos={addVideos}
+          onAdjust={liveAdjust}
+          onPatchText={patchText}
+          onAddText={addText}
+          onRemoveText={removeText}
+          onApplyAll={applyTextToAll}
+          onPieces={(sounds) => save({ sounds, sound: null })}
+        />
       )}
 
       {toast && <div className="fade-in fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-text px-4 py-2.5 text-[13.5px] font-semibold text-bg shadow-lg">{toast}</div>}
@@ -1350,10 +1384,33 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
 }
 
 /** Step 5 player: the whole video (hook, then every demo clip) with its texts and sound line, on one clock. */
-function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, onMove, onSplit, onAdd, onDelete, onUndo, onRedo }: {
+/** The full editor's extras on the whole-video timeline: clips and texts become selectable and editable, and it zooms. */
+type TimelineEdit = {
+  zoom: number;
+  /** `${clip id}:${piece id}` */
+  selClip: string | null;
+  selText: string | null;
+  onSelectClip: (segId: string, partId: string) => void;
+  onSelectText: (id: string) => void;
+  /** Piece i of a clip was trimmed to [a, b] (timeline seconds, inside its old window). */
+  onClipTrim: (segId: string, i: number, a: number, b: number) => void;
+  onTextTiming: (id: string, p: { start?: number; end?: number }) => void;
+  /** A text drag (or a drag on the preview) starts: one undo step. */
+  onTextBegin: () => void;
+  onTextMove: (id: string, pos: Partial<TextLayer>) => void;
+};
+
+function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, onMove, onSplit, onAdd, onDelete, onUndo, onRedo, claim = "whole", edit, toolbar, compact = false, autoFocus = false }: {
   segs: Seg[];
-  /** Shown next to the video (the selected sound's card). */
-  side: React.ReactNode;
+  /** Shown next to the video (the selected sound's card, or the editor's settings for the selection). */
+  side: React.ReactNode | ((time: number) => React.ReactNode);
+  /** Playback id (one player plays at a time). */
+  claim?: string;
+  edit?: TimelineEdit;
+  /** Replaces the Cut / + Sound buttons (the full editor's tools); gets the playhead time. */
+  toolbar?: (time: number) => React.ReactNode;
+  compact?: boolean;
+  autoFocus?: boolean;
   texts: TextLayer[];
   pieces: SoundPiece[];
   selected: string | null;
@@ -1371,7 +1428,10 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   const [t, setT] = useState(0);
   // Starts paused; pressing play here pauses the phone preview (one sound at a time).
   const [playing, setPlaying] = useState(false);
-  usePlaybackClaims("whole", setPlaying);
+  usePlaybackClaims(claim, setPlaying);
+  useEffect(() => {
+    if (autoFocus) scope.current?.focus({ preventScroll: true });
+  }, [autoFocus]);
   useEffect(() => {
     if (!playing) return;
     let raf = 0;
@@ -1399,11 +1459,14 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
     const down = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (!el || !scope.current?.contains(el)) return;
-      if (e.defaultPrevented || el?.closest('input, textarea, select, button, a, [contenteditable], [role="dialog"], [aria-modal="true"]') || document.querySelector('[role="dialog"], [aria-modal="true"]')) return;
+      // Not while typing or on a button, and not under another open dialog (the full editor is one itself).
+      const own = scope.current.closest('[role="dialog"]');
+      const others = [...document.querySelectorAll('[role="dialog"], [aria-modal="true"]')].some((d) => d !== own);
+      if (e.defaultPrevented || el.closest("input, textarea, select, button, a, [contenteditable]") || others) return;
       const k = keys.current;
       const mod = e.ctrlKey || e.metaKey;
       if (e.code === "Space") {
-        if (!k.playing) claimPlayback("whole");
+        if (!k.playing) claimPlayback(claim);
         setPlaying(!k.playing);
       } else if (e.key === "Delete" || e.key === "Backspace") k.onDelete();
       else if ((!mod && e.key.toLowerCase() === "s") || (mod && e.key.toLowerCase() === "b")) {
@@ -1421,14 +1484,14 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
     };
     window.addEventListener("keydown", down);
     return () => window.removeEventListener("keydown", down);
-  }, [total]);
+  }, [total, claim]);
 
   return (
     <div ref={scope} tabIndex={-1} onPointerDownCapture={(e) => {
       if (!(e.target as HTMLElement).closest('input, textarea, select, button, a, [contenteditable]')) scope.current?.focus({ preventScroll: true });
-    }} className="@container space-y-4 outline-none">
-      <div className="grid grid-cols-1 items-start gap-4 @min-[600px]:grid-cols-[300px_minmax(0,1fr)]">
-      <div className="relative aspect-[9/16] w-full max-w-[300px] overflow-hidden rounded-2xl border border-line bg-[#14121f] [container-type:size]">
+    }} className="@container space-y-4 outline-none focus-visible:outline-none">
+      <div className={`grid grid-cols-1 items-start gap-4 ${compact ? "@min-[600px]:grid-cols-[240px_minmax(0,1fr)]" : "@min-[600px]:grid-cols-[300px_minmax(0,1fr)]"}`}>
+      <div className={`relative aspect-[9/16] w-full overflow-hidden rounded-2xl border border-line bg-[#14121f] [container-type:size] ${compact ? "max-w-[240px]" : "max-w-[300px]"}`}>
         {seg.src ? (
           <>
             <WarmthFilter adjust={seg.editable ? seg.adjust : null} />
@@ -1437,9 +1500,9 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-[12px] font-semibold text-white/40">{seg.id === "hook" ? "Your hook" : "Your demo"}</div>
         )}
-        {texts.filter((x) => x.text.trim() && time >= x.start && time < x.end).map((x) => <TextOverlay key={x.id} x={x} />)}
+        {texts.filter((x) => x.text.trim() && time >= x.start && time < x.end).map((x) => <TextOverlay key={x.id} x={x} onMove={edit ? (pos) => edit.onTextMove(x.id, pos) : undefined} />)}
       </div>
-      <div className="min-w-0">{side}</div>
+      <div className="min-w-0">{typeof side === "function" ? side(time) : side}</div>
       </div>
       {pieces.map((p, i) => (
         <SyncedAudio key={p.id} src={p.src} at={soundAt({ ...p, end: pieceEnd(pieces, i, total) }, time)} playing={playing} volume={p.volume / 100} />
@@ -1452,8 +1515,10 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
         total={total}
         t={time}
         playing={playing}
+        edit={edit}
+        toolbar={toolbar?.(time)}
         onPlay={() => {
-          if (!playing) claimPlayback("whole");
+          if (!playing) claimPlayback(claim);
           setPlaying((p) => !p);
         }}
         onSeek={(v) => {
@@ -1477,7 +1542,9 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
 }
 
 /** Player bar for the whole video, three lines like CapCut: the clips, the texts, the sound line (click a sound, ✂ split it, drag its ends to trim, + add another). */
-function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPlay, onSeek, onSelect, onTrim, onMove, onSplit, onAdd }: {
+function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPlay, onSeek, onSelect, onTrim, onMove, onSplit, onAdd, edit, toolbar }: {
+  edit?: TimelineEdit;
+  toolbar?: React.ReactNode;
   segs: Seg[];
   texts: TextLayer[];
   pieces: SoundPiece[];
@@ -1500,6 +1567,48 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
   const [guide, setGuide] = useState<number | null>(null);
   const span = (p: SoundPiece, i: number): [number, number] => (draft?.id === p.id ? [draft.at, draft.end] : [p.at, pieceEnd(pieces, i, total)]);
   const underPlayhead = pieces.some((p, i) => t > p.at + 0.25 && t < pieceEnd(pieces, i, total) - 0.25);
+  // Editor: a clip piece being trimmed (timeline seconds), saved on release.
+  const [clipDraft, setClipDraft] = useState<{ key: string; a: number; b: number } | null>(null);
+  // Zoomed in: keep the playhead in view while playing.
+  const scroller = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el || !playing || el.scrollWidth <= el.clientWidth) return;
+    const x = (t / total) * el.scrollWidth;
+    if (x < el.scrollLeft || x > el.scrollLeft + el.clientWidth - 24) el.scrollLeft = x - 24;
+  }, [t, playing, total]);
+
+  /** Editor: drag one end of a clip piece inward (what is trimmed off can come back with Undo). */
+  function trimClip(e: React.PointerEvent, segId: string, i: number, key: string, lo: number, hi: number, edge: "left" | "right") {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = area.current?.getBoundingClientRect();
+    if (!rect || !edit) return;
+    const done = edit.onClipTrim;
+    const sx = e.clientX;
+    let next: [number, number] = [lo, hi];
+    const move = (ev: PointerEvent) => {
+      const v = (edge === "left" ? lo : hi) + ((ev.clientX - sx) / rect.width) * total;
+      next = edge === "left" ? [Math.max(lo, Math.min(hi - 0.3, v)), hi] : [lo, Math.min(hi, Math.max(lo + 0.3, v))];
+      setClipDraft({ key, a: next[0], b: next[1] });
+      onSeek(edge === "left" ? next[0] : next[1] - 0.01);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setClipDraft(null);
+      if (next[0] !== lo || next[1] !== hi) done(segId, i, next[0], next[1]);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+  /** Editor: drag a text bar (move / either end), with a magnet to clip edges, the playhead and other texts. */
+  function dragText(e: React.PointerEvent, x: TextLayer, mode: "move" | "left" | "right") {
+    const rect = area.current?.getBoundingClientRect();
+    if (!rect || !edit) return;
+    edit.onSelectText(x.id);
+    dragTextBar(e, rect, total, x, mode, [0, total, t, ...segs.map((g) => g.offset), ...texts.filter((o) => o.id !== x.id).flatMap((o) => [o.start, o.end])], edit.onTextTiming, setGuide, edit.onTextBegin);
+  }
 
   function seek(e: React.PointerEvent) {
     const rect = area.current?.getBoundingClientRect();
@@ -1598,24 +1707,77 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
         <span className="whitespace-nowrap text-[12.5px] tabular-nums text-muted">
           {clock(t)} / {clock(total)}
         </span>
-        <div className="ml-auto flex items-center">
-          <button type="button" disabled={!underPlayhead} onClick={onSplit} title="Cut the sound in two at the playhead (S)" className="flex items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-1 text-[12px] font-bold text-text hover:bg-raised hover:text-accent disabled:text-soft disabled:hover:bg-transparent">
-            <Scissors className="h-3.5 w-3.5" />
-            Cut
-          </button>
-          <button type="button" onClick={onAdd} title="Add a sound at the playhead" className="flex items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-1 text-[12px] font-bold text-text hover:bg-raised hover:text-accent">
-            <Plus className="h-3.5 w-3.5" />
-            Sound
-          </button>
+        <div className="ml-auto flex flex-wrap items-center justify-end">
+          {toolbar ?? (
+            <>
+              <button type="button" disabled={!underPlayhead} onClick={onSplit} title="Cut the sound in two at the playhead (S)" className="flex items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-1 text-[12px] font-bold text-text hover:bg-raised hover:text-accent disabled:text-soft disabled:hover:bg-transparent">
+                <Scissors className="h-3.5 w-3.5" />
+                Cut
+              </button>
+              <button type="button" onClick={onAdd} title="Add a sound at the playhead" className="flex items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-1 text-[12px] font-bold text-text hover:bg-raised hover:text-accent">
+                <Plus className="h-3.5 w-3.5" />
+                Sound
+              </button>
+            </>
+          )}
         </div>
       </div>
-      <div ref={area} className="relative select-none">
+      <div ref={scroller} className={edit ? "overflow-x-auto pb-1" : undefined}>
+      <div ref={area} className="relative select-none" style={edit ? { width: `${edit.zoom * 100}%` } : undefined}>
         <div className="relative h-4 cursor-pointer" onPointerDown={seek}>
           {Array.from({ length: Math.floor(total) + 1 }, (_, s) => (
             <span key={s} className="absolute top-0 h-1.5 w-px bg-line" style={{ left: pct(s) }} />
           ))}
         </div>
-        {/* 1. the clips */}
+        {/* 1. the clips (editor: every piece, selectable, trim handles on the selected one) */}
+        {edit ? (
+          <div className="relative h-10 cursor-pointer rounded-md bg-raised/70" onPointerDown={seek}>
+            {segs.flatMap((x, si) => {
+              const spans = pieceSpans(x);
+              const name = x.id === "hook" ? "Hook" : x.src ? x.label : "Demo";
+              return x.parts.map((part, pi) => {
+                const key = `${x.id}:${part.id}`;
+                const lo = x.offset + spans[pi].at;
+                const hi = lo + spans[pi].len;
+                const [a, b] = clipDraft?.key === key ? [clipDraft.a, clipDraft.b] : [lo, hi];
+                const on = edit.selClip === key;
+                const handle = "absolute inset-y-0 z-10 flex w-3 cursor-ew-resize touch-none items-center justify-center bg-ink";
+                return (
+                  <div
+                    key={key}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Clip: ${name}${x.parts.length > 1 ? ` ${pi + 1}` : ""}`}
+                    aria-pressed={on}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      edit.onSelectClip(x.id, part.id);
+                      seek(e);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); edit.onSelectClip(x.id, part.id); }
+                    }}
+                    className={`absolute inset-y-0 flex items-center gap-1 overflow-hidden px-3.5 text-[10.5px] font-bold outline-none ${si || pi ? "border-l-2 border-panel" : "rounded-l-md"} ${x.id === "hook" ? "bg-[#221d33] text-white" : si % 2 ? "bg-[#dfdde9] text-text" : "bg-[#d2d0df] text-text"} ${on ? "z-10 ring-2 ring-inset ring-accent" : ""}`}
+                    style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})` }}
+                  >
+                    <Film className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{name}{x.parts.length > 1 ? ` ${pi + 1}` : ""}</span>
+                    {on && x.editable && (
+                      <>
+                        <span aria-label="Trim clip start" onPointerDown={(e) => trimClip(e, x.id, pi, key, lo, hi, "left")} className={`${handle} left-0`}>
+                          <span className="h-3.5 w-0.5 rounded-full bg-white" />
+                        </span>
+                        <span aria-label="Trim clip end" onPointerDown={(e) => trimClip(e, x.id, pi, key, lo, hi, "right")} className={`${handle} right-0`}>
+                          <span className="h-3.5 w-0.5 rounded-full bg-white" />
+                        </span>
+                      </>
+                    )}
+                  </div>
+                );
+              });
+            })}
+          </div>
+        ) : (
         <div className="flex h-7 cursor-pointer overflow-hidden rounded-md text-[10.5px] font-bold" onPointerDown={seek}>
           {segs.map((x, i) => (
             <div
@@ -1628,15 +1790,41 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
             </div>
           ))}
         </div>
-        {/* 2. the texts */}
+        )}
+        {/* 2. the texts (editor: drag to move, drag the ends to stretch) */}
         {texts.length > 0 && (
           <div className="mt-1 space-y-1">
             {texts.map((x) => (
-              <div key={x.id} className="relative h-5 cursor-pointer rounded-md bg-raised/70" onPointerDown={seek}>
-                <div className="absolute inset-y-0 flex items-center gap-1 overflow-hidden rounded-md bg-texttrack-tint px-1.5 text-[10px] font-semibold text-texttrack" style={{ left: pct(x.start), width: `calc(${pct(x.end)} - ${pct(x.start)})` }}>
-                  <Type className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{x.text}</span>
-                </div>
+              <div key={x.id} className={`relative cursor-pointer rounded-md bg-raised/70 ${edit ? "h-6" : "h-5"}`} onPointerDown={seek}>
+                {edit ? (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Text: ${x.text.trim() || "Text"}`}
+                    aria-pressed={edit.selText === x.id}
+                    onPointerDown={(e) => dragText(e, x, "move")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); edit.onSelectText(x.id); }
+                    }}
+                    title="Drag to move. Drag the ends to make it longer or shorter."
+                    className={`absolute inset-y-0 flex cursor-grab touch-none items-center gap-1 overflow-hidden rounded-md bg-texttrack-tint px-3.5 text-[10.5px] font-semibold text-texttrack outline-none active:cursor-grabbing ${edit.selText === x.id ? "ring-2 ring-inset ring-texttrack" : ""}`}
+                    style={{ left: pct(x.start), width: `calc(${pct(x.end)} - ${pct(x.start)})` }}
+                  >
+                    <Type className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{x.text.trim() || "Text"}</span>
+                    <span aria-label="Text start" onPointerDown={(e) => dragText(e, x, "left")} className="absolute inset-y-0 left-0 flex w-2.5 cursor-ew-resize touch-none items-center justify-center rounded-l-md bg-texttrack">
+                      <span className="h-2.5 w-px rounded-full bg-white" />
+                    </span>
+                    <span aria-label="Text end" onPointerDown={(e) => dragText(e, x, "right")} className="absolute inset-y-0 right-0 flex w-2.5 cursor-ew-resize touch-none items-center justify-center rounded-r-md bg-texttrack">
+                      <span className="h-2.5 w-px rounded-full bg-white" />
+                    </span>
+                  </div>
+                ) : (
+                  <div className="absolute inset-y-0 flex items-center gap-1 overflow-hidden rounded-md bg-texttrack-tint px-1.5 text-[10px] font-semibold text-texttrack" style={{ left: pct(x.start), width: `calc(${pct(x.end)} - ${pct(x.start)})` }}>
+                    <Type className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{x.text}</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1708,6 +1896,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
         <div className="pointer-events-none absolute bottom-0 top-0 z-20 w-0.5 rounded bg-text" style={{ left: pct(t) }} />
         {guide !== null && <div className="pointer-events-none absolute -bottom-1 -top-1 z-30 w-px -translate-x-1/2 bg-accent" style={{ left: pct(guide) }} />}
       </div>
+      </div>
     </div>
   );
 }
@@ -1717,14 +1906,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
  * ✂ Split cuts a sound at the playhead, + Add sound puts another one in at the playhead, 🗑 leaves that stretch
  * to the video's own sound. Each sound: the hook's own sound, a real song, or the user's file.
  */
-function SoundStep({ run, source, segs, texts, videoLen, onPieces }: {
-  run: Run;
-  source: Reference | null;
-  segs: Seg[];
-  texts: TextLayer[];
-  videoLen: number;
-  onPieces: (pieces: SoundPiece[]) => void;
-}) {
+function useSounds(run: Run, source: Reference | null, videoLen: number, onPieces: (pieces: SoundPiece[]) => void) {
   const pieces = soundPieces(run, videoLen);
   const [selId, setSelId] = useState<string | null>(null);
   const found = pieces.findIndex((p) => p.id === selId);
@@ -1933,26 +2115,323 @@ function SoundStep({ run, source, segs, texts, videoLen, onPieces }: {
     </div>
   );
 
+  const select = (id: string | null) => {
+    setSelId(id);
+    setChanging(false);
+    setAdding(null);
+  };
+  const move = (id: string, at: number, end: number) => put(pieces.map((p) => (p.id === id ? { ...p, at, end } : p)));
+  return { pieces, sel, selId: found >= 0 ? selId : null, choosing, select, split, addAt, trimPiece, move, deleteSelected, undo, redo, panel };
+}
+
+/** Step 5: the whole video with its sound line. */
+function SoundStep({ run, source, segs, texts, videoLen, onPieces }: {
+  run: Run;
+  source: Reference | null;
+  segs: Seg[];
+  texts: TextLayer[];
+  videoLen: number;
+  onPieces: (pieces: SoundPiece[]) => void;
+}) {
+  const s = useSounds(run, source, videoLen, onPieces);
   return (
     <WholePlayer
       segs={segs}
       texts={texts}
-      pieces={pieces}
-      selected={sel?.id ?? null}
-      onSelect={(id) => {
-        setSelId(id);
-        setChanging(false);
-        setAdding(null);
-      }}
-      onTrim={trimPiece}
-      onMove={(id, at, end) => put(pieces.map((p) => (p.id === id ? { ...p, at, end } : p)))}
-      onSplit={split}
-      onAdd={addAt}
-      onDelete={deleteSelected}
-      onUndo={undo}
-      onRedo={redo}
-      side={panel}
+      pieces={s.pieces}
+      selected={s.sel?.id ?? null}
+      onSelect={s.select}
+      onTrim={s.trimPiece}
+      onMove={s.move}
+      onSplit={s.split}
+      onAdd={s.addAt}
+      onDelete={s.deleteSelected}
+      onUndo={s.undo}
+      onRedo={s.redo}
+      side={s.panel}
     />
+  );
+}
+
+/** What Undo in the full editor brings back. */
+type EditorSnap = { hook: Run["hook"]; demo: Run["demo"]; texts: TextLayer[]; sounds: SoundPiece[] };
+
+/**
+ * The full editor (Edit under the phone): every clip, text and sound on one timeline, like CapCut but only what
+ * Mavya does. Select something to change it on the right; Cut (S), Delete and Undo work on the selection.
+ */
+function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, onParts, onDeleteClip, onAddVideos, onAdjust, onPatchText, onAddText, onRemoveText, onApplyAll, onPieces }: {
+  run: Run;
+  source: Reference | null;
+  segs: Seg[];
+  texts: TextLayer[];
+  videoLen: number;
+  onClose: () => void;
+  onRestore: (s: EditorSnap) => void;
+  onParts: (clipId: string, parts: Part[]) => void;
+  onDeleteClip: (clipId: string) => void;
+  onAddVideos: (files: File[]) => Promise<void>;
+  onAdjust: (clipId: string, a: Partial<Adjust>) => void;
+  onPatchText: (id: string, p: Partial<TextLayer>) => void;
+  onAddText: (afterId: string | null, w: [number, number], text?: string) => void;
+  onRemoveText: (id: string) => void;
+  onApplyAll: (id: string) => void;
+  onPieces: (pieces: SoundPiece[]) => void;
+}) {
+  const [sel, setSel] = useState<{ kind: "clip"; seg: string; part: string } | { kind: "text"; id: string } | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [past, setPast] = useState<EditorSnap[]>([]);
+  const [future, setFuture] = useState<EditorSnap[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const snap = (): EditorSnap => ({ hook: run.hook, demo: run.demo, texts, sounds: soundPieces(run, videoLen) });
+  const remember = () => {
+    setPast((p) => [...p.slice(-49), snap()]);
+    setFuture([]);
+  };
+  const sounds = useSounds(run, source, videoLen, (p) => {
+    remember();
+    onPieces(p);
+  });
+  const undo = () => {
+    const last = past[past.length - 1];
+    if (!last) return;
+    setPast((p) => p.slice(0, -1));
+    setFuture((f) => [...f, snap()]);
+    onRestore(last);
+    setSel(null);
+  };
+  const redo = () => {
+    const next = future[future.length - 1];
+    if (!next) return;
+    setFuture((f) => f.slice(0, -1));
+    setPast((p) => [...p, snap()]);
+    onRestore(next);
+    setSel(null);
+  };
+  const pick = (next: typeof sel) => {
+    setSel(next);
+    sounds.select(null);
+  };
+  const r3 = (x: number) => Math.round(x * 1000) / 1000;
+  const selSeg = sel?.kind === "clip" ? segs.find((x) => x.id === sel.seg) : undefined;
+  const selText = sel?.kind === "text" ? texts.find((x) => x.id === sel.id) : undefined;
+  const canDelete = Boolean(selText || (selSeg && (selSeg.parts.length > 1 || selSeg.id !== "hook")) || (!sel && sounds.selId));
+
+  /** ✂ at the playhead: the selected sound or text, else the clip under the playhead (two pieces, side by side). */
+  const cut = (time: number) => {
+    if (!sel && sounds.selId) {
+      sounds.split(time);
+      return;
+    }
+    if (selText) {
+      if (time <= selText.start + 0.3 || time >= selText.end - 0.3) return;
+      remember();
+      onPatchText(selText.id, { end: r3(time) });
+      onAddText(selText.id, [r3(time), selText.end], selText.text);
+      return;
+    }
+    const seg = segs.find((x) => time >= x.offset && time < x.offset + x.len);
+    if (!seg || !seg.editable) return;
+    const { file, i } = fileAt(seg, time - seg.offset);
+    const p = seg.parts[i];
+    const sp = speedOf(seg.adjust);
+    if ((file - p.start) / sp <= 0.2 || (p.end - file) / sp <= 0.2) return;
+    const second = { id: uid(), start: r3(file), end: p.end };
+    remember();
+    onParts(seg.id, [...seg.parts.slice(0, i), { ...p, end: r3(file) }, second, ...seg.parts.slice(i + 1)]);
+    pick({ kind: "clip", seg: seg.id, part: second.id });
+  };
+  /** Delete the selection: a text, a clip piece (the last piece of a demo clip removes the clip), or a sound. */
+  const remove = () => {
+    if (selText) {
+      remember();
+      onRemoveText(selText.id);
+      setSel(null);
+    } else if (selSeg && sel?.kind === "clip") {
+      if (selSeg.parts.length > 1) {
+        remember();
+        onParts(selSeg.id, selSeg.parts.filter((x) => x.id !== sel.part));
+      } else if (selSeg.id !== "hook") {
+        remember();
+        onDeleteClip(selSeg.id);
+      }
+      setSel(null);
+    } else if (sounds.selId) sounds.deleteSelected();
+  };
+
+  const side = (time: number) => {
+    if (selSeg) {
+      const fileT = fileAt(selSeg, Math.max(0, Math.min(selSeg.len, time - selSeg.offset))).file;
+      return (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-[14px] font-semibold">
+            <Film className="h-4 w-4 text-soft" />
+            {selSeg.id === "hook" ? "Hook" : selSeg.label}
+          </div>
+          <AdvancedSettings
+            key={selSeg.id}
+            defaultOpen
+            value={selSeg.adjust}
+            disabled={!selSeg.editable || !selSeg.src}
+            onChange={(a) => onAdjust(selSeg.id, a)}
+            motion={motionAt(selSeg.adjust, fileT)}
+            keyOn={keyAt(selSeg.adjust, fileT) >= 0}
+            onMotion={(patch) => onAdjust(selSeg.id, setMotion(selSeg.adjust, fileT, patch))}
+            onKey={() => onAdjust(selSeg.id, toggleKey(selSeg.adjust, fileT))}
+          />
+        </div>
+      );
+    }
+    if (selText) {
+      return (
+        <TextRow
+          key={selText.id}
+          t={selText}
+          placeholder="Text"
+          onPatch={(patch) => onPatchText(selText.id, patch)}
+          onAdd={() => {
+            remember();
+            onAddText(selText.id, [selText.start, selText.end]);
+          }}
+          onRemove={remove}
+          onApplyAll={texts.length > 1 ? () => { remember(); onApplyAll(selText.id); } : undefined}
+        />
+      );
+    }
+    if (sounds.selId || sounds.choosing) return sounds.panel;
+    return <p className="pt-1 text-[13px] text-soft">Select a clip, text or sound</p>;
+  };
+
+  const tool = "flex items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-1 text-[12px] font-bold text-text hover:bg-raised hover:text-accent disabled:text-soft disabled:hover:bg-transparent";
+  const toolbar = (time: number) => (
+    <>
+      <button type="button" onClick={() => cut(time)} title="Cut at the playhead (S)" className={tool}>
+        <Scissors className="h-3.5 w-3.5" />
+        Cut
+      </button>
+      <button type="button" disabled={!canDelete} onClick={remove} title="Delete the selection (Delete)" className={tool}>
+        <Trash2 className="h-3.5 w-3.5" />
+        Delete
+      </button>
+      <span className="mx-1 h-4 w-px bg-line" />
+      <label title="Add video clips at the end" className={`${tool} cursor-pointer ${uploading ? "pointer-events-none text-soft" : ""}`}>
+        {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Film className="h-3.5 w-3.5" />}
+        Clips
+        <input
+          type="file"
+          accept="video/*"
+          multiple
+          className="hidden"
+          onChange={async (e) => {
+            const files = [...(e.target.files ?? [])];
+            e.target.value = "";
+            if (!files.length) return;
+            setUploading(true);
+            remember();
+            try {
+              await onAddVideos(files);
+            } finally {
+              setUploading(false);
+            }
+          }}
+        />
+      </label>
+      <button
+        type="button"
+        title="Add a text at the playhead"
+        onClick={() => {
+          const at = r3(Math.max(0, Math.min(time, videoLen - 0.5)));
+          remember();
+          onAddText(null, [at, r3(Math.min(videoLen, at + 2))]);
+        }}
+        className={tool}
+      >
+        <Type className="h-3.5 w-3.5" />
+        Text
+      </button>
+      <button
+        type="button"
+        title="Add a sound at the playhead"
+        onClick={() => {
+          setSel(null);
+          sounds.addAt(time);
+        }}
+        className={tool}
+      >
+        <Music className="h-3.5 w-3.5" />
+        Sound
+      </button>
+      <span className="mx-1 h-4 w-px bg-line" />
+      <button type="button" disabled={zoom <= 1} onClick={() => setZoom((z) => Math.max(1, z / 2))} title="Zoom out" aria-label="Zoom out" className={tool}>
+        <ZoomOut className="h-4 w-4" />
+      </button>
+      <button type="button" disabled={zoom >= 8} onClick={() => setZoom((z) => Math.min(8, z * 2))} title="Zoom in" aria-label="Zoom in" className={tool}>
+        <ZoomIn className="h-4 w-4" />
+      </button>
+    </>
+  );
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Edit video" className="fixed inset-0 z-40 flex flex-col bg-panel">
+      <header className="flex items-center gap-2 border-b border-line px-5 py-3">
+        <h2 className="text-[16px] font-extrabold tracking-tight">Edit video</h2>
+        <button type="button" disabled={!past.length} onClick={undo} title="Undo (Ctrl+Z)" aria-label="Undo" className="ml-2 rounded-lg p-1.5 text-muted hover:bg-raised hover:text-text disabled:text-line-strong disabled:hover:bg-transparent">
+          <Undo2 className="h-4 w-4" />
+        </button>
+        <button type="button" disabled={!future.length} onClick={redo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo" className="rounded-lg p-1.5 text-muted hover:bg-raised hover:text-text disabled:text-line-strong disabled:hover:bg-transparent">
+          <Redo2 className="h-4 w-4" />
+        </button>
+        <button type="button" onClick={onClose} className="btn-primary ml-auto px-4 py-2 text-[14px]">
+          <Check className="h-4 w-4" />
+          Done
+        </button>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div className="mx-auto max-w-[1100px]">
+          <WholePlayer
+            claim="editor"
+            compact
+            autoFocus
+            segs={segs}
+            texts={texts}
+            pieces={sounds.pieces}
+            selected={sel ? null : sounds.selId}
+            onSelect={(id) => {
+              setSel(null);
+              sounds.select(id);
+            }}
+            onTrim={sounds.trimPiece}
+            onMove={sounds.move}
+            onSplit={cut}
+            onAdd={sounds.addAt}
+            onDelete={remove}
+            onUndo={undo}
+            onRedo={redo}
+            side={side}
+            toolbar={toolbar}
+            edit={{
+              zoom,
+              selClip: sel?.kind === "clip" ? `${sel.seg}:${sel.part}` : null,
+              selText: sel?.kind === "text" ? sel.id : null,
+              onSelectClip: (seg, part) => pick({ kind: "clip", seg, part }),
+              onSelectText: (id) => pick({ kind: "text", id }),
+              onClipTrim: (segId, i, a, b) => {
+                const seg = segs.find((x) => x.id === segId);
+                if (!seg) return;
+                const lo = seg.offset + pieceSpans(seg)[i].at;
+                const sp = speedOf(seg.adjust);
+                const p = seg.parts[i];
+                remember();
+                onParts(segId, seg.parts.map((x, j) => (j === i ? { ...p, start: r3(p.start + (a - lo) * sp), end: r3(p.start + (b - lo) * sp) } : x)));
+              },
+              onTextTiming: (id, patch) => onPatchText(id, { ...(patch.start !== undefined ? { start: r3(patch.start) } : {}), ...(patch.end !== undefined ? { end: r3(patch.end) } : {}) }),
+              onTextBegin: remember,
+              onTextMove: (id, pos) => onPatchText(id, pos),
+            }}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -2181,6 +2660,9 @@ function SongBrowser({ busyId, onClose, onUse }: { busyId: number | null; onClos
             </div>
           ))}
         </div>
+        <p className="border-t border-line px-5 py-2.5 text-[11.5px] leading-snug text-soft">
+          Due to copyright, songs here are 30s previews. For the full song, upload your own mp3, or pick the song in Instagram or TikTok when you post.
+        </p>
       </div>
     </div>
   );
@@ -2431,7 +2913,7 @@ function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, onRenam
 }
 
 /** Step 3 Advanced settings: brightness, contrast, saturation, warmth and zoom of the hook clip. */
-function AdvancedSettings({ value, disabled, onChange, motion, keyOn, onMotion, onKey }: {
+function AdvancedSettings({ value, disabled, onChange, motion, keyOn, onMotion, onKey, defaultOpen = false }: {
   value?: Partial<Adjust>;
   disabled: boolean;
   onChange: (a: Partial<Adjust>) => void;
@@ -2440,8 +2922,10 @@ function AdvancedSettings({ value, disabled, onChange, motion, keyOn, onMotion, 
   keyOn: boolean;
   onMotion: (p: Partial<Motion>) => void;
   onKey: () => void;
+  /** Start open (the full editor shows the settings right away). */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const v = fullAdjust(value);
   const hasKeys = v.keys.length > 0;
   const set = (key: AdjustRow["key"], n: number) => {
@@ -2719,6 +3203,56 @@ function TrimmedVideo({ src, parts, muted = false, adjust, rate = 1, onTime }: {
 
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${(sec % 60).toFixed(1).padStart(4, "0")}`;
 
+/**
+ * Drag a text bar on a timeline `rect` that is `len` seconds wide: move it, or stretch / shrink it from either
+ * end (like CapCut), with a magnet (12px) to `points`. `onStart` runs on the first real move (one undo step).
+ */
+function dragTextBar(e: React.PointerEvent, rect: DOMRect, len: number, x: TextLayer, mode: "move" | "left" | "right", points: number[], onTiming: (id: string, p: { start?: number; end?: number }) => void, setGuide: (v: number | null) => void, onStart?: () => void) {
+  e.preventDefault();
+  e.stopPropagation();
+  const sx = e.clientX;
+  const { start, end } = x;
+  const size = end - start;
+  const tol = (12 / rect.width) * len;
+  const snap = magnet(points, tol);
+  const snapEnd = magnet(points, tol);
+  let started = false;
+  const move = (ev: PointerEvent) => {
+    if (!started) {
+      if (Math.abs(ev.clientX - sx) < 2) return;
+      started = true;
+      onStart?.();
+    }
+    const d = ((ev.clientX - sx) / rect.width) * len;
+    if (mode === "move") {
+      const raw = start + d;
+      const a = snap(raw);
+      const b = snapEnd(raw + size);
+      const ns = a !== null && (b === null || Math.abs(a - raw) <= Math.abs(b - raw - size)) ? a : b !== null ? b - size : round1(raw);
+      const clamped = Math.max(0, Math.min(len - size, ns));
+      setGuide(a !== null && clamped === a ? a : b !== null && clamped === b - size ? b : null);
+      onTiming(x.id, { start: clamped, end: clamped + size });
+    } else if (mode === "left") {
+      const p = snap(start + d);
+      const v = Math.max(0, Math.min(end - 0.3, p ?? round1(start + d)));
+      setGuide(p !== null && v === p ? p : null);
+      onTiming(x.id, { start: v });
+    } else {
+      const p = snap(end + d);
+      const v = Math.min(len, Math.max(start + 0.3, p ?? round1(end + d)));
+      setGuide(p !== null && v === p ? p : null);
+      onTiming(x.id, { end: v });
+    }
+  };
+  const up = () => {
+    setGuide(null);
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", up);
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+}
+
 /** Player bar under a clip: play/pause, time, ruler, the clip's pieces side by side (Cut splits the piece under
  *  the playhead; the selected piece has trim handles and can be deleted), text bars, keyframes, Undo. */
 function ClipControls({ label, playing, onPlay, t, len, pieces, selected, onSelect, draft, onTrim, onTrimEnd, onDelete, onSeek, onCut, canCut, texts, onTiming, keys, onKeyMove, canUndo, onUndo }: {
@@ -2799,47 +3333,10 @@ function ClipControls({ label, playing, onPlay, t, len, pieces, selected, onSele
   }
   /** Drag a text bar: move it, or stretch / shrink it from either end (like CapCut). */
   function dragText(e: React.PointerEvent, x: TextLayer, mode: "move" | "left" | "right") {
-    e.preventDefault();
-    e.stopPropagation();
     const rect = area.current?.getBoundingClientRect();
     if (!rect) return;
-    const sx = e.clientX;
-    const { start, end } = x;
-    const size = end - start;
-    // Snap (like CapCut) to the clip's start and end, the playhead, and other texts' edges, within 8px.
-    const tol = (12 / rect.width) * len;
-    const points = [0, len, t, ...pieces.map((p) => p.at), ...texts.filter((o) => o.id !== x.id).flatMap((o) => [o.start, o.end])];
-    const snap = magnet(points, tol);
-    const snapEnd = magnet(points, tol);
-    const move = (ev: PointerEvent) => {
-      const d = ((ev.clientX - sx) / rect.width) * len;
-      if (mode === "move") {
-        const raw = start + d;
-        const a = snap(raw);
-        const b = snapEnd(raw + size);
-        const ns = a !== null && (b === null || Math.abs(a - raw) <= Math.abs(b - raw - size)) ? a : b !== null ? b - size : round1(raw);
-        const clamped = Math.max(0, Math.min(len - size, ns));
-        setGuide(a !== null && clamped === a ? a : b !== null && clamped === b - size ? b : null);
-        onTiming(x.id, { start: clamped, end: clamped + size });
-      } else if (mode === "left") {
-        const p = snap(start + d);
-        const v = Math.max(0, Math.min(end - 0.3, p ?? round1(start + d)));
-        setGuide(p !== null && v === p ? p : null);
-        onTiming(x.id, { start: v });
-      } else {
-        const p = snap(end + d);
-        const v = Math.min(len, Math.max(start + 0.3, p ?? round1(end + d)));
-        setGuide(p !== null && v === p ? p : null);
-        onTiming(x.id, { end: v });
-      }
-    };
-    const up = () => {
-      setGuide(null);
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
+    // Snap to the clip's start and end, the pieces, the playhead, and other texts' edges.
+    dragTextBar(e, rect, len, x, mode, [0, len, t, ...pieces.map((p) => p.at), ...texts.filter((o) => o.id !== x.id).flatMap((o) => [o.start, o.end])], onTiming, setGuide);
   }
   return (
     <div className="w-full rounded-2xl border border-line bg-panel p-3">
