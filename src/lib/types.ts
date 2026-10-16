@@ -218,6 +218,8 @@ export type Run = {
     generated?: { src: string; seconds: number; at: string; /** What the user said went wrong when regenerating. */ note?: string };
     /** Step 3 Advanced settings: brightness / contrast / saturation / warmth / zoom of the hook clip. */
     adjust?: Partial<Adjust>;
+    /** Pieces after a Cut (file times, played back to back). Absent = one piece from start to end. */
+    parts?: Part[];
   };
   demo: {
     /** Older runs: a single demo clip. Newer runs use clips. */
@@ -266,7 +268,7 @@ export type DemoClip = {
   /** Suggested on-screen length, seconds. */
   target?: number;
   mediaId?: string;
-  /** A video that is not an upload (e.g. the generated hook's file, when the hook was cut in two). */
+  /** A video that is not an upload. */
   src?: string;
   name?: string;
   /** File length; start / end trim it. */
@@ -274,7 +276,12 @@ export type DemoClip = {
   start?: number;
   end?: number;
   adjust?: Partial<Adjust>;
+  /** Pieces after a Cut (file times, played back to back). Absent = one piece from start to end. */
+  parts?: Part[];
 };
+
+/** One kept piece of a clip's file. Cut splits a clip into pieces that sit side by side on its bar. */
+export type Part = { id: string; start: number; end: number };
 
 /** A chosen sound: the hook's own sound, a real song's 30s clip, or the user's file. */
 export type PartSound = {

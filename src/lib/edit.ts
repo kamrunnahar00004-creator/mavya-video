@@ -1,7 +1,7 @@
 import type { Adjust } from "@/lib/adjust";
 import { speedOf } from "@/lib/adjust";
 const roundTime = (n: number) => Math.round(n * 1000) / 1000;
-import type { DemoClip, Reference, Run, TextLayer } from "@/lib/types";
+import type { DemoClip, Part, Reference, Run, TextLayer } from "@/lib/types";
 
 /**
  * The finished video is one timeline: the hook, then the demo clips that have a video, in order.
@@ -21,10 +21,55 @@ export type Seg = {
   adjust?: Partial<Adjust>;
   /** Hook only: speed / look apply once the hook is generated. */
   editable: boolean;
+  /** The pieces that play, back to back (one piece until the clip is Cut). start / end = the first and last frame used. */
+  parts: Part[];
   /** Timeline position and on-screen length. */
   offset: number;
   len: number;
 };
+
+/** A clip's pieces; a clip that was never Cut is one piece from start to end. */
+export const partsOf = (x: { start: number; end: number; parts?: Part[] }): Part[] => (x.parts?.length ? x.parts : [{ id: "p0", start: x.start, end: x.end }]);
+
+/** start / end / parts to store for a clip with these pieces (one piece = no parts list). */
+export const storeParts = (parts: Part[]) => ({
+  start: Math.min(...parts.map((p) => p.start)),
+  end: Math.max(...parts.map((p) => p.end)),
+  parts: parts.length > 1 ? parts : undefined,
+});
+
+const pieceLen = (p: Part, speed: number) => Math.max(0.05, p.end - p.start) / speed;
+export const segSpeed = (s: Pick<Seg, "editable" | "adjust">) => (s.editable ? speedOf(s.adjust) : 1);
+
+/** Where each piece starts on screen (from the clip's start), and how long it plays. */
+export function pieceSpans(s: Pick<Seg, "parts" | "editable" | "adjust">): { at: number; len: number }[] {
+  const sp = segSpeed(s);
+  let at = 0;
+  return s.parts.map((p) => {
+    const len = pieceLen(p, sp);
+    const span = { at, len };
+    at += len;
+    return span;
+  });
+}
+
+/** The file time (and piece) shown at on-screen time `rel` from the clip's start. */
+export function fileAt(s: Pick<Seg, "parts" | "editable" | "adjust">, rel: number): { file: number; i: number } {
+  const sp = segSpeed(s);
+  const spans = pieceSpans(s);
+  let i = spans.findIndex((x) => rel < x.at + x.len);
+  if (i < 0) i = spans.length - 1;
+  const p = s.parts[i];
+  return { file: Math.max(p.start, Math.min(p.end, p.start + (rel - spans[i].at) * sp)), i };
+}
+
+/** On-screen time (from the clip's start) where file time `file` shows, or null when that frame was cut away. */
+export function relAt(s: Pick<Seg, "parts" | "editable" | "adjust">, file: number): number | null {
+  const sp = segSpeed(s);
+  const spans = pieceSpans(s);
+  const i = s.parts.findIndex((p) => file >= p.start - 0.001 && file <= p.end + 0.001);
+  return i < 0 ? null : spans[i].at + Math.max(0, file - s.parts[i].start) / sp;
+}
 
 /** Where a demo clip's video plays from: its own file, or its upload; null while it has no video yet. */
 export const clipSrc = (c: DemoClip): string | null => c.src ?? (c.mediaId ? `/api/media/${c.mediaId}` : null);
@@ -43,20 +88,21 @@ export const segLen = (s: { start: number; end: number; adjust?: Partial<Adjust>
 export function timeline(run: Run, source: Reference | null): Seg[] {
   const h = run.hook;
   const hookSrc = h.generated?.src ?? (h.clip?.mediaId ? `/api/media/${h.clip.mediaId}` : source?.mediaId ? `/api/media/${source.mediaId}` : null);
-  const segs: Omit<Seg, "offset" | "len">[] = [
+  const segs: (Omit<Seg, "offset" | "len" | "parts"> & { parts?: Part[] })[] = [
     h.generated
-      ? { id: "hook", label: "Hook", src: hookSrc, seconds: h.generated.seconds, start: h.start ?? 0, end: h.end ?? h.generated.seconds, adjust: h.adjust, editable: true }
+      ? { id: "hook", label: "Hook", src: hookSrc, seconds: h.generated.seconds, start: h.start ?? 0, end: h.end ?? h.generated.seconds, parts: partsOf({ start: h.start ?? 0, end: h.end ?? h.generated.seconds, parts: h.parts }), adjust: h.adjust, editable: true }
       : { id: "hook", label: "Hook", src: hookSrc, seconds: h.end ?? 3, start: h.clip ? 0 : (h.start ?? 0), end: h.clip ? Math.max(0.5, (h.end ?? 3) - (h.start ?? 0)) : (h.end ?? 3), editable: false },
   ];
   const clips = demoClips(run).filter((c) => clipSrc(c));
   clips.forEach((c, i) => {
     const seconds = c.seconds ?? 3;
-    segs.push({ id: c.id, label: clips.length > 1 ? `${i + 1}. ${c.label}` : c.label, src: clipSrc(c), seconds, start: c.start ?? 0, end: c.end ?? seconds, adjust: c.adjust, editable: true });
+    segs.push({ id: c.id, label: clips.length > 1 ? `${i + 1}. ${c.label}` : c.label, src: clipSrc(c), seconds, start: c.start ?? 0, end: c.end ?? seconds, parts: partsOf({ start: c.start ?? 0, end: c.end ?? seconds, parts: c.parts }), adjust: c.adjust, editable: true });
   });
   let at = 0;
   return segs.map((s) => {
-    const len = s.editable ? segLen(s) : Math.max(0.5, s.end - s.start);
-    const seg = { ...s, offset: at, len };
+    const parts = s.parts ?? [{ id: "p0", start: s.start, end: s.end }];
+    const len = s.editable ? parts.reduce((t, p) => t + pieceLen(p, speedOf(s.adjust)), 0) : Math.max(0.5, s.end - s.start);
+    const seg = { ...s, parts, offset: at, len };
     at += len;
     return seg;
   });
@@ -79,6 +125,49 @@ export function retimeTexts(texts: TextLayer[], offset: number, from: Window, to
     if (x > offset + oldLen) return x - oldLen + newLen;
     const file = from.start + (x - offset) * from.speed;
     return offset + Math.max(0, Math.min(newLen, (file - to.start) / to.speed));
+  };
+  return texts.map((t) => {
+    const start = roundTime(map(t.start));
+    let end = roundTime(map(t.end));
+    if (end - start < 0.3) end = roundTime(start + 0.3);
+    return { ...t, start, end };
+  });
+}
+
+type Pieces = { parts: Part[]; speed: number };
+
+/**
+ * Re-times texts after one clip (at timeline `offset`) changes its pieces or speed (Cut, trim or delete a
+ * piece, Undo). Texts before it stay, texts after it shift, edges inside it follow the same frames, edges on
+ * the clip's start or end stay on them. An edge on a frame that was cut away lands where that frame was.
+ */
+export function remapTexts(texts: TextLayer[], offset: number, from: Pieces, to: Pieces): TextLayer[] {
+  const oldL = from.parts.map((p) => pieceLen(p, from.speed));
+  const newL = to.parts.map((p) => pieceLen(p, to.speed));
+  const sum = (l: number[], n = l.length) => l.slice(0, n).reduce((a, x) => a + x, 0);
+  const oldLen = sum(oldL);
+  const newLen = sum(newL);
+  const map = (x: number) => {
+    if (x < offset - 0.05) return x;
+    if (Math.abs(x - offset) <= 0.05) return offset;
+    if (Math.abs(x - (offset + oldLen)) <= 0.05) return offset + newLen;
+    if (x > offset + oldLen) return x - oldLen + newLen;
+    let rel = x - offset;
+    let i = 0;
+    while (i < oldL.length - 1 && rel > oldL[i]) rel -= oldL[i++];
+    const p = from.parts[i];
+    const file = p.start + rel * from.speed;
+    const has = (q: Part) => file >= q.start - 0.01 && file <= q.end + 0.01;
+    let j = to.parts.findIndex((q) => q.id === p.id && has(q));
+    if (j < 0) j = to.parts.findIndex(has);
+    if (j >= 0) return offset + sum(newL, j) + Math.max(0, Math.min(newL[j], (file - to.parts[j].start) / to.speed));
+    const k = to.parts.findIndex((q) => q.id === p.id);
+    if (k >= 0) return offset + sum(newL, k) + (file < to.parts[k].start ? 0 : newL[k]);
+    for (let n = i + 1; n < from.parts.length; n++) {
+      const m = to.parts.findIndex((q) => q.id === from.parts[n].id);
+      if (m >= 0) return offset + sum(newL, m);
+    }
+    return offset + newLen;
   };
   return texts.map((t) => {
     const start = roundTime(map(t.start));

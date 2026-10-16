@@ -23,9 +23,14 @@ function face(v: unknown): boolean {
   return v.kind === "photo" ? mediaId(v.mediaId) : v.kind === "ai" ? number(v.index, 0, 69) && Number.isInteger(v.index) : v.kind === "character" ? typeof v.id === "string" && /^[A-Za-z0-9_-]+$/.test(v.id) : v.kind === "described" && string(v.text);
 }
 
+/** Pieces of a clip after a Cut: file times, each with end > start. */
+function parts(v: unknown): boolean {
+  return Array.isArray(v) && v.length >= 1 && v.length <= 50 && v.every((p) => object(p) && string(p.id) && number(p.start) && number(p.end) && (p.end as number) > (p.start as number) && (p.start as number) >= 0);
+}
+
 function hook(v: unknown): boolean {
   if (!object(v) || !["upload", "avatar"].includes(String(v.mode)) || !string(v.text) || !nullable(v.clip, clip)) return false;
-  if (!optional(v.face, (f) => nullable(f, face)) || !optional(v.adjust, adjust)) return false;
+  if (!optional(v.face, (f) => nullable(f, face)) || !optional(v.adjust, adjust) || !optional(v.parts, parts)) return false;
   if (!optional(v.start, number) || !optional(v.end, number) || (typeof v.start === "number" && typeof v.end === "number" && v.end <= v.start)) return false;
   for (const key of ["original", "note", "describe", "color", "font", "textStyle"]) if (!optional(v[key], string)) return false;
   return optional(v.generated, (g) => object(g) && localVideo(g.src) && number(g.seconds, 0.1) && string(g.at)) && optional(v.describeReady, (b) => typeof b === "boolean");
@@ -34,7 +39,7 @@ function hook(v: unknown): boolean {
 function demo(v: unknown): boolean {
   if (!object(v) || !nullable(v.clip, clip) || !["none", "laptop", "overlay"].includes(String(v.frame))) return false;
   return optional(v.clips, (cs) => Array.isArray(cs) && cs.length <= 100 && cs.every((c) => {
-    if (!object(c) || !string(c.id) || !string(c.label) || !optional(c.mediaId, mediaId) || !optional(c.src, localVideo) || !optional(c.adjust, adjust)) return false;
+    if (!object(c) || !string(c.id) || !string(c.label) || !optional(c.mediaId, mediaId) || !optional(c.src, localVideo) || !optional(c.adjust, adjust) || !optional(c.parts, parts)) return false;
     for (const key of ["name", "hint", "camera", "text"]) if (!optional(c[key], string)) return false;
     for (const key of ["seconds", "start", "end", "target"]) if (!optional(c[key], number)) return false;
     return optional(c.steps, (s) => Array.isArray(s) && s.every(string)) && !(typeof c.start === "number" && typeof c.end === "number" && c.end <= c.start);

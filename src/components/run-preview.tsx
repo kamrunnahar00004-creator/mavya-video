@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Adjust, fullAdjust, speedOf, videoStyle, warmthId, warmthMatrix } from "@/lib/adjust";
-import { timeline } from "@/lib/edit";
+import { fileAt, timeline } from "@/lib/edit";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 import { Pause, Play } from "lucide-react";
 import { AVATAR_TONES, round1 } from "@/lib/client";
@@ -43,7 +43,7 @@ export function RunPreview({ run, source, texts }: { run: Run; source: Reference
   const time = Math.min(t, total - 0.001);
   const seg = segs.find((x) => time >= x.offset && time < x.offset + x.len) ?? segs[segs.length - 1];
   const speed = seg.editable ? speedOf(seg.adjust) : 1;
-  const at = seg.start + (time - seg.offset) * speed;
+  const { file: at, i: piece } = fileAt(seg, time - seg.offset);
   const bar = useRef<HTMLDivElement>(null);
 
   function scrub(e: React.PointerEvent) {
@@ -99,7 +99,7 @@ export function RunPreview({ run, source, texts }: { run: Run; source: Reference
             {seg.src ? (
               <>
                 <WarmthFilter adjust={seg.editable ? seg.adjust : null} />
-                <SyncedVideo key={`${seg.id}|${seg.src}`} src={seg.src} at={at} playing={playing} rate={speed} volume={seg.editable ? fullAdjust(seg.adjust).volume / 100 : 0} style={seg.editable ? videoStyle(seg.adjust, at) : undefined} />
+                <SyncedVideo key={`${seg.id}|${seg.src}`} src={seg.src} at={at} piece={piece} playing={playing} rate={speed} volume={seg.editable ? fullAdjust(seg.adjust).volume / 100 : 0} style={seg.editable ? videoStyle(seg.adjust, at) : undefined} />
                 {seg.id === "hook" && hook.face && hook.face.kind !== "described" && !hook.clip && !hook.generated && (
                   <span className="pointer-events-none absolute left-2 top-8 flex items-center gap-1.5 rounded-lg bg-black/55 px-2 py-1 text-[10.5px] font-bold text-white">
                     <span className="relative h-4 w-4 overflow-hidden rounded-full">
@@ -185,7 +185,7 @@ export function WarmthFilter({ adjust }: { adjust?: Partial<Adjust> | null }) {
   );
 }
 
-export function SyncedVideo({ src, at, playing, style, rate = 1, volume = 0 }: { src: string; at: number; playing: boolean; style?: React.CSSProperties; rate?: number; volume?: number }) {
+export function SyncedVideo({ src, at, piece = 0, playing, style, rate = 1, volume = 0 }: { src: string; at: number; /** Which piece of a Cut clip plays; a new piece always jumps to its frame. */ piece?: number; playing: boolean; style?: React.CSSProperties; rate?: number; volume?: number }) {
   const ref = useRef<HTMLVideoElement>(null);
   // Browsers only allow sound after the page was clicked once; until then the video plays silently (it would not play at all otherwise).
   const unlocked = useSoundUnlocked();
@@ -216,6 +216,10 @@ export function SyncedVideo({ src, at, playing, style, rate = 1, volume = 0 }: {
     // Paused: follow the scrubber. Playing: only correct real drift (e.g. after a loop).
     if (playing ? Math.abs(v.currentTime - at) > 0.5 : Math.abs(v.currentTime - at) > 0.04) v.currentTime = at;
   }, [at, playing]);
+  useEffect(() => {
+    const v = ref.current;
+    if (v && v.readyState >= 1) v.currentTime = atRef.current;
+  }, [piece]);
   return (
     <video
       ref={ref}
