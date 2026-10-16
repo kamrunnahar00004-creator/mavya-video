@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, ClipboardPaste, Copy, Diamond, Download, Eye, Film, FolderOpen, GripVertical, Heart, Link as LinkIcon, ListOrdered, Loader2, Magnet, Music, Pause, PenLine, Play, Plus, Redo2, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
@@ -14,7 +14,7 @@ import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundP
 import type { Song } from "@/app/api/songs/route";
 import { type Seg, clipSrc, demoClips, fileAt, moveClipPiece, removeDemoClip, segAt, videoLength, pieceSpans, relAt, remapTexts, retimeTexts, runSteps, shotList, storeParts, timeline } from "@/lib/edit";
 import { STYLE_GROUPS, STYLE_PRESETS, autoSecond, stylePreset } from "@/lib/text-styles";
-import { AVATAR_TONES, TEXT_Y, clipFromFile, flushRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
+import { AVATAR_TONES, TEXT_Y, clipFromFile, saveStateOf, subscribeSaves, flushRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { PLATFORM_LABEL, commentCta, fmtTime, fmtViews, isLikelyBoosted, type DemoClip, type Frame, type Part, type Reference, type SoundPiece, type Run, type TextLayer, type TextPos } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
 import { HistoryPanel } from "@/components/history-panel";
@@ -443,6 +443,7 @@ export function RunView() {
           Videos
         </Link>
         <TitleInput value={run.title === "Untitled run" ? "Untitled video" : run.title} onSave={(title) => save({ title })} />
+        <SaveStatus id={run.id} />
         <button type="button" onClick={() => setLibraryOpen(true)} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-muted hover:bg-raised hover:text-text">
           <FolderOpen className="h-4 w-4" />
           My files
@@ -730,10 +731,24 @@ export function RunView() {
                 setLibraryOpen(false);
                 setToast("Hook replaced");
               }}
-              onUseDemo={(clips) => {
-                // The demo is replaced by that one, clips as they were cut (empty spaces left out).
+              onUseDemo={(clips, from) => {
+                // The demo is replaced by that one, clips as they were cut (empty spaces left out), with its own texts:
+                // the old demo's texts go, each of its texts lands on the same clip in this video.
                 const copy = clips.map((c) => ({ ...c, id: uid(), gap: undefined }));
-                save({ demo: { ...run.demo, clip: null, mode: copy.length > 1 ? "clips" : "single", clips: copy }, texts });
+                const nextRun: Run = { ...run, demo: { ...run.demo, clip: null, mode: copy.length > 1 ? "clips" : "single", clips: copy } };
+                const demoStart = segs[0].len;
+                const theirs = timeline(from, null).filter((g) => g.id !== "hook");
+                const ours = timeline(nextRun, source).filter((g) => g.id !== "hook");
+                const r3 = (x: number) => Math.round(x * 1000) / 1000;
+                const brought = runTexts(from).flatMap((x) => {
+                  if (x.id === "hook") return [];
+                  const i = theirs.findIndex((g) => x.start >= g.offset - 0.05 && x.start < g.offset + g.len);
+                  if (i < 0 || !ours[i]) return [];
+                  const d = ours[i].offset - theirs[i].offset;
+                  return [{ ...x, id: uid(), start: r3(x.start + d), end: r3(x.end + d) }];
+                });
+                const kept = texts.filter((x) => x.id === "hook" || x.start < demoStart - 0.05);
+                save({ demo: nextRun.demo, texts: [...kept, ...brought] });
                 setLibraryOpen(false);
                 setToast("Demo replaced");
               }}
@@ -779,6 +794,19 @@ export function RunView() {
 }
 
 /* ---------------- Layout pieces ---------------- */
+
+/** "Saving..." / "Saved" next to the title; red while a save failed (it is retried). */
+function SaveStatus({ id }: { id: string }) {
+  const state = useSyncExternalStore(subscribeSaves, () => saveStateOf(id), () => "idle" as const);
+  if (state === "idle") return null;
+  if (state === "error") return <span className="text-[12.5px] font-semibold text-red-600">Couldn&apos;t save, retrying</span>;
+  return (
+    <span className="flex items-center gap-1 text-[12.5px] font-semibold text-soft">
+      {state === "saved" && <Check className="h-3.5 w-3.5" />}
+      {state === "saving" ? "Saving..." : "Saved"}
+    </span>
+  );
+}
 
 function TitleInput({ value, onSave }: { value: string; onSave: (v: string) => void }) {
   const [draft, setDraft] = useState(value);

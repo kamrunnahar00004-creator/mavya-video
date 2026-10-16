@@ -58,29 +58,64 @@ type PendingSave = { patch: Partial<Run>; timer: ReturnType<typeof setTimeout>; 
 const pendingSaves = new Map<string, PendingSave>();
 const saveChains = new Map<string, Promise<Run | null>>();
 
+/** Save status per run, for the "Saved" label: saving, saved, or error (a server or network failure is retried). */
+export type SaveState = "idle" | "saving" | "saved" | "error";
+const saveStates = new Map<string, SaveState>();
+const saveListeners = new Set<() => void>();
+function setSaveState(id: string, state: SaveState) {
+  if (saveStates.get(id) === state) return;
+  saveStates.set(id, state);
+  saveListeners.forEach((l) => l());
+}
+export function subscribeSaves(listener: () => void) {
+  saveListeners.add(listener);
+  return () => {
+    saveListeners.delete(listener);
+  };
+}
+export const saveStateOf = (id: string): SaveState => saveStates.get(id) ?? "idle";
+
 function flushRun(id: string) {
   const pending = pendingSaves.get(id);
   if (!pending) return;
   clearTimeout(pending.timer);
   pendingSaves.delete(id);
+  // retry: a server or network failure (a rejected edit, 4xx, would fail again the same way).
+  let retry = false;
   const operation = (saveChains.get(id) ?? Promise.resolve(null)).then(async () => {
     try {
       const body = JSON.stringify(pending.patch);
       // Browsers reject keepalive bodies above their 64 KiB quota, even on an open page.
       const keepalive = new TextEncoder().encode(body).byteLength < 60000;
       const res = await fetch(`/api/runs/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body, keepalive });
-      return res.ok ? ((await res.json()) as Run) : null;
-    } catch { return null; }
+      if (res.ok) return (await res.json()) as Run;
+      retry = res.status >= 500;
+      return null;
+    } catch {
+      retry = true;
+      return null;
+    }
   });
   saveChains.set(id, operation);
   void operation.then((run) => {
     pending.done.forEach((resolve) => resolve(run));
     if (saveChains.get(id) === operation) saveChains.delete(id);
+    if (run) {
+      if (!pendingSaves.has(id) && !saveChains.has(id)) setSaveState(id, "saved");
+      return;
+    }
+    setSaveState(id, "error");
+    if (!retry) return;
+    // Try again in 3 s, under any newer edit (the newer values win).
+    const newer = pendingSaves.get(id);
+    if (newer) newer.patch = { ...pending.patch, ...newer.patch };
+    else pendingSaves.set(id, { patch: pending.patch, done: [], timer: setTimeout(() => flushRun(id), 3000) });
   });
 }
 
 /** Keep live edits immediate, merge input bursts, and send writes in order per run. */
 export function patchRun(id: string, patch: Partial<Run>): Promise<Run | null> {
+  if (saveStateOf(id) !== "error") setSaveState(id, "saving");
   return new Promise((resolve) => {
     const previous = pendingSaves.get(id);
     if (previous) clearTimeout(previous.timer);

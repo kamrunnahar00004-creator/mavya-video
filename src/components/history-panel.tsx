@@ -53,7 +53,8 @@ export function HistoryPanel({ run, refs, refreshKey, onClose, onUseHook, onUseF
   onUseFace: (f: Face) => void;
   /** `from`: the video it was made in (its hook and character come along). */
   onUseGenerated: (g: Generated, from: Run) => void;
-  onUseDemo: (clips: DemoClip[]) => void;
+  /** `from`: the video the demo is in (its texts come along). */
+  onUseDemo: (clips: DemoClip[], from: Run) => void;
   onUseSound: (p: SoundPiece) => void;
 }) {
   const [runs, setRuns] = useState<Run[] | null>(null);
@@ -117,10 +118,10 @@ export function HistoryPanel({ run, refs, refreshKey, onClose, onUseHook, onUseF
   }
 
   // One demo per video: all its clips, as they were cut.
-  const demos: Entry<DemoClip[]>[] = [];
+  const demos: Entry<{ clips: DemoClip[]; run: Run }>[] = [];
   for (const r of all) {
     const clips = demoClips(r).filter((c) => clipSrc(c));
-    if (clips.length) demos.push({ key: r.id, at: r.updatedAt, ...from(r), kind: "all", value: clips });
+    if (clips.length) demos.push({ key: r.id, at: r.updatedAt, ...from(r), kind: "all", value: { clips, run: r } });
   }
 
   const music: Entry<SoundPiece>[] = [];
@@ -213,11 +214,11 @@ export function HistoryPanel({ run, refs, refreshKey, onClose, onUseHook, onUseF
     body = list.length ? (
       <Grid>
         {list.map((x) => {
-          const clips = x.value;
+          const clips = x.value.clips;
           const first = partsOf({ start: clips[0].start ?? 0, end: clips[0].end ?? clips[0].seconds ?? 3, parts: clips[0].parts });
           const len = clips.reduce((t, c) => t + partsOf({ start: c.start ?? 0, end: c.end ?? c.seconds ?? 3, parts: c.parts }).reduce((a, p) => a + (p.end - p.start), 0) / speedOf(c.adjust), 0);
           return (
-            <Card key={x.key} onUse={x.runId === run.id ? undefined : () => onUseDemo(clips)} footer={<><div className="truncate text-[12.5px] font-semibold">{clips.length} {clips.length === 1 ? "clip" : "clips"} · {fmtTime(len)}</div>{meta(x)}</>}>
+            <Card key={x.key} onUse={x.runId === run.id ? undefined : () => onUseDemo(clips, x.value.run)} footer={<><div className="truncate text-[12.5px] font-semibold">{clips.length} {clips.length === 1 ? "clip" : "clips"} · {fmtTime(len)}</div>{meta(x)}</>}>
               <HoverVideo src={clipSrc(clips[0]) ?? ""} at={first[0].start} />
             </Card>
           );
