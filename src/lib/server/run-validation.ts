@@ -7,7 +7,7 @@ const optional = (v: unknown, check: (v: unknown) => boolean) => v === undefined
 const string = (v: unknown) => typeof v === "string" && v.length <= 10000;
 const nullable = (v: unknown, check: (v: unknown) => boolean) => v === null || check(v);
 const mediaId = (v: unknown) => typeof v === "string" && /^[0-9a-f-]{36}\.(mp4|mov|webm|jpg|png|mp3|m4a|aac|wav)$/.test(v);
-const localVideo = (v: unknown) => typeof v === "string" && (/^\/api\/media\/[0-9a-f.-]+$/.test(v) || /^\/samples\/[A-Za-z0-9._-]+\.mp4$/.test(v));
+const localVideo = (v: unknown) => typeof v === "string" && (/^\/api\/media\/[0-9a-f-]{36}\.(mp4|mov|webm)$/.test(v) || /^\/samples\/[A-Za-z0-9._-]+\.mp4$/.test(v));
 const id = (v: unknown) => typeof v === "string" && /^[A-Za-z0-9_-]{1,40}$/.test(v);
 const uniqueIds = (values: unknown[]) => new Set(values.map((v) => object(v) ? v.id : undefined)).size === values.length;
 const within = (v: Record<string, unknown>, length: unknown) => typeof length !== "number" || [v.start, v.end, ...(Array.isArray(v.parts) ? v.parts.flatMap((p) => object(p) ? [p.start, p.end] : []) : [])].every((n) => n === undefined || (typeof n === "number" && n <= length + 0.001));

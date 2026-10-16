@@ -55,6 +55,7 @@ async function main() {
 
   const { validRunPatch, validAnalysis } = load('lib/server/run-validation.ts');
   assert.equal(validRunPatch({hook: run.hook, demo: run.demo, texts: [text]}), true);
+  assert.equal(validRunPatch({hook:{...run.hook,generated:{src:'/api/media/00000000-0000-4000-8000-000000000000.mp4',seconds:3,at:'now'}}}),true);
   for (const bad of [[], null, {hook: []}, {hook: {mode: 'upload'}}, {demo: {clip: null, frame: 'none', clips: [null]}}, {texts: [null]}, {texts: [{...text, end: -1}]}, {hook: {...run.hook, adjust: {keys: null}}}, {sounds: [null]}, {hook: {...run.hook, generated: {src: 'https://example.com/a.mp4', seconds: 3, at: 'now'}}}]) assert.equal(validRunPatch(bad), false, JSON.stringify(bad));
   for(const bad of [{hook:{...run.hook,face:{kind:'ai',index:6}}},{texts:[text,text]},{texts:[{...text,second:{}}]},{demo:{...sample.demo,clips:[{...sample.demo.clips[0],id:'hook'}]}},{demo:{...sample.demo,clips:[sample.demo.clips[0],sample.demo.clips[0]]}},{hook:{...sample.hook,parts:[{id:'a',start:0,end:5}]}},{demo:{...sample.demo,clips:[{...sample.demo.clips[0],parts:[pieces[0],pieces[0]]}]}}]) assert.equal(validRunPatch(bad),false,JSON.stringify(bad));
   assert.equal(validAnalysis({segments:{}}),false);
