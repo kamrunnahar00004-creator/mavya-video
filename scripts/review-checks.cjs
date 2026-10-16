@@ -68,6 +68,14 @@ async function main() {
     const store = load('lib/server/store.ts');
     const runs = await Promise.all(Array.from({length: 8}, () => store.createRun()));
     assert.equal((await store.listRuns()).length, 8);
+
+    const shared = await store.saveMedia(new File(['video'],'demo.mp4',{type:'video/mp4'}),true);
+    await store.updateRun(runs[0].id,{hook:{...runs[0].hook,generated:{src:'/api/media/'+shared.mediaId,seconds:1,at:'now'}}});
+    await store.deleteAsset(shared.mediaId);
+    assert.ok(await store.mediaInfo(shared.mediaId));
+    const unused = await store.saveMedia(new File(['unused'],'unused.mp4',{type:'video/mp4'}),true);
+    await store.deleteAsset(unused.mediaId);
+    assert.equal(await store.mediaInfo(unused.mediaId),null);
     fs.writeFileSync('.data/db.json', '{broken');
     await assert.rejects(store.updateRun(runs[0].id, {title: 'Do not erase'}));
     assert.equal(fs.readFileSync('.data/db.json', 'utf8'), '{broken');

@@ -196,5 +196,12 @@ export async function mediaInfo(mediaId: string): Promise<{ file: string; size: 
 
 async function deleteMediaFile(mediaId: string): Promise<void> {
   if (!isMediaId(mediaId)) return;
+  // Removing an asset/history entry must not break a run or another reference.
+  const usedBy = (value: unknown): boolean => {
+    if (typeof value === "string") return value === mediaId || value === `/api/media/${mediaId}`;
+    if (Array.isArray(value)) return value.some(usedBy);
+    return !!value && typeof value === "object" && Object.values(value).some(usedBy);
+  };
+  if (usedBy(await readDb())) return;
   await unlink(path.join(MEDIA_DIR, mediaId)).catch(() => undefined);
 }
