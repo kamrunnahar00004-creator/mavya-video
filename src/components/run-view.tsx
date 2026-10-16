@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, ClipboardPaste, Copy, Diamond, Download, Eye, Film, FolderOpen, GripVertical, Heart, Link as LinkIcon, ListOrdered, Loader2, Music, Pause, PenLine, Play, Plus, Redo2, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, ClipboardPaste, Copy, Diamond, Download, Eye, Film, FolderOpen, GripVertical, Heart, Link as LinkIcon, ListOrdered, Loader2, Magnet, Music, Pause, PenLine, Play, Plus, Redo2, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
 import { waveform } from "@/lib/waveform";
 import { analyzeVideo } from "@/lib/analyze";
 import { CHARACTERS, characterById } from "@/lib/characters";
@@ -11,7 +11,7 @@ import { FONT_CHOICES, fontCss, fontLabel, loadFonts } from "@/lib/studio-data";
 import { ADJUST_ROWS, type Adjust, type AdjustRow, type Motion, NO_ADJUST, fullAdjust, isAdjusted, keyAt, motionAt, moveKey, panBy, setMotion, speedOf, toggleKey, videoStyle } from "@/lib/adjust";
 import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundPieces, soundRows } from "@/lib/sound";
 import type { Song } from "@/app/api/songs/route";
-import { type Seg, clipSrc, cutOutTexts, demoClips, fileAt, pieceSpans, relAt, remapTexts, retimeTexts, runSteps, shotList, storeParts, timeline } from "@/lib/edit";
+import { type Seg, clipSrc, cutOutTexts, demoClips, fileAt, segAt, videoLength, pieceSpans, relAt, remapTexts, retimeTexts, runSteps, shotList, storeParts, timeline } from "@/lib/edit";
 import { STYLE_GROUPS, STYLE_PRESETS, autoSecond, stylePreset } from "@/lib/text-styles";
 import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, flushRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { PLATFORM_LABEL, commentCta, fmtTime, fmtViews, isLikelyBoosted, type Asset, type DemoClip, type Frame, type Part, type Reference, type SoundPiece, type Run, type TextLayer, type TextPos } from "@/lib/types";
@@ -206,7 +206,7 @@ export function RunView() {
     pickHook(r, "upload");
   };
   const segs = timeline(run, source);
-  const videoLen = segs.reduce((t, x) => t + x.len, 0);
+  const videoLen = videoLength(segs);
   const hasDemo = demoClips(run).some((c) => clipSrc(c));
   const stepDone = runSteps(run);
   const current = stepDone.findIndex((d) => !d) + 1 || stepDone.length; // 1-based; all done = last step
@@ -255,10 +255,15 @@ export function RunView() {
     commitTexts();
   };
   /** A clip's pieces changed (Cut, trim or delete a piece, Undo). Texts follow the same frames; texts only on a deleted piece go with it. */
-  const setParts = (clipId: string, parts: Part[]) => {
+  const setParts = (clipId: string, parts: Part[], hold = false) => {
     const seg = segs.find((x) => x.id === clipId);
     if (!seg || !parts.length) return;
     const speed = speedOf(seg.adjust);
+    // Magnet off (hold): the clip after it stays where it is; the change goes into the empty space before it.
+    const after = segs[segs.indexOf(seg) + 1];
+    const keep = hold && Boolean(after);
+    const newLen = parts.reduce((t, x) => t + Math.max(0.05, x.end - x.start), 0) / speed;
+    const fix = (c: DemoClip) => (keep && c.id === after.id ? { ...c, gap: Math.round(Math.max(0, (c.gap ?? 0) + seg.len - newLen) * 1000) / 1000 } : c);
     const spans = pieceSpans(seg);
     let kept = texts;
     for (let i = 0; i < seg.parts.length; i++) {
@@ -267,10 +272,10 @@ export function RunView() {
       const b = a + spans[i].len;
       kept = kept.filter((x) => x.id === "hook" || x.start < a - 0.05 || x.end > b + 0.05);
     }
-    const nextTexts = remapTexts(kept, seg.offset, { parts: seg.parts, speed }, { parts, speed });
+    const nextTexts = remapTexts(kept, seg.offset, { parts: seg.parts, speed }, { parts, speed }, keep);
     const stored = storeParts(parts);
-    if (clipId === "hook") save({ hook: { ...hook, ...stored }, texts: nextTexts });
-    else save({ demo: { ...run.demo, clips: demoClips(run).map((c) => (c.id === clipId ? { ...c, ...stored } : c)) }, texts: nextTexts });
+    if (clipId === "hook") save({ hook: { ...hook, ...stored }, demo: keep ? { ...run.demo, clips: demoClips(run).map(fix) } : run.demo, texts: nextTexts });
+    else save({ demo: { ...run.demo, clips: demoClips(run).map((c) => (c.id === clipId ? { ...c, ...stored } : fix(c))) }, texts: nextTexts });
   };
   const clipEditor = (seg: Seg) => (
     <ClipEditor
@@ -389,11 +394,47 @@ export function RunView() {
     const i = beforeId === null ? kept.length : kept.findIndex((c) => c.id === beforeId);
     save({ hook: segId === "hook" ? { ...hook, ...rest } : hook, demo: { ...run.demo, mode: "clips", clips: [...kept.slice(0, i), piece, ...kept.slice(i)] } });
   };
-  const deleteClip = (clipId: string) => {
+  const deleteClip = (clipId: string, hold = false) => {
     const seg = segs.find((x) => x.id === clipId);
-    const clips = demoClips(run).filter((c) => c.id !== clipId);
+    const after = seg && segs[segs.indexOf(seg) + 1];
+    let clips = demoClips(run).filter((c) => c.id !== clipId);
     const lastVideo = Boolean(seg) && !clips.some((c) => clipSrc(c));
+    if (seg && after && hold) {
+      // Magnet off: an empty space stays where the clip was; only the texts on it go.
+      clips = clips.map((c) => (c.id === after.id ? { ...c, gap: Math.round(((c.gap ?? 0) + seg.gap + seg.len) * 1000) / 1000 } : c));
+      save({ demo: { ...run.demo, clips }, texts: texts.filter((x) => x.id === "hook" || !(x.start >= seg.offset - 0.05 && x.end <= seg.offset + seg.len + 0.05)) });
+      return;
+    }
     save({ demo: { ...run.demo, clips }, texts: !seg || lastVideo ? texts : cutOutTexts(texts, seg.offset, seg.len) });
+  };
+  /** Magnet off: put a demo clip at timeline time `to`, between its neighbours (the clip after it stays). Texts only on it move with it. */
+  const shiftClip = (clipId: string, to: number) => {
+    const i = segs.findIndex((x) => x.id === clipId);
+    const seg = segs[i];
+    if (!seg || i <= 0) return;
+    const prevEnd = segs[i - 1].offset + segs[i - 1].len;
+    const next = segs[i + 1];
+    const at = Math.max(prevEnd, next ? Math.min(to, next.offset - seg.len) : to);
+    const d = at - seg.offset;
+    if (Math.abs(d) < 0.01) return;
+    const r = (x: number) => Math.round(x * 1000) / 1000;
+    const clips = demoClips(run).map((c) => (c.id === clipId ? { ...c, gap: r(at - prevEnd) } : next && c.id === next.id ? { ...c, gap: r(next.offset - (at + seg.len)) } : c));
+    save({ demo: { ...run.demo, clips }, texts: texts.map((x) => (x.id !== "hook" && x.start >= seg.offset - 0.05 && x.end <= seg.offset + seg.len + 0.05 ? { ...x, start: r(x.start + d), end: r(x.end + d) } : x)) });
+  };
+  /** Magnet back on: every empty space closes; texts after it move up with the clips. */
+  const closeGaps = () => {
+    const r = (x: number) => Math.round(x * 1000) / 1000;
+    let next = texts;
+    for (const g of [...segs].reverse()) {
+      if (!g.gap) continue;
+      const from = g.offset - g.gap;
+      const m = (v: number) => (v >= g.offset - 0.05 ? v - g.gap : v > from ? from : v);
+      next = next.map((x) => {
+        const start = r(m(x.start));
+        return { ...x, start, end: r(Math.max(start + 0.3, m(x.end))) };
+      });
+    }
+    save({ demo: { ...run.demo, clips: demoClips(run).map((c) => (c.gap ? { ...c, gap: undefined } : c)) }, texts: next });
   };
   const resetDemo = () => {
     if (hasDemo && !confirm("Remove your demo clips?")) return;
@@ -718,6 +759,8 @@ export function RunView() {
           onAddVideos={addVideos}
           onInsertClip={(clip, at) => insertClips([clip], at)}
           onMoveClip={moveClipTo}
+          onShiftClip={shiftClip}
+          onCloseGaps={closeGaps}
           onAdjust={liveAdjust}
           onPatchText={patchText}
           onAddText={addText}
@@ -1438,6 +1481,10 @@ type TimelineEdit = {
   onTextMove: (id: string, pos: Partial<TextLayer>) => void;
   /** A clip piece was dragged to just before clip `beforeId` (null = the end). */
   onMoveClip: (segId: string, partId: string, beforeId: string | null) => void;
+  /** Main track magnet: on = clips stay joined; off = clips can be dragged anywhere, leaving empty space. */
+  magnet: boolean;
+  /** Magnet off: a clip was dragged to start at timeline time `to`. */
+  onShiftClip: (segId: string, to: number) => void;
 };
 
 function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, onMove, onSplit, onAdd, onDelete, onUndo, onRedo, onCopy, onPaste, claim = "whole", edit, toolbar, compact = false, autoFocus = false }: {
@@ -1467,7 +1514,7 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   onRedo: () => void;
 }) {
   const scope = useRef<HTMLDivElement>(null);
-  const total = Math.max(0.5, segs.reduce((a, x) => a + x.len, 0));
+  const total = Math.max(0.5, videoLength(segs));
   const [t, setT] = useState(0);
   // Starts paused; pressing play here pauses the phone preview (one sound at a time).
   const [playing, setPlaying] = useState(false);
@@ -1499,7 +1546,8 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
     return () => cancelAnimationFrame(raf);
   }, [playing, total]);
   const time = Math.min(t, total - 0.001);
-  const seg = segs.find((x) => time >= x.offset && time < x.offset + x.len) ?? segs[segs.length - 1];
+  const hit = segAt(segs, time);
+  const seg = hit ?? segs[segs.length - 1];
   const speed = seg.editable ? speedOf(seg.adjust) : 1;
   const { file: at, i: piece } = fileAt(seg, time - seg.offset);
 
@@ -1561,7 +1609,7 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   };
   const videoBox = (cls: string, style?: React.CSSProperties) => (
     <div className={`relative aspect-[9/16] overflow-hidden rounded-2xl border border-line bg-[#14121f] [container-type:size] ${cls}`} style={style}>
-      {seg.src ? (
+      {!hit ? null : seg.src ? (
         <>
           <WarmthFilter adjust={seg.editable ? seg.adjust : null} />
           <SyncedVideo key={`${seg.id}|${seg.src}`} src={seg.src} at={at} piece={piece} playing={playing} rate={speed} volume={seg.editable ? fullAdjust(seg.adjust).volume / 100 : 0} style={seg.editable ? videoStyle(seg.adjust, at) : undefined} />
@@ -1750,7 +1798,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
   const underPlayhead = pieces.some((p, i) => t > p.at + 0.25 && t < pieceEnd(pieces, i, total) - 0.25);
   // Editor: a clip piece being trimmed (timeline seconds), saved on release.
   // The trimmed piece keeps its start on the timeline and everything after it slides along (no gap, like CapCut's main track).
-  const [clipDraft, setClipDraft] = useState<{ key: string; lo: number; cutL: number; cutR: number } | null>(null);
+  const [clipDraft, setClipDraft] = useState<{ key: string; seg: string; lo: number; cutL: number; cutR: number } | null>(null);
   // Zoomed in: keep the playhead in view while playing.
   const scroller = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -1770,16 +1818,42 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
     return () => ro.disconnect();
   }, []);
   // Editor: a clip piece being dragged to a new place (pixels moved, and where it would land).
-  const [clipMove, setClipMove] = useState<{ key: string; dx: number; at: number } | null>(null);
+  const [clipMove, setClipMove] = useState<{ key: string; seg: string; whole: boolean; dx: number; at: number | null } | null>(null);
   /** Editor: press a clip piece to select it (and put the playhead there); drag it sideways to move it between the demo clips. The hook stays first. */
   function pressClip(e: React.PointerEvent, x: Seg, partId: string, key: string, lo: number, hi: number) {
     e.stopPropagation();
     const rect = area.current?.getBoundingClientRect();
     if (!rect || !edit) return;
     const drop = edit.onMoveClip;
+    const shiftTo = edit.onShiftClip;
     edit.onSelectClip(x.id, partId);
     const toT = (cx: number) => ((cx - rect.left) / rect.width) * width;
     onSeek(toT(e.clientX));
+    // Magnet off: the whole clip slides along the timeline, between its neighbours (the hook stays first).
+    if (!edit.magnet) {
+      const i = segs.findIndex((g) => g.id === x.id);
+      const prevEnd = i > 0 ? segs[i - 1].offset + segs[i - 1].len : 0;
+      const nx = segs[i + 1];
+      const sx0 = e.clientX;
+      let to = x.offset;
+      let slid = false;
+      const slide = (ev: PointerEvent) => {
+        if (x.id === "hook") return onSeek(toT(ev.clientX));
+        if (!slid && Math.abs(ev.clientX - sx0) < 4) return;
+        slid = true;
+        to = Math.max(prevEnd, Math.min(nx ? nx.offset - x.len : Infinity, x.offset + ((ev.clientX - sx0) / rect.width) * width));
+        setClipMove({ key, seg: x.id, whole: true, dx: ((to - x.offset) / width) * rect.width, at: null });
+      };
+      const done = () => {
+        window.removeEventListener("pointermove", slide);
+        window.removeEventListener("pointerup", done);
+        setClipMove(null);
+        if (slid) shiftTo(x.id, Math.round(to * 1000) / 1000);
+      };
+      window.addEventListener("pointermove", slide);
+      window.addEventListener("pointerup", done);
+      return;
+    }
     const movable = x.id !== "hook" || x.parts.length > 1;
     const bounds: { id: string | null; at: number }[] = [...segs.filter((g) => g.id !== "hook").map((g) => ({ id: g.id as string | null, at: g.offset })), { id: null, at: total }];
     const sx = e.clientX;
@@ -1795,7 +1869,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
       const mid = (lo + hi) / 2 + ((ev.clientX - sx) / rect.width) * width;
       const near = bounds.reduce((best, c) => (Math.abs(c.at - mid) < Math.abs(best.at - mid) ? c : best));
       target = near.id;
-      setClipMove({ key, dx: ev.clientX - sx, at: near.at });
+      setClipMove({ key, seg: x.id, whole: false, dx: ev.clientX - sx, at: near.at });
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -1828,7 +1902,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
         setGuide(snapped !== null && end === snapped ? snapped : null);
         cut = [0, hi - end];
       }
-      setClipDraft({ key, lo, cutL: cut[0], cutR: cut[1] });
+      setClipDraft({ key, seg: segId, lo, cutL: cut[0], cutR: cut[1] });
       onSeek(edge === "left" ? lo + cut[0] : hi - cut[1] - 0.01);
     };
     const up = () => {
@@ -1979,9 +2053,11 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
                 const lo = x.offset + spans[pi].at;
                 const hi = lo + spans[pi].len;
                 const d = clipDraft;
-                const shift = d && lo > d.lo + 0.001 ? d.cutL + d.cutR : 0;
+                // Magnet on: everything after slides along; off: only the rest of this clip does (the next clip stays, leaving space).
+                const shift = d && lo > d.lo + 0.001 && (edit.magnet || x.id === d.seg) ? d.cutL + d.cutR : 0;
                 const [a, b] = d?.key === key ? [lo, hi - d.cutL - d.cutR] : [lo - shift, hi - shift];
                 const on = edit.selClip === key;
+                const moving = Boolean(clipMove && (clipMove.whole ? clipMove.seg === x.id : clipMove.key === key));
                 const handle = "absolute inset-y-0 z-10 flex w-3 cursor-ew-resize touch-none items-center justify-center bg-ink";
                 // Frames across the piece, one every 32px, from the part of the file it plays (rounded to 0.5s so they are reused).
                 const FRAME = 32;
@@ -2001,8 +2077,8 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
                       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); edit.onSelectClip(x.id, part.id); }
                     }}
                     title={x.id === "hook" && x.parts.length === 1 ? undefined : "Drag to move"}
-                    className={`absolute inset-y-0 flex items-center gap-1 overflow-hidden px-3.5 text-[10.5px] font-bold outline-none ${x.id === "hook" && x.parts.length === 1 ? "" : "cursor-grab active:cursor-grabbing"} ${si || pi ? "border-l-2 border-panel" : "rounded-l-md"} ${x.id === "hook" ? "bg-[#221d33] text-white" : si % 2 ? "bg-[#dfdde9] text-text" : "bg-[#d2d0df] text-text"} ${on ? "z-10 ring-2 ring-inset ring-accent" : ""} ${clipMove?.key === key ? "z-30 opacity-80 shadow-lg" : ""}`}
-                    style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})`, transform: clipMove?.key === key ? `translateX(${clipMove.dx}px)` : undefined }}
+                    className={`absolute inset-y-0 flex items-center gap-1 overflow-hidden px-3.5 text-[10.5px] font-bold outline-none ${x.id === "hook" && x.parts.length === 1 ? "" : "cursor-grab active:cursor-grabbing"} ${si || pi ? "border-l-2 border-panel" : "rounded-l-md"} ${x.id === "hook" ? "bg-[#221d33] text-white" : si % 2 ? "bg-[#dfdde9] text-text" : "bg-[#d2d0df] text-text"} ${on ? "z-10 ring-2 ring-inset ring-accent" : ""} ${moving ? "z-30 opacity-80 shadow-lg" : ""}`}
+                    style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})`, transform: moving && clipMove ? `translateX(${clipMove.dx}px)` : undefined }}
                   >
                     {x.src && count > 0 && <Filmstrip src={x.src} times={times} frame={FRAME} />}
                     <span className={`relative flex min-w-0 items-center gap-1 ${x.src ? "self-start mt-1 rounded bg-black/60 px-1.5 py-0.5 text-white" : ""}`}>
@@ -2025,7 +2101,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
               });
             })}
             {/* where the dragged clip will land */}
-            {clipMove && <span className="pointer-events-none absolute -bottom-1 -top-1 z-40 w-[3px] -translate-x-1/2 rounded-full bg-accent" style={{ left: pct(clipMove.at) }} />}
+            {clipMove && clipMove.at !== null && <span className="pointer-events-none absolute -bottom-1 -top-1 z-40 w-[3px] -translate-x-1/2 rounded-full bg-accent" style={{ left: pct(clipMove.at ?? 0) }} />}
           </div>
         ) : (
         <div className="flex h-7 cursor-pointer overflow-hidden rounded-md text-[10.5px] font-bold" onPointerDown={seek}>
@@ -2412,7 +2488,7 @@ type EditorSnap = { hook: Run["hook"]; demo: Run["demo"]; texts: TextLayer[]; so
  * The full editor (Edit under the phone): every clip, text and sound on one timeline, like CapCut but only what
  * Mavya does. Select something to change it on the right; Cut (S), Delete and Undo work on the selection.
  */
-function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, onParts, onDeleteClip, onAddVideos, onInsertClip, onMoveClip, onAdjust, onPatchText, onAddText, onRemoveText, onApplyAll, onPieces }: {
+function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, onParts, onDeleteClip, onAddVideos, onInsertClip, onMoveClip, onShiftClip, onCloseGaps, onAdjust, onPatchText, onAddText, onRemoveText, onApplyAll, onPieces }: {
   run: Run;
   source: Reference | null;
   segs: Seg[];
@@ -2420,8 +2496,11 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
   videoLen: number;
   onClose: () => void;
   onRestore: (s: EditorSnap) => void;
-  onParts: (clipId: string, parts: Part[]) => void;
-  onDeleteClip: (clipId: string) => void;
+  /** hold = keep the clips after it in place (magnet off). */
+  onParts: (clipId: string, parts: Part[], hold?: boolean) => void;
+  onDeleteClip: (clipId: string, hold?: boolean) => void;
+  onShiftClip: (clipId: string, to: number) => void;
+  onCloseGaps: () => void;
   /** Insert before demo clip `at`. */
   onAddVideos: (files: File[], at: number) => Promise<void>;
   onInsertClip: (clip: DemoClip, at: number) => void;
@@ -2435,6 +2514,8 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
 }) {
   const [sel, setSel] = useState<{ kind: "clip"; seg: string; part: string } | { kind: "text"; id: string } | null>(null);
   const [zoom, setZoom] = useState(1);
+  // Main track magnet (on by default, like CapCut): clips stay joined. Off: drag clips anywhere, shortening leaves space.
+  const [magnet, setMagnet] = useState(true);
   const [past, setPast] = useState<EditorSnap[]>([]);
   const [future, setFuture] = useState<EditorSnap[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -2535,10 +2616,10 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
     } else if (selSeg && sel?.kind === "clip") {
       if (selSeg.parts.length > 1) {
         remember();
-        onParts(selSeg.id, selSeg.parts.filter((x) => x.id !== sel.part));
+        onParts(selSeg.id, selSeg.parts.filter((x) => x.id !== sel.part), !magnet);
       } else if (selSeg.id !== "hook") {
         remember();
-        onDeleteClip(selSeg.id);
+        onDeleteClip(selSeg.id, !magnet);
       }
       setSel(null);
     } else if (sounds.selId) sounds.deleteSelected();
@@ -2661,6 +2742,22 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
         Sound
       </button>
       <span className="mx-1 h-4 w-px bg-line" />
+      <button
+        type="button"
+        aria-pressed={magnet}
+        aria-label="Magnet"
+        title={magnet ? "Magnet on: clips stay joined. Turn off to move clips freely and leave empty space." : "Magnet off: drag clips anywhere. Turn on to close the empty spaces."}
+        onClick={() => {
+          if (!magnet && segs.some((x) => x.gap > 0)) {
+            remember();
+            onCloseGaps();
+          }
+          setMagnet((m) => !m);
+        }}
+        className={`${tool} ${magnet ? "bg-accent-tint text-accent hover:bg-accent-tint" : ""}`}
+      >
+        <Magnet className="h-4 w-4" />
+      </button>
       <button type="button" disabled={zoom <= 1} onClick={() => setZoom((z) => Math.max(1, z / 2))} title="Zoom out" aria-label="Zoom out" className={tool}>
         <ZoomOut className="h-4 w-4" />
       </button>
@@ -2717,11 +2814,16 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
                 const sp = speedOf(seg.adjust);
                 const p = seg.parts[i];
                 remember();
-                onParts(segId, seg.parts.map((x, j) => (j === i ? { ...p, start: r3(p.start + (a - lo) * sp), end: r3(p.start + (b - lo) * sp) } : x)));
+                onParts(segId, seg.parts.map((x, j) => (j === i ? { ...p, start: r3(p.start + (a - lo) * sp), end: r3(p.start + (b - lo) * sp) } : x)), !magnet);
               },
               onTextTiming: (id, patch) => onPatchText(id, { ...(patch.start !== undefined ? { start: r3(patch.start) } : {}), ...(patch.end !== undefined ? { end: r3(patch.end) } : {}) }),
               onTextBegin: remember,
               onTextMove: (id, pos) => onPatchText(id, pos),
+              magnet,
+              onShiftClip: (segId, to) => {
+                remember();
+                onShiftClip(segId, to);
+              },
               onMoveClip: (segId, partId, beforeId) => {
                 remember();
                 onMoveClip(segId, partId, beforeId);

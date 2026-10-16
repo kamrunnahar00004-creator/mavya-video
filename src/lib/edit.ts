@@ -23,10 +23,18 @@ export type Seg = {
   editable: boolean;
   /** The pieces that play, back to back (one piece until the clip is Cut). start / end = the first and last frame used. */
   parts: Part[];
+  /** Empty space before it (black), seconds (the editor's magnet off). */
+  gap: number;
   /** Timeline position and on-screen length. */
   offset: number;
   len: number;
 };
+
+/** Length of the whole video (the end of the last clip, gaps included). */
+export const videoLength = (segs: Seg[]) => (segs.length ? segs[segs.length - 1].offset + segs[segs.length - 1].len : 0);
+
+/** The clip playing at `time`, or null in an empty space. */
+export const segAt = (segs: Seg[], time: number) => segs.find((x) => time >= x.offset && time < x.offset + x.len) ?? null;
 
 /** A clip's pieces; a clip that was never Cut is one piece from start to end. */
 export const partsOf = (x: { start: number; end: number; parts?: Part[] }): Part[] => (x.parts?.length ? x.parts : [{ id: "p0", start: x.start, end: x.end }]);
@@ -90,18 +98,19 @@ export function timeline(run: Run, source: Reference | null): Seg[] {
   const hookSrc = h.generated?.src ?? (h.clip?.mediaId ? `/api/media/${h.clip.mediaId}` : source?.mediaId ? `/api/media/${source.mediaId}` : null);
   const segs: (Omit<Seg, "offset" | "len" | "parts"> & { parts?: Part[] })[] = [
     h.generated
-      ? { id: "hook", label: "Hook", src: hookSrc, seconds: h.generated.seconds, start: h.start ?? 0, end: h.end ?? h.generated.seconds, parts: partsOf({ start: h.start ?? 0, end: h.end ?? h.generated.seconds, parts: h.parts }), adjust: h.adjust, editable: true }
-      : { id: "hook", label: "Hook", src: hookSrc, seconds: h.end ?? 3, start: h.clip ? 0 : (h.start ?? 0), end: h.clip ? Math.max(0.5, (h.end ?? 3) - (h.start ?? 0)) : (h.end ?? 3), editable: false },
+      ? { id: "hook", label: "Hook", src: hookSrc, seconds: h.generated.seconds, start: h.start ?? 0, end: h.end ?? h.generated.seconds, parts: partsOf({ start: h.start ?? 0, end: h.end ?? h.generated.seconds, parts: h.parts }), adjust: h.adjust, editable: true, gap: 0 }
+      : { id: "hook", label: "Hook", src: hookSrc, seconds: h.end ?? 3, start: h.clip ? 0 : (h.start ?? 0), end: h.clip ? Math.max(0.5, (h.end ?? 3) - (h.start ?? 0)) : (h.end ?? 3), editable: false, gap: 0 },
   ];
   const clips = demoClips(run).filter((c) => clipSrc(c));
   clips.forEach((c, i) => {
     const seconds = c.seconds ?? 3;
-    segs.push({ id: c.id, label: clips.length > 1 ? `${i + 1}. ${c.label}` : c.label, src: clipSrc(c), seconds, start: c.start ?? 0, end: c.end ?? seconds, parts: partsOf({ start: c.start ?? 0, end: c.end ?? seconds, parts: c.parts }), adjust: c.adjust, editable: true });
+    segs.push({ id: c.id, label: clips.length > 1 ? `${i + 1}. ${c.label}` : c.label, src: clipSrc(c), seconds, start: c.start ?? 0, end: c.end ?? seconds, parts: partsOf({ start: c.start ?? 0, end: c.end ?? seconds, parts: c.parts }), adjust: c.adjust, editable: true, gap: Math.max(0, c.gap ?? 0) });
   });
   let at = 0;
   return segs.map((s) => {
     const parts = s.parts ?? [{ id: "p0", start: s.start, end: s.end }];
     const len = s.editable ? parts.reduce((t, p) => t + pieceLen(p, speedOf(s.adjust)), 0) : Math.max(0.5, s.end - s.start);
+    at += s.gap;
     const seg = { ...s, parts, offset: at, len };
     at += len;
     return seg;
@@ -141,17 +150,19 @@ type Pieces = { parts: Part[]; speed: number };
  * piece, Undo). Texts before it stay, texts after it shift, edges inside it follow the same frames, edges on
  * the clip's start or end stay on them. An edge on a frame that was cut away lands where that frame was.
  */
-export function remapTexts(texts: TextLayer[], offset: number, from: Pieces, to: Pieces): TextLayer[] {
+export function remapTexts(texts: TextLayer[], offset: number, from: Pieces, to: Pieces, keepAfter = false): TextLayer[] {
   const oldL = from.parts.map((p) => pieceLen(p, from.speed));
   const newL = to.parts.map((p) => pieceLen(p, to.speed));
   const sum = (l: number[], n = l.length) => l.slice(0, n).reduce((a, x) => a + x, 0);
   const oldLen = sum(oldL);
   const newLen = sum(newL);
-  const map = (x: number) => {
+  // keepAfter (magnet off): what comes after the clip stays where it is.
+  const map = (x: number, isStart: boolean) => {
     if (x < offset - 0.05) return x;
     if (Math.abs(x - offset) <= 0.05) return offset;
+    if (keepAfter && isStart && x >= offset + oldLen - 0.05) return x;
     if (Math.abs(x - (offset + oldLen)) <= 0.05) return offset + newLen;
-    if (x > offset + oldLen) return x - oldLen + newLen;
+    if (x > offset + oldLen) return keepAfter ? x : x - oldLen + newLen;
     let rel = x - offset;
     let i = 0;
     while (i < oldL.length - 1 && rel > oldL[i]) rel -= oldL[i++];
@@ -170,8 +181,8 @@ export function remapTexts(texts: TextLayer[], offset: number, from: Pieces, to:
     return offset + newLen;
   };
   return texts.map((t) => {
-    const start = roundTime(map(t.start));
-    let end = roundTime(map(t.end));
+    const start = roundTime(map(t.start, true));
+    let end = roundTime(map(t.end, false));
     if (end - start < 0.3) end = roundTime(start + 0.3);
     return { ...t, start, end };
   });

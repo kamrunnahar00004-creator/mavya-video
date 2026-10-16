@@ -278,6 +278,8 @@ export type DemoClip = {
   adjust?: Partial<Adjust>;
   /** Pieces after a Cut (file times, played back to back). Absent = one piece from start to end. */
   parts?: Part[];
+  /** Empty space (black) before this clip, seconds: only with the editor's magnet off. */
+  gap?: number;
 };
 
 /** One kept piece of a clip's file. Cut splits a clip into pieces that sit side by side on its bar. */

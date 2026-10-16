@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Adjust, fullAdjust, speedOf, videoStyle, warmthId, warmthMatrix } from "@/lib/adjust";
-import { fileAt, timeline } from "@/lib/edit";
+import { fileAt, segAt, timeline, videoLength } from "@/lib/edit";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 import { Pause, Play } from "lucide-react";
 import { AVATAR_TONES, round1 } from "@/lib/client";
@@ -19,7 +19,7 @@ import { AvatarPlaceholder } from "@/components/frames";
 export function RunPreview({ run, source, texts }: { run: Run; source: Reference | null; texts: TextLayer[] }) {
   const hook = run.hook;
   const segs = timeline(run, source);
-  const total = round1(segs.reduce((a, x) => a + x.len, 0));
+  const total = round1(videoLength(segs));
 
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -41,7 +41,8 @@ export function RunPreview({ run, source, texts }: { run: Run; source: Reference
   }, [playing, total]);
 
   const time = Math.min(t, total - 0.001);
-  const seg = segs.find((x) => time >= x.offset && time < x.offset + x.len) ?? segs[segs.length - 1];
+  const hit = segAt(segs, time);
+  const seg = hit ?? segs[segs.length - 1];
   const speed = seg.editable ? speedOf(seg.adjust) : 1;
   const { file: at, i: piece } = fileAt(seg, time - seg.offset);
   const bar = useRef<HTMLDivElement>(null);
@@ -96,7 +97,7 @@ export function RunPreview({ run, source, texts }: { run: Run; source: Reference
                 <svg viewBox="0 0 26 12" className="h-[10px] w-auto"><rect x="0.5" y="0.5" width="22" height="11" rx="3" fill="none" stroke="white" strokeOpacity="0.5" /><rect x="2" y="2" width="16" height="8" rx="1.6" fill="white" /><rect x="23.5" y="4" width="1.8" height="4" rx="0.9" fill="white" fillOpacity="0.5" /></svg>
               </span>
             </div>
-            {seg.src ? (
+            {!hit ? null : seg.src ? (
               <>
                 <WarmthFilter adjust={seg.editable ? seg.adjust : null} />
                 <SyncedVideo key={`${seg.id}|${seg.src}`} src={seg.src} at={at} piece={piece} playing={playing} rate={speed} volume={seg.editable ? fullAdjust(seg.adjust).volume / 100 : 0} style={seg.editable ? videoStyle(seg.adjust, at) : undefined} />
