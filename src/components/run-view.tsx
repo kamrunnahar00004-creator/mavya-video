@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, Copy, Diamond, Download, Eye, Film, FolderOpen, GripVertical, Heart, Link as LinkIcon, ListOrdered, Loader2, Music, Pause, PenLine, Play, Plus, Redo2, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, ClipboardPaste, Copy, Diamond, Download, Eye, Film, FolderOpen, GripVertical, Heart, Link as LinkIcon, ListOrdered, Loader2, Music, Pause, PenLine, Play, Plus, Redo2, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
 import { waveform } from "@/lib/waveform";
 import { analyzeVideo } from "@/lib/analyze";
 import { CHARACTERS, characterById } from "@/lib/characters";
@@ -317,22 +317,34 @@ export function RunView() {
     if (now && !old && suggested) nextTexts = [...nextTexts, textOver(nextTexts, suggested, now.offset, now.len)];
     save({ demo: nextRun.demo, texts: nextTexts });
   };
-  /** "Upload your demo" with one or more videos: one = a single demo, several = clips 1..N in file-name order (IMG_001, IMG_002...). */
-  const addVideos = async (files: File[]) => {
+  /** "Upload your demo" with one or more videos: one = a single demo, several = clips 1..N in file-name order (IMG_001, IMG_002...).
+   *  `at` = insert before this demo clip (the editor's + Clips at the playhead); default at the end. Texts from there on move later. */
+  const addVideos = async (files: File[], at?: number) => {
     const sorted = [...files].sort((x, y) => x.name.localeCompare(y.name, undefined, { numeric: true }));
     const ups = await Promise.all(sorted.map((f) => clipFromFile(f)));
     setLibraryKey((k) => k + 1);
-    const cur = runRef.current ?? run;
-    // A single demo turning into clips: "Your demo" becomes "Clip 1".
-    const before = demoClips(cur).map((c) => (files.length && c.label === "Your demo" ? { ...c, label: "Clip 1" } : c));
+    const count = demoClips(runRef.current ?? run).length;
     const added: DemoClip[] = ups.map((c, i) => {
       const seconds = round1(c.length ?? 3);
-      return { id: uid(), label: `Clip ${before.length + i + 1}`, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds };
+      return { id: uid(), label: `Clip ${count + i + 1}`, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds };
     });
-    const clips = [...before, ...added];
+    insertClips(added, at);
+  };
+  /** Puts demo clips in before demo clip `at` (default: the end). Texts from there on move later by their length. */
+  const insertClips = (added: DemoClip[], at?: number) => {
+    const cur = runRef.current ?? run;
+    // A single demo turning into clips: "Your demo" becomes "Clip 1".
+    const before = demoClips(cur).map((c) => (added.length && c.label === "Your demo" ? { ...c, label: "Clip 1" } : c));
+    const pos = at === undefined ? before.length : Math.max(0, Math.min(before.length, at));
+    const clips = [...before.slice(0, pos), ...added, ...before.slice(pos)];
     const nextRun: Run = { ...cur, demo: { ...cur.demo, mode: clips.length > 1 ? "clips" : "single", clips } };
-    // New clips go at the end, so no text moves.
-    save({ demo: nextRun.demo, texts: runTexts(cur) });
+    // Texts from the insert point on move later by the new clips' length (at the end, nothing moves).
+    const old = timeline(cur, null);
+    const next = before.slice(pos).map((c) => old.find((g) => g.id === c.id)).find(Boolean);
+    const from = next ? next.offset : Infinity;
+    const by = timeline(nextRun, null).filter((g) => added.some((c) => c.id === g.id)).reduce((t, g) => t + g.len, 0);
+    const r = (x: number) => Math.round(x * 1000) / 1000;
+    save({ demo: nextRun.demo, texts: runTexts(cur).map((x) => (x.start >= from - 0.05 ? { ...x, start: r(x.start + by), end: r(x.end + by) } : x)) });
   };
   /** Move a demo clip to position `to`. Texts that sit on that clip (or any moved clip) go with it; texts across several clips keep their time. */
   const moveClip = (clipId: string, to: number) => {
@@ -352,6 +364,30 @@ export function RunView() {
       return d ? { ...x, start: Math.round((x.start + d) * 1000) / 1000, end: Math.round((x.end + d) * 1000) / 1000 } : x;
     });
     save({ demo: { ...run.demo, mode: run.demo.mode ?? "clips", clips: next }, texts: nextTexts });
+  };
+  /** Editor drag: a clip goes just before clip `beforeId` (null = the end). A piece of a Cut clip becomes its own clip there. */
+  const moveClipTo = (segId: string, partId: string, beforeId: string | null) => {
+    const clips = demoClips(run);
+    const seg = segs.find((x) => x.id === segId);
+    const at = beforeId === null ? clips.length : clips.findIndex((c) => c.id === beforeId);
+    if (!seg || at < 0) return;
+    if (seg.parts.length === 1) {
+      if (segId === "hook") return;
+      const from = clips.findIndex((c) => c.id === segId);
+      const to = at > from ? at - 1 : at;
+      if (from >= 0 && to !== from) moveClip(segId, to);
+      return;
+    }
+    const part = seg.parts.find((x) => x.id === partId);
+    if (!part) return;
+    const own = clips.find((c) => c.id === segId);
+    const piece: DemoClip = own
+      ? { ...own, id: uid(), label: `${own.label} (part)`, start: part.start, end: part.end, parts: undefined }
+      : { id: uid(), label: "Hook (part)", src: seg.src ?? undefined, name: "Hook", seconds: seg.seconds, start: part.start, end: part.end, adjust: seg.adjust };
+    const rest = storeParts(seg.parts.filter((x) => x.id !== partId));
+    const kept = clips.map((c) => (c.id === segId ? { ...c, ...rest } : c));
+    const i = beforeId === null ? kept.length : kept.findIndex((c) => c.id === beforeId);
+    save({ hook: segId === "hook" ? { ...hook, ...rest } : hook, demo: { ...run.demo, mode: "clips", clips: [...kept.slice(0, i), piece, ...kept.slice(i)] } });
   };
   const deleteClip = (clipId: string) => {
     const seg = segs.find((x) => x.id === clipId);
@@ -680,6 +716,8 @@ export function RunView() {
           onParts={setParts}
           onDeleteClip={deleteClip}
           onAddVideos={addVideos}
+          onInsertClip={(clip, at) => insertClips([clip], at)}
+          onMoveClip={moveClipTo}
           onAdjust={liveAdjust}
           onPatchText={patchText}
           onAddText={addText}
@@ -1398,14 +1436,19 @@ type TimelineEdit = {
   /** A text drag (or a drag on the preview) starts: one undo step. */
   onTextBegin: () => void;
   onTextMove: (id: string, pos: Partial<TextLayer>) => void;
+  /** A clip piece was dragged to just before clip `beforeId` (null = the end). */
+  onMoveClip: (segId: string, partId: string, beforeId: string | null) => void;
 };
 
-function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, onMove, onSplit, onAdd, onDelete, onUndo, onRedo, claim = "whole", edit, toolbar, compact = false, autoFocus = false }: {
+function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, onMove, onSplit, onAdd, onDelete, onUndo, onRedo, onCopy, onPaste, claim = "whole", edit, toolbar, compact = false, autoFocus = false }: {
   segs: Seg[];
   /** Shown next to the video (the selected sound's card, or the editor's settings for the selection). */
   side: React.ReactNode | ((time: number) => React.ReactNode);
   /** Playback id (one player plays at a time). */
   claim?: string;
+  /** Ctrl+C / Ctrl+V (the full editor). */
+  onCopy?: () => void;
+  onPaste?: (time: number) => void;
   edit?: TimelineEdit;
   /** Replaces the Cut / + Sound buttons (the full editor's tools); gets the playhead time. */
   toolbar?: (time: number) => React.ReactNode;
@@ -1432,6 +1475,16 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   useEffect(() => {
     if (autoFocus) scope.current?.focus({ preventScroll: true });
   }, [autoFocus]);
+  // Editor: the height of the space above the timeline (the video fills it).
+  const stage = useRef<HTMLDivElement>(null);
+  const [stageH, setStageH] = useState(0);
+  useEffect(() => {
+    const el = stage.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setStageH(entry.contentRect.height));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   useEffect(() => {
     if (!playing) return;
     let raf = 0;
@@ -1451,18 +1504,31 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   const { file: at, i: piece } = fileAt(seg, time - seg.offset);
 
   // Keyboard, like CapCut: Space play/pause, Delete removes the selected sound, S / Ctrl+B split, Ctrl+Z undo, Ctrl+Shift+Z redo, arrows move the playhead, Esc deselects.
-  const keys = useRef({ time, playing, onSplit, onDelete, onUndo, onRedo, onSelect });
+  const keys = useRef({ time, playing, onSplit, onDelete, onUndo, onRedo, onSelect, onCopy, onPaste });
   useEffect(() => {
-    keys.current = { time, playing, onSplit, onDelete, onUndo, onRedo, onSelect };
+    keys.current = { time, playing, onSplit, onDelete, onUndo, onRedo, onSelect, onCopy, onPaste };
   });
+  // The last click was in this player: shortcuts keep working even when focus fell back to the page (e.g. after Delete).
+  const active = useRef(Boolean(autoFocus));
+  useEffect(() => {
+    const down = (e: PointerEvent) => {
+      active.current = Boolean(scope.current?.contains(e.target as Node));
+    };
+    window.addEventListener("pointerdown", down, true);
+    return () => window.removeEventListener("pointerdown", down, true);
+  }, []);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
-      if (!el || !scope.current?.contains(el)) return;
-      // Not while typing or on a button, and not under another open dialog (the full editor is one itself).
-      const own = scope.current.closest('[role="dialog"]');
-      const others = [...document.querySelectorAll('[role="dialog"], [aria-modal="true"]')].some((d) => d !== own);
-      if (e.defaultPrevented || el.closest("input, textarea, select, button, a, [contenteditable]") || others) return;
+      const root = scope.current;
+      if (!el || !root) return;
+      const inside = root.contains(el) || ((el === document.body || el === document.documentElement || root.closest('[role="dialog"]')?.contains(el)) && active.current);
+      if (!inside) return;
+      // Not while typing, and not under another open dialog (the full editor is one itself). On a button, Space / Enter press it.
+      const own = root.closest('[role="dialog"]');
+      const others = [...document.querySelectorAll('[role="dialog"], [aria-modal="true"]')].some((d) => d !== own && !d.contains(root));
+      if (e.defaultPrevented || el.closest("input, textarea, select, [contenteditable]") || others) return;
+      if ((e.code === "Space" || e.key === "Enter") && el.closest("button, a, label")) return;
       const k = keys.current;
       const mod = e.ctrlKey || e.metaKey;
       if (e.code === "Space") {
@@ -1472,6 +1538,10 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
       else if ((!mod && e.key.toLowerCase() === "s") || (mod && e.key.toLowerCase() === "b")) {
         setPlaying(false);
         k.onSplit(k.time);
+      } else if (mod && e.key.toLowerCase() === "c" && k.onCopy) k.onCopy();
+      else if (mod && e.key.toLowerCase() === "v" && k.onPaste) {
+        setPlaying(false);
+        k.onPaste(k.time);
       } else if (mod && e.key.toLowerCase() === "z") (e.shiftKey ? k.onRedo : k.onUndo)();
       else if (mod && e.key.toLowerCase() === "y") k.onRedo();
       else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
@@ -1486,57 +1556,82 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
     return () => window.removeEventListener("keydown", down);
   }, [total, claim]);
 
+  const focusIn = (e: React.PointerEvent) => {
+    if (!(e.target as HTMLElement).closest("input, textarea, select, button, a, [contenteditable]")) scope.current?.focus({ preventScroll: true });
+  };
+  const videoBox = (cls: string, style?: React.CSSProperties) => (
+    <div className={`relative aspect-[9/16] overflow-hidden rounded-2xl border border-line bg-[#14121f] [container-type:size] ${cls}`} style={style}>
+      {seg.src ? (
+        <>
+          <WarmthFilter adjust={seg.editable ? seg.adjust : null} />
+          <SyncedVideo key={`${seg.id}|${seg.src}`} src={seg.src} at={at} piece={piece} playing={playing} rate={speed} volume={seg.editable ? fullAdjust(seg.adjust).volume / 100 : 0} style={seg.editable ? videoStyle(seg.adjust, at) : undefined} />
+        </>
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center text-[12px] font-semibold text-white/40">{seg.id === "hook" ? "Your hook" : "Your demo"}</div>
+      )}
+      {texts.filter((x) => x.text.trim() && time >= x.start && time < x.end).map((x) => <TextOverlay key={x.id} x={x} onMove={edit ? (pos) => edit.onTextMove(x.id, pos) : undefined} />)}
+    </div>
+  );
+  const sideNode = typeof side === "function" ? side(time) : side;
+  const audio = pieces.map((p, i) => <SyncedAudio key={p.id} src={p.src} at={soundAt({ ...p, end: pieceEnd(pieces, i, total) }, time)} playing={playing} volume={p.volume / 100} />);
+  const controls = (
+    <WholeControls
+      segs={segs}
+      texts={texts}
+      pieces={pieces}
+      selected={selected}
+      total={total}
+      t={time}
+      playing={playing}
+      edit={edit}
+      toolbar={toolbar?.(time)}
+      onPlay={() => {
+        if (!playing) claimPlayback(claim);
+        setPlaying((p) => !p);
+      }}
+      onSeek={(v) => {
+        setPlaying(false);
+        setT(Math.max(0, Math.min(total - 0.01, v)));
+      }}
+      onSelect={onSelect}
+      onTrim={onTrim}
+      onMove={onMove}
+      onSplit={() => {
+        setPlaying(false);
+        onSplit(time);
+      }}
+      onAdd={() => {
+        setPlaying(false);
+        onAdd(time);
+      }}
+    />
+  );
+
+  if (compact) {
+    // The full editor, like CapCut: the video in the middle, as tall as the space above the timeline; its settings right
+    // beside it (scrolling on their own, so selecting something never moves the timeline); the timeline pinned below.
+    return (
+      <div ref={scope} tabIndex={-1} onPointerDownCapture={focusIn} className="flex h-full flex-col gap-3 outline-none focus-visible:outline-none">
+        <div ref={stage} className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-5">
+          <div />
+          {videoBox("", { height: stageH, width: (stageH * 9) / 16 })}
+          <div className="min-h-0 max-w-[380px] overflow-y-auto pr-1" style={{ maxHeight: stageH }}>
+            {sideNode}
+          </div>
+        </div>
+        {audio}
+        <div className="max-h-[45vh] shrink-0 overflow-y-auto">{controls}</div>
+      </div>
+    );
+  }
   return (
-    <div ref={scope} tabIndex={-1} onPointerDownCapture={(e) => {
-      if (!(e.target as HTMLElement).closest('input, textarea, select, button, a, [contenteditable]')) scope.current?.focus({ preventScroll: true });
-    }} className="@container space-y-4 outline-none focus-visible:outline-none">
-      <div className={`grid grid-cols-1 items-start gap-4 ${compact ? "@min-[600px]:grid-cols-[240px_minmax(0,1fr)]" : "@min-[600px]:grid-cols-[300px_minmax(0,1fr)]"}`}>
-      <div className={`relative aspect-[9/16] w-full overflow-hidden rounded-2xl border border-line bg-[#14121f] [container-type:size] ${compact ? "max-w-[240px]" : "max-w-[300px]"}`}>
-        {seg.src ? (
-          <>
-            <WarmthFilter adjust={seg.editable ? seg.adjust : null} />
-            <SyncedVideo key={`${seg.id}|${seg.src}`} src={seg.src} at={at} piece={piece} playing={playing} rate={speed} volume={seg.editable ? fullAdjust(seg.adjust).volume / 100 : 0} style={seg.editable ? videoStyle(seg.adjust, at) : undefined} />
-          </>
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-[12px] font-semibold text-white/40">{seg.id === "hook" ? "Your hook" : "Your demo"}</div>
-        )}
-        {texts.filter((x) => x.text.trim() && time >= x.start && time < x.end).map((x) => <TextOverlay key={x.id} x={x} onMove={edit ? (pos) => edit.onTextMove(x.id, pos) : undefined} />)}
+    <div ref={scope} tabIndex={-1} onPointerDownCapture={focusIn} className="@container space-y-4 outline-none focus-visible:outline-none">
+      <div className="grid grid-cols-1 items-start gap-4 @min-[600px]:grid-cols-[300px_minmax(0,1fr)]">
+        {videoBox("w-full max-w-[300px]")}
+        <div className="min-w-0">{sideNode}</div>
       </div>
-      <div className="min-w-0">{typeof side === "function" ? side(time) : side}</div>
-      </div>
-      {pieces.map((p, i) => (
-        <SyncedAudio key={p.id} src={p.src} at={soundAt({ ...p, end: pieceEnd(pieces, i, total) }, time)} playing={playing} volume={p.volume / 100} />
-      ))}
-      <WholeControls
-        segs={segs}
-        texts={texts}
-        pieces={pieces}
-        selected={selected}
-        total={total}
-        t={time}
-        playing={playing}
-        edit={edit}
-        toolbar={toolbar?.(time)}
-        onPlay={() => {
-          if (!playing) claimPlayback(claim);
-          setPlaying((p) => !p);
-        }}
-        onSeek={(v) => {
-          setPlaying(false);
-          setT(Math.max(0, Math.min(total - 0.01, v)));
-        }}
-        onSelect={onSelect}
-        onTrim={onTrim}
-        onMove={onMove}
-        onSplit={() => {
-          setPlaying(false);
-          onSplit(time);
-        }}
-        onAdd={() => {
-          setPlaying(false);
-          onAdd(time);
-        }}
-      />
+      {audio}
+      {controls}
     </div>
   );
 }
@@ -1561,22 +1656,63 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
   onAdd: () => void;
 }) {
   const area = useRef<HTMLDivElement>(null);
-  const pct = (v: number) => `${(Math.max(0, Math.min(total, v)) / total) * 100}%`;
+  // Seconds across the bar. The editor leaves room after the video (like CapCut), so the end of the video is not the end of the bar.
+  const width = edit ? Math.max(total * 2, total + 10) : total;
+  const pct = (v: number) => `${(Math.max(0, Math.min(width, v)) / width) * 100}%`;
   // A sound being trimmed follows the pointer; it is saved once, on release.
   const [draft, setDraft] = useState<{ id: string; at: number; end: number } | null>(null);
   const [guide, setGuide] = useState<number | null>(null);
   const span = (p: SoundPiece, i: number): [number, number] => (draft?.id === p.id ? [draft.at, draft.end] : [p.at, pieceEnd(pieces, i, total)]);
   const underPlayhead = pieces.some((p, i) => t > p.at + 0.25 && t < pieceEnd(pieces, i, total) - 0.25);
   // Editor: a clip piece being trimmed (timeline seconds), saved on release.
-  const [clipDraft, setClipDraft] = useState<{ key: string; a: number; b: number } | null>(null);
+  // The trimmed piece keeps its start on the timeline and everything after it slides along (no gap, like CapCut's main track).
+  const [clipDraft, setClipDraft] = useState<{ key: string; lo: number; cutL: number; cutR: number } | null>(null);
   // Zoomed in: keep the playhead in view while playing.
   const scroller = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = scroller.current;
     if (!el || !playing || el.scrollWidth <= el.clientWidth) return;
-    const x = (t / total) * el.scrollWidth;
+    const x = (t / width) * el.scrollWidth;
     if (x < el.scrollLeft || x > el.scrollLeft + el.clientWidth - 24) el.scrollLeft = x - 24;
-  }, [t, playing, total]);
+  }, [t, playing, width]);
+
+  // Editor: a clip piece being dragged to a new place (pixels moved, and where it would land).
+  const [clipMove, setClipMove] = useState<{ key: string; dx: number; at: number } | null>(null);
+  /** Editor: press a clip piece to select it (and put the playhead there); drag it sideways to move it between the demo clips. The hook stays first. */
+  function pressClip(e: React.PointerEvent, x: Seg, partId: string, key: string, lo: number, hi: number) {
+    e.stopPropagation();
+    const rect = area.current?.getBoundingClientRect();
+    if (!rect || !edit) return;
+    const drop = edit.onMoveClip;
+    edit.onSelectClip(x.id, partId);
+    const toT = (cx: number) => ((cx - rect.left) / rect.width) * width;
+    onSeek(toT(e.clientX));
+    const movable = x.id !== "hook" || x.parts.length > 1;
+    const bounds: { id: string | null; at: number }[] = [...segs.filter((g) => g.id !== "hook").map((g) => ({ id: g.id as string | null, at: g.offset })), { id: null, at: total }];
+    const sx = e.clientX;
+    let dragging = false;
+    let target: string | null | undefined;
+    const move = (ev: PointerEvent) => {
+      if (!movable) {
+        onSeek(toT(ev.clientX));
+        return;
+      }
+      if (!dragging && Math.abs(ev.clientX - sx) < 4) return;
+      dragging = true;
+      const mid = (lo + hi) / 2 + ((ev.clientX - sx) / rect.width) * width;
+      const near = bounds.reduce((best, c) => (Math.abs(c.at - mid) < Math.abs(best.at - mid) ? c : best));
+      target = near.id;
+      setClipMove({ key, dx: ev.clientX - sx, at: near.at });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setClipMove(null);
+      if (dragging && target !== undefined) drop(x.id, partId, target);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
 
   /** Editor: drag one end of a clip piece inward (what is trimmed off can come back with Undo). */
   function trimClip(e: React.PointerEvent, segId: string, i: number, key: string, lo: number, hi: number, edge: "left" | "right") {
@@ -1586,18 +1722,28 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
     if (!rect || !edit) return;
     const done = edit.onClipTrim;
     const sx = e.clientX;
-    let next: [number, number] = [lo, hi];
+    // The end snaps (12px) to the playhead, texts and sounds.
+    const snapEnd = magnet([t, ...texts.flatMap((x) => [x.start, x.end]), ...pieces.flatMap((q, j) => [q.at, pieceEnd(pieces, j, total)])], (12 / rect.width) * width);
+    let cut: [number, number] = [0, 0];
     const move = (ev: PointerEvent) => {
-      const v = (edge === "left" ? lo : hi) + ((ev.clientX - sx) / rect.width) * total;
-      next = edge === "left" ? [Math.max(lo, Math.min(hi - 0.3, v)), hi] : [lo, Math.min(hi, Math.max(lo + 0.3, v))];
-      setClipDraft({ key, a: next[0], b: next[1] });
-      onSeek(edge === "left" ? next[0] : next[1] - 0.01);
+      const dx = ((ev.clientX - sx) / rect.width) * width;
+      if (edge === "left") cut = [Math.max(0, Math.min(hi - lo - 0.3, dx)), 0];
+      else {
+        const raw = hi + dx;
+        const snapped = snapEnd(raw);
+        const end = Math.max(lo + 0.3, Math.min(hi, snapped ?? raw));
+        setGuide(snapped !== null && end === snapped ? snapped : null);
+        cut = [0, hi - end];
+      }
+      setClipDraft({ key, lo, cutL: cut[0], cutR: cut[1] });
+      onSeek(edge === "left" ? lo + cut[0] : hi - cut[1] - 0.01);
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      setGuide(null);
       setClipDraft(null);
-      if (next[0] !== lo || next[1] !== hi) done(segId, i, next[0], next[1]);
+      if (cut[0] || cut[1]) done(segId, i, lo + cut[0], hi - cut[1]);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -1607,13 +1753,13 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
     const rect = area.current?.getBoundingClientRect();
     if (!rect || !edit) return;
     edit.onSelectText(x.id);
-    dragTextBar(e, rect, total, x, mode, [0, total, t, ...segs.map((g) => g.offset), ...texts.filter((o) => o.id !== x.id).flatMap((o) => [o.start, o.end])], edit.onTextTiming, setGuide, edit.onTextBegin);
+    dragTextBar(e, rect, total, x, mode, [0, total, t, ...segs.map((g) => g.offset), ...texts.filter((o) => o.id !== x.id).flatMap((o) => [o.start, o.end])], edit.onTextTiming, setGuide, edit.onTextBegin, width);
   }
 
   function seek(e: React.PointerEvent) {
     const rect = area.current?.getBoundingClientRect();
     if (!rect) return;
-    const at = (x: number) => ((x - rect.left) / rect.width) * total;
+    const at = (x: number) => ((x - rect.left) / rect.width) * width;
     onSeek(at(e.clientX));
     const move = (ev: PointerEvent) => onSeek(at(ev.clientX));
     const up = () => {
@@ -1633,7 +1779,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
     const [a0, b0] = [p.at, pieceEnd(pieces, i, total)];
     const size = b0 - a0;
     const [lo, hi] = rowBounds(pieces, i, total);
-    const tol = (12 / rect.width) * total;
+    const tol = (12 / rect.width) * width;
     const points = [0, total, t, lo, hi, ...segs.map((x) => x.offset), ...pieces.flatMap((q, j) => (j === i ? [] : [q.at, pieceEnd(pieces, j, total)]))];
     const snapA = magnet(points, tol);
     const snapB = magnet(points, tol);
@@ -1643,7 +1789,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
     const move = (ev: PointerEvent) => {
       if (!moved && Math.abs(ev.clientX - sx) < 3) return;
       moved = true;
-      const raw = a0 + ((ev.clientX - sx) / rect.width) * total;
+      const raw = a0 + ((ev.clientX - sx) / rect.width) * width;
       const sa = snapA(raw);
       const sb = snapB(raw + size);
       let a = sa !== null && (sb === null || Math.abs(sa - raw) <= Math.abs(sb - raw - size)) ? sa : sb !== null ? sb - size : raw;
@@ -1672,14 +1818,14 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
     const p = pieces[i];
     const [a0, b0] = [p.at, pieceEnd(pieces, i, total)];
     const [lo, hi] = rowBounds(pieces, i, total);
-    const tol = (12 / rect.width) * total;
+    const tol = (12 / rect.width) * width;
     // Magnet: clip edges, the playhead, the start / end, and the neighbouring sounds' edges (so they connect).
     const points = [0, total, t, lo, hi, ...segs.map((x) => x.offset), ...pieces.flatMap((q, j) => (j === i ? [] : [q.at, pieceEnd(pieces, j, total)]))];
     const sx = e.clientX;
     let next: [number, number] = [a0, b0];
     const snapEdge = magnet(points, tol);
     const move = (ev: PointerEvent) => {
-      const raw = (edge === "left" ? a0 : b0) + ((ev.clientX - sx) / rect.width) * total;
+      const raw = (edge === "left" ? a0 : b0) + ((ev.clientX - sx) / rect.width) * width;
       const snapped = snapEdge(raw);
       const v = snapped ?? raw;
       next = edge === "left" ? [Math.max(lo, Math.min(b0 - 0.5, v)), b0] : [a0, Math.min(hi, Math.max(a0 + 0.5, v))];
@@ -1725,7 +1871,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
       <div ref={scroller} className={edit ? "overflow-x-auto pb-1" : undefined}>
       <div ref={area} className="relative select-none" style={edit ? { width: `${edit.zoom * 100}%` } : undefined}>
         <div className="relative h-4 cursor-pointer" onPointerDown={seek}>
-          {Array.from({ length: Math.floor(total) + 1 }, (_, s) => (
+          {Array.from({ length: Math.floor(width) + 1 }, (_, s) => (
             <span key={s} className="absolute top-0 h-1.5 w-px bg-line" style={{ left: pct(s) }} />
           ))}
         </div>
@@ -1739,7 +1885,9 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
                 const key = `${x.id}:${part.id}`;
                 const lo = x.offset + spans[pi].at;
                 const hi = lo + spans[pi].len;
-                const [a, b] = clipDraft?.key === key ? [clipDraft.a, clipDraft.b] : [lo, hi];
+                const d = clipDraft;
+                const shift = d && lo > d.lo + 0.001 ? d.cutL + d.cutR : 0;
+                const [a, b] = d?.key === key ? [lo, hi - d.cutL - d.cutR] : [lo - shift, hi - shift];
                 const on = edit.selClip === key;
                 const handle = "absolute inset-y-0 z-10 flex w-3 cursor-ew-resize touch-none items-center justify-center bg-ink";
                 return (
@@ -1749,16 +1897,13 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
                     tabIndex={0}
                     aria-label={`Clip: ${name}${x.parts.length > 1 ? ` ${pi + 1}` : ""}`}
                     aria-pressed={on}
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      edit.onSelectClip(x.id, part.id);
-                      seek(e);
-                    }}
+                    onPointerDown={(e) => pressClip(e, x, part.id, key, lo, hi)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); edit.onSelectClip(x.id, part.id); }
                     }}
-                    className={`absolute inset-y-0 flex items-center gap-1 overflow-hidden px-3.5 text-[10.5px] font-bold outline-none ${si || pi ? "border-l-2 border-panel" : "rounded-l-md"} ${x.id === "hook" ? "bg-[#221d33] text-white" : si % 2 ? "bg-[#dfdde9] text-text" : "bg-[#d2d0df] text-text"} ${on ? "z-10 ring-2 ring-inset ring-accent" : ""}`}
-                    style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})` }}
+                    title={x.id === "hook" && x.parts.length === 1 ? undefined : "Drag to move"}
+                    className={`absolute inset-y-0 flex items-center gap-1 overflow-hidden px-3.5 text-[10.5px] font-bold outline-none ${x.id === "hook" && x.parts.length === 1 ? "" : "cursor-grab active:cursor-grabbing"} ${si || pi ? "border-l-2 border-panel" : "rounded-l-md"} ${x.id === "hook" ? "bg-[#221d33] text-white" : si % 2 ? "bg-[#dfdde9] text-text" : "bg-[#d2d0df] text-text"} ${on ? "z-10 ring-2 ring-inset ring-accent" : ""} ${clipMove?.key === key ? "z-30 opacity-80 shadow-lg" : ""}`}
+                    style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})`, transform: clipMove?.key === key ? `translateX(${clipMove.dx}px)` : undefined }}
                   >
                     <Film className="h-3 w-3 shrink-0" />
                     <span className="truncate">{name}{x.parts.length > 1 ? ` ${pi + 1}` : ""}</span>
@@ -1776,6 +1921,8 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
                 );
               });
             })}
+            {/* where the dragged clip will land */}
+            {clipMove && <span className="pointer-events-none absolute -bottom-1 -top-1 z-40 w-[3px] -translate-x-1/2 rounded-full bg-accent" style={{ left: pct(clipMove.at) }} />}
           </div>
         ) : (
         <div className="flex h-7 cursor-pointer overflow-hidden rounded-md text-[10.5px] font-bold" onPointerDown={seek}>
@@ -1893,6 +2040,8 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
           })}
         </div>
         ))}
+        {/* where the video ends */}
+        {edit && <div className="pointer-events-none absolute bottom-0 top-0 z-10 border-l border-dashed border-line-strong" style={{ left: pct(total) }} />}
         <div className="pointer-events-none absolute bottom-0 top-0 z-20 w-0.5 rounded bg-text" style={{ left: pct(t) }} />
         {guide !== null && <div className="pointer-events-none absolute -bottom-1 -top-1 z-30 w-px -translate-x-1/2 bg-accent" style={{ left: pct(guide) }} />}
       </div>
@@ -2160,7 +2309,7 @@ type EditorSnap = { hook: Run["hook"]; demo: Run["demo"]; texts: TextLayer[]; so
  * The full editor (Edit under the phone): every clip, text and sound on one timeline, like CapCut but only what
  * Mavya does. Select something to change it on the right; Cut (S), Delete and Undo work on the selection.
  */
-function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, onParts, onDeleteClip, onAddVideos, onAdjust, onPatchText, onAddText, onRemoveText, onApplyAll, onPieces }: {
+function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, onParts, onDeleteClip, onAddVideos, onInsertClip, onMoveClip, onAdjust, onPatchText, onAddText, onRemoveText, onApplyAll, onPieces }: {
   run: Run;
   source: Reference | null;
   segs: Seg[];
@@ -2170,7 +2319,10 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
   onRestore: (s: EditorSnap) => void;
   onParts: (clipId: string, parts: Part[]) => void;
   onDeleteClip: (clipId: string) => void;
-  onAddVideos: (files: File[]) => Promise<void>;
+  /** Insert before demo clip `at`. */
+  onAddVideos: (files: File[], at: number) => Promise<void>;
+  onInsertClip: (clip: DemoClip, at: number) => void;
+  onMoveClip: (segId: string, partId: string, beforeId: string | null) => void;
   onAdjust: (clipId: string, a: Partial<Adjust>) => void;
   onPatchText: (id: string, p: Partial<TextLayer>) => void;
   onAddText: (afterId: string | null, w: [number, number], text?: string) => void;
@@ -2183,6 +2335,8 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
   const [past, setPast] = useState<EditorSnap[]>([]);
   const [future, setFuture] = useState<EditorSnap[]>([]);
   const [uploading, setUploading] = useState(false);
+  // Copied with Ctrl+C (or Copy): a text, or a clip piece (pasted as a new clip).
+  const [copied, setCopied] = useState<{ kind: "text"; t: TextLayer } | { kind: "clip"; clip: Omit<DemoClip, "id"> } | null>(null);
   const snap = (): EditorSnap => ({ hook: run.hook, demo: run.demo, texts, sounds: soundPieces(run, videoLen) });
   const remember = () => {
     setPast((p) => [...p.slice(-49), snap()]);
@@ -2241,6 +2395,34 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
     onParts(seg.id, [...seg.parts.slice(0, i), { ...p, end: r3(file) }, second, ...seg.parts.slice(i + 1)]);
     pick({ kind: "clip", seg: seg.id, part: second.id });
   };
+  /** Where a clip goes in at the playhead: the clip edge nearest to it (before the clip in its first half, else after). */
+  const insertIndex = (time: number) => {
+    const clips = demoClips(run);
+    const seg = segs.find((x) => time >= x.offset && time < x.offset + x.len);
+    const i = seg ? clips.findIndex((c) => c.id === seg.id) : -1;
+    return !seg || seg.id === "hook" ? 0 : i < 0 ? clips.length : time - seg.offset > seg.len / 2 ? i + 1 : i;
+  };
+  const copy = () => {
+    if (selText) setCopied({ kind: "text", t: selText });
+    else if (selSeg && sel?.kind === "clip" && selSeg.src && selSeg.editable) {
+      const part = selSeg.parts.find((x) => x.id === sel.part) ?? selSeg.parts[0];
+      const from = demoClips(run).find((c) => c.id === selSeg.id);
+      const name = selSeg.id === "hook" ? "Hook" : (from?.label ?? "Clip");
+      setCopied({ kind: "clip", clip: { label: `${name} copy`, ...(from?.mediaId ? { mediaId: from.mediaId } : { src: selSeg.src }), name: from?.name ?? name, seconds: selSeg.seconds, start: part.start, end: part.end, adjust: selSeg.adjust } });
+    }
+  };
+  /** Paste at the playhead: a text keeps its look and length; a clip goes in at the nearest clip edge. */
+  const paste = (time: number) => {
+    if (!copied) return;
+    remember();
+    if (copied.kind === "text") {
+      const len = copied.t.end - copied.t.start;
+      const at = r3(Math.max(0, Math.min(time, videoLen - 0.3)));
+      onAddText(texts.some((x) => x.id === copied.t.id) ? copied.t.id : null, [at, r3(Math.min(videoLen, at + len))], copied.t.text);
+    } else onInsertClip({ ...copied.clip, id: uid() }, insertIndex(time));
+  };
+  const canCopy = Boolean(selText || (selSeg?.src && selSeg.editable));
+
   /** Delete the selection: a text, a clip piece (the last piece of a demo clip removes the clip), or a sound. */
   const remove = () => {
     if (selText) {
@@ -2305,6 +2487,13 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
   const tool = "flex items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-1 text-[12px] font-bold text-text hover:bg-raised hover:text-accent disabled:text-soft disabled:hover:bg-transparent";
   const toolbar = (time: number) => (
     <>
+      <button type="button" disabled={!past.length} onClick={undo} title="Undo (Ctrl+Z)" aria-label="Undo" className={tool}>
+        <Undo2 className="h-4 w-4" />
+      </button>
+      <button type="button" disabled={!future.length} onClick={redo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo" className={tool}>
+        <Redo2 className="h-4 w-4" />
+      </button>
+      <span className="mx-1 h-4 w-px bg-line" />
       <button type="button" onClick={() => cut(time)} title="Cut at the playhead (S)" className={tool}>
         <Scissors className="h-3.5 w-3.5" />
         Cut
@@ -2313,8 +2502,14 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
         <Trash2 className="h-3.5 w-3.5" />
         Delete
       </button>
+      <button type="button" disabled={!canCopy} onClick={copy} title="Copy the selected clip or text (Ctrl+C)" aria-label="Copy" className={tool}>
+        <Copy className="h-4 w-4" />
+      </button>
+      <button type="button" disabled={!copied} onClick={() => paste(time)} title="Paste at the playhead (Ctrl+V)" aria-label="Paste" className={tool}>
+        <ClipboardPaste className="h-4 w-4" />
+      </button>
       <span className="mx-1 h-4 w-px bg-line" />
-      <label title="Add video clips at the end" className={`${tool} cursor-pointer ${uploading ? "pointer-events-none text-soft" : ""}`}>
+      <label title="Add video clips at the playhead (between clips)" className={`${tool} cursor-pointer ${uploading ? "pointer-events-none text-soft" : ""}`}>
         {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Film className="h-3.5 w-3.5" />}
         Clips
         <input
@@ -2326,10 +2521,11 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
             const files = [...(e.target.files ?? [])];
             e.target.value = "";
             if (!files.length) return;
+            const at = insertIndex(time);
             setUploading(true);
             remember();
             try {
-              await onAddVideos(files);
+              await onAddVideos(files, at);
             } finally {
               setUploading(false);
             }
@@ -2375,19 +2571,13 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
     <div role="dialog" aria-modal="true" aria-label="Edit video" className="fixed inset-0 z-40 flex flex-col bg-panel">
       <header className="flex items-center gap-2 border-b border-line px-5 py-3">
         <h2 className="text-[16px] font-extrabold tracking-tight">Edit video</h2>
-        <button type="button" disabled={!past.length} onClick={undo} title="Undo (Ctrl+Z)" aria-label="Undo" className="ml-2 rounded-lg p-1.5 text-muted hover:bg-raised hover:text-text disabled:text-line-strong disabled:hover:bg-transparent">
-          <Undo2 className="h-4 w-4" />
-        </button>
-        <button type="button" disabled={!future.length} onClick={redo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo" className="rounded-lg p-1.5 text-muted hover:bg-raised hover:text-text disabled:text-line-strong disabled:hover:bg-transparent">
-          <Redo2 className="h-4 w-4" />
-        </button>
         <button type="button" onClick={onClose} className="btn-primary ml-auto px-4 py-2 text-[14px]">
           <Check className="h-4 w-4" />
           Done
         </button>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        <div className="mx-auto max-w-[1100px]">
+      <div className="min-h-0 flex-1 px-5 py-4">
+        <div className="mx-auto h-full max-w-[1400px]">
           <WholePlayer
             claim="editor"
             compact
@@ -2407,6 +2597,8 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
             onDelete={remove}
             onUndo={undo}
             onRedo={redo}
+            onCopy={copy}
+            onPaste={paste}
             side={side}
             toolbar={toolbar}
             edit={{
@@ -2427,6 +2619,11 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
               onTextTiming: (id, patch) => onPatchText(id, { ...(patch.start !== undefined ? { start: r3(patch.start) } : {}), ...(patch.end !== undefined ? { end: r3(patch.end) } : {}) }),
               onTextBegin: remember,
               onTextMove: (id, pos) => onPatchText(id, pos),
+              onMoveClip: (segId, partId, beforeId) => {
+                remember();
+                onMoveClip(segId, partId, beforeId);
+                setSel(null);
+              },
             }}
           />
         </div>
@@ -3005,7 +3202,7 @@ function AdvancedSettings({ value, disabled, onChange, motion, keyOn, onMotion, 
                       step={r.step}
                       value={r.key === "zoom" ? Math.round(n) : n}
                       onChange={(e) => set(r.key, Number(e.target.value))}
-                      className={`w-14 rounded-lg border border-line bg-raised py-1 text-center text-[13px] tabular-nums outline-none focus:border-accent ${r.key === "speed" ? "pl-1 pr-3.5" : "px-2"}`}
+                      className={`w-14 rounded-lg border border-line bg-raised py-1 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none text-[13px] tabular-nums outline-none focus:border-accent ${r.key === "speed" ? "pl-1 pr-3.5" : "px-2"}`}
                     />
                     {r.key === "speed" && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[12.5px] text-soft">x</span>}
                   </span>
@@ -3207,13 +3404,13 @@ const clock = (sec: number) => `${Math.floor(sec / 60)}:${(sec % 60).toFixed(1).
  * Drag a text bar on a timeline `rect` that is `len` seconds wide: move it, or stretch / shrink it from either
  * end (like CapCut), with a magnet (12px) to `points`. `onStart` runs on the first real move (one undo step).
  */
-function dragTextBar(e: React.PointerEvent, rect: DOMRect, len: number, x: TextLayer, mode: "move" | "left" | "right", points: number[], onTiming: (id: string, p: { start?: number; end?: number }) => void, setGuide: (v: number | null) => void, onStart?: () => void) {
+function dragTextBar(e: React.PointerEvent, rect: DOMRect, len: number, x: TextLayer, mode: "move" | "left" | "right", points: number[], onTiming: (id: string, p: { start?: number; end?: number }) => void, setGuide: (v: number | null) => void, onStart?: () => void, scale = len) {
   e.preventDefault();
   e.stopPropagation();
   const sx = e.clientX;
   const { start, end } = x;
   const size = end - start;
-  const tol = (12 / rect.width) * len;
+  const tol = (12 / rect.width) * scale;
   const snap = magnet(points, tol);
   const snapEnd = magnet(points, tol);
   let started = false;
@@ -3223,7 +3420,7 @@ function dragTextBar(e: React.PointerEvent, rect: DOMRect, len: number, x: TextL
       started = true;
       onStart?.();
     }
-    const d = ((ev.clientX - sx) / rect.width) * len;
+    const d = ((ev.clientX - sx) / rect.width) * scale;
     if (mode === "move") {
       const raw = start + d;
       const a = snap(raw);
@@ -3380,7 +3577,9 @@ function ClipControls({ label, playing, onPlay, t, len, pieces, selected, onSele
         <div className="relative h-9 cursor-pointer overflow-hidden rounded-md bg-[repeating-linear-gradient(135deg,var(--raised),var(--raised)_4px,var(--line)_4px,var(--line)_6px)]" onPointerDown={(e) => track(e, onSeek)}>
           {/* the pieces, side by side (one until the clip is Cut) */}
           {pieces.map((p, i) => {
-            const [pa, pb] = draft?.i === i ? [draft.a, draft.b] : [p.at, p.at + p.len];
+            // While trimming, the piece keeps its start and the pieces after it slide along (no gap).
+            const cutBy = draft ? pieces[draft.i].len - (draft.b - draft.a) : 0;
+            const [pa, pb] = draft?.i === i ? [p.at, p.at + draft.b - draft.a] : draft && i > draft.i ? [p.at - cutBy, p.at + p.len - cutBy] : [p.at, p.at + p.len];
             const on = pieces.length > 1 && p.id === selected;
             return (
               <div
@@ -3445,7 +3644,7 @@ function ClipControls({ label, playing, onPlay, t, len, pieces, selected, onSele
                   track(e, (v) => { const x = Math.max(lo, Math.min(b - 0.3, round1(v))); last = [x, b]; onTrim(si, last, x); }, () => onTrimEnd(si, last));
                 }}
                 className={`${handle} rounded-l-md`}
-                style={{ left: pct(a) }}
+                style={{ left: pct(lo) }}
               >
                 <span className="h-3.5 w-0.5 rounded-full bg-white" />
               </span>
@@ -3464,10 +3663,22 @@ function ClipControls({ label, playing, onPlay, t, len, pieces, selected, onSele
                 }}
                 onPointerDown={(e) => {
                   let last: [number, number] = [a, b];
-                  track(e, (v) => { const x = Math.min(hi, Math.max(a + 0.3, round1(v))); last = [a, x]; onTrim(si, last, x); }, () => onTrimEnd(si, last));
+                  const rect = area.current?.getBoundingClientRect();
+                  // The end snaps (12px) to the playhead, the pieces and the texts.
+                  const snap = magnet([t, ...pieces.map((q) => q.at), ...texts.flatMap((o) => [o.start, o.end])], rect ? (12 / rect.width) * len : 0);
+                  track(e, (v) => {
+                    const sn = snap(v);
+                    const x = Math.min(hi, Math.max(a + 0.3, sn ?? round1(v)));
+                    setGuide(sn !== null && x === sn ? sn : null);
+                    last = [a, x];
+                    onTrim(si, last, x);
+                  }, () => {
+                    setGuide(null);
+                    onTrimEnd(si, last);
+                  });
                 }}
                 className={`${handle} -translate-x-full rounded-r-md`}
-                style={{ left: pct(b) }}
+                style={{ left: pct(lo + b - a) }}
               >
                 <span className="h-3.5 w-0.5 rounded-full bg-white" />
               </span>
