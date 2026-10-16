@@ -228,15 +228,15 @@ export function RunView() {
     liveTexts((t) => t.map((x) => (x.id === tid ? { ...x, ...patch } : x)));
     commitTexts();
   };
-  const addText = (afterId: string | null, [ws, we]: [number, number], text = "") => {
+  const addText = (afterId: string | null, [ws, we]: [number, number], text = "", template?: TextLayer) => {
     liveTexts((t) => {
       const i = afterId ? t.findIndex((x) => x.id === afterId) : -1;
       // Same look and spot as the subtitle it follows (the row's own "+", else the one before it in the video).
-      const base = t[i] ?? lookBefore(t, ws);
+      const base = template ?? t[i] ?? lookBefore(t, ws);
       // Only nudge it down when it would sit on top of that subtitle at the same time.
       const overlaps = base && base.start < we - 0.01 && base.end > ws + 0.01;
       const item: TextLayer = base
-        ? { ...base, id: uid(), text, start: ws, end: we, y: overlaps ? Math.min(90, base.y + 12) : base.y }
+        ? { ...base, id: uid(), text, start: ws, end: we, y: overlaps && !template ? Math.min(90, base.y + 12) : base.y }
         : { id: uid(), text, start: ws, end: we, x: 50, y: TEXT_Y.top, size: 4.6, font: "Arial", color: "#ffffff", style: "outline" };
       return i >= 0 ? [...t.slice(0, i + 1), item, ...t.slice(i + 1)] : [...t, item];
     });
@@ -2449,7 +2449,7 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
   onMoveClip: (segId: string, partId: string, beforeId: string | null) => void;
   onAdjust: (clipId: string, a: Partial<Adjust>) => void;
   onPatchText: (id: string, p: Partial<TextLayer>) => void;
-  onAddText: (afterId: string | null, w: [number, number], text?: string) => void;
+  onAddText: (afterId: string | null, w: [number, number], text?: string, template?: TextLayer) => void;
   onRemoveText: (id: string) => void;
   onApplyAll: (id: string) => void;
   onPieces: (pieces: SoundPiece[]) => void;
@@ -2457,7 +2457,7 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
   const [sel, setSel] = useState<{ kind: "clip"; seg: string; part: string } | { kind: "text"; id: string } | null>(null);
   const [zoom, setZoom] = useState(1);
   // Main track magnet (on by default, like CapCut): clips stay joined. Off: drag clips anywhere, shortening leaves space.
-  const [magnet, setMagnet] = useState(true);
+  const [magnet, setMagnet] = useState(() => !segs.some((s) => s.gap > 0));
   const [past, setPast] = useState<EditorSnap[]>([]);
   const [future, setFuture] = useState<EditorSnap[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -2468,8 +2468,15 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
     setPast((p) => [...p.slice(-49), snap()]);
     setFuture([]);
   };
-  const sounds = useSounds(run, source, videoLen, (p) => {
+  // One snapshot for a continuous pointer gesture; keyboard changes start a new action.
+  const gestureRemembered = useRef(false);
+  const rememberGesture = () => {
+    if (gestureRemembered.current) return;
+    gestureRemembered.current = true;
     remember();
+  };
+  const sounds = useSounds(run, source, videoLen, (p) => {
+    rememberGesture();
     onPieces(p);
   });
   const undo = () => {
@@ -2526,7 +2533,11 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
     const clips = demoClips(run);
     const seg = segs.find((x) => time >= x.offset && time < x.offset + x.len);
     const i = seg ? clips.findIndex((c) => c.id === seg.id) : -1;
-    return !seg || seg.id === "hook" ? 0 : i < 0 ? clips.length : time - seg.offset > seg.len / 2 ? i + 1 : i;
+    if (!seg) {
+      const next = clips.findIndex((c) => (segs.find((s) => s.id === c.id)?.offset ?? Infinity) >= time);
+      return next < 0 ? clips.length : next;
+    }
+    return seg.id === "hook" ? 0 : i < 0 ? clips.length : time - seg.offset > seg.len / 2 ? i + 1 : i;
   };
   const copy = () => {
     if (selText) setCopied({ kind: "text", t: selText });
@@ -2544,7 +2555,7 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
     if (copied.kind === "text") {
       const len = copied.t.end - copied.t.start;
       const at = r3(Math.max(0, Math.min(time, videoLen - 0.3)));
-      onAddText(texts.some((x) => x.id === copied.t.id) ? copied.t.id : null, [at, r3(Math.min(videoLen, at + len))], copied.t.text);
+      onAddText(texts.some((x) => x.id === copied.t.id) ? copied.t.id : null, [at, r3(Math.min(videoLen, at + len))], copied.t.text, copied.t);
     } else onInsertClip({ ...copied.clip, id: uid() }, insertIndex(time));
   };
   const canCopy = Boolean(selText || (selSeg?.src && selSeg.editable));
@@ -2581,11 +2592,11 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
             defaultOpen
             value={selSeg.adjust}
             disabled={!selSeg.editable || !selSeg.src}
-            onChange={(a) => onAdjust(selSeg.id, a)}
+            onChange={(a) => { rememberGesture(); onAdjust(selSeg.id, a); }}
             motion={motionAt(selSeg.adjust, fileT)}
             keyOn={keyAt(selSeg.adjust, fileT) >= 0}
-            onMotion={(patch) => onAdjust(selSeg.id, setMotion(selSeg.adjust, fileT, patch))}
-            onKey={() => onAdjust(selSeg.id, toggleKey(selSeg.adjust, fileT))}
+            onMotion={(patch) => { rememberGesture(); onAdjust(selSeg.id, setMotion(selSeg.adjust, fileT, patch)); }}
+            onKey={() => { rememberGesture(); onAdjust(selSeg.id, toggleKey(selSeg.adjust, fileT)); }}
           />
         </div>
       );
@@ -2596,7 +2607,7 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
           key={selText.id}
           t={selText}
           placeholder="Text"
-          onPatch={(patch) => onPatchText(selText.id, patch)}
+          onPatch={(patch) => { rememberGesture(); onPatchText(selText.id, patch); }}
           onAdd={() => {
             remember();
             onAddText(selText.id, [selText.start, selText.end]);
@@ -2710,7 +2721,7 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
   );
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Edit video" className="fixed inset-0 z-40 flex flex-col bg-panel">
+    <div role="dialog" aria-modal="true" aria-label="Edit video" onPointerDownCapture={() => { gestureRemembered.current = false; }} onKeyDownCapture={(e) => { if (!e.repeat) gestureRemembered.current = false; }} className="fixed inset-0 z-40 flex flex-col bg-panel">
       <header className="flex items-center gap-2 border-b border-line px-5 py-3">
         <h2 className="text-[16px] font-extrabold tracking-tight">Edit video</h2>
         <button type="button" onClick={onClose} className="btn-primary ml-auto px-4 py-2 text-[14px]">
@@ -2760,7 +2771,7 @@ function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, o
               },
               onTextTiming: (id, patch) => onPatchText(id, { ...(patch.start !== undefined ? { start: r3(patch.start) } : {}), ...(patch.end !== undefined ? { end: r3(patch.end) } : {}) }),
               onTextBegin: remember,
-              onTextMove: (id, pos) => onPatchText(id, pos),
+              onTextMove: (id, pos) => { rememberGesture(); onPatchText(id, pos); },
               magnet,
               onShiftClip: (segId, to) => {
                 remember();
