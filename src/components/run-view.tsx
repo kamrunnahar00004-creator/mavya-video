@@ -1268,7 +1268,10 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
                 // Cut = two pieces side by side in this clip; nothing is removed or moved.
                 setPlaying(false);
                 const f = Math.round(fileT * 1000) / 1000;
-                change([...seg.parts.slice(0, here.i), { ...herePart, end: f }, { id: uid(), start: f, end: herePart.end }, ...seg.parts.slice(here.i + 1)]);
+                // The new piece (after the playhead) is selected, like CapCut; the others show lighter.
+                const second = { id: uid(), start: f, end: herePart.end };
+                change([...seg.parts.slice(0, here.i), { ...herePart, end: f }, second, ...seg.parts.slice(here.i + 1)]);
+                setPick(second.id);
               }}
               texts={local}
               onTiming={(tid, patch) =>
@@ -2902,7 +2905,7 @@ function ClipControls({ label, playing, onPlay, t, len, pieces, selected, onSele
                     onDelete();
                   }
                 }}
-                className={`absolute inset-y-0 flex items-center bg-[#221d33] px-4 text-[10.5px] font-bold text-white outline-none ${i > 0 ? "border-l-2 border-panel" : ""} ${on ? "ring-2 ring-inset ring-accent" : ""}`}
+                className={`absolute inset-y-0 flex items-center px-4 text-[10.5px] font-bold text-white outline-none ${selected && pieces.length > 1 && !on ? "bg-[#a39eb5]" : "bg-[#221d33]"} ${i > 0 ? "border-l-2 border-panel" : ""} ${on ? "ring-2 ring-inset ring-accent" : ""}`}
                 style={{ left: pct(pa), width: `calc(${pct(pb)} - ${pct(pa)})` }}
               >
                 <span className="truncate">{pieces.length > 1 ? `${label} ${i + 1}` : label}</span>

@@ -99,10 +99,18 @@ export function RunsList() {
   }
 
   async function newRun() {
+    if (creating) return;
     setCreating(true);
-    const res = await fetch("/api/runs", { method: "POST" });
-    const run = (await res.json()) as Run;
-    router.push(`/studio/${run.id}`);
+    // Next keeps this page's state when you leave it (cacheComponents), so the spinner must stop here,
+    // or it is still spinning when you come back to the dashboard.
+    try {
+      const res = await fetch("/api/runs", { method: "POST" });
+      if (!res.ok) return;
+      const run = (await res.json()) as Run;
+      router.push(`/studio/${run.id}`);
+    } finally {
+      setCreating(false);
+    }
   }
 
   async function rename(r: Run, title: string) {
