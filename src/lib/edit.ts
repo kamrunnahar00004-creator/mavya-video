@@ -39,7 +39,7 @@ export function demoClips(run: Run): DemoClip[] {
 
 export const segLen = (s: { start: number; end: number; adjust?: Partial<Adjust> }) => Math.max(0.1, s.end - s.start) / speedOf(s.adjust);
 
-/** The run's timeline. With no demo clip yet, a 3s "Your demo" placeholder follows the hook. */
+/** The run's timeline: the hook, then the demo clips that have a video. No demo yet = just the hook. */
 export function timeline(run: Run, source: Reference | null): Seg[] {
   const h = run.hook;
   const hookSrc = h.generated?.src ?? (h.clip?.mediaId ? `/api/media/${h.clip.mediaId}` : source?.mediaId ? `/api/media/${source.mediaId}` : null);
@@ -53,7 +53,6 @@ export function timeline(run: Run, source: Reference | null): Seg[] {
     const seconds = c.seconds ?? 3;
     segs.push({ id: c.id, label: clips.length > 1 ? `${i + 1}. ${c.label}` : c.label, src: clipSrc(c), seconds, start: c.start ?? 0, end: c.end ?? seconds, adjust: c.adjust, editable: true });
   });
-  if (!clips.length) segs.push({ id: "placeholder", label: "Demo", src: null, seconds: 3, start: 0, end: 3, editable: false });
   let at = 0;
   return segs.map((s) => {
     const len = s.editable ? segLen(s) : Math.max(0.5, s.end - s.start);

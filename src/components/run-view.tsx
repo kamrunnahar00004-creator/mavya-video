@@ -312,14 +312,10 @@ export function RunView() {
     const clips = list.map((x) => (x.id === clipId ? { ...x, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds, adjust: undefined } : x));
     const before = timeline(cur, null);
     const old = before.find((x) => x.id === clipId);
-    const placeholder = before.find((x) => x.id === "placeholder");
     const nextRun: Run = { ...cur, demo: { ...cur.demo, mode: mode ?? cur.demo.mode ?? "single", clips } };
     const now = timeline(nextRun, null).find((x) => x.id === clipId);
     let nextTexts = runTexts(cur);
-    if (now && placeholder) {
-      // First demo video: texts on the "Your demo" placeholder land on it (a text over the whole placeholder covers the whole clip).
-      nextTexts = retimeTexts(nextTexts, now.offset, { start: placeholder.start, end: placeholder.end, speed: 1 }, { start: 0, end: now.len, speed: 1 });
-    } else if (now && old) {
+    if (now && old) {
       nextTexts = retimeTexts(nextTexts, old.offset, { start: old.start, end: old.end, speed: speedOf(old.adjust) }, { start: now.start, end: now.end, speed: speedOf(now.adjust) });
     } else if (now) {
       const by = now.len - (old?.len ?? 0);
@@ -329,13 +325,6 @@ export function RunView() {
     const suggested = list.find((x) => x.id === clipId)?.text;
     if (now && !old && suggested) nextTexts = [...nextTexts, textOver(nextTexts, suggested, now.offset, now.len)];
     save({ demo: nextRun.demo, texts: nextTexts });
-  };
-  /** With no demo video left, texts on the demo go back onto the 3s "Your demo" placeholder instead of being lost. */
-  const demoToPlaceholder = (from: TextLayer[]) => {
-    const demo = segs.filter((x) => x.id !== "hook");
-    const at = segs[0].len;
-    const len = demo.reduce((a, x) => a + x.len, 0);
-    return len ? retimeTexts(from, at, { start: 0, end: len, speed: 1 }, { start: 0, end: 3, speed: 1 }) : from;
   };
   /** "Upload your demo" with one or more videos: one = a single demo, several = clips 1..N in file-name order (IMG_001, IMG_002...). */
   const addVideos = async (files: File[]) => {
@@ -351,11 +340,8 @@ export function RunView() {
     });
     const clips = [...before, ...added];
     const nextRun: Run = { ...cur, demo: { ...cur.demo, mode: clips.length > 1 ? "clips" : "single", clips } };
-    // Texts on the "Your demo" placeholder land on the new videos (new clips go at the end, so nothing else moves).
-    const placeholder = timeline(cur, null).find((x) => x.id === "placeholder");
-    const demoLen = timeline(nextRun, null).filter((x) => added.some((c) => c.id === x.id)).reduce((t, x) => t + x.len, 0);
-    const nextTexts = placeholder ? retimeTexts(runTexts(cur), placeholder.offset, { start: placeholder.start, end: placeholder.end, speed: 1 }, { start: 0, end: demoLen, speed: 1 }) : runTexts(cur);
-    save({ demo: nextRun.demo, texts: nextTexts });
+    // New clips go at the end, so no text moves.
+    save({ demo: nextRun.demo, texts: runTexts(cur) });
   };
   /** Move a demo clip to position `to`. Texts that sit on that clip (or any moved clip) go with it; texts across several clips keep their time. */
   const moveClip = (clipId: string, to: number) => {
@@ -368,7 +354,7 @@ export function RunView() {
     const before = timeline(run, null);
     const after = timeline({ ...run, demo: { ...run.demo, clips: next } }, null);
     const nextTexts = texts.map((x) => {
-      const home = before.find((g) => g.id !== "hook" && g.id !== "placeholder" && x.start >= g.offset - 0.01 && x.end <= g.offset + g.len + 0.01);
+      const home = before.find((g) => g.id !== "hook" && x.start >= g.offset - 0.01 && x.end <= g.offset + g.len + 0.01);
       const now = home && after.find((g) => g.id === home.id);
       if (!home || !now) return x;
       const d = now.offset - home.offset;
@@ -380,11 +366,11 @@ export function RunView() {
     const seg = segs.find((x) => x.id === clipId);
     const clips = demoClips(run).filter((c) => c.id !== clipId);
     const lastVideo = Boolean(seg) && !clips.some((c) => clipSrc(c));
-    save({ demo: { ...run.demo, clips }, texts: !seg ? texts : lastVideo ? demoToPlaceholder(texts) : cutOutTexts(texts, seg.offset, seg.len) });
+    save({ demo: { ...run.demo, clips }, texts: !seg || lastVideo ? texts : cutOutTexts(texts, seg.offset, seg.len) });
   };
   const resetDemo = () => {
     if (hasDemo && !confirm("Remove your demo clips?")) return;
-    save({ demo: { ...run.demo, clip: null, mode: undefined, clips: [] }, texts: hasDemo ? demoToPlaceholder(texts) : texts });
+    save({ demo: { ...run.demo, clip: null, mode: undefined, clips: [] }, texts });
   };
   const resetHook = () => save({ sourceRefId: null, hook: { ...hook, source: undefined } });
   /** Applies a change to the hook text item (if the user kept it). */
