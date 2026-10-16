@@ -1636,6 +1636,90 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   );
 }
 
+/* Frames for the timeline's clip strips (like CapCut): grabbed in the browser from the clip's own file,
+ * one hidden video per file, one seek at a time, kept as small JPEGs for the session. */
+const frameCache = new Map<string, Promise<string | null>>();
+const frameQueue = new Map<string, Promise<unknown>>();
+const framePlayers = new Map<string, HTMLVideoElement>();
+
+function grabFrame(src: string, t: number): Promise<string | null> {
+  let v = framePlayers.get(src);
+  if (!v) {
+    v = document.createElement("video");
+    v.muted = true;
+    v.preload = "auto";
+    v.src = src;
+    framePlayers.set(src, v);
+  }
+  const video = v;
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), 8000);
+    const draw = () => {
+      clearTimeout(timer);
+      try {
+        const c = document.createElement("canvas");
+        c.width = 64;
+        c.height = 114;
+        const g = c.getContext("2d");
+        if (!g || !video.videoWidth) return resolve(null);
+        // Cover-crop to 9:16, like the video on screen.
+        const scale = Math.max(c.width / video.videoWidth, c.height / video.videoHeight);
+        const sw = c.width / scale;
+        const sh = c.height / scale;
+        g.drawImage(video, (video.videoWidth - sw) / 2, (video.videoHeight - sh) / 2, sw, sh, 0, 0, c.width, c.height);
+        resolve(c.toDataURL("image/jpeg", 0.6));
+      } catch {
+        resolve(null);
+      }
+    };
+    const seek = () => {
+      video.addEventListener("seeked", draw, { once: true });
+      video.currentTime = Math.max(0, Math.min(t, (video.duration || t + 0.1) - 0.05));
+    };
+    video.addEventListener("error", () => resolve(null), { once: true });
+    if (video.readyState >= 1) seek();
+    else video.addEventListener("loadedmetadata", seek, { once: true });
+  });
+}
+
+/** The frame of `src` at `t` seconds (cached; frames of one file are grabbed in order). */
+function frameAt(src: string, t: number): Promise<string | null> {
+  const key = `${src}@${t}`;
+  let p = frameCache.get(key);
+  if (!p) {
+    const prev = frameQueue.get(src) ?? Promise.resolve();
+    p = prev.then(() => grabFrame(src, t));
+    frameQueue.set(src, p.catch(() => null));
+    frameCache.set(key, p);
+  }
+  return p;
+}
+
+/** A row of frames from `src` at these file times, filling its parent (behind the label). */
+function Filmstrip({ src, times, frame }: { src: string; times: number[]; frame: number }) {
+  const key = times.join(",");
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let alive = true;
+    for (const t of key.split(",").map(Number)) {
+      void frameAt(src, t).then((url) => {
+        if (alive && url) setUrls((u) => (u[`${src}@${t}`] === url ? u : { ...u, [`${src}@${t}`]: url }));
+      });
+    }
+    return () => {
+      alive = false;
+    };
+  }, [src, key]);
+  return (
+    <span aria-hidden className="pointer-events-none absolute inset-0 flex overflow-hidden">
+      {times.map((t, i) => {
+        const url = urls[`${src}@${t}`];
+        return <span key={i} className="h-full shrink-0 bg-cover bg-center" style={{ width: frame, backgroundImage: url ? `url(${url})` : undefined }} />;
+      })}
+    </span>
+  );
+}
+
 /** Player bar for the whole video, three lines like CapCut: the clips, the texts, the sound line (click a sound, ✂ split it, drag its ends to trim, + add another). */
 function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPlay, onSeek, onSelect, onTrim, onMove, onSplit, onAdd, edit, toolbar }: {
   edit?: TimelineEdit;
@@ -1676,6 +1760,15 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
     if (x < el.scrollLeft || x > el.scrollLeft + el.clientWidth - 24) el.scrollLeft = x - 24;
   }, [t, playing, width]);
 
+  // Editor: the bar's width in pixels (how many frames fit on each clip piece).
+  const [areaW, setAreaW] = useState(0);
+  useEffect(() => {
+    const el = area.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setAreaW(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   // Editor: a clip piece being dragged to a new place (pixels moved, and where it would land).
   const [clipMove, setClipMove] = useState<{ key: string; dx: number; at: number } | null>(null);
   /** Editor: press a clip piece to select it (and put the playhead there); drag it sideways to move it between the demo clips. The hook stays first. */
@@ -1877,7 +1970,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
         </div>
         {/* 1. the clips (editor: every piece, selectable, trim handles on the selected one) */}
         {edit ? (
-          <div className="relative h-10 cursor-pointer rounded-md bg-raised/70" onPointerDown={seek}>
+          <div className="relative h-14 cursor-pointer rounded-md bg-raised/70" onPointerDown={seek}>
             {segs.flatMap((x, si) => {
               const spans = pieceSpans(x);
               const name = x.id === "hook" ? "Hook" : x.src ? x.label : "Demo";
@@ -1890,6 +1983,12 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
                 const [a, b] = d?.key === key ? [lo, hi - d.cutL - d.cutR] : [lo - shift, hi - shift];
                 const on = edit.selClip === key;
                 const handle = "absolute inset-y-0 z-10 flex w-3 cursor-ew-resize touch-none items-center justify-center bg-ink";
+                // Frames across the piece, one every 32px, from the part of the file it plays (rounded to 0.5s so they are reused).
+                const FRAME = 32;
+                const pps = areaW / width;
+                const speed = x.editable ? speedOf(x.adjust) : 1;
+                const count = pps > 0 ? Math.min(80, Math.max(1, Math.ceil(((hi - lo) * pps) / FRAME))) : 0;
+                const times = Array.from({ length: count }, (_, k) => Math.round(Math.min(part.end - 0.05, part.start + ((k * FRAME + FRAME / 2) / pps) * speed) * 2) / 2);
                 return (
                   <div
                     key={key}
@@ -1905,8 +2004,12 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
                     className={`absolute inset-y-0 flex items-center gap-1 overflow-hidden px-3.5 text-[10.5px] font-bold outline-none ${x.id === "hook" && x.parts.length === 1 ? "" : "cursor-grab active:cursor-grabbing"} ${si || pi ? "border-l-2 border-panel" : "rounded-l-md"} ${x.id === "hook" ? "bg-[#221d33] text-white" : si % 2 ? "bg-[#dfdde9] text-text" : "bg-[#d2d0df] text-text"} ${on ? "z-10 ring-2 ring-inset ring-accent" : ""} ${clipMove?.key === key ? "z-30 opacity-80 shadow-lg" : ""}`}
                     style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})`, transform: clipMove?.key === key ? `translateX(${clipMove.dx}px)` : undefined }}
                   >
-                    <Film className="h-3 w-3 shrink-0" />
-                    <span className="truncate">{name}{x.parts.length > 1 ? ` ${pi + 1}` : ""}</span>
+                    {x.src && count > 0 && <Filmstrip src={x.src} times={times} frame={FRAME} />}
+                    <span className={`relative flex min-w-0 items-center gap-1 ${x.src ? "self-start mt-1 rounded bg-black/60 px-1.5 py-0.5 text-white" : ""}`}>
+                      <Film className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{name}{x.parts.length > 1 ? ` ${pi + 1}` : ""}</span>
+                      {x.src && <span className="shrink-0 font-semibold tabular-nums text-white/75">{fmtTime(hi - lo)}</span>}
+                    </span>
                     {on && x.editable && (
                       <>
                         <span aria-label="Trim clip start" onPointerDown={(e) => trimClip(e, x.id, pi, key, lo, hi, "left")} className={`${handle} left-0`}>
