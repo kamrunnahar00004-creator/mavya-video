@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { speedOf } from "@/lib/adjust";
+import { claimPlayback, usePlaybackClaims } from "@/components/run-preview";
 import { Download, Film, FolderOpen, Loader2, Music, Pause, Play, X } from "lucide-react";
 import { characterById } from "@/lib/characters";
 import { clipSrc, demoClips, partsOf } from "@/lib/edit";
@@ -213,7 +215,7 @@ export function HistoryPanel({ run, refs, refreshKey, onClose, onUseHook, onUseF
         {list.map((x) => {
           const clips = x.value;
           const first = partsOf({ start: clips[0].start ?? 0, end: clips[0].end ?? clips[0].seconds ?? 3, parts: clips[0].parts });
-          const len = clips.reduce((t, c) => t + partsOf({ start: c.start ?? 0, end: c.end ?? c.seconds ?? 3, parts: c.parts }).reduce((a, p) => a + (p.end - p.start), 0), 0);
+          const len = clips.reduce((t, c) => t + partsOf({ start: c.start ?? 0, end: c.end ?? c.seconds ?? 3, parts: c.parts }).reduce((a, p) => a + (p.end - p.start), 0) / speedOf(c.adjust), 0);
           return (
             <Card key={x.key} onUse={x.runId === run.id ? undefined : () => onUseDemo(clips)} footer={<><div className="truncate text-[12.5px] font-semibold">{clips.length} {clips.length === 1 ? "clip" : "clips"} · {fmtTime(len)}</div>{meta(x)}</>}>
               <HoverVideo src={clipSrc(clips[0]) ?? ""} at={first[0].start} />
@@ -323,6 +325,10 @@ function Card({ children, footer, onUse, useLabel = "Use", action, square = fals
 /** A still frame that plays (muted, unless `sound`) while the pointer is on it. */
 function HoverVideo({ src, at = 0.5, sound = false }: { src: string; at?: number; sound?: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const who = useId();
+  const [playing, setPlaying] = useState(false);
+  usePlaybackClaims(who, setPlaying);
+  useEffect(() => { if (!playing) ref.current?.pause(); }, [playing]);
   return (
     <video
       ref={ref}
@@ -331,8 +337,9 @@ function HoverVideo({ src, at = 0.5, sound = false }: { src: string; at?: number
       playsInline
       loop
       preload="metadata"
-      onMouseEnter={() => void ref.current?.play().catch(() => undefined)}
+      onMouseEnter={() => { if (sound) claimPlayback(who); setPlaying(true); void ref.current?.play().catch(() => setPlaying(false)); }}
       onMouseLeave={() => {
+        setPlaying(false);
         const v = ref.current;
         if (!v) return;
         v.pause();
@@ -347,6 +354,9 @@ function HoverVideo({ src, at = 0.5, sound = false }: { src: string; at?: number
 function SoundRow({ p, meta, onUse }: { p: SoundPiece; meta: React.ReactNode; onUse: () => void }) {
   const audio = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
+  const who = useId();
+  usePlaybackClaims(who, setPlaying);
+  useEffect(() => { if (!playing) audio.current?.pause(); }, [playing]);
   return (
     <div className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-raised">
       <button
@@ -356,7 +366,7 @@ function SoundRow({ p, meta, onUse }: { p: SoundPiece; meta: React.ReactNode; on
           const a = audio.current;
           if (!a) return;
           if (playing) a.pause();
-          else void a.play().catch(() => setPlaying(false));
+          else { claimPlayback(who); void a.play().catch(() => setPlaying(false)); }
         }}
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-soundtrack-tint text-soundtrack"
       >

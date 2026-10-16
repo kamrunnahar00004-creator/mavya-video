@@ -282,14 +282,15 @@ export function RunView() {
    *  The hook's length changes: texts follow (a text over the whole hook keeps covering it). The old one is kept in versions. */
   const applyGenerated = (generated: NonNullable<Run["hook"]["generated"]>, text: string, extra: Partial<Run["hook"]> = {}, sourceRefId?: string | null) => {
     const sp = speedOf(hook.adjust);
+    const nextSpeed = "adjust" in extra ? speedOf(extra.adjust) : sp;
     const old = segs[0];
-    const moved = retimeTexts(texts, 0, { start: 0, end: old.len * sp, speed: sp }, { start: 0, end: generated.seconds, speed: sp });
+    const moved = retimeTexts(texts, 0, { start: 0, end: old.len * sp, speed: sp }, { start: 0, end: generated.seconds, speed: nextSpeed });
     const base = moved.find((x) => x.id === "hook");
-    const end = round1(generated.seconds / sp);
+    const end = round1(generated.seconds / nextSpeed);
     const item: TextLayer = base
       ? { ...base, text: base.text && base.text !== DEFAULT_HOOK_TEXT ? base.text : text }
       : { id: "hook", text, start: 0, end, x: 50, y: TEXT_Y.top, size: 4.6, font: "Arial", color: "#ffffff", style: "outline" };
-    const versions = hook.generated && hook.generated.src !== generated.src ? [...(hook.versions ?? []), hook.generated].slice(-50) : hook.versions;
+    const versions = hook.generated && (hook.generated.src !== generated.src || hook.generated.at !== generated.at) ? [...(hook.versions ?? []), hook.generated].slice(-50) : hook.versions;
     save({
       ...(sourceRefId !== undefined ? { sourceRefId } : {}),
       hook: { ...hook, ...extra, generated, versions, start: 0, end: generated.seconds, parts: undefined, text: item.text },
@@ -721,7 +722,7 @@ export function RunView() {
               }}
               onUseGenerated={(g, from) => {
                 // Steps 1 to 3 fill from the video it was made in: its viral hook, its character, and this generated hook.
-                applyGenerated(g, from.hook.text || hook.text, { face: from.hook.face ?? hook.face, source: from.hook.source ?? hook.source, describe: from.hook.describe, describeReady: from.hook.describeReady, adjust: from.hook.adjust }, from.sourceRefId ?? run.sourceRefId);
+                applyGenerated(g, from.hook.text || hook.text, { face: from.hook.face ?? hook.face, source: from.hook.source, describe: from.hook.describe, describeReady: from.hook.describeReady, adjust: from.hook.adjust }, from.sourceRefId);
                 setPicked(undefined);
                 setLibraryOpen(false);
                 setToast("Hook replaced");
