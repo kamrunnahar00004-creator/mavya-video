@@ -280,7 +280,7 @@ export function RunView() {
   };
   /** A generated hook goes in (new, or picked from My files with `extra` = the hook and character it was made from).
    *  The hook's length changes: texts follow (a text over the whole hook keeps covering it). The old one is kept in versions. */
-  const applyGenerated = (generated: NonNullable<Run["hook"]["generated"]>, text: string, extra: Partial<Run["hook"]> = {}, sourceRefId?: string | null) => {
+  const applyGenerated = (generated: NonNullable<Run["hook"]["generated"]>, text: string, extra: Partial<Run["hook"]> = {}, sourceRefId?: string | null, blankText = false) => {
     const sp = speedOf(hook.adjust);
     const nextSpeed = "adjust" in extra ? speedOf(extra.adjust) : sp;
     const old = segs[0];
@@ -288,8 +288,8 @@ export function RunView() {
     const base = moved.find((x) => x.id === "hook");
     const end = round1(generated.seconds / nextSpeed);
     const item: TextLayer = base
-      ? { ...base, text: base.text && base.text !== DEFAULT_HOOK_TEXT ? base.text : text }
-      : { id: "hook", text, start: 0, end, x: 50, y: TEXT_Y.top, size: 4.6, font: "Arial", color: "#ffffff", style: "outline" };
+      ? { ...base, text: blankText ? "" : base.text && base.text !== DEFAULT_HOOK_TEXT ? base.text : text }
+      : { id: "hook", text: blankText ? "" : text, start: 0, end, x: 50, y: TEXT_Y.top, size: 4.6, font: "Arial", color: "#ffffff", style: "outline" };
     const versions = hook.generated && (hook.generated.src !== generated.src || hook.generated.at !== generated.at) ? [...(hook.versions ?? []), hook.generated].slice(-50) : hook.versions;
     save({
       ...(sourceRefId !== undefined ? { sourceRefId } : {}),
@@ -724,8 +724,9 @@ export function RunView() {
               }}
               onUseGenerated={(g, from) => {
                 // Steps 1 to 3 fill from the video it was made in: its viral hook, its character, and this generated hook.
-                applyGenerated(g, from.hook.text || hook.text, { face: from.hook.face ?? hook.face, source: from.hook.source, describe: from.hook.describe, describeReady: from.hook.describeReady, adjust: from.hook.adjust }, from.sourceRefId);
-                setPicked(undefined);
+                // The words do not come along: the hook text box is left empty (same look and spot) and step 3 opens to type them.
+                applyGenerated(g, "", { face: from.hook.face ?? hook.face, source: from.hook.source, describe: from.hook.describe, describeReady: from.hook.describeReady, adjust: from.hook.adjust }, from.sourceRefId, true);
+                setPicked([3]);
                 setLibraryOpen(false);
                 setToast("Hook replaced");
               }}
