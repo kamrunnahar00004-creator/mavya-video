@@ -43,7 +43,7 @@ export const partsOf = (x: { start: number; end: number; parts?: Part[] }): Part
 export const storeParts = (parts: Part[]) => ({
   start: Math.min(...parts.map((p) => p.start)),
   end: Math.max(...parts.map((p) => p.end)),
-  parts: parts.length > 1 ? parts : undefined,
+  parts: parts.length > 1 || parts[0]?.id !== "p0" ? parts : undefined,
 });
 
 const pieceLen = (p: Part, speed: number) => Math.max(0.05, p.end - p.start) / speed;
@@ -180,11 +180,11 @@ export function remapTexts(texts: TextLayer[], offset: number, from: Pieces, to:
     }
     return offset + newLen;
   };
-  return texts.map((t) => {
+  return texts.flatMap((t) => {
     const start = roundTime(map(t.start, true));
-    let end = roundTime(map(t.end, false));
-    if (end - start < 0.3) end = roundTime(start + 0.3);
-    return { ...t, start, end };
+    const end = roundTime(map(t.end, false));
+    // Deleted frames must not turn into an invented 0.3s subtitle on the next clip.
+    return end > start ? [{ ...t, start, end }] : [];
   });
 }
 
@@ -192,13 +192,81 @@ export function remapTexts(texts: TextLayer[], offset: number, from: Pieces, to:
 export function cutOutTexts(texts: TextLayer[], offset: number, len: number): TextLayer[] {
   const out: TextLayer[] = [];
   for (const t of texts) {
-    if (t.start >= offset - 0.05 && t.end <= offset + len + 0.05 && t.id !== "hook") continue;
+    if (t.start >= offset - 0.05 && t.end <= offset + len + 0.05) continue;
     const map = (x: number) => (x <= offset ? x : x >= offset + len ? x - len : offset);
     const start = roundTime(map(t.start));
     const end = roundTime(Math.max(start + 0.3, map(t.end)));
     out.push({ ...t, start, end });
   }
   return out;
+}
+
+/** Delete a demo and its preceding gap together, or leave that space before its successor. */
+export function removeDemoClip(run: Run, clipId: string, texts: TextLayer[], hold = false): Pick<Run, "demo" | "texts"> {
+  const segs = timeline(run, null);
+  const index = segs.findIndex((s) => s.id === clipId);
+  const seg = segs[index];
+  const after = segs[index + 1];
+  let clips = demoClips(run).filter((c) => c.id !== clipId);
+  if (!seg) return { demo: { ...run.demo, clips }, texts };
+  if (hold && after) clips = clips.map((c) => c.id === after.id ? { ...c, gap: roundTime((c.gap ?? 0) + seg.gap + seg.len) } : c);
+  const nextTexts = hold
+    ? texts.filter((t) => !(t.start >= seg.offset - 0.001 && t.end <= seg.offset + seg.len + 0.001))
+    : cutOutTexts(texts, seg.offset - seg.gap, seg.gap + seg.len);
+  return { demo: { ...run.demo, clips }, texts: nextTexts };
+}
+
+/** Reorder a clip, or extract one piece, preserving text attached to its frames. */
+export function moveClipPiece(run: Run, texts: TextLayer[], segId: string, partId: string, beforeId: string | null, newId: string): Pick<Run, "hook" | "demo" | "texts"> | null {
+  const before = timeline(run, null);
+  const seg = before.find((s) => s.id === segId);
+  const clips = demoClips(run);
+  if (!seg || !seg.editable || (beforeId !== null && !clips.some((c) => c.id === beforeId))) return null;
+  const partIndex = seg.parts.findIndex((p) => p.id === partId);
+  if (partIndex < 0) return null;
+  const part = seg.parts[partIndex];
+  let hook = run.hook;
+  let kept = [...clips];
+  let moved: DemoClip;
+  const extracted = seg.parts.length > 1;
+  if (extracted) {
+    const own = clips.find((c) => c.id === segId);
+    moved = own
+      ? { ...own, id: newId, label: `${own.label} (part)`, start: part.start, end: part.end, parts: undefined, gap: undefined }
+      : { id: newId, label: "Hook (part)", src: seg.src ?? undefined, name: "Hook", seconds: seg.seconds, start: part.start, end: part.end, adjust: seg.adjust };
+    const rest = storeParts(seg.parts.filter((p) => p.id !== partId));
+    if (segId === "hook") hook = { ...hook, ...rest };
+    else kept = kept.map((c) => c.id === segId ? { ...c, ...rest } : c);
+  } else {
+    if (segId === "hook" || beforeId === segId) return null;
+    moved = clips.find((c) => c.id === segId)!;
+    kept = kept.filter((c) => c.id !== segId);
+  }
+  const pos = beforeId === null ? kept.length : kept.findIndex((c) => c.id === beforeId);
+  kept.splice(pos, 0, moved);
+  const demo = { ...run.demo, mode: "clips" as const, clips: kept };
+  const after = timeline({ ...run, hook, demo }, null);
+  const destination = after.find((s) => s.id === moved.id)!;
+  const span = pieceSpans(seg)[partIndex];
+  const pieceStart = seg.offset + span.at;
+  const pieceEnd = pieceStart + span.len;
+  const mapped = texts.flatMap((t) => {
+    if (extracted && t.start >= pieceStart - 0.001 && t.end <= pieceEnd + 0.001) {
+      const delta = destination.offset - pieceStart;
+      return [{ ...t, start: roundTime(t.start + delta), end: roundTime(t.end + delta) }];
+    }
+    const home = before.find((s) => t.start >= s.offset - 0.001 && t.end <= s.offset + s.len + 0.001);
+    if (!home) return [t];
+    if (extracted && home.id === segId) {
+      const target = after.find((s) => s.id === segId)!;
+      return remapTexts([t], seg.offset, { parts: seg.parts, speed: segSpeed(seg) }, { parts: target.parts, speed: segSpeed(target) })
+        .map((x) => ({ ...x, start: roundTime(x.start + target.offset - seg.offset), end: roundTime(x.end + target.offset - seg.offset) }));
+    }
+    const target = after.find((s) => s.id === home.id);
+    const delta = target ? target.offset - home.offset : 0;
+    return [{ ...t, start: roundTime(t.start + delta), end: roundTime(t.end + delta) }];
+  });
+  return { hook, demo, texts: mapped };
 }
 
 /** Shot list for "Build it clip by clip": from the hook's analysis when there is one, else a proven default

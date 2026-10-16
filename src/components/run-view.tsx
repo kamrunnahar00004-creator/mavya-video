@@ -11,7 +11,7 @@ import { FONT_CHOICES, fontCss, fontLabel, loadFonts } from "@/lib/studio-data";
 import { ADJUST_ROWS, type Adjust, type AdjustRow, type Motion, NO_ADJUST, fullAdjust, isAdjusted, keyAt, motionAt, moveKey, panBy, setMotion, speedOf, toggleKey, videoStyle } from "@/lib/adjust";
 import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundPieces, soundRows } from "@/lib/sound";
 import type { Song } from "@/app/api/songs/route";
-import { type Seg, clipSrc, cutOutTexts, demoClips, fileAt, segAt, videoLength, pieceSpans, relAt, remapTexts, retimeTexts, runSteps, shotList, storeParts, timeline } from "@/lib/edit";
+import { type Seg, clipSrc, demoClips, fileAt, moveClipPiece, removeDemoClip, segAt, videoLength, pieceSpans, relAt, remapTexts, retimeTexts, runSteps, shotList, storeParts, timeline } from "@/lib/edit";
 import { STYLE_GROUPS, STYLE_PRESETS, autoSecond, stylePreset } from "@/lib/text-styles";
 import { AVATAR_TONES, TEXT_Y, clipFromFile, flushRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { PLATFORM_LABEL, commentCta, fmtTime, fmtViews, isLikelyBoosted, type DemoClip, type Frame, type Part, type Reference, type SoundPiece, type Run, type TextLayer, type TextPos } from "@/lib/types";
@@ -270,7 +270,7 @@ export function RunView() {
       if (parts.some((q) => q.id === seg.parts[i].id)) continue;
       const a = seg.offset + spans[i].at;
       const b = a + spans[i].len;
-      kept = kept.filter((x) => x.id === "hook" || x.start < a - 0.05 || x.end > b + 0.05);
+      kept = kept.filter((x) => x.start < a - 0.001 || x.end > b + 0.001);
     }
     const nextTexts = remapTexts(kept, seg.offset, { parts: seg.parts, speed }, { parts, speed }, keep);
     const stored = storeParts(parts);
@@ -323,7 +323,7 @@ export function RunView() {
     const cur = runRef.current ?? run;
     const seconds = round1(c.length ?? 3);
     const list = startClips ?? demoClips(cur);
-    const clips = list.map((x) => (x.id === clipId ? { ...x, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds, parts: undefined, adjust: undefined } : x));
+    const clips = list.map((x) => (x.id === clipId ? { ...x, src: undefined, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds, parts: undefined, adjust: undefined } : x));
     const before = timeline(cur, null);
     const old = before.find((x) => x.id === clipId);
     const nextRun: Run = { ...cur, demo: { ...cur.demo, mode: mode ?? cur.demo.mode ?? "single", clips } };
@@ -365,7 +365,7 @@ export function RunView() {
     const old = timeline(cur, null);
     const next = before.slice(pos).map((c) => old.find((g) => g.id === c.id)).find(Boolean);
     const from = next ? next.offset : Infinity;
-    const by = timeline(nextRun, null).filter((g) => added.some((c) => c.id === g.id)).reduce((t, g) => t + g.len, 0);
+    const by = timeline(nextRun, null).filter((g) => added.some((c) => c.id === g.id)).reduce((t, g) => t + g.gap + g.len, 0);
     const r = (x: number) => Math.round(x * 1000) / 1000;
     save({ demo: nextRun.demo, texts: runTexts(cur).map((x) => (x.start >= from - 0.05 ? { ...x, start: r(x.start + by), end: r(x.end + by) } : x)) });
   };
@@ -390,41 +390,10 @@ export function RunView() {
   };
   /** Editor drag: a clip goes just before clip `beforeId` (null = the end). A piece of a Cut clip becomes its own clip there. */
   const moveClipTo = (segId: string, partId: string, beforeId: string | null) => {
-    const clips = demoClips(run);
-    const seg = segs.find((x) => x.id === segId);
-    const at = beforeId === null ? clips.length : clips.findIndex((c) => c.id === beforeId);
-    if (!seg || at < 0) return;
-    if (seg.parts.length === 1) {
-      if (segId === "hook") return;
-      const from = clips.findIndex((c) => c.id === segId);
-      const to = at > from ? at - 1 : at;
-      if (from >= 0 && to !== from) moveClip(segId, to);
-      return;
-    }
-    const part = seg.parts.find((x) => x.id === partId);
-    if (!part) return;
-    const own = clips.find((c) => c.id === segId);
-    const piece: DemoClip = own
-      ? { ...own, id: uid(), label: `${own.label} (part)`, start: part.start, end: part.end, parts: undefined }
-      : { id: uid(), label: "Hook (part)", src: seg.src ?? undefined, name: "Hook", seconds: seg.seconds, start: part.start, end: part.end, adjust: seg.adjust };
-    const rest = storeParts(seg.parts.filter((x) => x.id !== partId));
-    const kept = clips.map((c) => (c.id === segId ? { ...c, ...rest } : c));
-    const i = beforeId === null ? kept.length : kept.findIndex((c) => c.id === beforeId);
-    save({ hook: segId === "hook" ? { ...hook, ...rest } : hook, demo: { ...run.demo, mode: "clips", clips: [...kept.slice(0, i), piece, ...kept.slice(i)] } });
+    const patch = moveClipPiece(run, texts, segId, partId, beforeId, uid());
+    if (patch) save(patch);
   };
-  const deleteClip = (clipId: string, hold = false) => {
-    const seg = segs.find((x) => x.id === clipId);
-    const after = seg && segs[segs.indexOf(seg) + 1];
-    let clips = demoClips(run).filter((c) => c.id !== clipId);
-    const lastVideo = Boolean(seg) && !clips.some((c) => clipSrc(c));
-    if (seg && after && hold) {
-      // Magnet off: an empty space stays where the clip was; only the texts on it go.
-      clips = clips.map((c) => (c.id === after.id ? { ...c, gap: Math.round(((c.gap ?? 0) + seg.gap + seg.len) * 1000) / 1000 } : c));
-      save({ demo: { ...run.demo, clips }, texts: texts.filter((x) => x.id === "hook" || !(x.start >= seg.offset - 0.05 && x.end <= seg.offset + seg.len + 0.05)) });
-      return;
-    }
-    save({ demo: { ...run.demo, clips }, texts: !seg || lastVideo ? texts : cutOutTexts(texts, seg.offset, seg.len) });
-  };
+  const deleteClip = (clipId: string, hold = false) => save(removeDemoClip(run, clipId, texts, hold));
   /** Magnet off: put a demo clip at timeline time `to`, between its neighbours (the clip after it stays). Texts only on it move with it. */
   const shiftClip = (clipId: string, to: number) => {
     const i = segs.findIndex((x) => x.id === clipId);

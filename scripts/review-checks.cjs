@@ -16,7 +16,7 @@ require.extensions['.ts'] = (module, file) => module._compile(ts.transpileModule
 const load = (p) => require(path.join(root, 'src', p));
 
 async function main() {
-  const { retimeTexts, cutOutTexts, runSteps } = load('lib/edit.ts');
+  const { retimeTexts, cutOutTexts, runSteps, remapTexts, timeline, moveClipPiece, removeDemoClip, storeParts, fileAt, videoLength } = load('lib/edit.ts');
   const { soundPieces } = load('lib/sound.ts');
   const run = { hook: { mode: 'upload', text: '', clip: null }, demo: { clip: null, frame: 'none' }, sound: { kind: 'upload', src: '/api/media/a.mp3', start: 1, at: 2, end: 4, volume: 80 }, sounds: [] };
   assert.deepEqual(soundPieces(run, 8), []);
@@ -29,6 +29,29 @@ async function main() {
   assert.equal(retimed.start, 1.333);
   assert.ok(Math.abs(retimed.end - (1.333 + 2.933 / 1.3)) < 0.001);
   assert.equal(cutOutTexts([{ ...text, start: 6.333, end: 7.333 }], 1, 2.777)[0].start, 3.556);
+
+  const pieces = [{id:'a', start:0, end:1}, {id:'b', start:3, end:4}];
+  assert.equal(remapTexts([{...text,start:0,end:1}],0,{parts:pieces,speed:1},{parts:[pieces[1]],speed:1}).length,0);
+  const short = remapTexts([{...text,start:0,end:2}],0,{parts:pieces,speed:1},{parts:[{id:'a',start:0,end:0.1}],speed:1});
+  assert.equal(short[0].end,0.1);
+  assert.equal(storeParts([pieces[1]]).parts[0].id,'b');
+  const sample = { ...run, hook:{...run.hook,generated:{src:'/samples/hook-sample.mp4',seconds:2,at:'now'},start:0,end:2}, demo:{clip:null,frame:'none',clips:[{id:'d1',label:'First',src:'/samples/hook-sample.mp4',seconds:4,start:0,end:4,parts:pieces,gap:1},{id:'d2',label:'Second',src:'/samples/hook-sample.mp4',seconds:2,start:0,end:2,gap:2}]}};
+  assert.equal(videoLength(timeline(sample,null)),9);
+  assert.equal(fileAt(timeline(sample,null)[1],1.5).file,3.5);
+  const attached = [{...text,id:'a-text',start:3,end:4},{...text,id:'b-text',start:4,end:5},{...text,id:'last',start:7,end:9}];
+  const moved = moveClipPiece(sample,attached,'d1','b',null,'extracted');
+  const movedSegs=timeline({...sample,...moved},null);
+  const movedText=moved.texts.find(t=>t.id==='b-text');
+  assert.equal(movedText.start,movedSegs.find(s=>s.id==='extracted').offset);
+  assert.equal(moved.texts.find(t=>t.id==='last').start,movedSegs.find(s=>s.id==='d2').offset);
+  assert.equal(movedSegs.find(s=>s.id==='extracted').gap,0);
+  const removed=removeDemoClip(sample,'d1',attached,false);
+  assert.equal(removed.texts.find(t=>t.id==='last').start,4);
+  assert.equal(removed.texts.some(t=>t.id==='a-text'),false);
+  const held=removeDemoClip(sample,'d1',attached,true);
+  assert.equal(timeline({...sample,...held},null)[1].offset,7);
+  assert.equal(held.texts.find(t=>t.id==='last').start,7);
+  assert.equal(removeDemoClip(sample,'d2',attached).texts.some(t=>t.id==='last'),false);
 
   const { validRunPatch } = load('lib/server/run-validation.ts');
   assert.equal(validRunPatch({hook: run.hook, demo: run.demo, texts: [text]}), true);
