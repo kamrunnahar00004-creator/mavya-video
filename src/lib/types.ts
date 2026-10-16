@@ -216,6 +216,8 @@ export type Run = {
     faceMode?: "upload" | "describe";
     /** Step 3: the generated hook clip (a sample clip until Runway is connected). */
     generated?: { src: string; seconds: number; at: string; /** What the user said went wrong when regenerating. */ note?: string };
+    /** Earlier generated hooks (Regenerate keeps them for My files), oldest first. */
+    versions?: { src: string; seconds: number; at: string; note?: string }[];
     /** Step 3 Advanced settings: brightness / contrast / saturation / warmth / zoom of the hook clip. */
     adjust?: Partial<Adjust>;
     /** Pieces after a Cut (file times, played back to back). Absent = one piece from start to end. */
@@ -247,6 +249,8 @@ export type Run = {
   } | null;
   /** Current sound rows and split pieces. An explicit empty array means no sound. */
   sounds?: SoundPiece[];
+  /** Finished videos exported from this run, oldest first (shown in My files). */
+  exports?: { src: string; seconds: number; at: string }[];
   /** On-screen texts with timing. The one with id "hook" mirrors hook.text. Absent on older runs. */
   texts?: TextLayer[];
   /** Editor state. Older runs may hold the slot-based Project; the editor rebuilds those. */

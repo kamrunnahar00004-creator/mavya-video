@@ -13,10 +13,10 @@ import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundP
 import type { Song } from "@/app/api/songs/route";
 import { type Seg, clipSrc, cutOutTexts, demoClips, fileAt, segAt, videoLength, pieceSpans, relAt, remapTexts, retimeTexts, runSteps, shotList, storeParts, timeline } from "@/lib/edit";
 import { STYLE_GROUPS, STYLE_PRESETS, autoSecond, stylePreset } from "@/lib/text-styles";
-import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, flushRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
-import { PLATFORM_LABEL, commentCta, fmtTime, fmtViews, isLikelyBoosted, type Asset, type DemoClip, type Frame, type Part, type Reference, type SoundPiece, type Run, type TextLayer, type TextPos } from "@/lib/types";
+import { AVATAR_TONES, TEXT_Y, clipFromFile, flushRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
+import { PLATFORM_LABEL, commentCta, fmtTime, fmtViews, isLikelyBoosted, type DemoClip, type Frame, type Part, type Reference, type SoundPiece, type Run, type TextLayer, type TextPos } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
-import { LibraryPanel } from "@/components/library-panel";
+import { HistoryPanel } from "@/components/history-panel";
 import { RunPreview, SyncedAudio, SyncedVideo, TextOverlay, WarmthFilter, claimPlayback, soundAt, usePlaybackClaims } from "@/components/run-preview";
 
 const PRODUCT_KEY = "mavya-product-v1";
@@ -276,6 +276,24 @@ export function RunView() {
     const stored = storeParts(parts);
     if (clipId === "hook") save({ hook: { ...hook, ...stored }, demo: keep ? { ...run.demo, clips: demoClips(run).map(fix) } : run.demo, texts: nextTexts });
     else save({ demo: { ...run.demo, clips: demoClips(run).map((c) => (c.id === clipId ? { ...c, ...stored } : fix(c))) }, texts: nextTexts });
+  };
+  /** A generated hook goes in (new, or picked from My files with `extra` = the hook and character it was made from).
+   *  The hook's length changes: texts follow (a text over the whole hook keeps covering it). The old one is kept in versions. */
+  const applyGenerated = (generated: NonNullable<Run["hook"]["generated"]>, text: string, extra: Partial<Run["hook"]> = {}, sourceRefId?: string | null) => {
+    const sp = speedOf(hook.adjust);
+    const old = segs[0];
+    const moved = retimeTexts(texts, 0, { start: 0, end: old.len * sp, speed: sp }, { start: 0, end: generated.seconds, speed: sp });
+    const base = moved.find((x) => x.id === "hook");
+    const end = round1(generated.seconds / sp);
+    const item: TextLayer = base
+      ? { ...base, text: base.text && base.text !== DEFAULT_HOOK_TEXT ? base.text : text }
+      : { id: "hook", text, start: 0, end, x: 50, y: TEXT_Y.top, size: 4.6, font: "Arial", color: "#ffffff", style: "outline" };
+    const versions = hook.generated && hook.generated.src !== generated.src ? [...(hook.versions ?? []), hook.generated].slice(-50) : hook.versions;
+    save({
+      ...(sourceRefId !== undefined ? { sourceRefId } : {}),
+      hook: { ...hook, ...extra, generated, versions, start: 0, end: generated.seconds, parts: undefined, text: item.text },
+      texts: [item, ...moved.filter((x) => x.id !== "hook")],
+    });
   };
   const clipEditor = (seg: Seg) => (
     <ClipEditor
@@ -618,21 +636,7 @@ export function RunView() {
                 source={source}
                 seg={segs[0]}
                 texts={texts}
-                onGenerated={(generated, text) => {
-                  // The hook's length changes: texts follow (a text over the whole hook keeps covering it).
-                  const sp = speedOf(hook.adjust);
-                  const old = segs[0];
-                  const moved = retimeTexts(texts, 0, { start: 0, end: old.len * sp, speed: sp }, { start: 0, end: generated.seconds, speed: sp });
-                  const base = moved.find((x) => x.id === "hook");
-                  const end = round1(generated.seconds / sp);
-                  const item: TextLayer = base
-                    ? { ...base, text: base.text && base.text !== DEFAULT_HOOK_TEXT ? base.text : text }
-                    : { id: "hook", text, start: 0, end, x: 50, y: TEXT_Y.top, size: 4.6, font: "Arial", color: "#ffffff", style: "outline" };
-                  save({
-                    hook: { ...hook, generated, start: 0, end: generated.seconds, parts: undefined, text: item.text },
-                    texts: [item, ...moved.filter((x) => x.id !== "hook")],
-                  });
-                }}
+                onGenerated={(generated, text) => applyGenerated(generated, text)}
                 onPatch={patchText}
                 onAdd={addText}
                 onAdjust={(a) => liveAdjust("hook", a)}
@@ -730,15 +734,40 @@ export function RunView() {
       {libraryOpen && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-40 bg-black/20" onClick={() => setLibraryOpen(false)}>
           <div className="absolute bottom-3 right-3 top-3" onClick={(e) => e.stopPropagation()}>
-            <LibraryPanel
-              open
-              onToggle={() => setLibraryOpen(false)}
+            <HistoryPanel
+              run={run}
+              refs={refs}
               refreshKey={libraryKey}
-              useLabel={!run.demo.clip ? "Use as demo" : "Replace demo"}
-              onUse={async (a: Asset) => {
-                if (a.kind === "audio") return;
-                save({ demo: { ...run.demo, clip: await clipFromAsset({ ...a, kind: a.kind }) } });
+              onClose={() => setLibraryOpen(false)}
+              onUseHook={(r) => {
+                pickHook(r, r.owner === "user" ? "upload" : "library");
                 setLibraryOpen(false);
+                setToast("Hook replaced");
+              }}
+              onUseFace={(face) => {
+                save({ hook: { ...hook, face, faceMode: undefined } });
+                setLibraryOpen(false);
+                setToast("Character replaced");
+              }}
+              onUseGenerated={(g, from) => {
+                // Steps 1 to 3 fill from the video it was made in: its viral hook, its character, and this generated hook.
+                applyGenerated(g, from.hook.text || hook.text, { face: from.hook.face ?? hook.face, source: from.hook.source ?? hook.source, describe: from.hook.describe, describeReady: from.hook.describeReady, adjust: from.hook.adjust }, from.sourceRefId ?? run.sourceRefId);
+                setPicked(undefined);
+                setLibraryOpen(false);
+                setToast("Hook replaced");
+              }}
+              onUseDemo={(clips) => {
+                // The demo is replaced by that one, clips as they were cut (empty spaces left out).
+                const copy = clips.map((c) => ({ ...c, id: uid(), gap: undefined }));
+                save({ demo: { ...run.demo, clip: null, mode: copy.length > 1 ? "clips" : "single", clips: copy }, texts });
+                setLibraryOpen(false);
+                setToast("Demo replaced");
+              }}
+              onUseSound={(p) => {
+                // The sound is replaced by this one, under the whole video.
+                save({ sounds: [{ ...p, id: uid(), at: 0, end: videoLen, row: 0 }], sound: null });
+                setLibraryOpen(false);
+                setToast("Sound replaced");
               }}
             />
           </div>

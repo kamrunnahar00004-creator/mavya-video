@@ -33,7 +33,8 @@ function hook(v: unknown): boolean {
   if (!optional(v.face, (f) => nullable(f, face)) || !optional(v.adjust, adjust) || !optional(v.parts, parts)) return false;
   if (!optional(v.start, number) || !optional(v.end, number) || (typeof v.start === "number" && typeof v.end === "number" && v.end <= v.start)) return false;
   for (const key of ["original", "note", "describe", "color", "font", "textStyle"]) if (!optional(v[key], string)) return false;
-  return optional(v.generated, (g) => object(g) && localVideo(g.src) && number(g.seconds, 0.1) && string(g.at)) && optional(v.describeReady, (b) => typeof b === "boolean");
+  const gen = (g: unknown) => object(g) && localVideo(g.src) && number(g.seconds, 0.1) && string(g.at);
+  return optional(v.generated, gen) && optional(v.versions, (a) => Array.isArray(a) && a.length <= 50 && a.every(gen)) && optional(v.describeReady, (b) => typeof b === "boolean");
 }
 
 function demo(v: unknown): boolean {
