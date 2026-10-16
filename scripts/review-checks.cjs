@@ -92,9 +92,10 @@ async function main() {
   } finally { process.chdir(previous); fs.rmSync(dir, {recursive: true, force: true}); }
 
   const fetchBefore = global.fetch;
-  let calls = [], concurrent = 0, maxConcurrent = 0;
+  let calls = [], keepaliveValues = [], concurrent = 0, maxConcurrent = 0;
   global.fetch = async (url, options) => {
     calls.push(JSON.parse(options.body)); maxConcurrent = Math.max(maxConcurrent, ++concurrent);
+    keepaliveValues.push(options.keepalive);
     await new Promise(r => setTimeout(r, 30)); concurrent--;
     return Response.json({id:'test'});
   };
@@ -105,6 +106,9 @@ async function main() {
     await Promise.all([patchRun('test', {title:'last'}), patchRun('test', {texts:[text]})]);
     assert.equal(calls.length, 2); assert.equal(calls[1].title, 'last'); assert.equal(calls[1].texts[0].text, 'hello');
     assert.equal(maxConcurrent, 1);
+    await patchRun('test',{texts:[{...text,text:'あ'.repeat(30000)}]});
+    assert.equal(keepaliveValues.at(-1),false);
+    assert.equal(calls.at(-1).texts[0].text.length,30000);
   } finally { global.fetch = fetchBefore; }
   const documentBefore = global.document;
   let drawings = 0, retained = 0;

@@ -65,7 +65,10 @@ function flushRun(id: string) {
   pendingSaves.delete(id);
   const operation = (saveChains.get(id) ?? Promise.resolve(null)).then(async () => {
     try {
-      const res = await fetch(`/api/runs/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(pending.patch), keepalive: true });
+      const body = JSON.stringify(pending.patch);
+      // Browsers reject keepalive bodies above their 64 KiB quota, even on an open page.
+      const keepalive = new TextEncoder().encode(body).byteLength < 60000;
+      const res = await fetch(`/api/runs/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body, keepalive });
       return res.ok ? ((await res.json()) as Run) : null;
     } catch { return null; }
   });
