@@ -1374,7 +1374,9 @@ function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder 
               onPlay={() => { if (!playing) claimPlayback(`clip:${seg.id}`); setPlaying((x) => !x); }}
               t={t}
               len={len}
-              pieces={seg.parts.map((x, i) => ({ id: x.id, at: spans[i].at, len: spans[i].len }))}
+              src={seg.src ?? undefined}
+              speed={speed}
+              pieces={seg.parts.map((x, i) => ({ id: x.id, at: spans[i].at, len: spans[i].len, start: x.start, end: x.end }))}
               selected={picked}
               onSelect={setPick}
               draft={draft}
@@ -2035,7 +2037,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
                     key={key}
                     role="button"
                     tabIndex={0}
-                    aria-label={`Clip: ${name}${x.parts.length > 1 ? ` ${pi + 1}` : ""}`}
+                    aria-label={`Clip: ${x.parts.length > 1 ? pieceName(name, pi) : name}`}
                     aria-pressed={on}
                     onPointerDown={(e) => pressClip(e, x, part.id, key, lo, hi)}
                     onKeyDown={(e) => {
@@ -2048,7 +2050,7 @@ function WholeControls({ segs, texts, pieces, selected, total, t, playing, onPla
                     {x.src && count > 0 && <Filmstrip src={x.src} times={times} frame={FRAME} />}
                     <span className={`relative flex min-w-0 items-center gap-1 ${x.src ? "self-start mt-1 rounded bg-black/60 px-1.5 py-0.5 text-white" : ""}`}>
                       <Film className="h-3 w-3 shrink-0" />
-                      <span className="truncate">{name}{x.parts.length > 1 ? ` ${pi + 1}` : ""}</span>
+                      <span className="truncate">{x.parts.length > 1 ? pieceName(name, pi) : name}</span>
                       {x.src && <span className="shrink-0 font-semibold tabular-nums text-white/75">{fmtTime(hi - lo)}</span>}
                     </span>
                     {on && x.editable && (
@@ -3637,16 +3639,22 @@ function dragTextBar(e: React.PointerEvent, rect: DOMRect, len: number, x: TextL
   window.addEventListener("pointerup", up);
 }
 
+/** A piece of a Cut clip: "Hook 2", or "Clip 1.2" when the name already ends in a number. */
+const pieceName = (name: string, i: number) => (/\d$/.test(name) ? `${name}.${i + 1}` : `${name} ${i + 1}`);
+
 /** Player bar under a clip: play/pause, time, ruler, the clip's pieces side by side (Cut splits the piece under
  *  the playhead; the selected piece has trim handles and can be deleted), text bars, keyframes, Undo. */
-function ClipControls({ label, playing, onPlay, t, len, pieces, selected, onSelect, draft, onTrim, onTrimEnd, onDelete, onSeek, onCut, canCut, texts, onTiming, keys, onKeyMove, canUndo, onUndo }: {
+function ClipControls({ label, src, speed = 1, playing, onPlay, t, len, pieces, selected, onSelect, draft, onTrim, onTrimEnd, onDelete, onSeek, onCut, canCut, texts, onTiming, keys, onKeyMove, canUndo, onUndo }: {
   label: string;
   playing: boolean;
   onPlay: () => void;
   t: number;
   len: number;
-  /** The clip's pieces, on-screen: where each starts and how long it plays. */
-  pieces: { id: string; at: number; len: number }[];
+  /** The clip's file (frame strips on the pieces, like the full editor) and its speed. */
+  src?: string;
+  speed?: number;
+  /** The clip's pieces, on-screen: where each starts and how long it plays (and, for the frames, which part of the file). */
+  pieces: { id: string; at: number; len: number; start?: number; end?: number }[];
   selected: string | null;
   onSelect: (id: string) => void;
   /** Piece i being trimmed: its kept window [a, b] on the bar, until the handle is let go. */
@@ -3675,6 +3683,15 @@ function ClipControls({ label, playing, onPlay, t, len, pieces, selected, onSele
   const lo = sp?.at ?? 0;
   const hi = sp ? sp.at + sp.len : 0;
   const pct = (v: number) => `${(v / len) * 100}%`;
+  // The bar's width in pixels: how many frames fit on each piece.
+  const [areaW, setAreaW] = useState(0);
+  useEffect(() => {
+    const el = area.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setAreaW(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   function track(e: React.PointerEvent, on: (sec: number) => void, done?: () => void) {
     e.preventDefault();
     e.stopPropagation();
@@ -3761,13 +3778,19 @@ function ClipControls({ label, playing, onPlay, t, len, pieces, selected, onSele
             <span key={i} className={`absolute top-0 w-px bg-line ${i % 2 ? "h-1" : "h-1.5"}`} style={{ left: pct(i / 2) }} />
           ))}
         </div>
-        <div className="relative h-9 cursor-pointer overflow-hidden rounded-md bg-[repeating-linear-gradient(135deg,var(--raised),var(--raised)_4px,var(--line)_4px,var(--line)_6px)]" onPointerDown={(e) => track(e, onSeek)}>
+        <div className="relative h-12 cursor-pointer overflow-hidden rounded-md bg-[repeating-linear-gradient(135deg,var(--raised),var(--raised)_4px,var(--line)_4px,var(--line)_6px)]" onPointerDown={(e) => track(e, onSeek)}>
           {/* the pieces, side by side (one until the clip is Cut) */}
           {pieces.map((p, i) => {
             // While trimming, the piece keeps its start and the pieces after it slide along (no gap).
             const cutBy = draft ? pieces[draft.i].len - (draft.b - draft.a) : 0;
             const [pa, pb] = draft?.i === i ? [p.at, p.at + draft.b - draft.a] : draft && i > draft.i ? [p.at - cutBy, p.at + p.len - cutBy] : [p.at, p.at + p.len];
             const on = pieces.length > 1 && p.id === selected;
+            const dim = Boolean(selected) && pieces.length > 1 && !on;
+            // Frames across the piece (one every 28px) from the part of the file it plays, rounded to 0.5s so they are reused.
+            const FRAME = 28;
+            const pps = areaW / len;
+            const count = src && pps > 0 && p.start !== undefined && p.end !== undefined ? Math.min(60, Math.max(1, Math.ceil((p.len * pps) / FRAME))) : 0;
+            const times = Array.from({ length: count }, (_, k) => Math.round(Math.min((p.end ?? 0) - 0.05, (p.start ?? 0) + ((k * FRAME + FRAME / 2) / pps) * speed) * 2) / 2);
             return (
               <div
                 key={p.id}
@@ -3788,10 +3811,14 @@ function ClipControls({ label, playing, onPlay, t, len, pieces, selected, onSele
                     onDelete();
                   }
                 }}
-                className={`absolute inset-y-0 flex items-center px-4 text-[10.5px] font-bold text-white outline-none ${selected && pieces.length > 1 && !on ? "bg-[#a39eb5]" : "bg-[#221d33]"} ${i > 0 ? "border-l-2 border-panel" : ""} ${on ? "ring-2 ring-inset ring-accent" : ""}`}
+                className={`absolute inset-y-0 flex items-center overflow-hidden px-4 text-[10.5px] font-bold text-white outline-none ${dim && !count ? "bg-[#a39eb5]" : "bg-[#221d33]"} ${i > 0 ? "border-l-2 border-panel" : ""} ${on ? "ring-2 ring-inset ring-accent" : ""}`}
                 style={{ left: pct(pa), width: `calc(${pct(pb)} - ${pct(pa)})` }}
               >
-                <span className="truncate">{pieces.length > 1 ? `${label} ${i + 1}` : label}</span>
+                {src && count > 0 && <Filmstrip src={src} times={times} frame={FRAME} />}
+                {/* Not selected while another piece is: lighter. */}
+                {dim && count > 0 && <span aria-hidden className="pointer-events-none absolute inset-0 bg-white/55" />}
+                <span className={`relative truncate ${count > 0 ? "rounded bg-black/60 px-1.5 py-0.5" : ""}`}>{pieces.length > 1 ? pieceName(label, i) : label}</span>
+                {on && <span aria-hidden className="pointer-events-none absolute inset-0 ring-2 ring-inset ring-accent" />}
               </div>
             );
           })}
