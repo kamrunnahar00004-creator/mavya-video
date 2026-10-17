@@ -24,7 +24,7 @@ const poppins = Poppins({ variable: "--font-poppins", subsets: ["latin"], weight
 
 export const metadata: Metadata = {
   title: "Mavya: viral hook + demo videos",
-  description: "Steal hooks that already went viral, put an AI character in them, add your product demo. Make 100 videos a day.",
+  description: "Steal hooks that already went viral, put an AI character in them, add your product demo.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

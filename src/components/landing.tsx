@@ -29,21 +29,6 @@ const LIB_STRIP: [code: string, views: string][] = [
   ["Da9dDfqC3a2", "3.4M"], ["Db6BVR0T_-L", "8.9M"], ["DbtW-sFSSlP", "5.1M"], ["DZQq5b8y5-X", "2.7M"], ["DduKGOJTDgx", "2.6M"],
 ];
 
-/** The 10 x 10 grid: hooks across (one character each), product demos down. */
-const HOOK_FACES = ["olivia", "zuri", "jake", "mei", "marcus", "ava", "kenji", "amara", "liam", "freya"];
-const DEMOS = [
-  { name: "Candle", color: "#f4b860" },
-  { name: "Skincare", color: "#f2a7b8" },
-  { name: "App", color: "#7b4cfa" },
-  { name: "Course", color: "#2a5bd7" },
-  { name: "Coffee", color: "#8a5a3c" },
-  { name: "Sneakers", color: "#22a06b" },
-  { name: "Jewelry", color: "#c9a227" },
-  { name: "Plant", color: "#4caf50" },
-  { name: "Notebook", color: "#b02f86" },
-  { name: "Headphones", color: "#15121f" },
-];
-
 const FAQ = [
   { q: "Do I need to be on camera?", a: "No. Pick one of 70 AI characters, or use your own photo." },
   { q: "Where do the hooks come from?", a: "A library of short-form videos that already went viral. You copy the format, your character performs it, and the words are yours." },
@@ -115,7 +100,7 @@ export function Landing() {
         <div>
           <h1 className="text-[44px] font-black leading-[1.02] tracking-[-0.04em] sm:text-[60px]">
             Steal hooks that already went viral.
-            <span className="mt-1 block text-accent">Make 100 videos a day.</span>
+            <span className="mt-1 block text-accent">Put your product in them.</span>
           </h1>
           <p className="mt-6 max-w-[520px] text-[18px] leading-relaxed text-muted">
             The format that gets SaaS and apps signups on TikTok and Reels: a short hook that stops the scroll, then a demo of your product. Mavya makes the hook, you add the demo.
@@ -157,47 +142,6 @@ export function Landing() {
           ))}
         </div>
       </div>
-
-      {/* The math */}
-      <section className="border-y border-line bg-panel">
-        <div className="mx-auto max-w-[1160px] px-5 py-20">
-          <div className="grid items-center gap-12 lg:grid-cols-[0.9fr_1.1fr]">
-            <div>
-              <h2 className="text-[36px] font-black leading-[1.05] tracking-[-0.035em] sm:text-[44px]">
-                10 hooks × 10 demos
-                <span className="block text-accent">= 100 videos</span>
-              </h2>
-              <p className="mt-5 max-w-[440px] text-[17px] leading-relaxed text-muted">
-                Make each hook once. Put it on every product. Every hook, character, demo and song you use is saved, so the next video takes a minute.
-              </p>
-            </div>
-            <div className="overflow-x-auto">
-              <div className="inline-grid grid-cols-[74px_repeat(10,minmax(28px,1fr))] gap-1.5">
-                <span />
-                {HOOK_FACES.map((id) => (
-                  <span key={id} className="relative mx-auto h-7 w-7 overflow-hidden rounded-full ring-2 ring-panel">
-                    <Image src={characterById(id)?.thumb ?? ""} alt="" fill sizes="28px" className="object-cover" />
-                  </span>
-                ))}
-                {DEMOS.map((d) => (
-                  <div key={d.name} className="contents">
-                    <span className="flex items-center gap-1.5 truncate pr-1 text-[11.5px] font-bold text-muted">
-                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: d.color }} />
-                      {d.name}
-                    </span>
-                    {HOOK_FACES.map((id) => (
-                      <span key={id} className="relative aspect-[9/16] overflow-hidden rounded-[5px] bg-raised">
-                        <Image src={characterById(id)?.thumb ?? ""} alt="" fill sizes="32px" className="object-cover" />
-                        <span className="absolute inset-x-0 bottom-0 h-[30%]" style={{ background: d.color }} />
-                      </span>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* How it works */}
       <section id="how" className="mx-auto max-w-[1160px] scroll-mt-20 px-5 py-20">
@@ -279,7 +223,7 @@ export function Landing() {
       {/* Last call */}
       <section className="px-5 pb-20">
         <div className="mx-auto flex max-w-[1160px] flex-col items-center rounded-3xl bg-deep px-6 py-16 text-center">
-          <h2 className="max-w-[640px] text-[34px] font-black leading-[1.08] tracking-[-0.035em] text-white! sm:text-[44px]">Your next 100 videos start with one hook.</h2>
+          <h2 className="max-w-[640px] text-[34px] font-black leading-[1.08] tracking-[-0.035em] text-white! sm:text-[44px]">Start with a hook that already went viral.</h2>
           <Link href="/studio" className="btn-primary mt-8 px-7 py-3 text-[16px]">
             Start free
             <ArrowRight className="h-4 w-4" />
