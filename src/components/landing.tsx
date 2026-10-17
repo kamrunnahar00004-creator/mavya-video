@@ -7,30 +7,26 @@ import { CHARACTERS, characterById } from "@/lib/characters";
 import { PlanCards } from "@/components/plan-cards";
 import { StickyCta } from "@/components/sticky-cta";
 import { LoopVideo } from "@/components/loop-video";
+import { HookDemoExplainer } from "@/components/hook-demo-explainer";
 
 /** A character's landing clip, if one was dropped in public/landing/<id>.mp4 (short, muted, 480p); else its photo shows. */
 const clipFor = (id: string) => (existsSync(path.join(process.cwd(), "public", "landing", `${id}.mp4`)) ? `/landing/${id}.mp4` : null);
 
-/* Our own material only: the synthetic AI characters and the app's UI. No creator's video appears on this page. */
+/*
+ * Videos: the most-viewed hook + demo videos in the hook library (other creators'), as light silent loops in
+ * public/landing/lib-<code>.mp4 (made by a local script). LOCALHOST ONLY: replace them, or get the creators'
+ * permission, before this page is public.
+ */
 
-const HERO = [
-  { id: "zuri", text: "POV: you stopped editing by hand" },
-  { id: "jake", text: "How is this tool even legal?" },
-  { id: "mei", text: "I made 100 videos before lunch" },
-];
+/** The three hero phones play these whole. */
+const HERO = [{ lib: "Db6BVR0T_-L", views: "8.9M" }, { lib: "DcOiTp0xxTK", views: "5.6M" }, { lib: "DbtW-sFSSlP", views: "5.1M" }];
 
-/** The moving strip under the hero: more hooks, each an AI character with its caption. */
-const STRIP = [
-  { id: "olivia", text: "Nobody talks about this" },
-  { id: "marcus", text: "I tried it so you don't have to" },
-  { id: "ava", text: "Wait for it..." },
-  { id: "kenji", text: "This saved me 10 hours a week" },
-  { id: "amara", text: "Stop scrolling if you sell online" },
-  { id: "liam", text: "3 apps I can't live without" },
-  { id: "freya", text: "Don't buy this until you watch" },
-  { id: "andre", text: "My boss asked how I did this" },
-  { id: "priya", text: "Rating it honestly" },
-  { id: "noah", text: "The one tool I'd keep" },
+/** The explainer plays this one whole; its hook ends at the first cut. */
+const EXPLAIN = { code: "Dd--YQOqo16", hookEnd: 5.93, length: 20 };
+/** The moving strip. */
+const LIB_STRIP: [code: string, views: string][] = [
+  ["DZAiMMTP2YQ", "4.9M"], ["DdCqlaoP67w", "4.8M"], ["DdXIV6tuGTu", "4.1M"], ["DdLjyNctVi9", "3.6M"],
+  ["Da9dDfqC3a2", "3.4M"], ["DbHo7QFIvD4", "3.3M"], ["DZQq5b8y5-X", "2.7M"], ["DduKGOJTDgx", "2.6M"],
 ];
 
 /** The 10 x 10 grid: hooks across (one character each), product demos down. */
@@ -66,20 +62,26 @@ function Logo() {
   );
 }
 
-/** A phone playing a hook: an AI character with the hook's caption on top. */
-function Phone({ id, text, className = "" }: { id: string; text: string; className?: string }) {
-  const c = characterById(id);
+/** A phone playing a video from the library (whole), or an AI character with a hook caption on top. */
+function Phone({ id, text, lib, views, className = "" }: { id?: string; text?: string; lib?: string; views?: string; className?: string }) {
+  const c = id ? characterById(id) : null;
   return (
     <div className={`relative w-[200px] shrink-0 rounded-[34px] bg-ink p-[6px] shadow-[0_30px_60px_-24px_rgba(21,18,31,0.55)] ${className}`}>
       <div className="relative aspect-[9/19.5] overflow-hidden rounded-[28px] bg-[#14121f]">
-        {c && (clipFor(id) ? <LoopVideo src={clipFor(id) ?? ""} poster={c.src} className="absolute inset-0 h-full w-full object-cover" /> : <Image src={c.src} alt="" fill sizes="200px" className="object-cover" />)}
+        {lib ? (
+          <LoopVideo src={`/landing/lib-${lib}.mp4`} poster={`/landing/lib-${lib}.jpg`} className="absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          c && id && (clipFor(id) ? <LoopVideo src={clipFor(id) ?? ""} poster={c.src} className="absolute inset-0 h-full w-full object-cover" /> : <Image src={c.src} alt="" fill sizes="200px" className="object-cover" />)
+        )}
         <span className="absolute left-1/2 top-2.5 h-4 w-16 -translate-x-1/2 rounded-full bg-black" />
-        <p className="absolute inset-x-3 top-[17%] text-center font-[family-name:var(--font-montserrat)] text-[17px] font-black leading-tight text-white [-webkit-text-stroke:4px_#000] [paint-order:stroke_fill]">
-          {text}
-        </p>
+        {text && (
+          <p className="absolute inset-x-3 top-[17%] text-center font-[family-name:var(--font-montserrat)] text-[17px] font-black leading-tight text-white [-webkit-text-stroke:4px_#000] [paint-order:stroke_fill]">
+            {text}
+          </p>
+        )}
         <span className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10.5px] font-bold text-white">
           <Play className="h-2.5 w-2.5" fill="currentColor" />
-          Hook
+          {views ? `${views} views` : "Hook"}
         </span>
       </div>
     </div>
@@ -116,7 +118,7 @@ export function Landing() {
             <span className="mt-1 block text-accent">Make 100 videos a day.</span>
           </h1>
           <p className="mt-6 max-w-[520px] text-[18px] leading-relaxed text-muted">
-            The format that gets SaaS and apps signups on TikTok and Reels: a 3 second hook that stops the scroll, then a demo of your product. Mavya makes the hook, you add the demo.
+            The format that gets SaaS and apps signups on TikTok and Reels: a short hook that stops the scroll, then a demo of your product. Mavya makes the hook, you add the demo.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link href="/studio" className="btn-primary px-6 py-3 text-[16px]">
@@ -136,55 +138,21 @@ export function Landing() {
         </div>
       </section>
 
-      {/* What a hook + demo video is: a mock video playing on a loop, with its timeline and the two parts named */}
+      {/* What a hook + demo video is, shown with a real one */}
       <section className="mx-auto max-w-[1160px] px-5 pb-20">
-        <div className="grid items-center gap-10 rounded-3xl border border-line bg-panel p-6 sm:p-10 lg:grid-cols-[auto_1fr]">
-          <div className="mx-auto w-[230px]">
-            <HookDemoPhone />
-            {/* timeline: hook then demo, with a playhead */}
-            <div className="relative mt-4 flex h-7 overflow-hidden rounded-md text-[10.5px] font-bold">
-              <span className="flex w-1/3 items-center gap-1 bg-[#221d33] px-2 text-white"><Film className="h-3 w-3" />Hook</span>
-              <span className="flex flex-1 items-center gap-1 border-l-2 border-panel bg-[#d2d0df] px-2 text-text"><Film className="h-3 w-3" />Demo</span>
-              <span className="absolute inset-y-0 left-0 w-0.5 animate-[hd-playhead_9s_linear_infinite] bg-accent" />
-            </div>
-            <div className="mt-1 flex justify-between text-[11px] font-semibold tabular-nums text-soft">
-              <span>0:00</span>
-              <span className="-ml-3">0:03</span>
-              <span>0:09</span>
-            </div>
-          </div>
-          <div>
-            <h2 className="text-[34px] font-black leading-[1.05] tracking-[-0.035em] sm:text-[42px]">What is a hook + demo video?</h2>
-            <p className="mt-3 max-w-[520px] text-[16.5px] leading-relaxed text-muted">The short video SaaS founders post to get signups without ads. It works for any SaaS, app or online tool, because the product sells itself on screen. Two parts:</p>
-            <div className="mt-7 space-y-3">
-              <div className="flex animate-[hd-hook-label_9s_linear_infinite] gap-4 rounded-2xl border border-line p-4">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#221d33] text-[14px] font-extrabold text-white">1</span>
-                <div>
-                  <div className="flex items-baseline gap-2"><h3 className="text-[18px] font-extrabold">The hook</h3><span className="text-[12.5px] font-semibold tabular-nums text-soft">0:00 to 0:03</span></div>
-                  <p className="mt-0.5 text-[14.5px] leading-snug text-muted">A face and one line that stop the scroll. Copied from a video that already went viral, with an AI character in it.</p>
-                  <span className="mt-2 inline-block rounded-full bg-accent-tint px-2.5 py-0.5 text-[12px] font-bold text-accent">Mavya makes this</span>
-                </div>
-              </div>
-              <div className="flex animate-[hd-demo-label_9s_linear_infinite] gap-4 rounded-2xl border border-line p-4">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#d2d0df] text-[14px] font-extrabold text-text">2</span>
-                <div>
-                  <div className="flex items-baseline gap-2"><h3 className="text-[18px] font-extrabold">The demo</h3><span className="text-[12.5px] font-semibold tabular-nums text-soft">0:03 to the end</span></div>
-                  <p className="mt-0.5 text-[14.5px] leading-snug text-muted">Your SaaS or app doing the thing it promised: a screen recording, or your phone filming the screen.</p>
-                  <span className="mt-2 inline-block rounded-full bg-raised px-2.5 py-0.5 text-[12px] font-bold text-muted">You add this</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <HookDemoExplainer src={`/landing/lib-${EXPLAIN.code}-full.mp4`} poster={`/landing/lib-${EXPLAIN.code}.jpg`} hookEnd={EXPLAIN.hookEnd} length={EXPLAIN.length} />
       </section>
 
       {/* More hooks, moving sideways */}
       <div className="overflow-hidden pb-16" aria-hidden>
         <div className="flex w-max animate-[marquee_60s_linear_infinite] gap-4 hover:[animation-play-state:paused]">
-          {[...STRIP, ...STRIP].map((h, i) => (
-            <div key={i} className={`relative aspect-[9/16] w-[150px] shrink-0 overflow-hidden rounded-2xl border border-line bg-raised ${i % 2 ? "rotate-2" : "-rotate-2"}`}>
-              {clipFor(h.id) ? <LoopVideo src={clipFor(h.id) ?? ""} poster={characterById(h.id)?.src ?? ""} className="absolute inset-0 h-full w-full object-cover" /> : <Image src={characterById(h.id)?.src ?? ""} alt="" fill sizes="150px" className="object-cover" />}
-              <p className="absolute inset-x-2 top-[16%] text-center font-[family-name:var(--font-montserrat)] text-[13px] font-black leading-tight text-white [-webkit-text-stroke:3px_#000] [paint-order:stroke_fill]">{h.text}</p>
+          {[...LIB_STRIP, ...LIB_STRIP].map(([code, views], i) => (
+            <div key={i} className={`relative aspect-[9/16] w-[160px] shrink-0 overflow-hidden rounded-2xl border border-line bg-raised ${i % 2 ? "rotate-2" : "-rotate-2"}`}>
+              <LoopVideo src={`/landing/lib-${code}.mp4`} poster={`/landing/lib-${code}.jpg`} className="absolute inset-0 h-full w-full object-cover" />
+              <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-bold text-white">
+                <Play className="h-2.5 w-2.5" fill="currentColor" />
+                {views}
+              </span>
             </div>
           ))}
         </div>
@@ -329,55 +297,6 @@ export function Landing() {
           <a href="#" className="hover:text-text">Privacy</a>
         </div>
       </footer>
-    </div>
-  );
-}
-
-/**
- * A mock hook + demo video on a loop (CSS only): 3 s of hook (character + one line), then 6 s of demo (a product
- * on screen: the cursor clicks, the result appears). Same 9 s clock as the timeline and labels beside it.
- */
-function HookDemoPhone() {
-  const c = characterById("jake");
-  return (
-    <div className="relative rounded-[34px] bg-ink p-[6px] shadow-[0_30px_60px_-24px_rgba(21,18,31,0.55)]">
-      <div className="relative aspect-[9/16] overflow-hidden rounded-[28px] bg-[#14121f]">
-        {/* 1. the hook */}
-        <div className="absolute inset-0 animate-[hd-hook_9s_linear_infinite]">
-          {c && <Image src={c.src} alt="" fill sizes="230px" className="object-cover" />}
-          <p className="absolute inset-x-3 top-[16%] text-center font-[family-name:var(--font-montserrat)] text-[19px] font-black leading-tight text-white [-webkit-text-stroke:4px_#000] [paint-order:stroke_fill]">How is this tool even legal?</p>
-        </div>
-        {/* 2. the demo: a product on screen */}
-        <div className="absolute inset-0 animate-[hd-demo_9s_linear_infinite] bg-[linear-gradient(170deg,#2b2738,#14121f)]">
-          <p className="absolute inset-x-3 top-[9%] text-center font-[family-name:var(--font-montserrat)] text-[16px] font-black leading-tight text-white [-webkit-text-stroke:4px_#000] [paint-order:stroke_fill]">one click and...</p>
-          <div className="absolute inset-x-3 top-[27%] overflow-hidden rounded-xl bg-white shadow-2xl">
-            <div className="flex items-center gap-1 border-b border-line px-2 py-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#ff5f57]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-[#febc2e]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-[#28c840]" />
-              <span className="ml-1.5 h-2 flex-1 rounded-full bg-raised" />
-            </div>
-            <div className="space-y-1.5 p-3">
-              <span className="block h-2.5 w-3/4 rounded bg-text/85" />
-              <span className="block h-1.5 w-full rounded bg-line" />
-              <span className="block h-1.5 w-5/6 rounded bg-line" />
-              <span className="relative mt-2 flex h-7 w-24 items-center justify-center rounded-md border-2 border-ink bg-accent text-[10px] font-bold text-white">
-                Generate
-                {/* the cursor moves to the button and clicks */}
-                <svg viewBox="0 0 16 16" className="absolute h-4 w-4 animate-[hd-cursor_9s_linear_infinite] drop-shadow" aria-hidden>
-                  <path d="M2 1l11 6.5-5 1.2L6.3 14z" fill="#fff" stroke="#000" strokeWidth="1.2" strokeLinejoin="round" />
-                </svg>
-              </span>
-              {/* the result appears */}
-              <div className="mt-2 grid animate-[hd-result_9s_linear_infinite] grid-cols-3 gap-1">
-                {["#7b4cfa", "#2a5bd7", "#b02f86", "#22a06b", "#f4b860", "#15121f"].map((col) => (
-                  <span key={col} className="aspect-square rounded" style={{ background: col }} />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
