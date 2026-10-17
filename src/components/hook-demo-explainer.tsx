@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { LoopVideo } from "@/components/loop-video";
 
 const clock = (s: number) => `0:${String(Math.floor(s)).padStart(2, "0")}`;
 const LIGHT_VIOLET = "#b69cff";
@@ -39,7 +40,7 @@ export function HookDemoExplainer({ src, poster, strip, hookEnd, length }: { src
   return (
     <div className="relative overflow-hidden rounded-[28px] bg-[#15121f] text-white">
       <div aria-hidden className="pointer-events-none absolute -left-40 -top-40 h-[640px] w-[640px] rounded-full bg-[radial-gradient(closest-side,rgba(123,76,250,0.38),transparent)]" />
-      <div aria-hidden className="pointer-events-none absolute -bottom-48 right-0 h-[560px] w-[560px] rounded-full bg-[radial-gradient(closest-side,rgba(176,47,134,0.2),transparent)]" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-48 right-0 h-[560px] w-[560px] rounded-full bg-[radial-gradient(closest-side,rgba(123,76,250,0.16),transparent)]" />
       <div className="relative grid items-center gap-14 px-6 py-14 sm:px-12 sm:py-16 lg:grid-cols-[auto_1fr] lg:gap-20 lg:px-16 lg:py-20">
         <div className="mx-auto w-[250px]">
           <div className="relative rounded-[38px] bg-[#0b0910] p-[7px] shadow-[0_40px_80px_-30px_rgba(0,0,0,0.8)] ring-1 ring-white/10">
@@ -82,12 +83,13 @@ export function HookDemoExplainer({ src, poster, strip, hookEnd, length }: { src
 }
 
 /*
- * 10 hooks x 10 demos = 100 videos, kept simple: a fanned hand of three real hook cards, times a fanned hand of
- * three real demo cards, equals a big 100. The hands fan out once when they scroll into view (already fanned
+ * 10 hooks x 10 demos = 100 videos, kept simple: a fanned hand of three playing hook clips, times a fanned hand
+ * of three playing demo clips, equals a big 100. The hands fan out once when they scroll into view (already fanned
  * under reduced motion).
  */
-const MX_HOOKS = [0, 1, 3].map((i) => `/landing/mx-hook-${i}.jpg`);
-const MX_DEMOS = [0, 1, 3].map((i) => `/landing/mx-demo-${i}.jpg`);
+// Each card loops a few seconds: the hook part of three videos, the demo part of three others (public/landing/mx-*.mp4).
+const MX_HOOKS = [0, 1, 3].map((i) => `/landing/mx-hook-${i}`);
+const MX_DEMOS = [0, 1, 3].map((i) => `/landing/mx-demo-${i}`);
 const FAN = [
   { rotate: -9, x: -26, y: 6 },
   { rotate: 0, x: 0, y: 0 },
@@ -99,16 +101,17 @@ function Hand({ cards, label, on }: { cards: string[]; label: string; on: boolea
     <figure className="flex flex-col items-center">
       <div className="relative h-[124px] w-[124px] sm:h-[136px] sm:w-[136px]">
         {cards.map((src, i) => (
-          <span
+          <div
             key={src}
             className="absolute left-1/2 top-0 h-[116px] w-[66px] overflow-hidden rounded-[10px] bg-white/5 bg-cover bg-center shadow-[0_14px_30px_-12px_rgba(0,0,0,0.8)] ring-1 ring-white/20 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none sm:h-[128px] sm:w-[72px]"
             style={{
-              backgroundImage: `url(${src})`,
               zIndex: i === 1 ? 2 : 1,
               transform: on ? `translateX(calc(-50% + ${FAN[i].x}px)) translateY(${FAN[i].y}px) rotate(${FAN[i].rotate}deg)` : "translateX(-50%)",
               transitionDelay: `${i * 70}ms`,
             }}
-          />
+          >
+            <LoopVideo src={`${src}.mp4`} poster={`${src}.jpg`} className="absolute inset-0 h-full w-full object-cover" />
+          </div>
         ))}
       </div>
       <figcaption className="mt-3 text-[14px] font-semibold text-white/75">{label}</figcaption>

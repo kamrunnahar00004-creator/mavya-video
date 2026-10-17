@@ -181,9 +181,10 @@ export function Landing() {
 
       {/* Last call */}
       <section className="px-5 pb-20">
-        <div className="mx-auto flex max-w-[1160px] flex-col items-center rounded-3xl bg-deep px-6 py-16 text-center">
-          <h2 className="max-w-[640px] text-[34px] font-semibold leading-[1.08] tracking-[-0.035em] text-white! sm:text-[44px]">Start with a hook that already went viral.</h2>
-          <Link href="/studio" className="btn-primary mt-8 h-12 px-7 text-[16px]">
+        <div className="relative mx-auto flex max-w-[1160px] flex-col items-center overflow-hidden rounded-[28px] bg-[#15121f] px-6 py-20 text-center">
+          <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 h-[460px] w-[760px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-[radial-gradient(closest-side,rgba(123,76,250,0.38),transparent)]" />
+          <h2 className="relative max-w-[640px] text-[34px] font-semibold leading-[1.08] tracking-[-0.035em] text-white! sm:text-[44px]">Start with a hook that already went viral.</h2>
+          <Link href="/studio" className="btn-primary relative mt-8 h-12 px-7 text-[16px]">
             Sign up
             <ArrowRight className="h-4 w-4" />
           </Link>
