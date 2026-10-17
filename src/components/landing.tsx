@@ -95,7 +95,7 @@ export function Landing() {
               <span className="block text-balance text-accent">Mavya makes marketing easy.</span>
             </h1>
             <p className="mt-6 max-w-[500px] text-[17px] leading-relaxed text-muted sm:text-[18.5px]">
-              Hook + demo videos are the #1 way to market an app right now. Pick a viral hook. Mavya remakes it with an AI creator and walks you through the demo.
+              Pick a viral hook. Mavya does the rest.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Link href="/studio" className="btn-primary h-12 px-7 text-[16px]">
