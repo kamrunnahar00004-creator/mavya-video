@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronDown, Download, Film, Music, PenLine, Search, Type, Upload, Users } from "lucide-react";
+import { ArrowRight, Download, Film, Music, PenLine, Search, Type, Upload, Users } from "lucide-react";
 
 /*
  * How it works, in the Etsy Mavya "Research" layout (2026-10-17): the steps on the left, the active one marked
@@ -105,37 +105,86 @@ function AppWindow({ url, children }: { url: string; children: React.ReactNode }
   );
 }
 
-const cover = (code: string) => `/landing/lib-${code}.jpg`;
-/** Step 1: the library, sorted by views: two complete rows, the last tile says there are more. */
-const LIBRARY: [string, string][] = [
-  ["DcOiTp0xxTK", "5.6M"], ["Dd--YQOqo16", "5.0M"], ["DdCqlaoP67w", "4.8M"], ["DdLjyNctVi9", "3.6M"], ["DbHo7QFIvD4", "3.3M"],
-  ["DWp_8nwCPSF", "1.8M"], ["DeDo3iHKIKh", "1.6M"], ["DajwiOOtvDL", "1.6M"], ["DaFCnEnNxTM", "1.6M"],
+/*
+ * Step 1: the library like a research tool (same pattern as the Etsy Mavya keyword panel): the selected hook
+ * plays on top with its numbers, a table of hooks below. Real hooks from the library with their real numbers;
+ * click a row to play it, the rows also advance on their own.
+ */
+const HOOKS = [
+  { code: "DcOiTp0xxTK", line: "Been living paycheck to paycheck for 3 yrs and NOW I find this??!", app: "Maxle", format: "Text + music", views: "5.6M", likes: "34.7K", comments: "126" },
+  { code: "Dd--YQOqo16", line: "My sister is actually nuts why is this her wedding invitation", app: "Replit", format: "Text + music", views: "5.0M", likes: "221K", comments: "335" },
+  { code: "DdCqlaoP67w", line: "bro rate my startup idea", app: "Mise", format: "Text + music", views: "4.8M", likes: "71.2K", comments: "380" },
+  { code: "DdLjyNctVi9", line: "im so dead look what my sister just sent out to the WHOLE family", app: "Figma", format: "Voiceover", views: "3.6M", likes: "198K", comments: "523" },
+  { code: "DbHo7QFIvD4", line: "pov: he airdrops you THIS", app: "Figma", format: "Text + music", views: "3.3M", likes: "29.8K", comments: "202" },
 ];
+const HOOK_MS = 3500;
 function LibraryPanel() {
+  const [sel, setSel] = useState(0);
+  const [auto, setAuto] = useState(true);
+  useEffect(() => {
+    if (!auto || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const t = window.setTimeout(() => setSel((x) => (x + 1) % HOOKS.length), HOOK_MS);
+    return () => window.clearTimeout(t);
+  }, [auto, sel]);
+  const h = HOOKS[sel];
+  const stat = (label: string, value: string) => (
+    <div>
+      <p className="text-[12px] text-soft">{label}</p>
+      <p className="mt-0.5 text-[20px] font-semibold tabular-nums tracking-[-0.01em]">{value}</p>
+    </div>
+  );
   return (
     <div className="flex h-full flex-col p-5 sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-[16px] font-semibold">Viral library</h3>
-        <span className="flex h-9 w-[220px] items-center gap-2 rounded-lg bg-raised px-3 text-[13px] text-soft"><Search className="h-4 w-4" />Search hooks</span>
+        <span className="flex h-9 w-[200px] items-center gap-2 rounded-lg bg-raised px-3 text-[13px] text-soft"><Search className="h-4 w-4" />Search hooks</span>
       </div>
-      <div className="mt-4 flex items-center gap-5 border-b border-line text-[13px] font-semibold">
-        <span className="-mb-px border-b-2 border-ink pb-2 text-text">All</span>
-        <span className="pb-2 text-soft">Text + music</span>
-        <span className="pb-2 text-soft">Voiceover</span>
-        <span className="ml-auto flex items-center gap-1 pb-2 text-muted">Most viewed <ChevronDown className="h-3.5 w-3.5" /></span>
-      </div>
-      <div className="mt-4 grid grid-cols-5 gap-2.5">
-        {LIBRARY.map(([code, views], i) => (
-          <div key={code} className={`relative aspect-[9/16] overflow-hidden rounded-lg bg-raised bg-cover bg-center ${i === 3 ? "ring-[3px] ring-accent" : ""}`} style={{ backgroundImage: `url(${cover(code)})` }}>
-            <span className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/70 to-transparent" />
-            <span className="absolute bottom-1.5 left-2 text-[11px] font-bold text-white">▶ {views}</span>
-            {i === 3 && <span className="absolute left-1.5 top-1.5 rounded-md bg-accent px-1.5 py-0.5 text-[10.5px] font-bold text-white">Use this hook</span>}
-          </div>
-        ))}
-        <div className="flex aspect-[9/16] flex-col items-center justify-center gap-2 rounded-lg border border-line bg-raised text-center">
-          <Search className="h-5 w-5 text-accent" />
-          <span className="px-2 text-[12.5px] font-semibold leading-tight">Browse all hooks</span>
+
+      {/* the selected hook, playing, with its numbers */}
+      <div key={h.code} className="mt-4 grid grid-cols-[118px_1fr] gap-5 animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none">
+        <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-ink shadow-[0_16px_32px_-16px_rgba(21,18,31,0.6)]">
+          <video src={`/landing/lib-${h.code}.mp4`} poster={`/landing/lib-${h.code}.jpg`} muted loop playsInline autoPlay aria-label={h.line} className="absolute inset-0 h-full w-full object-cover" />
         </div>
+        <div className="flex min-w-0 flex-col">
+          <div className="flex items-center gap-2 text-[12px] font-semibold">
+            <span className="rounded-full bg-raised px-2 py-0.5 text-muted">{h.format}</span>
+            <span className="rounded-full bg-accent-tint px-2 py-0.5 text-accent">Demo: {h.app}</span>
+          </div>
+          <p className="mt-2.5 text-[17px] font-semibold leading-snug tracking-[-0.01em]">“{h.line}”</p>
+          <div className="mt-auto grid grid-cols-3 gap-3 border-t border-line pt-3">
+            {stat("Views", h.views)}
+            {stat("Likes", h.likes)}
+            {stat("Comments", h.comments)}
+          </div>
+          <span className="btn-primary mt-3 h-9 w-fit px-4 text-[13px]">Use this hook</span>
+        </div>
+      </div>
+
+      {/* the table */}
+      <div className="mt-5 grid grid-cols-[1fr_64px_56px] gap-3 border-b border-line px-2 pb-2 text-[12px] font-semibold text-soft">
+        <span>Hook</span>
+        <span className="text-right">Views</span>
+        <span className="text-right">Likes</span>
+      </div>
+      <div className="mt-1">
+        {HOOKS.map((x, i) => (
+          <button
+            key={x.code}
+            type="button"
+            onClick={() => {
+              setSel(i);
+              setAuto(false);
+            }}
+            className={`grid w-full cursor-pointer grid-cols-[1fr_64px_56px] items-center gap-3 rounded-lg px-2 py-1 text-left transition-colors ${i === sel ? "bg-accent-tint" : "hover:bg-raised"}`}
+          >
+            <span className="flex min-w-0 items-center gap-2.5">
+              <span className="h-[30px] w-[17px] shrink-0 rounded-[4px] bg-cover bg-center" style={{ backgroundImage: `url(/landing/lib-${x.code}.jpg)` }} />
+              <span className={`truncate text-[13px] ${i === sel ? "font-semibold text-text" : "text-muted"}`}>{x.line}</span>
+            </span>
+            <span className="text-right text-[13px] font-semibold tabular-nums">{x.views}</span>
+            <span className="text-right text-[13px] tabular-nums text-muted">{x.likes}</span>
+          </button>
+        ))}
       </div>
     </div>
   );
