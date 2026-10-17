@@ -2,10 +2,9 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Download, Film, FolderOpen, Music, Play, Type } from "lucide-react";
-import { CHARACTERS, characterById } from "@/lib/characters";
+import { ArrowRight, Play } from "lucide-react";
+import { characterById } from "@/lib/characters";
 import { PlanCards } from "@/components/plan-cards";
-import { StickyCta } from "@/components/sticky-cta";
 import { LoopVideo } from "@/components/loop-video";
 import { HookDemoExplainer } from "@/components/hook-demo-explainer";
 
@@ -17,6 +16,14 @@ const clipFor = (id: string) => (existsSync(path.join(process.cwd(), "public", "
  * public/landing/lib-<code>.mp4 (made by a local script). LOCALHOST ONLY: replace them, or get the creators'
  * permission, before this page is public.
  */
+
+/** How it works: real screens from the app (public/landing/app-*.jpg, captured from localhost by a local script). */
+const STEPS = [
+  { shot: "/landing/app-library.jpg", alt: "The viral hook library", title: "A library of hooks that already went viral.", text: "Sorted by views. Pick one and make it yours." },
+  { shot: "/landing/app-characters.jpg", alt: "Choosing an AI creator", title: "Remixed with an AI creator.", text: "70 characters or your own face. No filming the hook." },
+  { shot: "/landing/app-shotlist.jpg", alt: "The shot list for the demo", title: "A shot list for your demo.", text: "Exactly what to film, shot by shot." },
+  { shot: "/landing/app-editor.jpg", alt: "The video editor", title: "Edit, add sound, export.", text: "A built-in editor and trending songs. Everything is saved to reuse." },
+];
 
 /** The three hero phones play these whole. */
 const HERO = [{ lib: "DdLjyNctVi9", views: "3.6M" }, { lib: "DcOiTp0xxTK", views: "5.6M" }, { lib: "DbHo7QFIvD4", views: "3.3M" }];
@@ -98,20 +105,21 @@ export function Landing() {
       {/* Hero */}
       <section className="mx-auto grid max-w-[1160px] items-center gap-12 px-5 pb-20 pt-16 lg:grid-cols-[1.05fr_1fr] lg:pt-24">
         <div>
-          <h1 className="text-[44px] font-black leading-[1.02] tracking-[-0.04em] sm:text-[60px]">
-            Steal hooks that already went viral.
-            <span className="mt-1 block text-accent">Put your product in them.</span>
+          <h1 className="text-[52px] font-black leading-[0.98] tracking-[-0.045em] sm:text-[76px]">
+            Automate your
+            <span className="block text-accent">app&apos;s marketing.</span>
           </h1>
-          <p className="mt-6 max-w-[520px] text-[18px] leading-relaxed text-muted">
-            The format that gets SaaS and apps signups on TikTok and Reels: a short hook that stops the scroll, then a demo of your product. Mavya makes the hook, you add the demo.
+          <p className="mt-6 max-w-[500px] text-[19px] leading-relaxed text-muted">
+            Hook + demo videos are the #1 way to market an app right now. Pick a viral hook. Mavya remakes it with an AI creator and walks you through the rest.
           </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link href="/studio" className="btn-primary px-6 py-3 text-[16px]">
+          <div className="mt-8 flex flex-wrap items-center gap-6">
+            <Link href="/studio" className="btn-primary px-7 py-3.5 text-[16px]">
               Start free
               <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link href="/library" className="flex items-center gap-2 rounded-lg border border-line-strong bg-panel px-5 py-3 text-[15px] font-bold text-text hover:border-ink">
-              See the hook library
+            <Link href="/library" className="group flex items-center gap-1.5 text-[15px] font-bold text-text">
+              <span className="underline decoration-line-strong decoration-2 underline-offset-[6px] group-hover:decoration-accent">See the hook library</span>
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
           </div>
           <p className="mt-4 text-[13.5px] font-semibold text-soft">No credit card. Reels, TikTok and Shorts.</p>
@@ -143,44 +151,24 @@ export function Landing() {
         </div>
       </div>
 
-      {/* How it works */}
-      <section id="how" className="mx-auto max-w-[1160px] scroll-mt-20 px-5 py-20">
-        <h2 className="text-[36px] font-black tracking-[-0.035em] sm:text-[44px]">How it works</h2>
-        <div className="mt-10 grid gap-x-8 gap-y-10 rounded-3xl border-2 border-ink bg-panel p-6 shadow-[6px_6px_0_var(--ink)] sm:grid-cols-2 sm:p-8 lg:grid-cols-4">
-          <Step n={1} title="Steal a hook" text="Browse hooks that already pulled millions of views.">
-            <div className="flex gap-2">
-              {["2.1M", "870K", "4.3M"].map((v, i) => (
-                <span key={v} className="relative aspect-[9/16] flex-1 overflow-hidden rounded-lg" style={{ background: ["linear-gradient(160deg,#2e1065,#7b4cfa)", "linear-gradient(160deg,#15121f,#2a5bd7)", "linear-gradient(160deg,#5b2fd6,#b02f86)"][i] }}>
-                  <span className="absolute bottom-1.5 left-1.5 rounded bg-black/50 px-1 text-[10px] font-bold text-white">{v}</span>
-                </span>
-              ))}
-            </div>
-          </Step>
-          <Step n={2} title="Pick your character" text="70 AI characters, or your own photo.">
-            <div className="grid grid-cols-4 gap-1.5">
-              {CHARACTERS.slice(0, 8).map((c) => (
-                <span key={c.id} className="relative aspect-square overflow-hidden rounded-lg">
-                  <Image src={c.thumb} alt="" fill sizes="48px" className="object-cover" />
-                </span>
-              ))}
-            </div>
-          </Step>
-          <Step n={3} title="Add your demo" text="Drop in your product clips. Cut, trim, add text and sound.">
-            <div className="space-y-1.5">
-              <div className="flex h-7 gap-0.5 overflow-hidden rounded-md">
-                <span className="flex w-[38%] items-center gap-1 bg-[#221d33] px-2 text-[10px] font-bold text-white"><Film className="h-3 w-3" />Hook</span>
-                <span className="flex flex-1 items-center gap-1 bg-[#d2d0df] px-2 text-[10px] font-bold"><Film className="h-3 w-3" />Demo</span>
+      {/* How it works: the whole product, each step a real screen from the app */}
+      <section id="how" className="mx-auto max-w-[1160px] scroll-mt-24 px-5 py-20">
+        <h2 className="max-w-[640px] text-[36px] font-black leading-[1.05] tracking-[-0.035em] sm:text-[48px]">From viral hook to finished video, step by step.</h2>
+        <div className="mt-12 grid gap-x-10 gap-y-14 md:grid-cols-2">
+          {STEPS.map((step, i) => (
+            <div key={step.title}>
+              <div className="overflow-hidden rounded-2xl border-2 border-ink bg-panel shadow-[6px_6px_0_var(--ink)]">
+                <Image src={step.shot} alt={step.alt} width={1180} height={738} sizes="(min-width: 768px) 540px, 100vw" className="aspect-[16/10] w-full object-cover object-top" />
               </div>
-              <div className="flex h-5 items-center gap-1 rounded-md bg-texttrack-tint px-2 text-[10px] font-semibold text-texttrack" style={{ width: "62%" }}><Type className="h-3 w-3" />Text</div>
-              <div className="flex h-6 items-center gap-1 rounded-md bg-soundtrack-tint px-2 text-[10px] font-bold text-soundtrack"><Music className="h-3 w-3" />Trending sound</div>
+              <div className="mt-6 flex gap-4">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-[14px] font-extrabold text-white">{i + 1}</span>
+                <div>
+                  <h3 className="text-[21px] font-extrabold leading-tight">{step.title}</h3>
+                  <p className="mt-1.5 text-[16px] leading-snug text-muted">{step.text}</p>
+                </div>
+              </div>
             </div>
-          </Step>
-          <Step n={4} title="Export and reuse" text="Download, post, and reuse any part on the next product.">
-            <div className="space-y-2">
-              <span className="btn-primary w-full py-2 text-[13px]"><Download className="h-3.5 w-3.5" />Export</span>
-              <span className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[12px] font-semibold text-muted"><FolderOpen className="h-3.5 w-3.5" />Saved to My files</span>
-            </div>
-          </Step>
+          ))}
         </div>
       </section>
 
@@ -231,8 +219,6 @@ export function Landing() {
         </div>
       </section>
 
-      <StickyCta />
-
       <footer className="border-t border-line pb-24">
         <div className="mx-auto flex max-w-[1160px] flex-wrap items-center gap-4 px-5 py-6 text-[13px] text-soft">
           <Logo />
@@ -241,17 +227,6 @@ export function Landing() {
           <a href="#" className="hover:text-text">Privacy</a>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function Step({ n, title, text, children }: { n: number; title: string; text: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col">
-      <div className="h-[112px]">{children}</div>
-      <span className="mt-5 flex h-7 w-7 items-center justify-center rounded-full bg-accent-tint text-[13px] font-extrabold text-accent">{n}</span>
-      <h3 className="mt-3 text-[18px] font-extrabold">{title}</h3>
-      <p className="mt-1 text-[14.5px] leading-snug text-muted">{text}</p>
     </div>
   );
 }
