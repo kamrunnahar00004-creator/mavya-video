@@ -110,7 +110,7 @@ export function Landing() {
             <span className="block text-accent">app&apos;s marketing.</span>
           </h1>
           <p className="mt-6 max-w-[500px] text-[19px] leading-relaxed text-muted">
-            Hook + demo videos are the #1 way to market an app right now. Pick a viral hook. Mavya remakes it with an AI creator and walks you through the rest.
+            Hook + demo videos are the #1 way to market an app right now. Pick a viral hook. Mavya remakes it with an AI creator and walks you through the demo.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-6">
             <Link href="/studio" className="btn-primary px-7 py-3.5 text-[16px]">
