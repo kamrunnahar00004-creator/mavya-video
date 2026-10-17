@@ -87,7 +87,8 @@ export function Landing() {
 
       {/* Hero: text left (semibold, three clean lines), the three phones fanned right, both in the first screen */}
       <section className="relative overflow-hidden">
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[620px] bg-[radial-gradient(45%_60%_at_70%_10%,var(--accent-tint)_0%,transparent_100%)]" />
+        {/* violet glow behind the phones, a little stronger, so the dark card below feels like a continuation */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[600px] bg-[radial-gradient(46%_58%_at_72%_32%,rgba(123,76,250,0.2)_0%,transparent_100%)]" />
         <div className="relative mx-auto grid max-w-[1160px] items-center gap-12 px-5 pb-24 pt-16 lg:grid-cols-[1.1fr_1fr] lg:pt-24">
           <div>
             <h1 className="text-[38px] font-semibold leading-[1.14] tracking-[-0.035em] sm:text-[48px] lg:text-[46px] xl:text-[48px]">
