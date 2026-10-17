@@ -40,7 +40,7 @@ export function HowItWorks() {
       <div className="mx-auto max-w-[1160px] px-5">
         <p className="text-[14px] font-semibold text-accent">How it works</p>
         <h2 className="mt-2 max-w-[680px] text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">From viral hook to finished video.</h2>
-        <p className="mt-4 max-w-[600px] text-[17px] leading-relaxed text-muted">Mavya walks you through every step. You only film the demo.</p>
+        <p className="mt-4 max-w-[600px] text-[18px] leading-relaxed text-muted">Mavya walks you through every step. You only film the demo.</p>
 
         <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-14" onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
           <div role="tablist" aria-orientation="vertical" aria-label="How it works" className="flex flex-col">
@@ -59,11 +59,11 @@ export function HowItWorks() {
                   )}
                   <button type="button" role="tab" aria-selected={on} aria-controls="hiw-panel" onClick={() => pick(i)} className="group block w-full cursor-pointer py-5 text-left">
                     <span className={`block text-[13px] font-semibold tabular-nums transition-colors ${on ? "text-accent" : "text-soft"}`}>Step {i + 1}</span>
-                    <span className={`mt-1 block text-[21px] font-semibold tracking-[-0.015em] transition-colors ${on ? "text-text" : "text-muted group-hover:text-text"}`}>{s.title}</span>
-                    <span className={`mt-2 block text-[15.5px] leading-relaxed transition-colors ${on ? "text-muted" : "text-soft"}`}>{s.body}</span>
+                    <span className={`mt-1 block text-[20px] font-semibold tracking-[-0.015em] transition-colors ${on ? "text-text" : "text-muted group-hover:text-text"}`}>{s.title}</span>
+                    <span className={`mt-2 block text-[16px] leading-relaxed transition-colors ${on ? "text-muted" : "text-soft"}`}>{s.body}</span>
                   </button>
                   {on && (
-                    <Link href="/studio" className="-mt-2 mb-5 inline-flex items-center gap-1.5 text-[15px] font-semibold text-accent hover:underline">
+                    <Link href="/studio" className="-mt-2 mb-5 inline-flex items-center gap-1.5 text-[16px] font-semibold text-accent hover:underline">
                       Try it free <ArrowRight className="h-4 w-4" />
                     </Link>
                   )}

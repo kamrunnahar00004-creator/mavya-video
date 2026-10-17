@@ -216,7 +216,11 @@ input[type="range"] {
   }
 }
 
-/* Landing page (2026-10-17): Geist type for a calmer, more premium read; colours stay the brand's own. */
+/* Landing page (2026-10-17): Geist type for a calmer, more premium read; colours stay the brand's own.
+   Secondary text is a little darker than in the app so it passes WCAG AA (4.9:1 on the page). */
+.landing-theme {
+  --soft: #6b6780;
+}
 .landing-theme,
 .landing-theme h1,
 .landing-theme h2,

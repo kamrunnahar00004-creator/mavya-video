@@ -83,11 +83,11 @@ export function Landing() {
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[600px] bg-[radial-gradient(46%_58%_at_72%_32%,rgba(123,76,250,0.2)_0%,transparent_100%)]" />
         <div className="relative mx-auto grid max-w-[1160px] items-center gap-12 px-5 pb-24 pt-16 lg:grid-cols-[1.1fr_1fr] lg:pt-24">
           <div>
-            <h1 className="text-[38px] font-semibold leading-[1.14] tracking-[-0.035em] sm:text-[48px] lg:text-[46px] xl:text-[48px]">
+            <h1 className="text-[40px] font-semibold leading-[1.12] tracking-[-0.035em] sm:text-[48px]">
               <span className="block">AI made building easy.</span>
               <span className="block text-balance text-accent">Mavya makes marketing easy.</span>
             </h1>
-            <p className="mt-7 max-w-[480px] text-[17px] leading-relaxed text-muted sm:text-[18.5px]">
+            <p className="mt-7 max-w-[480px] text-[18px] leading-relaxed text-muted">
               Hook + demo videos are the #1 way to market your app. Create your next viral video in under 2 minutes.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
@@ -119,8 +119,8 @@ export function Landing() {
       {/* Pricing */}
       <section id="pricing" className="scroll-mt-20 border-y border-line bg-panel">
         <div className="mx-auto max-w-[1160px] px-5 py-20">
-          <h2 className="text-[36px] font-semibold tracking-[-0.035em] sm:text-[44px]">Pricing</h2>
-          <p className="mt-3 text-[17px] text-muted">You pay for AI hooks. Editing and exporting are unlimited on every paid plan.</p>
+          <h2 className="text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">Pricing</h2>
+          <p className="mt-4 text-[18px] leading-relaxed text-muted">You pay for AI hooks. Editing and exporting are unlimited on every paid plan.</p>
           <div className="mt-10">
             <PlanCards
               quiet
@@ -139,7 +139,7 @@ export function Landing() {
 
       {/* FAQ */}
       <section id="faq" className="mx-auto max-w-[820px] scroll-mt-20 px-5 py-20">
-        <h2 className="text-[36px] font-semibold tracking-[-0.035em] sm:text-[44px]">Questions</h2>
+        <h2 className="text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">Questions</h2>
         <div className="mt-8 divide-y divide-line rounded-2xl border border-line bg-panel">
           {FAQ.map((f) => (
             <details key={f.q} className="group px-5 py-4">
@@ -155,9 +155,9 @@ export function Landing() {
 
       {/* Last call */}
       <section className="px-5 pb-20">
-        <div className="relative mx-auto flex max-w-[1160px] flex-col items-center overflow-hidden rounded-[28px] bg-[#15121f] px-6 py-20 text-center">
+        <div className="relative mx-auto flex max-w-[1120px] flex-col items-center overflow-hidden rounded-[28px] bg-[#15121f] px-6 py-20 text-center">
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 h-[460px] w-[760px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-[radial-gradient(closest-side,rgba(123,76,250,0.38),transparent)]" />
-          <h2 className="relative max-w-[640px] text-[34px] font-semibold leading-[1.08] tracking-[-0.035em] text-white! sm:text-[44px]">Start with a hook that already went viral.</h2>
+          <h2 className="relative max-w-[640px] text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px] text-white!">Start with a hook that already went viral.</h2>
           <Link href="/studio" className="btn-primary relative mt-8 h-12 px-7 text-[16px]">
             Sign up
             <ArrowRight className="h-4 w-4" />

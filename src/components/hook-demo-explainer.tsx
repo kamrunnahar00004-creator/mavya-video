@@ -65,16 +65,16 @@ export function HookDemoExplainer({ src, poster, strip, hookEnd, length }: { src
         </div>
 
         <div className="max-w-[600px]">
-          <h2 className="text-balance text-[34px] font-semibold leading-[1.08] tracking-[-0.035em] text-white! sm:text-[40px] xl:text-[42px]">
+          <h2 className="text-balance text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] text-white! sm:text-[40px]">
             What’s a <span className="whitespace-nowrap">hook + demo</span> video?
           </h2>
-          <p className="mt-5 text-[18px] leading-relaxed text-white/70 sm:text-[19px]">
+          <p className="mt-5 text-[18px] leading-relaxed text-white/75">
             A scroll-stopping face <span className="font-semibold" style={{ color: LIGHT_VIOLET }}>(the hook)</span> followed by your product in action <span className="font-semibold" style={{ color: LIGHT_VIOLET }}>(the demo)</span>.
           </p>
           <div className="mt-12 border-t border-white/10 pt-10">
             <h3 className="text-[20px] font-semibold text-white!">The game is volume.</h3>
             <VolumeMatrix />
-            <p className="mt-7 text-[18px] leading-relaxed text-white/70">More videos, more shots at going viral.</p>
+            <p className="mt-7 text-[18px] leading-relaxed text-white/75">More videos, more shots at going viral.</p>
           </div>
         </div>
       </div>
