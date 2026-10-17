@@ -19,14 +19,14 @@ const clipFor = (id: string) => (existsSync(path.join(process.cwd(), "public", "
  */
 
 /** The three hero phones play these whole. */
-const HERO = [{ lib: "Db6BVR0T_-L", views: "8.9M" }, { lib: "DcOiTp0xxTK", views: "5.6M" }, { lib: "DbtW-sFSSlP", views: "5.1M" }];
+const HERO = [{ lib: "DdLjyNctVi9", views: "3.6M" }, { lib: "DcOiTp0xxTK", views: "5.6M" }, { lib: "DbHo7QFIvD4", views: "3.3M" }];
 
 /** The explainer plays this one whole; its hook ends at the first cut. */
 const EXPLAIN = { code: "Dd--YQOqo16", hookEnd: 5.93, length: 20 };
 /** The moving strip. */
 const LIB_STRIP: [code: string, views: string][] = [
-  ["DZAiMMTP2YQ", "4.9M"], ["DdCqlaoP67w", "4.8M"], ["DdXIV6tuGTu", "4.1M"], ["DdLjyNctVi9", "3.6M"],
-  ["Da9dDfqC3a2", "3.4M"], ["DbHo7QFIvD4", "3.3M"], ["DZQq5b8y5-X", "2.7M"], ["DduKGOJTDgx", "2.6M"],
+  ["DZAiMMTP2YQ", "4.9M"], ["DdCqlaoP67w", "4.8M"], ["DdXIV6tuGTu", "4.1M"],
+  ["Da9dDfqC3a2", "3.4M"], ["Db6BVR0T_-L", "8.9M"], ["DbtW-sFSSlP", "5.1M"], ["DZQq5b8y5-X", "2.7M"], ["DduKGOJTDgx", "2.6M"],
 ];
 
 /** The 10 x 10 grid: hooks across (one character each), product demos down. */
