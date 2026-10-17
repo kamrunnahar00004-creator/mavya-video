@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const clock = (s: number) => `0:${String(Math.floor(s)).padStart(2, "0")}`;
 const LIGHT_VIOLET = "#b69cff";
@@ -82,12 +82,39 @@ export function HookDemoExplainer({ src, poster, strip, hookEnd, length }: { src
 }
 
 /*
- * 10 hooks x 10 demos = 100 videos, shown with real material: four hook faces down the side, four demo screens
- * across the top, and in each cell the video they make (that hook above that demo). The cells fill in once,
- * one after another, when the matrix scrolls into view (instantly under reduced motion).
+ * 10 hooks x 10 demos = 100 videos, kept simple: a fanned hand of three real hook cards, times a fanned hand of
+ * three real demo cards, equals a big 100. The hands fan out once when they scroll into view (already fanned
+ * under reduced motion).
  */
-const MX_HOOKS = [0, 1, 2, 3].map((i) => `/landing/mx-hook-${i}.jpg`);
-const MX_DEMOS = [0, 1, 2, 3].map((i) => `/landing/mx-demo-${i}.jpg`);
+const MX_HOOKS = [0, 1, 3].map((i) => `/landing/mx-hook-${i}.jpg`);
+const MX_DEMOS = [0, 1, 3].map((i) => `/landing/mx-demo-${i}.jpg`);
+const FAN = [
+  { rotate: -9, x: -26, y: 6 },
+  { rotate: 0, x: 0, y: 0 },
+  { rotate: 9, x: 26, y: 6 },
+];
+
+function Hand({ cards, label, on }: { cards: string[]; label: string; on: boolean }) {
+  return (
+    <figure className="flex flex-col items-center">
+      <div className="relative h-[124px] w-[124px] sm:h-[136px] sm:w-[136px]">
+        {cards.map((src, i) => (
+          <span
+            key={src}
+            className="absolute left-1/2 top-0 h-[116px] w-[66px] overflow-hidden rounded-[10px] bg-white/5 bg-cover bg-center shadow-[0_14px_30px_-12px_rgba(0,0,0,0.8)] ring-1 ring-white/20 transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none sm:h-[128px] sm:w-[72px]"
+            style={{
+              backgroundImage: `url(${src})`,
+              zIndex: i === 1 ? 2 : 1,
+              transform: on ? `translateX(calc(-50% + ${FAN[i].x}px)) translateY(${FAN[i].y}px) rotate(${FAN[i].rotate}deg)` : "translateX(-50%)",
+              transitionDelay: `${i * 70}ms`,
+            }}
+          />
+        ))}
+      </div>
+      <figcaption className="mt-3 text-[14px] font-semibold text-white/75">{label}</figcaption>
+    </figure>
+  );
+}
 
 function VolumeMatrix() {
   const ref = useRef<HTMLDivElement>(null);
@@ -100,45 +127,21 @@ function VolumeMatrix() {
         setOn(true);
         io.disconnect();
       }
-    }, { threshold: 0.4 });
+    }, { threshold: 0.5 });
     io.observe(el);
     return () => io.disconnect();
   }, []);
-  const tile = "relative h-[62px] w-[36px] shrink-0 overflow-hidden rounded-[7px] bg-white/5 bg-cover bg-center sm:h-[70px] sm:w-[40px]";
+  const op = "pb-7 text-[30px] font-light text-white/35";
   return (
-    <div ref={ref} className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-6">
-      <div className="grid grid-cols-[40px_repeat(4,auto)_28px] items-center gap-2 sm:grid-cols-[44px_repeat(4,auto)_28px]">
-        <span />
-        {MX_DEMOS.map((d) => (
-          <span key={d} className={`${tile} ring-1 ring-white/15`} style={{ backgroundImage: `url(${d})` }} />
-        ))}
-        <span className="text-center text-[12px] font-semibold text-white/40">+6</span>
-        {MX_HOOKS.map((h, r) => (
-          <Fragment key={h}>
-            <span className="h-10 w-10 rounded-full bg-cover bg-top ring-2 ring-[#b69cff]/60 sm:h-11 sm:w-11" style={{ backgroundImage: `url(${h})` }} />
-            {MX_DEMOS.map((d, c) => (
-              <span
-                key={d}
-                className={`${tile} ring-1 ring-white/10 transition-[opacity,transform] duration-500 ease-out motion-reduce:transition-none`}
-                style={{ opacity: on ? 1 : 0.12, transform: on ? "none" : "scale(0.88)", transitionDelay: on ? `${(r * 4 + c) * 55}ms` : "0ms" }}
-              >
-                <span className="absolute inset-x-0 top-0 h-1/2 bg-cover bg-top" style={{ backgroundImage: `url(${h})` }} />
-                <span className="absolute inset-x-0 bottom-0 h-1/2 border-t border-black/40 bg-cover bg-center" style={{ backgroundImage: `url(${d})` }} />
-              </span>
-            ))}
-            <span className="text-center text-[14px] text-white/30">…</span>
-          </Fragment>
-        ))}
-        <span className="text-center text-[12px] font-semibold text-white/40">+6</span>
-      </div>
-      <div className="flex items-center gap-5">
-        <span className="text-[28px] font-light text-white/40">=</span>
-        <div>
-          <div className="text-[64px] font-semibold leading-none tracking-[-0.04em]" style={{ color: LIGHT_VIOLET }}>100</div>
-          <div className="mt-1 text-[15px] font-semibold text-white/70">videos</div>
-          <div className="mt-3 text-[13px] text-white/45">10 hooks × 10 demos</div>
-        </div>
-      </div>
+    <div ref={ref} className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-6 sm:gap-x-8">
+      <Hand cards={MX_HOOKS} label="10 hooks" on={on} />
+      <span className={op}>×</span>
+      <Hand cards={MX_DEMOS} label="10 demos" on={on} />
+      <span className={op}>=</span>
+      <figure className="flex flex-col items-center pb-1">
+        <div className="text-[72px] font-semibold leading-none tracking-[-0.045em] sm:text-[84px]" style={{ color: LIGHT_VIOLET }}>100</div>
+        <figcaption className="mt-3 text-[14px] font-semibold text-white/75">videos</figcaption>
+      </figure>
     </div>
   );
 }
