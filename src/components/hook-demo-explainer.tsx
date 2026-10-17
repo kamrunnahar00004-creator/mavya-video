@@ -51,8 +51,11 @@ export function HookDemoExplainer({ src, poster, hookEnd, length }: { src: strin
         </div>
       </div>
       <div>
-        <h2 className="text-[34px] font-semibold leading-[1.05] tracking-[-0.035em] sm:text-[42px]">What is a hook + demo video?</h2>
-        <p className="mt-3 max-w-[520px] text-[16.5px] leading-relaxed text-muted">The short video SaaS founders post to get signups without ads. It works for any SaaS, app or online tool, because the product sells itself on screen. Two parts:</p>
+        <h2 className="text-[34px] font-semibold leading-[1.05] tracking-[-0.035em] sm:text-[42px]">What’s a hook + demo video?</h2>
+        <p className="mt-3 max-w-[540px] text-[16.5px] leading-relaxed text-muted">A scroll-stopping face (the hook) followed by your product in action (the demo).</p>
+        <p className="mt-3 max-w-[540px] text-[16.5px] leading-relaxed text-muted">
+          <span className="font-semibold text-text">The game is volume.</span> 10 hooks × 10 demos = 100 videos. More videos, more shots at going viral.
+        </p>
         <div className="mt-7 space-y-3">
           <div className={card(inHook)}>
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-text text-[14px] font-semibold text-white">1</span>
