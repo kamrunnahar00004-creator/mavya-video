@@ -1,9 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Play } from "lucide-react";
 import { PlanCards } from "@/components/plan-cards";
 import { LoopVideo } from "@/components/loop-video";
 import { HookDemoExplainer } from "@/components/hook-demo-explainer";
+import { HowItWorks } from "@/components/how-it-works";
 
 
 /*
@@ -11,14 +11,6 @@ import { HookDemoExplainer } from "@/components/hook-demo-explainer";
  * public/landing/lib-<code>.mp4 (made by a local script). LOCALHOST ONLY: replace them, or get the creators'
  * permission, before this page is public.
  */
-
-/** How it works: real screens from the app (public/landing/app-*.jpg, captured from localhost by a local script). */
-const STEPS = [
-  { shot: "/landing/app-library.jpg", alt: "The viral hook library", title: "A library of hooks that already went viral.", text: "Sorted by views. Pick one and make it yours." },
-  { shot: "/landing/app-characters.jpg", alt: "Choosing an AI creator", title: "Remixed with an AI creator.", text: "70 characters or your own face. No filming the hook." },
-  { shot: "/landing/app-shotlist.jpg", alt: "The shot list for the demo", title: "A shot list for your demo.", text: "Exactly what to film, shot by shot." },
-  { shot: "/landing/app-editor.jpg", alt: "The video editor", title: "Edit, add sound, export.", text: "A built-in editor and trending songs. Everything is saved to reuse." },
-];
 
 /** The three hero phones play these whole. */
 const HERO = [
@@ -122,26 +114,7 @@ export function Landing() {
         <HookDemoExplainer src={`/landing/lib-${EXPLAIN.code}-full.mp4`} poster={`/landing/lib-${EXPLAIN.code}.jpg`} strip="/landing/explain-strip.jpg" hookEnd={EXPLAIN.hookEnd} length={EXPLAIN.length} />
       </section>
 
-      {/* How it works: the whole product, each step a real screen from the app */}
-      <section id="how" className="mx-auto max-w-[1160px] scroll-mt-24 px-5 py-20">
-        <h2 className="max-w-[640px] text-[36px] font-semibold leading-[1.05] tracking-[-0.035em] sm:text-[48px]">From viral hook to finished video, step by step.</h2>
-        <div className="mt-12 grid gap-x-10 gap-y-14 md:grid-cols-2">
-          {STEPS.map((step, i) => (
-            <div key={step.title}>
-              <div className="overflow-hidden rounded-xl border border-line bg-panel shadow-[0_16px_40px_-12px_rgba(28,26,23,0.18),0_3px_8px_rgba(28,26,23,0.06)]">
-                <Image src={step.shot} alt={step.alt} width={1180} height={738} sizes="(min-width: 768px) 540px, 100vw" className="aspect-[16/10] w-full object-cover object-top" />
-              </div>
-              <div className="mt-6 flex gap-4">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-[14px] font-semibold text-white">{i + 1}</span>
-                <div>
-                  <h3 className="text-[21px] font-semibold leading-tight">{step.title}</h3>
-                  <p className="mt-1.5 text-[16px] leading-snug text-muted">{step.text}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      <HowItWorks />
 
       {/* Pricing */}
       <section id="pricing" className="scroll-mt-20 border-y border-line bg-panel">

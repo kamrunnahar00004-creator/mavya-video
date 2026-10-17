@@ -235,3 +235,13 @@ input[type="range"] {
     stroke-opacity: 0.5;
   }
 }
+
+/* Landing, How it works: the active step's rail fills while the steps advance; a new screen fades up. */
+@keyframes hiw-rail {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@keyframes hiw-fade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
