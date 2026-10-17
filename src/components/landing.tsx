@@ -88,11 +88,11 @@ export function Landing() {
       {/* Hero: text left (semibold, three clean lines), the three phones fanned right, both in the first screen */}
       <section className="relative overflow-hidden">
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[620px] bg-[radial-gradient(45%_60%_at_70%_10%,var(--accent-tint)_0%,transparent_100%)]" />
-        <div className="relative mx-auto grid max-w-[1160px] items-center gap-12 px-5 pb-24 pt-16 lg:grid-cols-[1.3fr_1fr] lg:pt-24">
+        <div className="relative mx-auto grid max-w-[1160px] items-center gap-12 px-5 pb-24 pt-16 lg:grid-cols-[1.1fr_1fr] lg:pt-24">
           <div>
-            <h1 className="text-[40px] font-semibold leading-[1.08] tracking-[-0.038em] sm:text-[50px] lg:text-[48px] xl:text-[52px]">
-              <span className="block lg:whitespace-nowrap">AI made building easy.</span>
-              <span className="block text-accent lg:whitespace-nowrap">Mavya makes marketing easy.</span>
+            <h1 className="text-[40px] font-semibold leading-[1.06] tracking-[-0.038em] sm:text-[52px] lg:text-[48px] xl:text-[50px]">
+              <span className="block">AI made building easy.</span>
+              <span className="block text-balance text-accent">Mavya makes marketing easy.</span>
             </h1>
             <p className="mt-6 max-w-[500px] text-[17px] leading-relaxed text-muted sm:text-[18.5px]">
               Hook + demo videos are the #1 way to market an app right now. Pick a viral hook. Mavya remakes it with an AI creator and walks you through the demo.
