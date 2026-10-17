@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronDown, Download, Film, Music, PenLine, Search, Type, Upload } from "lucide-react";
+import { ArrowRight, ChevronDown, Download, Film, Music, PenLine, Search, Type, Upload, Users } from "lucide-react";
 
 /*
  * How it works, in the Etsy Mavya "Research" layout (2026-10-17): the steps on the left, the active one marked
@@ -106,15 +106,10 @@ function AppWindow({ url, children }: { url: string; children: React.ReactNode }
 }
 
 const cover = (code: string) => `/landing/lib-${code}.jpg`;
-/** Fades a panel's bottom edge out, so a long grid reads as "and many more". */
-const FADE = "[mask-image:linear-gradient(to_bottom,black_62%,transparent)]";
-
-/** Step 1: the library, sorted by views, fading out below (there are many more). */
+/** Step 1: the library, sorted by views: two complete rows, the last tile says there are more. */
 const LIBRARY: [string, string][] = [
-  ["DcOiTp0xxTK", "5.6M"], ["Dd--YQOqo16", "5.0M"], ["DdCqlaoP67w", "4.8M"], ["DdLjyNctVi9", "3.6M"],
-  ["DbHo7QFIvD4", "3.3M"], ["DWp_8nwCPSF", "1.8M"], ["DeDo3iHKIKh", "1.6M"], ["DajwiOOtvDL", "1.6M"],
-  ["DaFCnEnNxTM", "1.6M"], ["Dd5IUdKphv8", "1.5M"], ["Da8y1bfqG4V", "1.4M"], ["Dd-LI6_qeUp", "1.3M"],
-  ["DeCh8DbAxDt", "1.3M"], ["Ddlnj3gBl6l", "1.3M"], ["DdzIAhgg63u", "1.2M"], ["DeAdRbPgOTb", "1.2M"],
+  ["DcOiTp0xxTK", "5.6M"], ["Dd--YQOqo16", "5.0M"], ["DdCqlaoP67w", "4.8M"], ["DdLjyNctVi9", "3.6M"], ["DbHo7QFIvD4", "3.3M"],
+  ["DWp_8nwCPSF", "1.8M"], ["DeDo3iHKIKh", "1.6M"], ["DajwiOOtvDL", "1.6M"], ["DaFCnEnNxTM", "1.6M"],
 ];
 function LibraryPanel() {
   return (
@@ -129,23 +124,26 @@ function LibraryPanel() {
         <span className="pb-2 text-soft">Voiceover</span>
         <span className="ml-auto flex items-center gap-1 pb-2 text-muted">Most viewed <ChevronDown className="h-3.5 w-3.5" /></span>
       </div>
-      <div className={`mt-4 min-h-0 flex-1 overflow-hidden ${FADE}`}>
-        <div className="grid grid-cols-4 gap-2.5">
-          {LIBRARY.map(([code, views], i) => (
-            <div key={code} className={`relative aspect-[9/16] overflow-hidden rounded-lg bg-raised bg-cover bg-center ${i === 3 ? "ring-[3px] ring-accent" : ""}`} style={{ backgroundImage: `url(${cover(code)})` }}>
-              <span className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/70 to-transparent" />
-              <span className="absolute bottom-1.5 left-2 text-[11px] font-bold text-white">▶ {views}</span>
-              {i === 3 && <span className="absolute left-1.5 top-1.5 rounded-md bg-accent px-1.5 py-0.5 text-[10.5px] font-bold text-white">Use this hook</span>}
-            </div>
-          ))}
+      <div className="mt-4 grid grid-cols-5 gap-2.5">
+        {LIBRARY.map(([code, views], i) => (
+          <div key={code} className={`relative aspect-[9/16] overflow-hidden rounded-lg bg-raised bg-cover bg-center ${i === 3 ? "ring-[3px] ring-accent" : ""}`} style={{ backgroundImage: `url(${cover(code)})` }}>
+            <span className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/70 to-transparent" />
+            <span className="absolute bottom-1.5 left-2 text-[11px] font-bold text-white">▶ {views}</span>
+            {i === 3 && <span className="absolute left-1.5 top-1.5 rounded-md bg-accent px-1.5 py-0.5 text-[10.5px] font-bold text-white">Use this hook</span>}
+          </div>
+        ))}
+        <div className="flex aspect-[9/16] flex-col items-center justify-center gap-2 rounded-lg border border-line bg-raised text-center">
+          <Search className="h-5 w-5 text-accent" />
+          <span className="px-2 text-[12.5px] font-semibold leading-tight">Browse all hooks</span>
         </div>
       </div>
     </div>
   );
 }
 
-/** Step 2: make your character three ways; the cast fades out below (70 in all). */
-const CAST = ["olivia", "zuri", "mei", "jake", "ella", "sienna", "simone", "yuna", "liam", "ava", "amara", "isla", "hana", "marcus", "mia", "jada", "freya", "minho", "ruby", "sora", "nora", "imani", "noah", "harper"];
+/** Step 2: make your character three ways; three complete rows of the cast, the last tile says how many more (70 in all). */
+const CAST = ["olivia", "zuri", "mei", "jake", "ella", "sienna", "simone", "yuna", "liam", "ava", "amara", "isla", "hana", "marcus", "mia", "jada", "freya"];
+const CAST_TOTAL = 70;
 function CharacterPanel() {
   const box = "flex h-[74px] flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-strong text-[13px] font-semibold text-text";
   return (
@@ -156,14 +154,16 @@ function CharacterPanel() {
         <span className={box}><PenLine className="h-5 w-5 text-accent" />Describe your character</span>
       </div>
       <p className="mt-5 text-[13px] font-semibold text-muted">Or pick from the library</p>
-      <div className={`mt-2.5 min-h-0 flex-1 overflow-hidden ${FADE}`}>
-        <div className="grid grid-cols-6 gap-2">
-          {CAST.map((id, i) => (
-            <span key={id} className={`relative aspect-[4/5] overflow-hidden rounded-lg bg-raised bg-cover bg-center ${i === 0 ? "ring-[3px] ring-accent" : ""}`} style={{ backgroundImage: `url(/characters/thumbs/${id}.jpg)` }}>
-              <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-1.5 pb-1 pt-4 text-[10.5px] font-semibold capitalize text-white">{id}</span>
-            </span>
-          ))}
-        </div>
+      <div className="mt-2.5 grid grid-cols-6 gap-2">
+        {CAST.map((id, i) => (
+          <span key={id} className={`relative aspect-square overflow-hidden rounded-lg bg-raised bg-cover bg-center ${i === 0 ? "ring-[3px] ring-accent" : ""}`} style={{ backgroundImage: `url(/characters/thumbs/${id}.jpg)` }}>
+            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-1.5 pb-1 pt-4 text-[10.5px] font-semibold capitalize text-white">{id}</span>
+          </span>
+        ))}
+        <span className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-line bg-raised">
+          <Users className="h-4 w-4 text-accent" />
+          <span className="text-[12.5px] font-semibold">+{CAST_TOTAL - CAST.length} more</span>
+        </span>
       </div>
     </div>
   );
