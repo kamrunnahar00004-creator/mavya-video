@@ -90,12 +90,12 @@ export function Landing() {
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[620px] bg-[radial-gradient(45%_60%_at_70%_10%,var(--accent-tint)_0%,transparent_100%)]" />
         <div className="relative mx-auto grid max-w-[1160px] items-center gap-12 px-5 pb-24 pt-16 lg:grid-cols-[1.1fr_1fr] lg:pt-24">
           <div>
-            <h1 className="text-[40px] font-semibold leading-[1.06] tracking-[-0.038em] sm:text-[52px] lg:text-[48px] xl:text-[50px]">
+            <h1 className="text-[38px] font-semibold leading-[1.14] tracking-[-0.035em] sm:text-[48px] lg:text-[46px] xl:text-[48px]">
               <span className="block">AI made building easy.</span>
               <span className="block text-balance text-accent">Mavya makes marketing easy.</span>
             </h1>
-            <p className="mt-6 max-w-[500px] text-[17px] leading-relaxed text-muted sm:text-[18.5px]">
-              Pick a viral hook. Mavya does the rest.
+            <p className="mt-7 max-w-[480px] text-[17px] leading-relaxed text-muted sm:text-[18.5px]">
+              Hook + demo videos are the #1 way to market an app. Pick a viral hook. Mavya does the rest.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Link href="/studio" className="btn-primary h-12 px-7 text-[16px]">
