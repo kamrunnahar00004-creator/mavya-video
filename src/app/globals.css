@@ -215,3 +215,11 @@ input[type="range"] {
     animation: none;
   }
 }
+
+/* Landing page (2026-10-17): Geist type for a calmer, more premium read; colours stay the brand's own. */
+.landing-theme,
+.landing-theme h1,
+.landing-theme h2,
+.landing-theme h3 {
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}

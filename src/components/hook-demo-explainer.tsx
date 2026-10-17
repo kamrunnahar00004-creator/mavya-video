@@ -51,21 +51,21 @@ export function HookDemoExplainer({ src, poster, hookEnd, length }: { src: strin
         </div>
       </div>
       <div>
-        <h2 className="text-[34px] font-black leading-[1.05] tracking-[-0.035em] sm:text-[42px]">What is a hook + demo video?</h2>
+        <h2 className="text-[34px] font-semibold leading-[1.05] tracking-[-0.035em] sm:text-[42px]">What is a hook + demo video?</h2>
         <p className="mt-3 max-w-[520px] text-[16.5px] leading-relaxed text-muted">The short video SaaS founders post to get signups without ads. It works for any SaaS, app or online tool, because the product sells itself on screen. Two parts:</p>
         <div className="mt-7 space-y-3">
           <div className={card(inHook)}>
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#221d33] text-[14px] font-extrabold text-white">1</span>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-text text-[14px] font-semibold text-white">1</span>
             <div>
-              <div className="flex items-baseline gap-2"><h3 className="text-[18px] font-extrabold">The hook</h3><span className="text-[12.5px] font-semibold tabular-nums text-soft">the first {Math.round(hookEnd)} seconds</span></div>
+              <div className="flex items-baseline gap-2"><h3 className="text-[18px] font-semibold">The hook</h3><span className="text-[12.5px] font-semibold tabular-nums text-soft">the first {Math.round(hookEnd)} seconds</span></div>
               <p className="mt-0.5 text-[14.5px] leading-snug text-muted">A face and one line that stop the scroll. Copied from a video that already went viral, with an AI character in it.</p>
               <span className="mt-2 inline-block rounded-full bg-accent-tint px-2.5 py-0.5 text-[12px] font-bold text-accent">Mavya makes this</span>
             </div>
           </div>
           <div className={card(!inHook)}>
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#d2d0df] text-[14px] font-extrabold text-text">2</span>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-raised text-[14px] font-semibold text-text">2</span>
             <div>
-              <div className="flex items-baseline gap-2"><h3 className="text-[18px] font-extrabold">The demo</h3><span className="text-[12.5px] font-semibold tabular-nums text-soft">to the end</span></div>
+              <div className="flex items-baseline gap-2"><h3 className="text-[18px] font-semibold">The demo</h3><span className="text-[12.5px] font-semibold tabular-nums text-soft">to the end</span></div>
               <p className="mt-0.5 text-[14.5px] leading-snug text-muted">Your SaaS or app doing the thing it promised: a screen recording, or your phone filming the screen.</p>
               <span className="mt-2 inline-block rounded-full bg-raised px-2.5 py-0.5 text-[12px] font-bold text-muted">You add this</span>
             </div>
