@@ -223,3 +223,15 @@ input[type="range"] {
 .landing-theme h3 {
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
+
+/* Landing: a few links in the hooks x demos network light up in turn. */
+@keyframes net-pulse {
+  0%, 100% { stroke-opacity: 0; }
+  40%, 60% { stroke-opacity: 0.9; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[net-pulse_3\.2s_ease-in-out_infinite\] {
+    animation: none;
+    stroke-opacity: 0.5;
+  }
+}

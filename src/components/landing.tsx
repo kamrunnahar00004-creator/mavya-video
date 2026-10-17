@@ -118,7 +118,7 @@ export function Landing() {
 
       {/* What a hook + demo video is, shown with a real one */}
       <section className="mx-auto max-w-[1160px] px-5 pb-20">
-        <HookDemoExplainer src={`/landing/lib-${EXPLAIN.code}-full.mp4`} poster={`/landing/lib-${EXPLAIN.code}.jpg`} hookEnd={EXPLAIN.hookEnd} length={EXPLAIN.length} />
+        <HookDemoExplainer src={`/landing/lib-${EXPLAIN.code}-full.mp4`} poster={`/landing/lib-${EXPLAIN.code}.jpg`} strip="/landing/explain-strip.jpg" hookEnd={EXPLAIN.hookEnd} length={EXPLAIN.length} />
       </section>
 
       {/* How it works: the whole product, each step a real screen from the app */}
