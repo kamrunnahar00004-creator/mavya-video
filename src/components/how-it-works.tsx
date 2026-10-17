@@ -1,22 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, ChevronDown, Download, Film, Music, Search, Sparkles, Type, Upload } from "lucide-react";
+import { ArrowRight, ChevronDown, Download, Film, Music, PenLine, Search, Type, Upload } from "lucide-react";
 
 /*
  * How it works, in the Etsy Mavya "Research" layout (2026-10-17): the steps on the left, the active one marked
  * by a violet rail that fills while the steps advance on their own (every 7 s, paused on hover, stopped once a
  * step is clicked); on the right, that step's screen in a browser window. The screens are drawn in code from
- * real material (library covers, the AI cast, demo frames); they illustrate the app, they are not live.
+ * real material (library covers, the AI cast, a real demo video); they illustrate the app, they are not live.
  */
 const ROTATE_MS = 7000;
 
 const STEPS = [
-  { key: "hook", title: "Steal a viral hook", body: "Browse hooks that already pulled millions of views. Pick one and make it yours.", url: "mavya.app/library", Panel: LibraryPanel },
-  { key: "remix", title: "Remix it with an AI creator", body: "Pick one of 70 characters or your own face. Mavya makes the hook, no filming.", url: "mavya.app/studio/new/character", Panel: RemixPanel },
-  { key: "demo", title: "Film the demo, shot by shot", body: "Mavya tells you exactly what to film: the problem, your product, the magic moment, the result.", url: "mavya.app/studio/new/demo", Panel: ShotListPanel },
-  { key: "edit", title: "Edit, add sound, export", body: "A built-in editor with trending songs. Every hook, demo and sound is saved to reuse.", url: "mavya.app/studio/new/edit", Panel: EditorPanel },
+  { key: "hook", title: "Steal a viral hook", body: "Browse hooks that already did millions of views. Pick one and make it yours.", url: "mavya.app/library", Panel: LibraryPanel },
+  { key: "remix", title: "Remix it with your character", body: "Generate one, pick one from our library, or upload your photo. Mavya makes the hook, no filming.", url: "mavya.app/studio/new/character", Panel: CharacterPanel },
+  { key: "demo", title: "Film the demo, shot by shot", body: "Mavya describes every shot of the demo. Film it on your phone and drop it in.", url: "mavya.app/studio/new/demo", Panel: DemoPanel },
+  { key: "sound", title: "Copy the viral sound", body: "Use the hook's original sound or a trending song, then export.", url: "mavya.app/studio/new/sound", Panel: SoundPanel },
 ];
 
 export function HowItWorks() {
@@ -76,7 +76,7 @@ export function HowItWorks() {
             <div aria-hidden className="pointer-events-none absolute -inset-10 bg-[radial-gradient(55%_50%_at_50%_45%,rgba(123,76,250,0.12)_0%,transparent_100%)]" />
             <div id="hiw-panel" role="tabpanel" key={current.key} className="relative animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none">
               <AppWindow url={current.url}>
-                <div className="text-left sm:min-h-[540px]">
+                <div className="h-[560px] overflow-hidden text-left">
                   <current.Panel />
                 </div>
               </AppWindow>
@@ -106,15 +106,19 @@ function AppWindow({ url, children }: { url: string; children: React.ReactNode }
 }
 
 const cover = (code: string) => `/landing/lib-${code}.jpg`;
+/** Fades a panel's bottom edge out, so a long grid reads as "and many more". */
+const FADE = "[mask-image:linear-gradient(to_bottom,black_62%,transparent)]";
 
-/** Step 1: the library, sorted by views, one hook picked. */
+/** Step 1: the library, sorted by views, fading out below (there are many more). */
+const LIBRARY: [string, string][] = [
+  ["DcOiTp0xxTK", "5.6M"], ["Dd--YQOqo16", "5.0M"], ["DdCqlaoP67w", "4.8M"], ["DdLjyNctVi9", "3.6M"],
+  ["DbHo7QFIvD4", "3.3M"], ["DWp_8nwCPSF", "1.8M"], ["DeDo3iHKIKh", "1.6M"], ["DajwiOOtvDL", "1.6M"],
+  ["DaFCnEnNxTM", "1.6M"], ["Dd5IUdKphv8", "1.5M"], ["Da8y1bfqG4V", "1.4M"], ["Dd-LI6_qeUp", "1.3M"],
+  ["DeCh8DbAxDt", "1.3M"], ["Ddlnj3gBl6l", "1.3M"], ["DdzIAhgg63u", "1.2M"], ["DeAdRbPgOTb", "1.2M"],
+];
 function LibraryPanel() {
-  const hooks: [string, string, string][] = [
-    ["DcOiTp0xxTK", "5.6M", "35K"], ["DdLjyNctVi9", "3.6M", "198K"], ["DbHo7QFIvD4", "3.3M", "30K"],
-    ["Dd--YQOqo16", "5.0M", "221K"], ["DdCqlaoP67w", "4.8M", "71K"], ["DbtW-sFSSlP", "5.1M", "169K"],
-  ];
   return (
-    <div className="p-5 sm:p-6">
+    <div className="flex h-full flex-col p-5 sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-[16px] font-semibold">Viral library</h3>
         <span className="flex h-9 w-[220px] items-center gap-2 rounded-lg bg-raised px-3 text-[13px] text-soft"><Search className="h-4 w-4" />Search hooks</span>
@@ -125,123 +129,166 @@ function LibraryPanel() {
         <span className="pb-2 text-soft">Voiceover</span>
         <span className="ml-auto flex items-center gap-1 pb-2 text-muted">Most viewed <ChevronDown className="h-3.5 w-3.5" /></span>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        {hooks.map(([code, views, likes], i) => (
-          <div key={code} className={`relative aspect-[9/14] overflow-hidden rounded-xl bg-cover bg-center ${i === 1 ? "ring-[3px] ring-accent" : ""}`} style={{ backgroundImage: `url(${cover(code)})` }}>
-            <span className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 to-transparent" />
-            <span className="absolute bottom-2 left-2 flex gap-2 text-[11px] font-bold text-white">
-              <span>▶ {views}</span>
-              <span className="text-white/80">♥ {likes}</span>
-            </span>
-            {i === 1 && <span className="absolute left-2 top-2 rounded-md bg-accent px-2 py-1 text-[11px] font-bold text-white">Use this hook</span>}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** Step 2: the stolen hook, the creator picked, the hook being made. */
-function RemixPanel() {
-  const cast = ["olivia", "ella", "jake", "sienna", "liam", "freya", "marcus", "ava"];
-  return (
-    <div className="p-5 sm:p-6">
-      <h3 className="text-[16px] font-semibold">Remix the hook</h3>
-      <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-        <figure>
-          <div className="aspect-[9/14] overflow-hidden rounded-xl bg-cover bg-center" style={{ backgroundImage: `url(${cover("DdLjyNctVi9")})` }} />
-          <figcaption className="mt-2 text-[12px] font-semibold text-muted">Viral hook · 3.6M views</figcaption>
-        </figure>
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-tint text-accent"><Sparkles className="h-5 w-5" /></span>
-        <figure>
-          <div className="relative aspect-[9/14] overflow-hidden rounded-xl bg-cover bg-center ring-[3px] ring-accent" style={{ backgroundImage: "url(/characters/olivia.jpg)" }}>
-            <span className="absolute inset-x-3 bottom-3 rounded-lg bg-black/60 p-2.5 backdrop-blur">
-              <span className="block text-[11px] font-semibold text-white">Generating your hook</span>
-              <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-white/20">
-                <span className="block h-full w-2/3 rounded-full bg-accent" />
-              </span>
-            </span>
-          </div>
-          <figcaption className="mt-2 text-[12px] font-semibold text-muted">Your hook · Olivia</figcaption>
-        </figure>
-      </div>
-      <p className="mt-5 text-[13px] font-semibold text-muted">Choose your creator</p>
-      <div className="mt-2 grid grid-cols-8 gap-2">
-        {cast.map((id, i) => (
-          <span key={id} className={`aspect-square rounded-lg bg-cover bg-center ${i === 0 ? "ring-[3px] ring-accent" : ""}`} style={{ backgroundImage: `url(/characters/thumbs/${id}.jpg)` }} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** Step 3: the shot list for the demo, one shot opened, one already filmed. */
-function ShotListPanel() {
-  const shots = [
-    { t: "Show the problem", s: "2s", done: true },
-    { t: "Open your product", s: "1.5s", open: true },
-    { t: "The magic moment", s: "3s" },
-    { t: "The result", s: "2s" },
-  ];
-  return (
-    <div className="p-5 sm:p-6">
-      <h3 className="text-[16px] font-semibold">Film your demo</h3>
-      <p className="mt-1 text-[13px] text-muted">4 shots, about 9 seconds</p>
-      <div className="mt-4 space-y-2.5">
-        {shots.map((x, i) => (
-          <div key={x.t} className={`rounded-xl border bg-panel ${x.open ? "border-accent" : "border-line"}`}>
-            <div className="flex items-center gap-3 px-4 py-3">
-              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12.5px] font-bold ${x.done ? "bg-accent text-white" : "bg-raised text-muted"}`}>{x.done ? <Check className="h-4 w-4" strokeWidth={3} /> : i + 1}</span>
-              <span className="min-w-0 flex-1">
-                <span className="text-[14px] font-semibold">{x.t}</span> <span className="text-[12.5px] text-soft">~{x.s}</span>
-              </span>
-              {x.done ? (
-                <span className="h-10 w-6 rounded-md bg-cover bg-center" style={{ backgroundImage: "url(/landing/mx-demo-1.jpg)" }} />
-              ) : (
-                <span className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[12.5px] font-semibold"><Upload className="h-3.5 w-3.5" />Upload clip</span>
-              )}
+      <div className={`mt-4 min-h-0 flex-1 overflow-hidden ${FADE}`}>
+        <div className="grid grid-cols-4 gap-2.5">
+          {LIBRARY.map(([code, views], i) => (
+            <div key={code} className={`relative aspect-[9/16] overflow-hidden rounded-lg bg-raised bg-cover bg-center ${i === 3 ? "ring-[3px] ring-accent" : ""}`} style={{ backgroundImage: `url(${cover(code)})` }}>
+              <span className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/70 to-transparent" />
+              <span className="absolute bottom-1.5 left-2 text-[11px] font-bold text-white">▶ {views}</span>
+              {i === 3 && <span className="absolute left-1.5 top-1.5 rounded-md bg-accent px-1.5 py-0.5 text-[10.5px] font-bold text-white">Use this hook</span>}
             </div>
-            {x.open && (
-              <div className="border-t border-line px-4 py-3 text-[13px] text-muted">
-                <p><span className="font-semibold text-text">Camera:</span> over your shoulder, screen fills the frame</p>
-                <ol className="mt-1.5 list-decimal space-y-0.5 pl-5">
-                  <li>Open your site or app</li>
-                  <li>Let it fully load</li>
-                </ol>
-              </div>
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-/** Step 4: the editor, with the clips, a text and a song on the timeline, ready to export. */
-function EditorPanel() {
-  const bars = Array.from({ length: 150 }, (_, i) => 6 + Math.round(Math.abs(Math.sin(i * 1.7) * 9 + Math.sin(i * 0.45) * 6)));
+/** Step 2: make your character three ways; the cast fades out below (70 in all). */
+const CAST = ["olivia", "zuri", "mei", "jake", "ella", "sienna", "simone", "yuna", "liam", "ava", "amara", "isla", "hana", "marcus", "mia", "jada", "freya", "minho", "ruby", "sora", "nora", "imani", "noah", "harper"];
+function CharacterPanel() {
+  const box = "flex h-[74px] flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-strong text-[13px] font-semibold text-text";
   return (
-    <div className="p-5 sm:p-6">
+    <div className="flex h-full flex-col p-5 sm:p-6">
+      <h3 className="text-[16px] font-semibold">Choose your character</h3>
+      <div className="mt-4 flex gap-3">
+        <span className={box}><Upload className="h-5 w-5 text-accent" />Upload your photo</span>
+        <span className={box}><PenLine className="h-5 w-5 text-accent" />Describe your character</span>
+      </div>
+      <p className="mt-5 text-[13px] font-semibold text-muted">Or pick from the library</p>
+      <div className={`mt-2.5 min-h-0 flex-1 overflow-hidden ${FADE}`}>
+        <div className="grid grid-cols-6 gap-2">
+          {CAST.map((id, i) => (
+            <span key={id} className={`relative aspect-[4/5] overflow-hidden rounded-lg bg-raised bg-cover bg-center ${i === 0 ? "ring-[3px] ring-accent" : ""}`} style={{ backgroundImage: `url(/characters/thumbs/${id}.jpg)` }}>
+              <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-1.5 pb-1 pt-4 text-[10.5px] font-semibold capitalize text-white">{id}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/*
+ * Step 3: the shot list on the left, the demo playing on the right; the shot on screen lights up (times are
+ * this video's own scenes: the link opens, the question, picking a date idea, the calendar).
+ */
+const DEMO = { src: "/landing/lib-DbHo7QFIvD4.mp4", poster: "/landing/lib-DbHo7QFIvD4.jpg" };
+const SHOTS = [
+  { from: 0, to: 3, title: "Your hook", text: "Made by Mavya with your character." },
+  { from: 3, to: 7, title: "Show what you got", text: "Phone over the laptop. Open the link." },
+  { from: 7, to: 11, title: "The big question", text: "Film the first screen, then tap YES." },
+  { from: 11, to: 16.5, title: "Pick an option", text: "Show the choices and pick one." },
+  { from: 16.5, to: 21, title: "The payoff", text: "End on the result: it goes straight to his calendar." },
+];
+function DemoPanel() {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [t, setT] = useState(0);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    let raf = 0;
+    const tick = () => {
+      setT(v.currentTime);
+      raf = requestAnimationFrame(tick);
+    };
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) void v.play().catch(() => undefined);
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  const at = SHOTS.findIndex((s) => t >= s.from && t < s.to);
+  return (
+    <div className="grid h-full grid-cols-[minmax(0,1fr)_200px] gap-5 p-5 sm:p-6">
+      <div>
+        <h3 className="text-[16px] font-semibold">Film your demo</h3>
+        <p className="mt-1 text-[13px] text-muted">4 shots, about 18 seconds</p>
+        <ol className="mt-4 space-y-2">
+          {SHOTS.map((s, i) => {
+            const on = i === at;
+            return (
+              <li key={s.title} className={`rounded-xl border px-3.5 py-2.5 transition-colors duration-300 ${on ? "border-accent bg-accent-tint" : "border-line"}`}>
+                <div className="flex items-center gap-2.5">
+                  <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11.5px] font-bold transition-colors duration-300 ${on ? "bg-accent text-white" : "bg-raised text-muted"}`}>{i === 0 ? "H" : i}</span>
+                  <span className={`text-[14px] font-semibold ${on ? "text-text" : "text-muted"}`}>{s.title}</span>
+                  <span className="ml-auto text-[11.5px] tabular-nums text-soft">{Math.round(s.to - s.from)}s</span>
+                </div>
+                <p className={`mt-1 pl-[34px] text-[12.5px] leading-snug ${on ? "text-muted" : "text-soft"}`}>{s.text}</p>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+      <div className="flex items-center">
+        <div className="w-full rounded-[28px] bg-ink p-[5px] shadow-[0_24px_50px_-24px_rgba(21,18,31,0.55)]">
+          <div className="relative aspect-[9/19.5] overflow-hidden rounded-[23px] bg-black">
+            <video ref={ref} src={DEMO.src} poster={DEMO.poster} muted loop playsInline aria-label="A demo" className="absolute inset-0 h-full w-full object-cover" />
+            <span className="absolute left-1/2 top-2 h-3.5 w-14 -translate-x-1/2 rounded-full bg-black" />
+            {at >= 0 && <span className="absolute bottom-2.5 left-2.5 rounded-full bg-accent px-2 py-0.5 text-[10.5px] font-bold text-white">{at === 0 ? "Hook" : `Shot ${at}`}</span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Step 4: a trending song picked (shown, not played), on the timeline under the clips, ready to export. */
+const SONG = { title: "Dracula", artist: "JENNIE" };
+function SoundPanel() {
+  const bars = Array.from({ length: 48 }, (_, i) => 10 + Math.round(Math.abs(Math.sin(i * 1.3) * 16 + Math.sin(i * 0.37) * 10)));
+  const wave = Array.from({ length: 150 }, (_, i) => 6 + Math.round(Math.abs(Math.sin(i * 1.7) * 9 + Math.sin(i * 0.45) * 6)));
+  return (
+    <div className="flex h-full flex-col p-5 sm:p-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-[16px] font-semibold">Edit video</h3>
+        <h3 className="text-[16px] font-semibold">Add sound</h3>
         <span className="btn-primary h-9 px-4 text-[13px]"><Download className="h-4 w-4" />Export</span>
       </div>
-      <div className="mt-4 flex justify-center">
-        <div className="relative aspect-[9/16] w-[150px] overflow-hidden rounded-xl bg-cover bg-center" style={{ backgroundImage: "url(/characters/olivia.jpg)" }}>
-          <p className="absolute inset-x-2 top-[18%] text-center text-[12.5px] font-black leading-tight text-white [-webkit-text-stroke:3px_#000] [paint-order:stroke_fill]">This app fixed my mornings</p>
+      {/* the song, playing (visual only) */}
+      <div className="mt-5 flex items-center gap-4 rounded-2xl bg-[#15121f] p-4 text-white">
+        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#7b4cfa,#b02f86)] shadow-[0_10px_24px_-10px_rgba(123,76,250,0.8)]">
+          <Music className="h-7 w-7" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-[16px] font-semibold">{SONG.title}</span>
+            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10.5px] font-bold text-[#b69cff]">Trending</span>
+          </div>
+          <div className="text-[13px] text-white/60">{SONG.artist}</div>
+          <div aria-hidden className="mt-2.5 flex h-8 items-center gap-[3px]">
+            {bars.map((h, i) => (
+              <span key={i} className="w-[3px] shrink-0 origin-center rounded-full bg-[#b69cff] animate-[hiw-eq_1.1s_ease-in-out_infinite] motion-reduce:animate-none" style={{ height: h, animationDelay: `${(i % 8) * 0.12}s` }} />
+            ))}
+          </div>
         </div>
       </div>
+      {/* the other ways to add sound */}
+      <div className="mt-3 divide-y divide-line rounded-xl border border-line">
+        {[
+          { icon: Film, title: "The hook's original sound", sub: "Copied from the viral video" },
+          { icon: Search, title: "Browse trending songs", sub: "Search any song" },
+          { icon: Upload, title: "Upload your own", sub: "Any audio or video file" },
+        ].map((o) => (
+          <div key={o.title} className="flex items-center gap-3 px-4 py-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-tint text-accent"><o.icon className="h-4 w-4" /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13.5px] font-semibold">{o.title}</span>
+              <span className="block text-[12px] text-soft">{o.sub}</span>
+            </span>
+            <span className="rounded-lg border border-line px-3 py-1 text-[12px] font-semibold text-muted">Use</span>
+          </div>
+        ))}
+      </div>
+      {/* the timeline: clips, text, the song */}
       <div className="mt-4 space-y-1.5 rounded-xl border border-line p-3">
         <div className="flex h-9 gap-0.5 overflow-hidden rounded-md">
-          <span className="flex w-[34%] items-center gap-1 bg-cover bg-center px-2 text-[10.5px] font-bold text-white" style={{ backgroundImage: "linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.35)),url(/characters/olivia.jpg)" }}><Film className="h-3 w-3" />Hook</span>
-          <span className="flex flex-1 items-center gap-1 bg-cover bg-center px-2 text-[10.5px] font-bold text-white" style={{ backgroundImage: "linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.35)),url(/landing/explain-strip.jpg)" }}><Film className="h-3 w-3" />Demo</span>
+          <span className="flex w-[22%] items-center gap-1 bg-cover bg-center px-2 text-[10.5px] font-bold text-white" style={{ backgroundImage: "linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.35)),url(/characters/olivia.jpg)" }}><Film className="h-3 w-3" />Hook</span>
+          <span className="flex flex-1 items-center gap-1 bg-cover bg-center px-2 text-[10.5px] font-bold text-white" style={{ backgroundImage: "linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.35)),url(/landing/explain-strip.jpg)", backgroundSize: "100% 100%" }}><Film className="h-3 w-3" />Demo</span>
         </div>
-        <div className="flex h-6 w-[34%] items-center gap-1 rounded-md bg-texttrack-tint px-2 text-[10.5px] font-semibold text-texttrack"><Type className="h-3 w-3" />This app fixed my mornings</div>
+        <div className="flex h-6 w-[22%] items-center gap-1 rounded-md bg-texttrack-tint px-2 text-[10.5px] font-semibold text-texttrack"><Type className="h-3 w-3 shrink-0" /><span className="truncate">pov: he airdrops you this</span></div>
         <div className="flex h-8 items-center gap-1.5 overflow-hidden rounded-md bg-soundtrack-tint px-2 text-soundtrack">
           <Music className="h-3.5 w-3.5 shrink-0" />
-          <span className="shrink-0 text-[10.5px] font-bold">Trending sound</span>
+          <span className="shrink-0 text-[10.5px] font-bold">{SONG.title} · {SONG.artist}</span>
           <span className="flex h-full flex-1 items-center gap-[2px]">
-            {bars.map((h, i) => <span key={i} className="w-[2px] shrink-0 rounded-full bg-soundtrack/60" style={{ height: h }} />)}
+            {wave.map((h, i) => <span key={i} className="w-[2px] shrink-0 rounded-full bg-soundtrack/60" style={{ height: h }} />)}
           </span>
         </div>
       </div>
