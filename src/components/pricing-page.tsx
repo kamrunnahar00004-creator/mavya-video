@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Minus, Plus } from "lucide-react";
-import { MarketingFooter, MarketingHeader } from "@/components/marketing-chrome";
+import { MarketingFooter, MarketingHeader, MavyaMark } from "@/components/marketing-chrome";
 import { BUSINESS, PLANS, money, planById, priceOf, type BillingCycle, type Plan } from "@/lib/plans";
 
 /*
@@ -31,7 +31,7 @@ const COMPARE: { group: string; rows: { label: string; cells: (string | boolean)
   {
     group: "Make videos",
     rows: [
-      { label: "AI video hooks a month", cells: [...PLANS.map((p) => String(p.hooks)), "Custom"] },
+      { label: "AI video hooks a month", cells: [...PLANS.map((p) => String(p.hooks)), "Unlimited"] },
       { label: "Text on screen", cells: ["Unlimited", "Unlimited", "Unlimited", "Unlimited"] },
       { label: "Shot-by-shot scripts for your app", cells: ["Unlimited", "Unlimited", "Unlimited", "Unlimited"] },
       { label: "AI characters, or your own face", cells: ["Unlimited", "Unlimited", "Unlimited", "Unlimited"] },
@@ -115,13 +115,13 @@ function BusinessCard() {
       <p className="relative text-[17px] font-semibold">{BUSINESS.name}</p>
       <p className="relative mt-1 min-h-[40px] text-[13.5px] text-white/70">We run your short-form for you</p>
       <p className="relative mt-4 text-[30px] font-semibold leading-[1.05] tracking-[-0.03em]">{BUSINESS.price}</p>
-      <p className="relative mt-1.5 text-[12.5px] text-white/60">{BUSINESS.note}</p>
+      <p className="relative mt-1.5 text-[12.5px] text-white/60">Minimum applies</p>
       <a href={BUSINESS.contact} className={`${cardBtn} relative mt-5 bg-white text-[#15121f] hover:bg-white/90`}>
         Book a call
         <ArrowRight className="h-4 w-4" />
       </a>
       <div className="relative mt-6 border-t border-white/10 pt-5">
-        <p className="mb-3 text-[13px] font-semibold">Everything in Studio, and:</p>
+        <p className="mb-3 text-[13px] font-semibold">Everything in Studio, plus:</p>
         <ul className="space-y-2.5">
           {BUSINESS.features.map((f) => (
             <li key={f} className="flex items-start gap-2.5 text-[14px] leading-snug text-white/85">
@@ -136,7 +136,7 @@ function BusinessCard() {
 }
 
 export function PricingPage() {
-  const [cycle, setCycle] = useState<BillingCycle>("annual");
+  const [cycle, setCycle] = useState<BillingCycle>("monthly");
   return (
     <div className="landing-theme min-h-full bg-bg">
       <MarketingHeader active="pricing" />
@@ -272,26 +272,9 @@ function CostStack() {
   const mavyaOn = shown > STACK.length + 1;
   const save = STACK_TOTAL - MAVYA.price;
   return (
-    <div ref={ref} className="grid items-center gap-12 lg:grid-cols-[1fr_1fr]">
-      <div>
-        <h2 className="text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">One tool instead of six.</h2>
-        <p className="mt-5 max-w-[480px] text-[18px] leading-relaxed text-muted">
-          A hook + demo video takes six jobs: finding the hook, writing the script, making the hook video, the AI creator, the edit and the music. Most people pay a separate tool for each.
-        </p>
-        <div className="mt-8 flex items-end gap-6">
-          <div>
-            <p className="text-[13px] font-semibold text-soft">You save</p>
-            <p className="mt-1 text-[44px] font-semibold leading-none tracking-[-0.03em] text-accent tabular-nums">{usd(Math.round(save))}<span className="text-[18px] font-semibold text-soft"> / month</span></p>
-          </div>
-          <div className="pb-1">
-            <p className="text-[13px] font-semibold text-soft">That&apos;s</p>
-            <p className="mt-1 text-[20px] font-semibold">{Math.round((save / STACK_TOTAL) * 100)}% less</p>
-          </div>
-        </div>
-      </div>
-
-      {/* the receipt */}
-      <div className="relative">
+    <div ref={ref} className="mx-auto max-w-[560px]">
+      <h2 className="text-center text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">One tool instead of six.</h2>
+      <div className="relative mt-10">
         <div aria-hidden className="pointer-events-none absolute -inset-10 bg-[radial-gradient(50%_50%_at_50%_50%,rgba(123,76,250,0.14)_0%,transparent_100%)]" />
         <div className="relative rounded-2xl border border-line bg-panel p-6 shadow-[0_0_0_1px_rgba(21,18,31,0.03),0_24px_48px_-20px_rgba(21,18,31,0.2),0_60px_120px_-40px_rgba(123,76,250,0.3)] sm:p-8">
           <div className="flex items-center justify-between border-b border-dashed border-line-strong pb-4">
@@ -318,14 +301,17 @@ function CostStack() {
               <span aria-hidden className={`absolute left-[-4px] right-[-4px] top-1/2 h-[3px] origin-left -translate-y-1/2 rounded-full bg-red-500 transition-transform duration-500 ${totalOn ? "scale-x-100" : "scale-x-0"}`} />
             </span>
           </div>
-          <div className={`mt-5 flex items-center justify-between rounded-xl bg-accent px-5 py-4 text-white transition-[opacity,transform] duration-500 ${mavyaOn ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"}`}>
-            <span>
+          <div className={`mt-5 flex items-center gap-4 rounded-xl bg-accent px-5 py-4 text-white transition-[opacity,transform] duration-500 ${mavyaOn ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"}`}>
+            <MavyaMark className="h-10 w-10 shrink-0" inverted />
+            <span className="min-w-0 flex-1">
               <span className="block text-[15px] font-semibold">Mavya {MAVYA.name}</span>
-              <span className="block text-[13px] text-white/75">Everything above, in one place</span>
+              <span className="block text-[13px] text-white/80">All six, in one place</span>
             </span>
-            <span className="text-[30px] font-semibold tabular-nums tracking-[-0.02em]">${MAVYA.price}</span>
+            <span className="text-right">
+              <span className="block text-[30px] font-semibold leading-none tabular-nums tracking-[-0.02em]">${MAVYA.price}</span>
+              <span className="mt-1 block text-[12.5px] font-semibold text-white/85">{Math.round((save / STACK_TOTAL) * 100)}% less</span>
+            </span>
           </div>
-          <p className="mt-4 text-[12px] leading-relaxed text-soft">Lowest listed monthly prices of each tool, October 2026. Prices change; check each vendor.</p>
         </div>
       </div>
     </div>

@@ -24,17 +24,6 @@ export type Plan = {
   popular?: boolean;
 };
 
-/** What every plan includes. */
-export const EVERY_PLAN = [
-  "20 AI video hooks a month",
-  "Unlimited text on screen",
-  "Unlimited shot-by-shot scripts for your app",
-  "Unlimited AI characters, or your own face",
-  "Hooks that already pulled millions of views",
-  "Trending songs or the hook's original sound",
-  "Built-in editor and unlimited exports",
-];
-
 export const PLANS: Plan[] = [
   {
     id: "starter",
@@ -43,28 +32,28 @@ export const PLANS: Plan[] = [
     yearly: 290,
     hooks: 20,
     line: "Everything you need to go viral",
-    features: EVERY_PLAN,
+    features: ["20 AI video hooks a month", "Unlimited text on screen", "Unlimited shot-by-shot scripts", "Unlimited AI characters"],
   },
   {
     id: "pro",
     name: "Pro",
     price: 59,
     yearly: 590,
-    hooks: 20,
+    hooks: 60,
     line: "Our team in your corner every week",
     plus: "Starter",
     popular: true,
-    features: ["Weekly review of your videos by our team", "Written feedback: what to keep, what to change", "Hook picks for your app, every week", "Priority generation"],
+    features: ["60 AI video hooks a month", "Weekly review and feedback", "Priority generation"],
   },
   {
     id: "studio",
     name: "Studio",
     price: 99,
     yearly: 990,
-    hooks: 20,
+    hooks: 150,
     line: "Every video reviewed before you post",
     plus: "Pro",
-    features: ["We review every video before you post", "Notes on the hook, the script and the edit", "1:1 guidance on what to make next", "Priority support"],
+    features: ["150 AI video hooks a month", "We review every video", "1:1 guidance and priority support"],
   },
 ];
 
@@ -74,13 +63,7 @@ export const BUSINESS = {
   line: "Done for you",
   price: "Pay for results",
   note: "Minimum applies. Miss the quota, you don't pay.",
-  features: [
-    "Send us your website. That's it.",
-    "A dedicated marketing team runs your short-form",
-    "We pick the hooks, make the demos, edit and post",
-    "A monthly views quota, agreed up front",
-    "Miss the quota, you don't pay for that month",
-  ],
+  features: ["Send us your website. That's it.", "A dedicated team runs your short-form", "A views quota, agreed up front", "Miss it, you don't pay"],
   contact: "mailto:hello@mavya.app?subject=Mavya%20Business",
 };
 

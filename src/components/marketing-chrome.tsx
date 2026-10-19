@@ -1,10 +1,32 @@
 import Link from "next/link";
 
+/**
+ * The Mavya mark: a violet tile with a play button whose right edge curls into a hook (hook + video).
+ * `inverted`: white tile, violet glyph (for use on violet).
+ */
+export function MavyaMark({ className = "h-8 w-8", inverted = false }: { className?: string; inverted?: boolean }) {
+  const tile = inverted ? "#ffffff" : "url(#mavya-tile)";
+  const ink = inverted ? "#7b4cfa" : "#ffffff";
+  return (
+    <svg viewBox="0 0 32 32" className={className} aria-hidden>
+      <defs>
+        <linearGradient id="mavya-tile" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#8f66ff" />
+          <stop offset="1" stopColor="#5b2fd6" />
+        </linearGradient>
+      </defs>
+      <rect width="32" height="32" rx="9" fill={tile} />
+      <path d="M11.5 9.6v12.8c0 .9 1 1.4 1.7.9l9.4-6.4c.6-.4.6-1.4 0-1.8l-9.4-6.4c-.7-.5-1.7 0-1.7.9Z" fill={ink} />
+      <path d="M21.6 21.2c1.9.4 3.3 1.9 3.3 3.6 0 2-1.8 3.4-3.9 3.4" fill="none" stroke={ink} strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /** The marketing pages' logo, floating header and footer (landing and pricing). */
 export function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2.5">
-      <span className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-[15px] font-semibold text-white">M</span>
+      <MavyaMark />
       <span className="text-[18px] font-bold tracking-tight">Mavya</span>
     </Link>
   );
