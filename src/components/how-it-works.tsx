@@ -77,7 +77,7 @@ export function HowItWorks() {
             <div aria-hidden className="pointer-events-none absolute -inset-12 bg-[radial-gradient(50%_45%_at_55%_50%,rgba(123,76,250,0.16)_0%,transparent_100%)]" />
             <div id="hiw-panel" role="tabpanel" key={current.key} className="relative animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none">
               <AppWindow url={current.url}>
-                <div className="h-[540px] overflow-hidden text-left">
+                <div className="h-[566px] overflow-hidden text-left">
                   <current.Panel />
                 </div>
               </AppWindow>
@@ -140,13 +140,13 @@ function LibraryPanel() {
           <video src={`/landing/lib-${h.code}.mp4`} poster={`/landing/lib-${h.code}.jpg`} muted loop playsInline autoPlay aria-label={h.line} className="absolute inset-0 h-full w-full object-cover" />
         </div>
         <div className="flex min-w-0 flex-col">
-          <div key={h.code} className={`flex flex-col ${FADE_IN}`}>
+          <div key={h.code} className={`flex flex-col pb-6 ${FADE_IN}`}>
           <div className="flex items-center gap-2 text-[12px] font-semibold">
             <span className="rounded-full bg-raised px-2 py-0.5 text-muted">{h.format}</span>
             <span className="rounded-full bg-accent-tint px-2 py-0.5 text-accent">Demo: {h.app}</span>
           </div>
-          <p className="mt-2.5 text-[17px] font-semibold leading-snug tracking-[-0.01em]">“{h.line}”</p>
-          <div className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-3">
+          <p className="mt-3 text-[18px] font-semibold leading-snug tracking-[-0.01em]">“{h.line}”</p>
+          <div className="mt-5 grid grid-cols-3 gap-4 border-t border-line pt-4">
             {stat("Views", h.views)}
             {stat("Likes", h.likes)}
             {stat("Comments", h.comments)}
@@ -155,7 +155,7 @@ function LibraryPanel() {
           </div>
 
       {/* the table */}
-      <div className="mt-5 grid grid-cols-[1fr_64px_56px] gap-3 border-b border-line px-2 pb-2 text-[12px] font-semibold text-soft">
+      <div className="mt-auto grid grid-cols-[1fr_64px_56px] gap-3 border-b border-line px-2 pb-2 text-[12px] font-semibold text-soft">
         <span>Hook</span>
         <span className="text-right">Views</span>
         <span className="text-right">Likes</span>
@@ -202,7 +202,7 @@ function useCycle(count: number, ms: number) {
 /** The facts strip under a featured item: small label, big value (same as the library's Views / Likes / Comments). */
 function Facts({ items }: { items: [string, string][] }) {
   return (
-    <div className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-3">
+    <div className="mt-5 grid grid-cols-3 gap-4 border-t border-line pt-4">
       {items.map(([label, value]) => (
         <div key={label} className="min-w-0">
           <p className="text-[12px] text-soft">{label}</p>
@@ -213,7 +213,7 @@ function Facts({ items }: { items: [string, string][] }) {
   );
 }
 /** Every step screen: a big 9:16 media column on the left, the facts and the list on the right. */
-const BODY = "mt-5 grid min-h-0 flex-1 grid-cols-[236px_minmax(0,1fr)] items-start gap-7";
+const BODY = "mt-6 grid min-h-0 grid-cols-[248px_minmax(0,1fr)] items-stretch gap-10";
 const FADE_IN = "animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none";
 const MEDIA = "relative aspect-[9/16] w-full overflow-hidden rounded-2xl bg-ink shadow-[0_24px_48px_-20px_rgba(21,18,31,0.55)] ring-1 ring-black/5";
 const TAG = "rounded-full px-2 py-0.5 text-[12px] font-semibold";
@@ -247,13 +247,13 @@ function CharacterPanel() {
           </span>
         </div>
         <div className="flex min-w-0 flex-col">
-          <div key={id} className={`flex flex-col ${FADE_IN}`}>
+          <div key={id} className={`flex flex-col pb-6 ${FADE_IN}`}>
           <div className="flex items-center gap-2">
             <span className={`${TAG} bg-raised text-muted`}>AI character</span>
             <span className={`${TAG} bg-accent-tint text-accent`}>Hook: bro rate my startup idea</span>
           </div>
-          <p className="mt-2.5 text-[22px] font-semibold tracking-[-0.015em]">{name}</p>
-          <p className="mt-1 text-[14px] leading-snug text-muted">Performs the hook in place of the original creator. Same moves, same timing.</p>
+          <p className="mt-3 text-[22px] font-semibold tracking-[-0.015em]">{name}</p>
+          <p className="mt-1.5 text-[15px] leading-relaxed text-muted">Performs the hook in place of the original creator. Same moves, same timing.</p>
           <Facts items={[["Type", "AI character"], ["Hook", "rate my startup"], ["Format", "9:16 video"]]} />
           <div className="flex flex-wrap gap-2 pt-3">
             <span className="btn-primary h-9 px-4 text-[13px]">Use {name}</span>
@@ -262,7 +262,7 @@ function CharacterPanel() {
           </div>
           </div>
 
-      <div className="mt-5 flex items-center justify-between border-b border-line px-0.5 pb-2 text-[12px] font-semibold text-soft">
+      <div className="mt-auto flex items-center justify-between border-b border-line px-0.5 pb-2 text-[12px] font-semibold text-soft">
         <span>Characters</span>
         <span>+{CAST_TOTAL - CAST.length} more</span>
       </div>
@@ -330,16 +330,16 @@ function DemoPanel() {
           <video ref={ref} src={DEMO.src} poster={DEMO.poster} muted loop playsInline aria-label="A demo" className="absolute inset-0 h-full w-full object-cover" />
         </div>
         <div className="flex min-w-0 flex-col">
-        <div key={at} className={`flex flex-col ${FADE_IN}`}>
+        <div key={at} className={`flex flex-col pb-6 ${FADE_IN}`}>
           <div className="flex items-center gap-2">
             <span className={`${TAG} bg-accent-tint text-accent`}>{at === 0 ? "Hook" : `Shot ${at} of 5`}</span>
           </div>
-          <p className="mt-2.5 text-[22px] font-semibold tracking-[-0.015em]">{shot.title}</p>
-          <p className="mt-1 text-[14px] leading-snug text-muted">{shot.text}</p>
+          <p className="mt-3 text-[22px] font-semibold tracking-[-0.015em]">{shot.title}</p>
+          <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{shot.text}</p>
           <Facts items={[["Length", `${Math.round(shot.to - shot.from)}s`], ["Camera", shot.camera], ["Text on screen", shot.onScreen]]} />
         </div>
 
-      <div className="mt-5 grid grid-cols-[28px_1fr_48px] gap-3 border-b border-line px-2 pb-2 text-[12px] font-semibold text-soft">
+      <div className="mt-auto grid grid-cols-[28px_1fr_48px] gap-3 border-b border-line px-2 pb-2 text-[12px] font-semibold text-soft">
         <span>#</span>
         <span>Shot</span>
         <span className="text-right">Length</span>
@@ -391,7 +391,7 @@ function SoundPanel() {
           </span>
         </div>
         <div className="flex min-w-0 flex-col">
-          <div key={x.title} className={`flex flex-col ${FADE_IN}`}>
+          <div key={x.title} className={`flex flex-col pb-6 ${FADE_IN}`}>
           <div className="flex items-center gap-2">
             <span className={`${TAG} ${x.type === "Trending" ? "bg-accent-tint text-accent" : "bg-raised text-muted"}`}>{x.type}</span>
           </div>
@@ -407,7 +407,7 @@ function SoundPanel() {
           </div>
           </div>
 
-      <div className="mt-5 grid grid-cols-[1fr_90px] gap-3 border-b border-line px-2 pb-2 text-[12px] font-semibold text-soft">
+      <div className="mt-auto grid grid-cols-[1fr_90px] gap-3 border-b border-line px-2 pb-2 text-[12px] font-semibold text-soft">
         <span>Sound</span>
         <span className="text-right">Type</span>
       </div>
