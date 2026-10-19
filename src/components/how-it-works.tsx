@@ -212,9 +212,9 @@ function Facts({ items }: { items: [string, string][] }) {
   );
 }
 /** Every step screen: a big 9:16 media column on the left, the facts and the list on the right. */
-const BODY = "mt-6 grid min-h-0 flex-1 grid-cols-[224px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] items-stretch gap-9";
+const BODY = "mt-6 grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] items-start gap-9";
 const FADE_IN = "animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none";
-const MEDIA = "relative h-full min-h-0 w-full overflow-hidden rounded-2xl bg-ink shadow-[0_24px_48px_-20px_rgba(21,18,31,0.55)] ring-1 ring-black/5";
+const MEDIA = "relative aspect-[9/16] w-full overflow-hidden rounded-2xl bg-ink shadow-[0_24px_48px_-20px_rgba(21,18,31,0.55)] ring-1 ring-black/5";
 const TAG = "rounded-full px-2 py-0.5 text-[12px] font-semibold";
 
 /*
@@ -289,8 +289,8 @@ function CharacterPanel() {
  */
 const DEMO = { src: "/landing/lib-DbHo7QFIvD4.mp4", poster: "/landing/lib-DbHo7QFIvD4.jpg" };
 const SHOTS = [
-  { from: 0, to: 3, title: "The hook", text: "Your character reacts to the hook. Mavya makes this part.", camera: "Selfie", onScreen: "pov: … he airdrops you THIS" },
-  { from: 3, to: 6, title: "The AirDrop arrives", text: "Film your laptop over your shoulder as the link pops up in the corner.", camera: "Over the shoulder", onScreen: "pov: … he airdrops you THIS" },
+  { from: 0, to: 3, title: "The hook", text: "Your character reacts to the hook. Mavya makes this part.", camera: "Selfie", onScreen: "pov: you’ve been flirting with the guy at your cafe for weeks now and today he airdrops you THIS" },
+  { from: 3, to: 6, title: "The AirDrop arrives", text: "Film your laptop over your shoulder as the link pops up in the corner.", camera: "Over the shoulder", onScreen: "pov: you’ve been flirting with the guy at your cafe for weeks now and today he airdrops you THIS" },
   { from: 6, to: 10, title: "The question", text: "The site opens on “wanna go on a date?”. Go for the no: it runs away.", camera: "Close on the screen", onScreen: "the hidden “no”" },
   { from: 10, to: 12, title: "Say yes", text: "Click YES. The page cheers back.", camera: "Close on the screen", onScreen: "I love cats" },
   { from: 12, to: 16, title: "Pick the date", text: "Open the list of date ideas, pick one, hit Next.", camera: "Close on the screen", onScreen: "the options???" },
@@ -336,9 +336,9 @@ function DemoPanel() {
           <p className="mt-3 text-[22px] font-semibold tracking-[-0.015em]">{shot.title}</p>
           <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{shot.text}</p>
           {/* the caption that goes on screen, shown the way it looks in the video */}
-          <span className="mt-4 flex w-fit max-w-full items-center gap-2 rounded-lg bg-ink py-1.5 pl-2 pr-3 text-[14px] font-bold leading-snug text-white">
+          <span className="mt-4 flex w-fit max-w-full items-start gap-2 rounded-lg bg-ink py-1.5 pl-2 pr-3 text-[14px] font-bold leading-snug text-white">
             <span className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 text-[10.5px] font-semibold text-white/80">On screen</span>
-            <span className="truncate">{shot.onScreen}</span>
+            <span className="min-w-0 pt-px">{shot.onScreen}</span>
           </span>
           <Facts items={[["Length", `${Math.round(shot.to - shot.from)}s`], ["Camera", shot.camera]]} />
         </div>
