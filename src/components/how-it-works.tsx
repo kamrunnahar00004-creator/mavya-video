@@ -203,8 +203,8 @@ function useCycle(count: number, ms: number) {
 function Facts({ items }: { items: [string, string][] }) {
   return (
     <div className="mt-5 grid grid-cols-3 gap-4 border-t border-line pt-4">
-      {items.map(([label, value]) => (
-        <div key={label} className="min-w-0">
+      {items.map(([label, value], i) => (
+        <div key={label} className={`min-w-0 ${i === 1 ? "text-center" : i === 2 ? "text-right" : ""}`}>
           <p className="text-[12px] text-soft">{label}</p>
           <p className="mt-0.5 truncate text-[16px] font-semibold tracking-[-0.01em]">{value}</p>
         </div>
