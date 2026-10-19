@@ -1,0 +1,14 @@
+import { Suspense } from "react";
+import type { Metadata } from "next";
+import { UsageView } from "@/components/usage-view";
+
+export const metadata: Metadata = { title: "Usage · Mavya" };
+
+/** Reads `?plan=` (preview), so it renders inside a Suspense boundary. */
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="card h-full" />}>
+      <UsageView />
+    </Suspense>
+  );
+}

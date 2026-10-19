@@ -5,14 +5,14 @@ import { usePathname } from "next/navigation";
 import { Clapperboard, Flame, Settings } from "lucide-react";
 
 const NAV = [
-  { href: "/studio", label: "Videos", icon: Clapperboard, also: [] as string[] },
-  { href: "/library", label: "Viral library", icon: Flame, also: [] },
-  { href: "/settings", label: "Settings", icon: Settings, also: ["/billing"] },
+  { href: "/studio", label: "Videos", icon: Clapperboard },
+  { href: "/library", label: "Viral library", icon: Flame },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 function Links({ pathname }: { pathname: string | null }) {
-  return NAV.map(({ href, label, icon: Icon, also }) => {
-    const on = [href, ...also].some((h) => pathname?.startsWith(h));
+  return NAV.map(({ href, label, icon: Icon }) => {
+    const on = pathname?.startsWith(href) ?? false;
     return (
       <Link
         key={href}

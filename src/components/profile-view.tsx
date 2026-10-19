@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Upload } from "lucide-react";
-import { SettingsHeader } from "@/components/settings-header";
+import { SettingsPage } from "@/components/settings-shell";
 import { NO_PROFILE, PROFILE_EVENT, initials, type Profile } from "@/lib/profile";
 
 /** Settings > Profile: picture, email (from sign-in), first and last name, and deleting the account. */
@@ -77,18 +77,9 @@ export function ProfileView() {
   const label = "text-[14px] font-semibold";
 
   return (
-    <div className="card h-full overflow-y-auto">
-      <div className="mx-auto max-w-[1080px] px-6 py-8">
-        <SettingsHeader tab="profile" />
-
-        <div className="max-w-[760px]">
-        <section className="mt-8 overflow-hidden rounded-2xl border border-line bg-panel">
-          <div className="px-6 py-5">
-            <h2 className="text-[17px] font-bold">Profile</h2>
-            <p className="mt-0.5 text-[13.5px] text-muted">Manage your personal details</p>
-          </div>
-
-          <div className={row}>
+    <SettingsPage title="Profile" subtitle="Manage your personal details">
+        <section className="mt-6 overflow-hidden rounded-2xl border border-line bg-panel">
+          <div className={row.replace("border-t ", "")}>
             <span className={label}>Profile picture</span>
             <div className="flex items-center gap-4">
               <Avatar profile={p} className="h-14 w-14 text-[18px]" />
@@ -125,11 +116,9 @@ export function ProfileView() {
           </div>
         </section>
 
-        <section className="mt-6 rounded-2xl border border-red-200 bg-panel">
-          <div className="px-6 py-5">
-            <h2 className="text-[17px] font-bold text-red-700">Danger zone</h2>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-red-100 px-6 py-5">
+        <h2 className="mt-10 text-[15px] font-bold text-red-700!">Danger zone</h2>
+        <section className="mt-3 rounded-2xl border border-red-200 bg-panel">
+          <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-5">
             <div>
               <p className="text-[14px] font-semibold">Delete account</p>
               <p className="mt-0.5 text-[13.5px] text-muted">Permanently delete your account and all associated data</p>
@@ -139,8 +128,6 @@ export function ProfileView() {
             </button>
           </div>
         </section>
-        </div>
-      </div>
 
       {confirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#15121f]/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && setConfirm(false)}>
@@ -166,7 +153,7 @@ export function ProfileView() {
         </div>
       )}
       {toast && <div className="fade-in fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-text px-4 py-2.5 text-[13.5px] font-semibold text-bg shadow-lg">{toast}</div>}
-    </div>
+    </SettingsPage>
   );
 }
 
