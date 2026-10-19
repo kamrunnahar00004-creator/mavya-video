@@ -13,10 +13,10 @@ import { ArrowRight, Film, Lock, Music, PenLine, Search, Upload } from "lucide-r
 const ROTATE_MS = 7000;
 
 const STEPS = [
-  { key: "hook", title: "Steal a viral hook", body: "Browse hooks that already did millions of views. Pick one and make it yours.", url: "mavya.app/library", Panel: LibraryPanel },
-  { key: "remix", title: "Remix it with your character", body: "Generate one, pick one from our library, or upload your photo. Mavya makes the hook, no filming.", url: "mavya.app/studio/new/character", Panel: CharacterPanel },
-  { key: "demo", title: "Film the demo, shot by shot", body: "Mavya describes every shot of the demo. Film it on your phone and drop it in.", url: "mavya.app/studio/new/demo", Panel: DemoPanel },
-  { key: "sound", title: "Copy the viral sound", body: "Use the hook's original sound or a trending song, then export.", url: "mavya.app/studio/new/sound", Panel: SoundPanel },
+  { key: "hook", title: "Find your hook", body: "Hooks that already pulled millions of views. Pick one.", url: "mavya.app/library", Panel: LibraryPanel },
+  { key: "remix", title: "Make it yours", body: "Your face, one from our library, or one you describe. Mavya recreates the hook with it.", url: "mavya.app/studio/new/character", Panel: CharacterPanel },
+  { key: "demo", title: "Film your demo", body: "Mavya writes the script, shot by shot. Film it on your phone in a minute.", url: "mavya.app/studio/new/demo", Panel: DemoPanel },
+  { key: "sound", title: "Add sound and export", body: "The hook's original audio or a trending track. Ready to post.", url: "mavya.app/studio/new/sound", Panel: SoundPanel },
 ];
 
 export function HowItWorks() {
@@ -39,8 +39,7 @@ export function HowItWorks() {
     <section id="how" className="scroll-mt-24 overflow-x-clip border-y border-line bg-panel py-20 sm:py-28">
       <div className="mx-auto max-w-[1280px] px-5">
         <p className="text-[14px] font-semibold text-accent">How it works</p>
-        <h2 className="mt-2 max-w-[680px] text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">From viral hook to finished video.</h2>
-        <p className="mt-4 max-w-[600px] text-[18px] leading-relaxed text-muted">Mavya walks you through every step. You only film the demo.</p>
+        <h2 className="mt-2 max-w-[760px] text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">From viral hook to finished video in minutes.</h2>
 
         <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,0.74fr)_minmax(0,1.26fr)] lg:gap-16" onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
           <div role="tablist" aria-orientation="vertical" aria-label="How it works" className="flex flex-col">
@@ -77,7 +76,7 @@ export function HowItWorks() {
             <div aria-hidden className="pointer-events-none absolute -inset-12 bg-[radial-gradient(50%_45%_at_55%_50%,rgba(123,76,250,0.16)_0%,transparent_100%)]" />
             <div id="hiw-panel" role="tabpanel" key={current.key} className="relative animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none">
               <AppWindow url={current.url}>
-                <div className="h-[600px] overflow-hidden text-left">
+                <div className="flex h-[640px] flex-col overflow-hidden text-left">
                   <current.Panel />
                 </div>
               </AppWindow>
@@ -129,7 +128,7 @@ function LibraryPanel() {
     </div>
   );
   return (
-    <div className="flex h-full flex-col p-5 sm:p-6">
+    <div className="flex min-h-0 flex-1 flex-col p-5 sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-[16px] font-semibold">Viral library</h3>
         <span className="flex h-9 w-[200px] items-center gap-2 rounded-lg bg-raised px-3 text-[13px] text-soft"><Search className="h-4 w-4" />Search hooks</span>
@@ -202,9 +201,9 @@ function useCycle(count: number, ms: number) {
 /** The facts strip under a featured item: small label, big value (same as the library's Views / Likes / Comments). */
 function Facts({ items }: { items: [string, string][] }) {
   return (
-    <div className="mt-5 grid grid-cols-[1fr_1.5fr_1fr] gap-4 border-t border-line pt-4">
+    <div className={`mt-5 grid gap-4 border-t border-line pt-4 ${items.length === 3 ? "grid-cols-[1fr_1.5fr_1fr]" : "grid-cols-2"}`}>
       {items.map(([label, value], i) => (
-        <div key={label} className={`min-w-0 ${i === 1 ? "text-center" : i === 2 ? "text-right" : ""}`}>
+        <div key={label} className={`min-w-0 ${items.length === 3 && i === 1 ? "text-center" : items.length === 3 && i === 2 ? "text-right" : ""}`}>
           <p className="text-[12px] text-soft">{label}</p>
           <p className="mt-0.5 truncate text-[16px] font-semibold tracking-[-0.01em]">{value}</p>
         </div>
@@ -213,9 +212,9 @@ function Facts({ items }: { items: [string, string][] }) {
   );
 }
 /** Every step screen: a big 9:16 media column on the left, the facts and the list on the right. */
-const BODY = "mt-6 grid min-h-0 grid-cols-[224px_minmax(0,1fr)] items-stretch gap-9";
+const BODY = "mt-6 grid min-h-0 flex-1 grid-cols-[224px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] items-stretch gap-9";
 const FADE_IN = "animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none";
-const MEDIA = "relative aspect-[9/16] w-full overflow-hidden rounded-2xl bg-ink shadow-[0_24px_48px_-20px_rgba(21,18,31,0.55)] ring-1 ring-black/5";
+const MEDIA = "relative h-full min-h-0 w-full overflow-hidden rounded-2xl bg-ink shadow-[0_24px_48px_-20px_rgba(21,18,31,0.55)] ring-1 ring-black/5";
 const TAG = "rounded-full px-2 py-0.5 text-[12px] font-semibold";
 
 /*
@@ -229,7 +228,7 @@ function CharacterPanel() {
   const id = CAST[sel];
   const name = id[0].toUpperCase() + id.slice(1);
   return (
-    <div className="flex h-full flex-col p-5 sm:p-6">
+    <div className="flex min-h-0 flex-1 flex-col p-5 sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-[16px] font-semibold">Choose your character</h3>
         <span className="text-[13px] text-soft">{CAST_TOTAL} in the library</span>
@@ -319,7 +318,7 @@ function DemoPanel() {
     if (v) v.currentTime = SHOTS[i].from + 0.05;
   };
   return (
-    <div className="flex h-full flex-col p-5 sm:p-6">
+    <div className="flex min-h-0 flex-1 flex-col p-5 sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-[16px] font-semibold">Film your demo</h3>
         <span className="text-[13px] text-soft">5 shots after the hook, 17 seconds</span>
@@ -336,7 +335,12 @@ function DemoPanel() {
           </div>
           <p className="mt-3 text-[22px] font-semibold tracking-[-0.015em]">{shot.title}</p>
           <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{shot.text}</p>
-          <Facts items={[["Length", `${Math.round(shot.to - shot.from)}s`], ["Camera", shot.camera], ["Text on screen", shot.onScreen]]} />
+          {/* the caption that goes on screen, shown the way it looks in the video */}
+          <span className="mt-4 flex w-fit max-w-full items-center gap-2 rounded-lg bg-ink py-1.5 pl-2 pr-3 text-[14px] font-bold leading-snug text-white">
+            <span className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 text-[10.5px] font-semibold text-white/80">On screen</span>
+            <span className="truncate">{shot.onScreen}</span>
+          </span>
+          <Facts items={[["Length", `${Math.round(shot.to - shot.from)}s`], ["Camera", shot.camera]]} />
         </div>
 
       <div className="mt-auto grid grid-cols-[28px_1fr_48px] gap-3 border-b border-line px-2 pb-2 text-[12px] font-semibold text-soft">
@@ -375,14 +379,14 @@ function SoundPanel() {
   const x = SOUNDS[sel];
   const wave = Array.from({ length: 64 }, (_, i) => 6 + Math.round(Math.abs(Math.sin(i * 1.3 + sel) * 14 + Math.sin(i * 0.37) * 8)));
   return (
-    <div className="flex h-full flex-col p-5 sm:p-6">
+    <div className="flex min-h-0 flex-1 flex-col p-5 sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-[16px] font-semibold">Add sound</h3>
         <span className="flex h-9 w-[200px] items-center gap-2 rounded-lg bg-raised px-3 text-[13px] text-soft"><Search className="h-4 w-4" />Search songs</span>
       </div>
 
       <div className={BODY}>
-        <div key={x.title} className={`relative flex aspect-[9/16] w-full flex-col items-center justify-center gap-4 overflow-hidden rounded-2xl shadow-[0_24px_48px_-20px_rgba(21,18,31,0.55)] ${FADE_IN}`} style={{ background: x.art }}>
+        <div key={x.title} className={`relative flex h-full min-h-0 w-full flex-col items-center justify-center gap-4 overflow-hidden rounded-2xl shadow-[0_24px_48px_-20px_rgba(21,18,31,0.55)] ${FADE_IN}`} style={{ background: x.art }}>
           {x.type === "Upload" ? <Upload className="h-12 w-12 text-white" /> : x.type === "Hook sound" ? <Film className="h-12 w-12 text-white" /> : <Music className="h-12 w-12 text-white" />}
           <span aria-hidden className="flex h-10 items-end gap-[4px]">
             {[18, 30, 14, 36, 22, 28, 16, 32, 20].map((h, i) => (
