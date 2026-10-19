@@ -26,7 +26,10 @@ export function LoopVideo({ src, poster, className = "" }: { src: string; poster
       if (e.isIntersecting && !document.hidden) void v.play().catch(() => undefined);
       else v.pause();
     }, { threshold: 0.33 });
-    const hide = () => { if (document.hidden) v.pause(); };
+    const hide = () => {
+      if (document.hidden) v.pause();
+      else if (visible.current && v.src) void v.play().catch(() => undefined);
+    };
     load.observe(v);
     play.observe(v);
     document.addEventListener("visibilitychange", hide);

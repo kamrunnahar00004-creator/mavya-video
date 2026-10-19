@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type RefObject } from "react";
 import Link from "next/link";
 import { ArrowRight, Film, Lock, Music, PenLine, Search, Upload } from "lucide-react";
 
@@ -11,6 +11,39 @@ import { ArrowRight, Film, Lock, Music, PenLine, Search, Upload } from "lucide-r
  * real material (library covers, the AI cast, a real demo video); they illustrate the app, they are not live.
  */
 const ROTATE_MS = 7000;
+/** True while the section is on screen and the tab is visible: timers and videos inside run only then. */
+const Live = createContext(true);
+const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function useLiveSection(ref: RefObject<HTMLElement | null>) {
+  const [onScreen, setOnScreen] = useState(false);
+  const [shown, setShown] = useState(true);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => setOnScreen(e.isIntersecting), { threshold: 0.2 });
+    io.observe(el);
+    const vis = () => setShown(!document.hidden);
+    document.addEventListener("visibilitychange", vis);
+    return () => {
+      io.disconnect();
+      document.removeEventListener("visibilitychange", vis);
+    };
+  }, [ref]);
+  return onScreen && shown;
+}
+/** A panel video that plays only while the section is live (and never for reduced motion). */
+function useLivePlay() {
+  const live = useContext(Live);
+  const ref = useRef<HTMLVideoElement>(null);
+  // No deps: also runs after a keyed video remounts.
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (live && !reducedMotion()) void v.play().catch(() => undefined);
+    else v.pause();
+  });
+  return ref;
+}
 
 const STEPS = [
   { key: "hook", title: "Find your hook", body: "Hooks that already pulled millions of views. Pick one.", url: "mavya.app/library", Panel: LibraryPanel },
@@ -23,10 +56,12 @@ export function HowItWorks() {
   const [active, setActive] = useState(0);
   const [auto, setAuto] = useState(true);
   const [hovering, setHovering] = useState(false);
-  const running = auto && !hovering;
+  const section = useRef<HTMLElement>(null);
+  const live = useLiveSection(section);
+  const running = auto && !hovering && live;
   useEffect(() => {
     if (!running) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (reducedMotion()) return;
     const t = window.setTimeout(() => setActive((a) => (a + 1) % STEPS.length), ROTATE_MS);
     return () => window.clearTimeout(t);
   }, [running, active]);
@@ -36,7 +71,7 @@ export function HowItWorks() {
   };
   const current = STEPS[active];
   return (
-    <section id="how" className="scroll-mt-24 overflow-x-clip border-y border-line bg-panel py-20 sm:py-28">
+    <section ref={section} id="how" className="scroll-mt-24 overflow-x-clip border-y border-line bg-panel py-20 sm:py-28">
       <div className="mx-auto max-w-[1280px] px-5">
         <p className="text-[14px] font-semibold text-accent">How it works</p>
         <h2 className="mt-2 max-w-[760px] text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">From viral hook to finished video in minutes.</h2>
@@ -63,7 +98,7 @@ export function HowItWorks() {
                   </button>
                   {on && (
                     <Link href="/studio" className="-mt-2 mb-5 inline-flex items-center gap-1.5 text-[16px] font-semibold text-accent hover:underline">
-                      Try it free <ArrowRight className="h-4 w-4" />
+                      Get started <ArrowRight className="h-4 w-4" />
                     </Link>
                   )}
                 </div>
@@ -76,8 +111,10 @@ export function HowItWorks() {
             <div aria-hidden className="pointer-events-none absolute -inset-12 bg-[radial-gradient(50%_45%_at_55%_50%,rgba(123,76,250,0.16)_0%,transparent_100%)]" />
             <div id="hiw-panel" role="tabpanel" key={current.key} className="relative animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none">
               <AppWindow url={current.url}>
-                <div className="flex h-[640px] flex-col overflow-hidden text-left">
-                  <current.Panel />
+                <div className="flex flex-col overflow-hidden text-left sm:h-[640px]">
+                  <Live.Provider value={live}>
+                    <current.Panel />
+                  </Live.Provider>
                 </div>
               </AppWindow>
             </div>
@@ -120,6 +157,7 @@ const HOOKS = [
 const HOOK_MS = 3500;
 function LibraryPanel() {
   const [sel, pick] = useCycle(HOOKS.length, HOOK_MS);
+  const video = useLivePlay();
   const h = HOOKS[sel];
   const stat = (label: string, value: string) => (
     <div>
@@ -136,7 +174,7 @@ function LibraryPanel() {
 
       <div className={BODY}>
         <div key={h.code} className={`${MEDIA} ${FADE_IN}`}>
-          <video src={`/landing/lib-${h.code}.mp4`} poster={`/landing/lib-${h.code}.jpg`} muted loop playsInline autoPlay aria-label={h.line} className="absolute inset-0 h-full w-full object-cover" />
+          <video ref={video} src={`/landing/lib-${h.code}.mp4`} poster={`/landing/lib-${h.code}.jpg`} muted loop playsInline aria-label={h.line} className="absolute inset-0 h-full w-full object-cover" />
         </div>
         <div className="flex min-w-0 flex-col">
           <div key={h.code} className={`flex flex-col pb-6 ${FADE_IN}`}>
@@ -186,11 +224,12 @@ function LibraryPanel() {
 function useCycle(count: number, ms: number) {
   const [sel, setSel] = useState(0);
   const [auto, setAuto] = useState(true);
+  const live = useContext(Live);
   useEffect(() => {
-    if (!auto || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!auto || !live || reducedMotion()) return;
     const t = window.setTimeout(() => setSel((x) => (x + 1) % count), ms);
     return () => window.clearTimeout(t);
-  }, [auto, sel, count, ms]);
+  }, [auto, live, sel, count, ms]);
   const pick = (i: number) => {
     setSel(i);
     setAuto(false);
@@ -212,9 +251,9 @@ function Facts({ items }: { items: [string, string][] }) {
   );
 }
 /** Every step screen: a big 9:16 media column on the left, the facts and the list on the right. */
-const BODY = "mt-6 grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] items-start gap-9";
+const BODY = "mt-6 grid min-h-0 flex-1 grid-cols-1 items-start gap-6 sm:grid-cols-[280px_minmax(0,1fr)] sm:grid-rows-[minmax(0,1fr)] sm:gap-9";
 const FADE_IN = "animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none";
-const MEDIA = "relative aspect-[9/16] w-full overflow-hidden rounded-2xl bg-ink shadow-[0_24px_48px_-20px_rgba(21,18,31,0.55)] ring-1 ring-black/5";
+const MEDIA = "relative mx-auto aspect-[9/16] w-full max-w-[240px] overflow-hidden sm:max-w-none rounded-2xl bg-ink shadow-[0_24px_48px_-20px_rgba(21,18,31,0.55)] ring-1 ring-black/5";
 const TAG = "rounded-full px-2 py-0.5 text-[12px] font-semibold";
 
 /*
@@ -297,20 +336,21 @@ const SHOTS = [
   { from: 16, to: 20, title: "The payoff", text: "Choose a day. The date lands straight in his calendar.", camera: "Close on the screen", onScreen: "it goes straight to his calendar" },
 ];
 function DemoPanel() {
-  const ref = useRef<HTMLVideoElement>(null);
+  const ref = useLivePlay();
+  const live = useContext(Live);
   const [t, setT] = useState(0);
+  // Follow the video's time (for the current shot) only while it can play.
   useEffect(() => {
     const v = ref.current;
-    if (!v) return;
+    if (!v || !live) return;
     let raf = 0;
     const tick = () => {
       setT(v.currentTime);
       raf = requestAnimationFrame(tick);
     };
-    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) void v.play().catch(() => undefined);
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [ref, live]);
   const at = Math.max(0, SHOTS.findIndex((x) => t >= x.from && t < x.to));
   const shot = SHOTS[at];
   const seek = (i: number) => {
