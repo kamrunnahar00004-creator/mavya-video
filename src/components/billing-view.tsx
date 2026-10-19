@@ -11,8 +11,9 @@ import type { Run } from "@/lib/types";
  * Accounts and Stripe are not connected yet: everyone is on Free, and the buttons say so.
  */
 export function BillingView() {
-  const current: PlanId = "free";
-  const plan = planById(current);
+  // Accounts and checkout are not connected yet: nobody has a plan.
+  const current: PlanId | null = null;
+  const plan = current ? planById(current) : null;
   const [used, setUsed] = useState<{ hooks: number; exports: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -52,15 +53,15 @@ export function BillingView() {
         <div className="mt-6 grid gap-4 md:grid-cols-[1.2fr_1fr_1fr]">
           <div className="flex flex-col rounded-2xl border border-line bg-panel p-5">
             <span className="text-[13px] font-semibold text-soft">Your plan</span>
-            <span className="mt-1 text-[24px] font-black tracking-tight">{plan.name}</span>
-            <span className="text-[13.5px] text-muted">{plan.price ? `$${plan.price} / month` : "No card on file"}</span>
-            <button type="button" onClick={notConnected} disabled={!plan.price} className="mt-4 flex w-fit items-center gap-1.5 rounded-lg border border-line-strong px-3 py-1.5 text-[13px] font-bold text-text hover:border-ink disabled:border-line disabled:text-soft">
+            <span className="mt-1 text-[24px] font-black tracking-tight">{plan ? plan.name : "No plan yet"}</span>
+            <span className="text-[13.5px] text-muted">{plan ? `$${plan.price} / month` : "Pick a plan below to start"}</span>
+            <button type="button" onClick={notConnected} disabled={!plan} className="mt-4 flex w-fit items-center gap-1.5 rounded-lg border border-line-strong px-3 py-1.5 text-[13px] font-bold text-text hover:border-ink disabled:border-line disabled:text-soft">
               <CreditCard className="h-4 w-4" />
               Manage billing
             </button>
           </div>
-          <Usage label="AI hooks this month" used={used?.hooks} limit={plan.hooks} />
-          <Usage label="Exports this month" used={used?.exports} limit={plan.exports} />
+          <Usage label="AI hooks this month" used={used?.hooks} limit={plan ? plan.hooks : 0} />
+          <Usage label="Exports this month" used={used?.exports} limit={null} />
         </div>
 
         {/* Plans */}
@@ -77,7 +78,7 @@ export function BillingView() {
                   onClick={notConnected}
                   className={p.popular ? "btn-primary w-full py-2.5 text-[14px]" : "flex w-full items-center justify-center rounded-lg border border-line-strong py-2.5 text-[14px] font-bold text-text hover:border-ink"}
                 >
-                  {p.price > plan.price ? `Upgrade to ${p.name}` : `Switch to ${p.name}`}
+                  {!plan ? `Choose ${p.name}` : p.price > plan.price ? `Upgrade to ${p.name}` : `Switch to ${p.name}`}
                 </button>
               )
             }

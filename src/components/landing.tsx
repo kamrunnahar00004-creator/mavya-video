@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Play } from "lucide-react";
-import { PlanCards } from "@/components/plan-cards";
+import { MarketingFooter, MarketingHeader } from "@/components/marketing-chrome";
 import { LoopVideo } from "@/components/loop-video";
 import { HookDemoExplainer } from "@/components/hook-demo-explainer";
 import { HowItWorks } from "@/components/how-it-works";
@@ -46,36 +46,10 @@ const FAQ = [
   { q: "Can I cancel anytime?", a: "Yes, from Billing. Your plan runs until the end of the month you paid for." },
 ];
 
-function Logo() {
-  return (
-    <Link href="/" className="flex items-center gap-2.5">
-      <span className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-[15px] font-semibold text-white">M</span>
-      <span className="text-[18px] font-bold tracking-tight">Mavya</span>
-    </Link>
-  );
-}
-
 export function Landing() {
   return (
     <div className="landing-theme min-h-full bg-bg">
-      <header className="sticky top-0 z-30 px-3 pt-3">
-        <div className="mx-auto flex max-w-[1160px] items-center gap-6 rounded-xl border border-line bg-panel/85 px-5 py-2.5 shadow-[0_1px_2px_rgba(28,26,23,0.05),0_8px_24px_-12px_rgba(28,26,23,0.12)] backdrop-blur">
-          <Logo />
-          <nav className="ml-4 hidden items-center gap-5 text-[14px] font-semibold text-muted md:flex">
-            <a href="#how" className="hover:text-text">How it works</a>
-            <a href="#pricing" className="hover:text-text">Pricing</a>
-            <a href="#faq" className="hover:text-text">FAQ</a>
-          </nav>
-          <div className="ml-auto flex items-center gap-3">
-            <Link href="/studio" className="text-[14px] font-semibold text-muted hover:text-text">
-              Log in
-            </Link>
-            <Link href="/studio" className="btn-primary px-4 py-2 text-[14px]">
-              Sign up
-            </Link>
-          </div>
-        </div>
-      </header>
+      <MarketingHeader />
 
       {/* Hero: text left (semibold, three clean lines), the three phones fanned right, both in the first screen */}
       <section className="relative overflow-hidden">
@@ -95,11 +69,11 @@ export function Landing() {
                 Sign up
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <a href="#pricing" className="inline-flex h-12 items-center justify-center rounded-lg border border-line-strong bg-panel px-7 text-[16px] font-bold text-text transition-colors hover:border-ink">
+              <Link href="/pricing" className="inline-flex h-12 items-center justify-center rounded-lg border border-line-strong bg-panel px-7 text-[16px] font-bold text-text transition-colors hover:border-ink">
                 Billing
-              </a>
+              </Link>
             </div>
-            <p className="mt-4 text-[13.5px] font-semibold text-soft">Free plan. No card. Reels, TikTok and Shorts.</p>
+            <p className="mt-4 text-[13.5px] font-semibold text-soft">For Reels, TikTok and Shorts.</p>
           </div>
           <div className="flex items-center justify-center py-4">
             <Phone {...HERO[0]} className="-mr-14 translate-y-6 -rotate-[8deg] scale-[0.86]" />
@@ -115,27 +89,6 @@ export function Landing() {
       </section>
 
       <HowItWorks />
-
-      {/* Pricing */}
-      <section id="pricing" className="scroll-mt-20 border-y border-line bg-panel">
-        <div className="mx-auto max-w-[1160px] px-5 py-20">
-          <h2 className="text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">Pricing</h2>
-          <p className="mt-4 text-[18px] leading-relaxed text-muted">You pay for AI hooks. Editing and exporting are unlimited on every paid plan.</p>
-          <div className="mt-10">
-            <PlanCards
-              quiet
-              action={(plan) => (
-                <Link
-                  href="/studio"
-                  className={plan.popular ? "btn-primary h-11 w-full text-[14.5px]" : "flex h-11 w-full items-center justify-center rounded-lg border border-line-strong bg-panel text-[14.5px] font-bold text-text transition-colors hover:border-ink"}
-                >
-                  {plan.price ? `Start with ${plan.name}` : "Sign up free"}
-                </Link>
-              )}
-            />
-          </div>
-        </div>
-      </section>
 
       {/* FAQ */}
       <section id="faq" className="mx-auto max-w-[820px] scroll-mt-20 px-5 py-20">
@@ -165,14 +118,7 @@ export function Landing() {
         </div>
       </section>
 
-      <footer className="border-t border-line pb-24">
-        <div className="mx-auto flex max-w-[1160px] flex-wrap items-center gap-4 px-5 py-6 text-[13px] text-soft">
-          <Logo />
-          <span className="ml-auto">© 2026 Mavya</span>
-          <a href="#" className="hover:text-text">Terms</a>
-          <a href="#" className="hover:text-text">Privacy</a>
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 }
