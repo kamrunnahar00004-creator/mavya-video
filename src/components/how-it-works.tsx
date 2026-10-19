@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Download, Film, Music, PenLine, Search, Type, Upload, Users } from "lucide-react";
+import { ArrowRight, Film, Music, PenLine, Search, Upload } from "lucide-react";
 
 /*
  * How it works, in the Etsy Mavya "Research" layout (2026-10-17): the steps on the left, the active one marked
@@ -119,13 +119,7 @@ const HOOKS = [
 ];
 const HOOK_MS = 3500;
 function LibraryPanel() {
-  const [sel, setSel] = useState(0);
-  const [auto, setAuto] = useState(true);
-  useEffect(() => {
-    if (!auto || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const t = window.setTimeout(() => setSel((x) => (x + 1) % HOOKS.length), HOOK_MS);
-    return () => window.clearTimeout(t);
-  }, [auto, sel]);
+  const [sel, pick] = useCycle(HOOKS.length, HOOK_MS);
   const h = HOOKS[sel];
   const stat = (label: string, value: string) => (
     <div>
@@ -171,10 +165,7 @@ function LibraryPanel() {
           <button
             key={x.code}
             type="button"
-            onClick={() => {
-              setSel(i);
-              setAuto(false);
-            }}
+            onClick={() => pick(i)}
             className={`grid w-full cursor-pointer grid-cols-[1fr_64px_56px] items-center gap-3 rounded-lg px-2 py-1 text-left transition-colors ${i === sel ? "bg-accent-tint" : "hover:bg-raised"}`}
           >
             <span className="flex min-w-0 items-center gap-2.5">
@@ -190,45 +181,113 @@ function LibraryPanel() {
   );
 }
 
-/** Step 2: make your character three ways; three complete rows of the cast, the last tile says how many more (70 in all). */
-const CAST = ["olivia", "zuri", "mei", "jake", "ella", "sienna", "simone", "yuna", "liam", "ava", "amara", "isla", "hana", "marcus", "mia", "jada", "freya"];
+/** Shared by the step screens: which row is selected; it advances on its own until a row is clicked. */
+function useCycle(count: number, ms: number) {
+  const [sel, setSel] = useState(0);
+  const [auto, setAuto] = useState(true);
+  useEffect(() => {
+    if (!auto || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const t = window.setTimeout(() => setSel((x) => (x + 1) % count), ms);
+    return () => window.clearTimeout(t);
+  }, [auto, sel, count, ms]);
+  const pick = (i: number) => {
+    setSel(i);
+    setAuto(false);
+  };
+  return [sel, pick] as const;
+}
+
+/** The facts strip under a featured item: small label, big value (same as the library's Views / Likes / Comments). */
+function Facts({ items }: { items: [string, string][] }) {
+  return (
+    <div className="mt-auto grid grid-cols-3 gap-3 border-t border-line pt-3">
+      {items.map(([label, value]) => (
+        <div key={label} className="min-w-0">
+          <p className="text-[12px] text-soft">{label}</p>
+          <p className="mt-0.5 truncate text-[16px] font-semibold tracking-[-0.01em]">{value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+const FEATURED = "mt-4 grid grid-cols-[118px_1fr] gap-5 animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none";
+const MEDIA = "relative aspect-[9/16] overflow-hidden rounded-xl bg-ink shadow-[0_16px_32px_-16px_rgba(21,18,31,0.6)]";
+const TAG = "rounded-full px-2 py-0.5 text-[12px] font-semibold";
+
+/*
+ * Step 2: the selected character large, with the hook it will perform and the three ways to get a character;
+ * a grid of the cast below that cycles (70 in the library).
+ */
+const CAST = ["olivia", "ella", "jake", "sienna", "liam", "freya", "ava", "marcus", "zuri", "isla", "noah", "harper", "mei", "emma", "owen", "chloe"];
 const CAST_TOTAL = 70;
 function CharacterPanel() {
-  const box = "flex h-[74px] flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-strong text-[13px] font-semibold text-text";
+  const [sel, pick] = useCycle(CAST.length, 2600);
+  const id = CAST[sel];
+  const name = id[0].toUpperCase() + id.slice(1);
   return (
     <div className="flex h-full flex-col p-5 sm:p-6">
-      <h3 className="text-[16px] font-semibold">Choose your character</h3>
-      <div className="mt-4 flex gap-3">
-        <span className={box}><Upload className="h-5 w-5 text-accent" />Upload your photo</span>
-        <span className={box}><PenLine className="h-5 w-5 text-accent" />Describe your character</span>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-[16px] font-semibold">Choose your character</h3>
+        <span className="text-[13px] text-soft">{CAST_TOTAL} in the library</span>
       </div>
-      <p className="mt-5 text-[13px] font-semibold text-muted">Or pick from the library</p>
-      <div className="mt-2.5 grid grid-cols-6 gap-2">
-        {CAST.map((id, i) => (
-          <span key={id} className={`relative aspect-square overflow-hidden rounded-lg bg-raised bg-cover bg-center ${i === 0 ? "ring-[3px] ring-accent" : ""}`} style={{ backgroundImage: `url(/characters/thumbs/${id}.jpg)` }}>
-            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-1.5 pb-1 pt-4 text-[10.5px] font-semibold capitalize text-white">{id}</span>
+
+      <div key={id} className={FEATURED}>
+        <div className={MEDIA}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/characters/${id}.jpg`} alt={name} className="absolute inset-0 h-full w-full object-cover" />
+          <span className="absolute inset-x-2 bottom-2 rounded-md bg-black/55 px-2 py-1.5 backdrop-blur">
+            <span className="block text-[10.5px] font-semibold text-white">Generating hook</span>
+            <span className="mt-1 block h-1 overflow-hidden rounded-full bg-white/25">
+              <span className="block h-full w-full origin-left animate-[hiw-grow_2600ms_linear_both] rounded-full bg-accent motion-reduce:animate-none" />
+            </span>
           </span>
+        </div>
+        <div className="flex min-w-0 flex-col">
+          <div className="flex items-center gap-2">
+            <span className={`${TAG} bg-raised text-muted`}>AI character</span>
+            <span className={`${TAG} bg-accent-tint text-accent`}>Hook: bro rate my startup idea</span>
+          </div>
+          <p className="mt-2.5 text-[22px] font-semibold tracking-[-0.015em]">{name}</p>
+          <p className="mt-1 text-[13px] text-muted">Performs the hook in place of the original creator.</p>
+          <div className="mt-auto flex flex-wrap gap-2 pt-3">
+            <span className="btn-primary h-9 px-4 text-[13px]">Use {name}</span>
+            <span className="flex h-9 items-center gap-1.5 rounded-lg border border-line-strong px-3 text-[13px] font-semibold"><Upload className="h-3.5 w-3.5" />Your photo</span>
+            <span className="flex h-9 items-center gap-1.5 rounded-lg border border-line-strong px-3 text-[13px] font-semibold"><PenLine className="h-3.5 w-3.5" />Describe one</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 flex items-center justify-between border-b border-line px-0.5 pb-2 text-[12px] font-semibold text-soft">
+        <span>Characters</span>
+        <span>+{CAST_TOTAL - CAST.length} more</span>
+      </div>
+      <div className="mt-2.5 grid grid-cols-8 gap-2">
+        {CAST.map((c, i) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => pick(i)}
+            aria-label={c}
+            className={`aspect-square cursor-pointer rounded-lg bg-raised bg-cover bg-center transition-[box-shadow,opacity] ${i === sel ? "ring-[3px] ring-accent" : "opacity-85 hover:opacity-100"}`}
+            style={{ backgroundImage: `url(/characters/thumbs/${c}.jpg)` }}
+          />
         ))}
-        <span className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-line bg-raised">
-          <Users className="h-4 w-4 text-accent" />
-          <span className="text-[12.5px] font-semibold">+{CAST_TOTAL - CAST.length} more</span>
-        </span>
       </div>
     </div>
   );
 }
 
 /*
- * Step 3: the shot list on the left, the demo playing on the right; the shot on screen lights up (times are
- * this video's own scenes: the link opens, the question, picking a date idea, the calendar).
+ * Step 3: the demo playing with the current shot's brief (what to film, camera, length); the shot list below,
+ * the shot on screen highlighted (times are this video's own scenes).
  */
 const DEMO = { src: "/landing/lib-DbHo7QFIvD4.mp4", poster: "/landing/lib-DbHo7QFIvD4.jpg" };
 const SHOTS = [
-  { from: 0, to: 3, title: "Your hook", text: "Made by Mavya with your character." },
-  { from: 3, to: 7, title: "Show what you got", text: "Phone over the laptop. Open the link." },
-  { from: 7, to: 11, title: "The big question", text: "Film the first screen, then tap YES." },
-  { from: 11, to: 16.5, title: "Pick an option", text: "Show the choices and pick one." },
-  { from: 16.5, to: 21, title: "The payoff", text: "End on the result: it goes straight to his calendar." },
+  { from: 0, to: 3, title: "Your hook", text: "Made by Mavya with your character.", camera: "Made by Mavya" },
+  { from: 3, to: 7, title: "Show what you got", text: "Open the link on your laptop.", camera: "Over the shoulder" },
+  { from: 7, to: 11, title: "The big question", text: "Film the first screen, then tap YES.", camera: "Close on the screen" },
+  { from: 11, to: 16.5, title: "Pick an option", text: "Show the choices and pick one.", camera: "Close on the screen" },
+  { from: 16.5, to: 21, title: "The payoff", text: "End on the result: it goes straight to his calendar.", camera: "Close on the screen" },
 ];
 function DemoPanel() {
   const ref = useRef<HTMLVideoElement>(null);
@@ -245,101 +304,113 @@ function DemoPanel() {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, []);
-  const at = SHOTS.findIndex((s) => t >= s.from && t < s.to);
+  const at = Math.max(0, SHOTS.findIndex((x) => t >= x.from && t < x.to));
+  const shot = SHOTS[at];
+  const seek = (i: number) => {
+    const v = ref.current;
+    if (v) v.currentTime = SHOTS[i].from + 0.05;
+  };
   return (
-    <div className="grid h-full grid-cols-[minmax(0,1fr)_200px] gap-5 p-5 sm:p-6">
-      <div>
+    <div className="flex h-full flex-col p-5 sm:p-6">
+      <div className="flex items-center justify-between gap-3">
         <h3 className="text-[16px] font-semibold">Film your demo</h3>
-        <p className="mt-1 text-[13px] text-muted">4 shots, about 18 seconds</p>
-        <ol className="mt-4 space-y-2">
-          {SHOTS.map((s, i) => {
-            const on = i === at;
-            return (
-              <li key={s.title} className={`rounded-xl border px-3.5 py-2.5 transition-colors duration-300 ${on ? "border-accent bg-accent-tint" : "border-line"}`}>
-                <div className="flex items-center gap-2.5">
-                  <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11.5px] font-bold transition-colors duration-300 ${on ? "bg-accent text-white" : "bg-raised text-muted"}`}>{i === 0 ? "H" : i}</span>
-                  <span className={`text-[14px] font-semibold ${on ? "text-text" : "text-muted"}`}>{s.title}</span>
-                  <span className="ml-auto text-[11.5px] tabular-nums text-soft">{Math.round(s.to - s.from)}s</span>
-                </div>
-                <p className={`mt-1 pl-[34px] text-[12.5px] leading-snug ${on ? "text-muted" : "text-soft"}`}>{s.text}</p>
-              </li>
-            );
-          })}
-        </ol>
+        <span className="text-[13px] text-soft">4 shots, about 18 seconds</span>
       </div>
-      <div className="flex items-center">
-        <div className="w-full rounded-[28px] bg-ink p-[5px] shadow-[0_24px_50px_-24px_rgba(21,18,31,0.55)]">
-          <div className="relative aspect-[9/19.5] overflow-hidden rounded-[23px] bg-black">
-            <video ref={ref} src={DEMO.src} poster={DEMO.poster} muted loop playsInline aria-label="A demo" className="absolute inset-0 h-full w-full object-cover" />
-            <span className="absolute left-1/2 top-2 h-3.5 w-14 -translate-x-1/2 rounded-full bg-black" />
-            {at >= 0 && <span className="absolute bottom-2.5 left-2.5 rounded-full bg-accent px-2 py-0.5 text-[10.5px] font-bold text-white">{at === 0 ? "Hook" : `Shot ${at}`}</span>}
-          </div>
+
+      <div className="mt-4 grid grid-cols-[118px_1fr] gap-5">
+        <div className={MEDIA}>
+          <video ref={ref} src={DEMO.src} poster={DEMO.poster} muted loop playsInline aria-label="A demo" className="absolute inset-0 h-full w-full object-cover" />
         </div>
+        <div key={at} className="flex min-w-0 flex-col animate-[hiw-fade_300ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none">
+          <div className="flex items-center gap-2">
+            <span className={`${TAG} bg-accent-tint text-accent`}>{at === 0 ? "Hook" : `Shot ${at} of 4`}</span>
+          </div>
+          <p className="mt-2.5 text-[22px] font-semibold tracking-[-0.015em]">{shot.title}</p>
+          <p className="mt-1 text-[14px] leading-snug text-muted">{shot.text}</p>
+          <Facts items={[["Length", `${Math.round(shot.to - shot.from)}s`], ["Camera", shot.camera], ["Film on", at === 0 ? "Nothing" : "Your phone"]]} />
+        </div>
+      </div>
+
+      <div className="mt-5 grid grid-cols-[28px_1fr_48px] gap-3 border-b border-line px-2 pb-2 text-[12px] font-semibold text-soft">
+        <span>#</span>
+        <span>Shot</span>
+        <span className="text-right">Length</span>
+      </div>
+      <div className="mt-1">
+        {SHOTS.map((x, i) => (
+          <button key={x.title} type="button" onClick={() => seek(i)} className={`grid w-full cursor-pointer grid-cols-[28px_1fr_48px] items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors ${i === at ? "bg-accent-tint" : "hover:bg-raised"}`}>
+            <span className={`text-[13px] font-semibold tabular-nums ${i === at ? "text-accent" : "text-soft"}`}>{i === 0 ? "H" : i}</span>
+            <span className={`truncate text-[13px] ${i === at ? "font-semibold text-text" : "text-muted"}`}>{x.title} <span className="text-soft">· {x.text}</span></span>
+            <span className="text-right text-[13px] tabular-nums text-muted">{Math.round(x.to - x.from)}s</span>
+          </button>
+        ))}
       </div>
     </div>
   );
 }
 
-/** Step 4: a trending song picked (shown, not played), on the timeline under the clips, ready to export. */
-const SONG = { title: "Dracula", artist: "JENNIE" };
+/*
+ * Step 4: the selected sound "playing" (visual only, nothing is played) with the part that plays; the sound
+ * options below that cycle: trending songs, the hook's own sound, your own file.
+ */
+const SOUNDS = [
+  { title: "Dracula", by: "JENNIE", type: "Trending", art: "linear-gradient(135deg,#7b4cfa,#b02f86)" },
+  { title: "The hook's original sound", by: "Copied from the viral video", type: "Hook sound", art: "linear-gradient(135deg,#15121f,#4b3a8c)" },
+  { title: "APT.", by: "ROSÉ & Bruno Mars", type: "Trending", art: "linear-gradient(135deg,#b02f86,#f4b860)" },
+  { title: "Die With A Smile", by: "Lady Gaga & Bruno Mars", type: "Trending", art: "linear-gradient(135deg,#2a5bd7,#7b4cfa)" },
+  { title: "Your own sound", by: "Any audio or video file", type: "Upload", art: "linear-gradient(135deg,#4d4a5e,#928fa6)" },
+];
 function SoundPanel() {
-  const bars = Array.from({ length: 48 }, (_, i) => 10 + Math.round(Math.abs(Math.sin(i * 1.3) * 16 + Math.sin(i * 0.37) * 10)));
-  const wave = Array.from({ length: 150 }, (_, i) => 6 + Math.round(Math.abs(Math.sin(i * 1.7) * 9 + Math.sin(i * 0.45) * 6)));
+  const [sel, pick] = useCycle(SOUNDS.length, 3200);
+  const x = SOUNDS[sel];
+  const wave = Array.from({ length: 64 }, (_, i) => 6 + Math.round(Math.abs(Math.sin(i * 1.3 + sel) * 14 + Math.sin(i * 0.37) * 8)));
   return (
     <div className="flex h-full flex-col p-5 sm:p-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h3 className="text-[16px] font-semibold">Add sound</h3>
-        <span className="btn-primary h-9 px-4 text-[13px]"><Download className="h-4 w-4" />Export</span>
+        <span className="flex h-9 w-[200px] items-center gap-2 rounded-lg bg-raised px-3 text-[13px] text-soft"><Search className="h-4 w-4" />Search songs</span>
       </div>
-      {/* the song, playing (visual only) */}
-      <div className="mt-5 flex items-center gap-4 rounded-2xl bg-[#15121f] p-4 text-white">
-        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#7b4cfa,#b02f86)] shadow-[0_10px_24px_-10px_rgba(123,76,250,0.8)]">
-          <Music className="h-7 w-7" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-[16px] font-semibold">{SONG.title}</span>
-            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10.5px] font-bold text-[#b69cff]">Trending</span>
-          </div>
-          <div className="text-[13px] text-white/60">{SONG.artist}</div>
-          <div aria-hidden className="mt-2.5 flex h-8 items-center gap-[3px]">
-            {bars.map((h, i) => (
-              <span key={i} className="w-[3px] shrink-0 origin-center rounded-full bg-[#b69cff] animate-[hiw-eq_1.1s_ease-in-out_infinite] motion-reduce:animate-none" style={{ height: h, animationDelay: `${(i % 8) * 0.12}s` }} />
+
+      <div key={x.title} className={FEATURED}>
+        <div className="relative flex aspect-[9/16] flex-col items-center justify-center gap-3 overflow-hidden rounded-xl shadow-[0_16px_32px_-16px_rgba(21,18,31,0.6)]" style={{ background: x.art }}>
+          {x.type === "Upload" ? <Upload className="h-8 w-8 text-white" /> : x.type === "Hook sound" ? <Film className="h-8 w-8 text-white" /> : <Music className="h-8 w-8 text-white" />}
+          <span aria-hidden className="flex h-7 items-end gap-[3px]">
+            {[14, 22, 10, 26, 16, 20, 12].map((h, i) => (
+              <span key={i} className="w-[3px] origin-bottom rounded-full bg-white/85 animate-[hiw-eq_1s_ease-in-out_infinite] motion-reduce:animate-none" style={{ height: h, animationDelay: `${i * 0.13}s` }} />
             ))}
-          </div>
-        </div>
-      </div>
-      {/* the other ways to add sound */}
-      <div className="mt-3 divide-y divide-line rounded-xl border border-line">
-        {[
-          { icon: Film, title: "The hook's original sound", sub: "Copied from the viral video" },
-          { icon: Search, title: "Browse trending songs", sub: "Search any song" },
-          { icon: Upload, title: "Upload your own", sub: "Any audio or video file" },
-        ].map((o) => (
-          <div key={o.title} className="flex items-center gap-3 px-4 py-3">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-tint text-accent"><o.icon className="h-4 w-4" /></span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13.5px] font-semibold">{o.title}</span>
-              <span className="block text-[12px] text-soft">{o.sub}</span>
-            </span>
-            <span className="rounded-lg border border-line px-3 py-1 text-[12px] font-semibold text-muted">Use</span>
-          </div>
-        ))}
-      </div>
-      {/* the timeline: clips, text, the song */}
-      <div className="mt-4 space-y-1.5 rounded-xl border border-line p-3">
-        <div className="flex h-9 gap-0.5 overflow-hidden rounded-md">
-          <span className="flex w-[22%] items-center gap-1 bg-cover bg-center px-2 text-[10.5px] font-bold text-white" style={{ backgroundImage: "linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.35)),url(/characters/olivia.jpg)" }}><Film className="h-3 w-3" />Hook</span>
-          <span className="flex flex-1 items-center gap-1 bg-cover bg-center px-2 text-[10.5px] font-bold text-white" style={{ backgroundImage: "linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.35)),url(/landing/explain-strip.jpg)", backgroundSize: "100% 100%" }}><Film className="h-3 w-3" />Demo</span>
-        </div>
-        <div className="flex h-6 w-[22%] items-center gap-1 rounded-md bg-texttrack-tint px-2 text-[10.5px] font-semibold text-texttrack"><Type className="h-3 w-3 shrink-0" /><span className="truncate">pov: he airdrops you this</span></div>
-        <div className="flex h-8 items-center gap-1.5 overflow-hidden rounded-md bg-soundtrack-tint px-2 text-soundtrack">
-          <Music className="h-3.5 w-3.5 shrink-0" />
-          <span className="shrink-0 text-[10.5px] font-bold">{SONG.title} · {SONG.artist}</span>
-          <span className="flex h-full flex-1 items-center gap-[2px]">
-            {wave.map((h, i) => <span key={i} className="w-[2px] shrink-0 rounded-full bg-soundtrack/60" style={{ height: h }} />)}
           </span>
         </div>
+        <div className="flex min-w-0 flex-col">
+          <div className="flex items-center gap-2">
+            <span className={`${TAG} ${x.type === "Trending" ? "bg-accent-tint text-accent" : "bg-raised text-muted"}`}>{x.type}</span>
+          </div>
+          <p className="mt-2.5 truncate text-[22px] font-semibold tracking-[-0.015em]">{x.title}</p>
+          <p className="mt-0.5 truncate text-[14px] text-muted">{x.by}</p>
+          {/* the whole sound; the part under the video is coloured */}
+          <div aria-hidden className="mt-3 flex h-9 items-center gap-[2px]">
+            {wave.map((h, i) => <span key={i} className={`w-[3px] shrink-0 rounded-full ${i >= 18 && i < 44 ? "bg-accent" : "bg-line-strong"}`} style={{ height: h }} />)}
+          </div>
+          <div className="mt-auto flex items-center gap-3 pt-3">
+            <span className="btn-primary h-9 px-4 text-[13px]">Use this sound</span>
+            <span className="text-[13px] text-muted">Plays under the whole video</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 grid grid-cols-[1fr_90px] gap-3 border-b border-line px-2 pb-2 text-[12px] font-semibold text-soft">
+        <span>Sound</span>
+        <span className="text-right">Type</span>
+      </div>
+      <div className="mt-1">
+        {SOUNDS.map((o, i) => (
+          <button key={o.title} type="button" onClick={() => pick(i)} className={`grid w-full cursor-pointer grid-cols-[1fr_90px] items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors ${i === sel ? "bg-accent-tint" : "hover:bg-raised"}`}>
+            <span className="flex min-w-0 items-center gap-2.5">
+              <span className="h-[26px] w-[26px] shrink-0 rounded-md" style={{ background: o.art }} />
+              <span className={`truncate text-[13px] ${i === sel ? "font-semibold text-text" : "text-muted"}`}>{o.title} <span className="font-normal text-soft">· {o.by}</span></span>
+            </span>
+            <span className={`text-right text-[12.5px] ${i === sel ? "font-semibold text-accent" : "text-muted"}`}>{o.type}</span>
+          </button>
+        ))}
       </div>
     </div>
   );

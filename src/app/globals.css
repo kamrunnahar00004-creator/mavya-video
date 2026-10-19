@@ -255,3 +255,9 @@ input[type="range"] {
   0%, 100% { transform: scaleY(0.35); }
   50% { transform: scaleY(1); }
 }
+
+/* Landing, How it works: the "Generating hook" bar fills while a character is shown. */
+@keyframes hiw-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
