@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Film, Music, PenLine, Search, Upload } from "lucide-react";
+import { ArrowRight, Film, Lock, Music, PenLine, Search, Upload } from "lucide-react";
 
 /*
  * How it works, in the Etsy Mavya "Research" layout (2026-10-17): the steps on the left, the active one marked
@@ -36,13 +36,13 @@ export function HowItWorks() {
   };
   const current = STEPS[active];
   return (
-    <section id="how" className="scroll-mt-24 overflow-x-clip py-20 sm:py-28">
-      <div className="mx-auto max-w-[1160px] px-5">
+    <section id="how" className="scroll-mt-24 overflow-x-clip border-y border-line bg-panel py-20 sm:py-28">
+      <div className="mx-auto max-w-[1280px] px-5">
         <p className="text-[14px] font-semibold text-accent">How it works</p>
         <h2 className="mt-2 max-w-[680px] text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">From viral hook to finished video.</h2>
         <p className="mt-4 max-w-[600px] text-[18px] leading-relaxed text-muted">Mavya walks you through every step. You only film the demo.</p>
 
-        <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-14" onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
+        <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,0.6fr)_minmax(0,1.4fr)] lg:gap-12" onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
           <div role="tablist" aria-orientation="vertical" aria-label="How it works" className="flex flex-col">
             {STEPS.map((s, i) => {
               const on = i === active;
@@ -73,10 +73,11 @@ export function HowItWorks() {
           </div>
 
           <div className="relative">
-            <div aria-hidden className="pointer-events-none absolute -inset-10 bg-[radial-gradient(55%_50%_at_50%_45%,rgba(123,76,250,0.12)_0%,transparent_100%)]" />
+            <div aria-hidden className="pointer-events-none absolute -inset-16 bg-[radial-gradient(rgba(21,18,31,0.11)_1px,transparent_1px)] [background-size:20px_20px] [mask-image:radial-gradient(ellipse_at_center,black_35%,transparent_72%)]" />
+            <div aria-hidden className="pointer-events-none absolute -inset-12 bg-[radial-gradient(50%_45%_at_55%_50%,rgba(123,76,250,0.16)_0%,transparent_100%)]" />
             <div id="hiw-panel" role="tabpanel" key={current.key} className="relative animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none">
               <AppWindow url={current.url}>
-                <div className="h-[560px] overflow-hidden text-left">
+                <div className="h-[540px] overflow-hidden text-left">
                   <current.Panel />
                 </div>
               </AppWindow>
@@ -90,14 +91,14 @@ export function HowItWorks() {
 
 function AppWindow({ url, children }: { url: string; children: React.ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-[14px] bg-panel shadow-[0_0_0_1px_rgba(21,18,31,0.05),0_2px_6px_rgba(21,18,31,0.04),0_40px_90px_-30px_rgba(21,18,31,0.24)]">
-      <div className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-        <span className="flex gap-1.5" aria-hidden>
-          <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
-          <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
-          <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
+    <div className="overflow-hidden rounded-[18px] bg-panel shadow-[0_0_0_1px_rgba(21,18,31,0.07),0_1px_2px_rgba(21,18,31,0.05),0_24px_48px_-20px_rgba(21,18,31,0.22),0_60px_120px_-40px_rgba(123,76,250,0.35)]">
+      <div className="flex items-center gap-3 border-b border-line bg-raised/80 px-4 py-3">
+        <span className="flex gap-2" aria-hidden>
+          <span className="h-3 w-3 rounded-full bg-[#ff5f57] ring-1 ring-inset ring-black/10" />
+          <span className="h-3 w-3 rounded-full bg-[#febc2e] ring-1 ring-inset ring-black/10" />
+          <span className="h-3 w-3 rounded-full bg-[#28c840] ring-1 ring-inset ring-black/10" />
         </span>
-        <span className="mx-auto truncate rounded-md border border-line bg-panel px-3 py-1 text-[12px] text-soft">{url}</span>
+        <span className="mx-auto flex w-[min(360px,60%)] items-center justify-center gap-1.5 truncate rounded-lg bg-panel px-3 py-1.5 text-[12.5px] text-muted shadow-[0_0_0_1px_rgba(21,18,31,0.06)]"><Lock className="h-3 w-3 shrink-0 text-soft" />{url}</span>
         <span className="w-[42px]" aria-hidden />
       </div>
       {children}
@@ -134,25 +135,24 @@ function LibraryPanel() {
         <span className="flex h-9 w-[200px] items-center gap-2 rounded-lg bg-raised px-3 text-[13px] text-soft"><Search className="h-4 w-4" />Search hooks</span>
       </div>
 
-      {/* the selected hook, playing, with its numbers */}
-      <div key={h.code} className="mt-4 grid grid-cols-[118px_1fr] gap-5 animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none">
-        <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-ink shadow-[0_16px_32px_-16px_rgba(21,18,31,0.6)]">
+      <div className={BODY}>
+        <div key={h.code} className={`${MEDIA} ${FADE_IN}`}>
           <video src={`/landing/lib-${h.code}.mp4`} poster={`/landing/lib-${h.code}.jpg`} muted loop playsInline autoPlay aria-label={h.line} className="absolute inset-0 h-full w-full object-cover" />
         </div>
         <div className="flex min-w-0 flex-col">
+          <div key={h.code} className={`flex flex-col ${FADE_IN}`}>
           <div className="flex items-center gap-2 text-[12px] font-semibold">
             <span className="rounded-full bg-raised px-2 py-0.5 text-muted">{h.format}</span>
             <span className="rounded-full bg-accent-tint px-2 py-0.5 text-accent">Demo: {h.app}</span>
           </div>
           <p className="mt-2.5 text-[17px] font-semibold leading-snug tracking-[-0.01em]">“{h.line}”</p>
-          <div className="mt-auto grid grid-cols-3 gap-3 border-t border-line pt-3">
+          <div className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-3">
             {stat("Views", h.views)}
             {stat("Likes", h.likes)}
             {stat("Comments", h.comments)}
           </div>
-          <span className="btn-primary mt-3 h-9 w-fit px-4 text-[13px]">Use this hook</span>
-        </div>
-      </div>
+          <span className="btn-primary mt-4 h-9 w-fit px-4 text-[13px]">Use this hook</span>
+          </div>
 
       {/* the table */}
       <div className="mt-5 grid grid-cols-[1fr_64px_56px] gap-3 border-b border-line px-2 pb-2 text-[12px] font-semibold text-soft">
@@ -177,6 +177,8 @@ function LibraryPanel() {
           </button>
         ))}
       </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -200,7 +202,7 @@ function useCycle(count: number, ms: number) {
 /** The facts strip under a featured item: small label, big value (same as the library's Views / Likes / Comments). */
 function Facts({ items }: { items: [string, string][] }) {
   return (
-    <div className="mt-auto grid grid-cols-3 gap-3 border-t border-line pt-3">
+    <div className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-3">
       {items.map(([label, value]) => (
         <div key={label} className="min-w-0">
           <p className="text-[12px] text-soft">{label}</p>
@@ -210,8 +212,10 @@ function Facts({ items }: { items: [string, string][] }) {
     </div>
   );
 }
-const FEATURED = "mt-4 grid grid-cols-[118px_1fr] gap-5 animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none";
-const MEDIA = "relative aspect-[9/16] overflow-hidden rounded-xl bg-ink shadow-[0_16px_32px_-16px_rgba(21,18,31,0.6)]";
+/** Every step screen: a big 9:16 media column on the left, the facts and the list on the right. */
+const BODY = "mt-5 grid min-h-0 flex-1 grid-cols-[236px_minmax(0,1fr)] items-start gap-7";
+const FADE_IN = "animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none";
+const MEDIA = "relative aspect-[9/16] w-full overflow-hidden rounded-2xl bg-ink shadow-[0_24px_48px_-20px_rgba(21,18,31,0.55)] ring-1 ring-black/5";
 const TAG = "rounded-full px-2 py-0.5 text-[12px] font-semibold";
 
 /*
@@ -231,8 +235,8 @@ function CharacterPanel() {
         <span className="text-[13px] text-soft">{CAST_TOTAL} in the library</span>
       </div>
 
-      <div key={id} className={FEATURED}>
-        <div className={MEDIA}>
+      <div className={BODY}>
+        <div key={id} className={`${MEDIA} ${FADE_IN}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={`/characters/${id}.jpg`} alt={name} className="absolute inset-0 h-full w-full object-cover" />
           <span className="absolute inset-x-2 bottom-2 rounded-md bg-black/55 px-2 py-1.5 backdrop-blur">
@@ -243,19 +247,20 @@ function CharacterPanel() {
           </span>
         </div>
         <div className="flex min-w-0 flex-col">
+          <div key={id} className={`flex flex-col ${FADE_IN}`}>
           <div className="flex items-center gap-2">
             <span className={`${TAG} bg-raised text-muted`}>AI character</span>
             <span className={`${TAG} bg-accent-tint text-accent`}>Hook: bro rate my startup idea</span>
           </div>
           <p className="mt-2.5 text-[22px] font-semibold tracking-[-0.015em]">{name}</p>
-          <p className="mt-1 text-[13px] text-muted">Performs the hook in place of the original creator.</p>
-          <div className="mt-auto flex flex-wrap gap-2 pt-3">
+          <p className="mt-1 text-[14px] leading-snug text-muted">Performs the hook in place of the original creator. Same moves, same timing.</p>
+          <Facts items={[["Type", "AI character"], ["Hook", "rate my startup"], ["Format", "9:16 video"]]} />
+          <div className="flex flex-wrap gap-2 pt-3">
             <span className="btn-primary h-9 px-4 text-[13px]">Use {name}</span>
             <span className="flex h-9 items-center gap-1.5 rounded-lg border border-line-strong px-3 text-[13px] font-semibold"><Upload className="h-3.5 w-3.5" />Your photo</span>
             <span className="flex h-9 items-center gap-1.5 rounded-lg border border-line-strong px-3 text-[13px] font-semibold"><PenLine className="h-3.5 w-3.5" />Describe one</span>
           </div>
-        </div>
-      </div>
+          </div>
 
       <div className="mt-5 flex items-center justify-between border-b border-line px-0.5 pb-2 text-[12px] font-semibold text-soft">
         <span>Characters</span>
@@ -273,6 +278,8 @@ function CharacterPanel() {
           />
         ))}
       </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -283,11 +290,12 @@ function CharacterPanel() {
  */
 const DEMO = { src: "/landing/lib-DbHo7QFIvD4.mp4", poster: "/landing/lib-DbHo7QFIvD4.jpg" };
 const SHOTS = [
-  { from: 0, to: 3, title: "Your hook", text: "Made by Mavya with your character.", camera: "Made by Mavya" },
-  { from: 3, to: 7, title: "Show what you got", text: "Open the link on your laptop.", camera: "Over the shoulder" },
-  { from: 7, to: 11, title: "The big question", text: "Film the first screen, then tap YES.", camera: "Close on the screen" },
-  { from: 11, to: 16.5, title: "Pick an option", text: "Show the choices and pick one.", camera: "Close on the screen" },
-  { from: 16.5, to: 21, title: "The payoff", text: "End on the result: it goes straight to his calendar.", camera: "Close on the screen" },
+  { from: 0, to: 3, title: "The hook", text: "Your character reacts to the hook. Mavya makes this part.", camera: "Selfie", onScreen: "pov: … he airdrops you THIS" },
+  { from: 3, to: 6, title: "The AirDrop arrives", text: "Film your laptop over your shoulder as the link pops up in the corner.", camera: "Over the shoulder", onScreen: "pov: … he airdrops you THIS" },
+  { from: 6, to: 10, title: "The question", text: "The site opens on “wanna go on a date?”. Go for the no: it runs away.", camera: "Close on the screen", onScreen: "the hidden “no”" },
+  { from: 10, to: 12, title: "Say yes", text: "Click YES. The page cheers back.", camera: "Close on the screen", onScreen: "I love cats" },
+  { from: 12, to: 16, title: "Pick the date", text: "Open the list of date ideas, pick one, hit Next.", camera: "Close on the screen", onScreen: "the options???" },
+  { from: 16, to: 20, title: "The payoff", text: "Choose a day. The date lands straight in his calendar.", camera: "Close on the screen", onScreen: "it goes straight to his calendar" },
 ];
 function DemoPanel() {
   const ref = useRef<HTMLVideoElement>(null);
@@ -314,22 +322,22 @@ function DemoPanel() {
     <div className="flex h-full flex-col p-5 sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-[16px] font-semibold">Film your demo</h3>
-        <span className="text-[13px] text-soft">4 shots, about 18 seconds</span>
+        <span className="text-[13px] text-soft">5 shots after the hook, 17 seconds</span>
       </div>
 
-      <div className="mt-4 grid grid-cols-[118px_1fr] gap-5">
+      <div className={BODY}>
         <div className={MEDIA}>
           <video ref={ref} src={DEMO.src} poster={DEMO.poster} muted loop playsInline aria-label="A demo" className="absolute inset-0 h-full w-full object-cover" />
         </div>
-        <div key={at} className="flex min-w-0 flex-col animate-[hiw-fade_300ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none">
+        <div className="flex min-w-0 flex-col">
+        <div key={at} className={`flex flex-col ${FADE_IN}`}>
           <div className="flex items-center gap-2">
-            <span className={`${TAG} bg-accent-tint text-accent`}>{at === 0 ? "Hook" : `Shot ${at} of 4`}</span>
+            <span className={`${TAG} bg-accent-tint text-accent`}>{at === 0 ? "Hook" : `Shot ${at} of 5`}</span>
           </div>
           <p className="mt-2.5 text-[22px] font-semibold tracking-[-0.015em]">{shot.title}</p>
           <p className="mt-1 text-[14px] leading-snug text-muted">{shot.text}</p>
-          <Facts items={[["Length", `${Math.round(shot.to - shot.from)}s`], ["Camera", shot.camera], ["Film on", at === 0 ? "Nothing" : "Your phone"]]} />
+          <Facts items={[["Length", `${Math.round(shot.to - shot.from)}s`], ["Camera", shot.camera], ["Text on screen", shot.onScreen]]} />
         </div>
-      </div>
 
       <div className="mt-5 grid grid-cols-[28px_1fr_48px] gap-3 border-b border-line px-2 pb-2 text-[12px] font-semibold text-soft">
         <span>#</span>
@@ -338,12 +346,14 @@ function DemoPanel() {
       </div>
       <div className="mt-1">
         {SHOTS.map((x, i) => (
-          <button key={x.title} type="button" onClick={() => seek(i)} className={`grid w-full cursor-pointer grid-cols-[28px_1fr_48px] items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors ${i === at ? "bg-accent-tint" : "hover:bg-raised"}`}>
+          <button key={x.title} type="button" onClick={() => seek(i)} className={`grid w-full cursor-pointer grid-cols-[28px_1fr_48px] items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors ${i === at ? "bg-accent-tint" : "hover:bg-raised"}`}>
             <span className={`text-[13px] font-semibold tabular-nums ${i === at ? "text-accent" : "text-soft"}`}>{i === 0 ? "H" : i}</span>
             <span className={`truncate text-[13px] ${i === at ? "font-semibold text-text" : "text-muted"}`}>{x.title} <span className="text-soft">· {x.text}</span></span>
             <span className="text-right text-[13px] tabular-nums text-muted">{Math.round(x.to - x.from)}s</span>
           </button>
         ))}
+      </div>
+        </div>
       </div>
     </div>
   );
@@ -371,16 +381,17 @@ function SoundPanel() {
         <span className="flex h-9 w-[200px] items-center gap-2 rounded-lg bg-raised px-3 text-[13px] text-soft"><Search className="h-4 w-4" />Search songs</span>
       </div>
 
-      <div key={x.title} className={FEATURED}>
-        <div className="relative flex aspect-[9/16] flex-col items-center justify-center gap-3 overflow-hidden rounded-xl shadow-[0_16px_32px_-16px_rgba(21,18,31,0.6)]" style={{ background: x.art }}>
-          {x.type === "Upload" ? <Upload className="h-8 w-8 text-white" /> : x.type === "Hook sound" ? <Film className="h-8 w-8 text-white" /> : <Music className="h-8 w-8 text-white" />}
-          <span aria-hidden className="flex h-7 items-end gap-[3px]">
-            {[14, 22, 10, 26, 16, 20, 12].map((h, i) => (
+      <div className={BODY}>
+        <div key={x.title} className={`relative flex aspect-[9/16] w-full flex-col items-center justify-center gap-4 overflow-hidden rounded-2xl shadow-[0_24px_48px_-20px_rgba(21,18,31,0.55)] ${FADE_IN}`} style={{ background: x.art }}>
+          {x.type === "Upload" ? <Upload className="h-12 w-12 text-white" /> : x.type === "Hook sound" ? <Film className="h-12 w-12 text-white" /> : <Music className="h-12 w-12 text-white" />}
+          <span aria-hidden className="flex h-10 items-end gap-[4px]">
+            {[18, 30, 14, 36, 22, 28, 16, 32, 20].map((h, i) => (
               <span key={i} className="w-[3px] origin-bottom rounded-full bg-white/85 animate-[hiw-eq_1s_ease-in-out_infinite] motion-reduce:animate-none" style={{ height: h, animationDelay: `${i * 0.13}s` }} />
             ))}
           </span>
         </div>
         <div className="flex min-w-0 flex-col">
+          <div key={x.title} className={`flex flex-col ${FADE_IN}`}>
           <div className="flex items-center gap-2">
             <span className={`${TAG} ${x.type === "Trending" ? "bg-accent-tint text-accent" : "bg-raised text-muted"}`}>{x.type}</span>
           </div>
@@ -390,12 +401,11 @@ function SoundPanel() {
           <div aria-hidden className="mt-3 flex h-9 items-center gap-[2px]">
             {wave.map((h, i) => <span key={i} className={`w-[3px] shrink-0 rounded-full ${i >= 18 && i < 44 ? "bg-accent" : "bg-line-strong"}`} style={{ height: h }} />)}
           </div>
-          <div className="mt-auto flex items-center gap-3 pt-3">
+          <div className="mt-4 flex items-center gap-3">
             <span className="btn-primary h-9 px-4 text-[13px]">Use this sound</span>
             <span className="text-[13px] text-muted">Plays under the whole video</span>
           </div>
-        </div>
-      </div>
+          </div>
 
       <div className="mt-5 grid grid-cols-[1fr_90px] gap-3 border-b border-line px-2 pb-2 text-[12px] font-semibold text-soft">
         <span>Sound</span>
@@ -411,6 +421,8 @@ function SoundPanel() {
             <span className={`text-right text-[12.5px] ${i === sel ? "font-semibold text-accent" : "text-muted"}`}>{o.type}</span>
           </button>
         ))}
+      </div>
+        </div>
       </div>
     </div>
   );
