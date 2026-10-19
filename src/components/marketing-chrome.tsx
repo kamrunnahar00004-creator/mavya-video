@@ -73,8 +73,8 @@ export function MarketingFooter() {
         <Logo />
         <span className="ml-auto">© 2026 Mavya</span>
         <Link href="/pricing" className="hover:text-text">Pricing</Link>
-        <a href="#" className="hover:text-text">Terms</a>
-        <a href="#" className="hover:text-text">Privacy</a>
+        <Link href="/terms" className="hover:text-text">Terms</Link>
+        <Link href="/privacy" className="hover:text-text">Privacy</Link>
       </div>
     </footer>
   );
