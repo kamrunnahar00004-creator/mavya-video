@@ -46,12 +46,13 @@ export function Logo() {
 export function MarketingHeader({ active }: { active?: "pricing" }) {
   const link = (on: boolean) => `hover:text-text ${on ? "text-text" : ""}`;
   return (
-    <header className="sticky top-0 z-30 px-3 pt-3">
+    <header className="sticky top-0 z-30">
       {MAINTENANCE && (
-        <p role="status" className="mx-auto mb-2 max-w-[1160px] rounded-lg bg-accent px-4 py-2 text-center text-[13.5px] font-semibold text-white">
+        <p role="status" className="bg-accent px-4 py-2.5 text-center text-[14px] font-semibold text-white">
           We&apos;re doing some maintenance. Mavya will be back soon.
         </p>
       )}
+      <div className="px-3 pt-3">
       <div className="mx-auto flex max-w-[1160px] items-center gap-6 rounded-xl border border-line bg-panel/85 px-5 py-2.5 shadow-[0_1px_2px_rgba(28,26,23,0.05),0_8px_24px_-12px_rgba(28,26,23,0.12)] backdrop-blur">
         <Logo />
         <nav className="ml-4 hidden items-center gap-5 text-[14px] font-semibold text-muted md:flex">
@@ -69,6 +70,7 @@ export function MarketingHeader({ active }: { active?: "pricing" }) {
             </Link>
           </div>
         )}
+      </div>
       </div>
     </header>
   );
