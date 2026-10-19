@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 /**
- * The Mavya mark: a violet tile with a play button whose right edge curls into a hook (hook + video).
+ * The Mavya mark: a violet tile with an M whose last stroke breaks out as a growth arrow (going viral).
  * `inverted`: white tile, violet glyph (for use on violet).
  */
 export function MavyaMark({ className = "h-8 w-8", inverted = false }: { className?: string; inverted?: boolean }) {
@@ -11,13 +11,12 @@ export function MavyaMark({ className = "h-8 w-8", inverted = false }: { classNa
     <svg viewBox="0 0 32 32" className={className} aria-hidden>
       <defs>
         <linearGradient id="mavya-tile" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#8f66ff" />
+          <stop offset="0" stopColor="#9b6bff" />
           <stop offset="1" stopColor="#5b2fd6" />
         </linearGradient>
       </defs>
       <rect width="32" height="32" rx="9" fill={tile} />
-      <path d="M11.5 9.6v12.8c0 .9 1 1.4 1.7.9l9.4-6.4c.6-.4.6-1.4 0-1.8l-9.4-6.4c-.7-.5-1.7 0-1.7.9Z" fill={ink} />
-      <path d="M21.6 21.2c1.9.4 3.3 1.9 3.3 3.6 0 2-1.8 3.4-3.9 3.4" fill="none" stroke={ink} strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M7 24V11l6.5 7 5.5-6 6-6M19.5 6H25v5.5" fill="none" stroke={ink} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

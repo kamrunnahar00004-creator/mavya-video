@@ -32,7 +32,7 @@ export const PLANS: Plan[] = [
     yearly: 290,
     hooks: 20,
     line: "Everything you need to go viral",
-    features: ["20 AI video hooks a month", "Unlimited text on screen", "Unlimited shot-by-shot scripts", "Unlimited AI characters"],
+    features: ["20 AI video hooks a month", "Unlimited text on screen", "Unlimited shot-by-shot scripts", "Unlimited AI characters", "Unlimited edits", "Unlimited exports"],
   },
   {
     id: "pro",
