@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { AccountChip } from "@/components/account-chip";
 import { NavLinks } from "@/components/nav-links";
 import { MavyaMark } from "@/components/marketing-chrome";
 
@@ -16,6 +17,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <NavLinks highlight />
           </Suspense>
         </nav>
+        <div className="mt-auto border-t border-line pt-2">
+          <AccountChip />
+        </div>
       </aside>
       <main className="min-w-0 flex-1">{children}</main>
     </div>
