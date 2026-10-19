@@ -1,22 +1,33 @@
 import Link from "next/link";
 
+/** A five-point star path centred on (cx, cy). */
+const star = (cx: number, cy: number, r: number) =>
+  Array.from({ length: 10 }, (_, i) => {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rr = i % 2 ? r * 0.45 : r;
+    return `${i ? "L" : "M"}${(cx + rr * Math.cos(a)).toFixed(2)} ${(cy + rr * Math.sin(a)).toFixed(2)}`;
+  }).join("") + "Z";
+const STARS = (
+  [[5.6, 20.2, 1.1], [8.6, 19.9, 1.2], [5.9, 23.3, 1.25], [9, 23.6, 1.55], [12.2, 23, 1.15], [5.8, 26.7, 1.45], [9.2, 27, 1.25], [12.2, 26.5, 1]] as const
+).map(([x, y, r]) => star(x, y, r)).join("");
+
 /**
- * The Mavya mark: a violet tile with an M whose last stroke breaks out as a growth arrow (going viral).
- * `inverted`: white tile, violet glyph (for use on violet).
+ * The Mavya mark: a violet tile with a rocket taking off, a trail of stars behind it (going viral).
+ * `inverted`: white tile, violet rocket (for use on violet).
  */
 export function MavyaMark({ className = "h-8 w-8", inverted = false }: { className?: string; inverted?: boolean }) {
-  const tile = inverted ? "#ffffff" : "url(#mavya-tile)";
+  const tile = inverted ? "#ffffff" : "#7b4cfa";
   const ink = inverted ? "#7b4cfa" : "#ffffff";
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden>
-      <defs>
-        <linearGradient id="mavya-tile" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#9b6bff" />
-          <stop offset="1" stopColor="#5b2fd6" />
-        </linearGradient>
-      </defs>
       <rect width="32" height="32" rx="9" fill={tile} />
-      <path d="M7 24V11l6.5 7 5.5-6 6-6M19.5 6H25v5.5" fill="none" stroke={ink} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+      <g transform="translate(18.6 14) rotate(45) scale(.9) translate(-16 -15)" fill={ink}>
+        <path d="M16 2.5C21 6 22.3 11.5 21.6 17.5L21 21.5H11L10.4 17.5C9.7 11.5 11 6 16 2.5Z" />
+        <path d="M10.6 13.5 6.8 18.2c-.4.5-.6 1.1-.6 1.7V24l4.9-3.2ZM21.4 13.5l3.8 4.7c.4.5.6 1.1.6 1.7V24l-4.9-3.2Z" />
+        <circle cx="16" cy="11" r="2.3" fill={tile} />
+        <path d="M16 26.4c-1.1-.7-1.8-1.3-1.8-2.1 0-.5.4-.9.9-.9.4 0 .7.2.9.5.2-.3.5-.5.9-.5.5 0 .9.4.9.9 0 .8-.7 1.4-1.8 2.1Z" />
+      </g>
+      <path d={STARS} fill={ink} />
     </svg>
   );
 }

@@ -145,7 +145,7 @@ export function PricingPage() {
 
       <main className="mx-auto max-w-[1240px] px-5 pb-24 pt-14 sm:pt-20">
         <h1 className="text-center text-[34px] font-semibold leading-[1.08] tracking-[-0.025em] sm:text-[44px]">Plans for every creator</h1>
-        <p className="mx-auto mt-3 max-w-[52ch] text-center text-[16px] text-muted">Every plan makes AI hooks from day one. Editing and exporting are unlimited.</p>
+        <p className="mx-auto mt-3 max-w-[52ch] text-center text-[16px] text-muted">Every plan makes AI hooks from day one.</p>
 
         {/* Monthly / Yearly */}
         <div className="mt-8 flex items-center justify-center gap-2.5">
