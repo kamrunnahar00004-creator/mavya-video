@@ -75,11 +75,19 @@ export function subscribeSaves(listener: () => void) {
 }
 export const saveStateOf = (id: string): SaveState => saveStates.get(id) ?? "idle";
 
+/** Patches sent or queued per run, by send order: a failed patch is retried only for sections nothing newer has written. */
+let saveSeq = 0;
+const sentPatches = new Map<string, Map<number, Partial<Run>>>();
+
 function flushRun(id: string) {
   const pending = pendingSaves.get(id);
   if (!pending) return;
   clearTimeout(pending.timer);
   pendingSaves.delete(id);
+  const seq = ++saveSeq;
+  const sent = sentPatches.get(id) ?? new Map<number, Partial<Run>>();
+  sent.set(seq, pending.patch);
+  sentPatches.set(id, sent);
   // retry: a server or network failure (a rejected edit, 4xx, would fail again the same way).
   let retry = false;
   const operation = (saveChains.get(id) ?? Promise.resolve(null)).then(async () => {
@@ -100,16 +108,23 @@ function flushRun(id: string) {
   void operation.then((run) => {
     pending.done.forEach((resolve) => resolve(run));
     if (saveChains.get(id) === operation) saveChains.delete(id);
+    // Sections written by a newer patch already queued or in flight: the retry must not replay older values over them.
+    const superseded = new Set<string>();
+    for (const [s, patch] of sent) if (s > seq) Object.keys(patch).forEach((k) => superseded.add(k));
+    sent.delete(seq);
+    if (!sent.size && sentPatches.get(id) === sent) sentPatches.delete(id);
     if (run) {
       if (!pendingSaves.has(id) && !saveChains.has(id)) setSaveState(id, "saved");
       return;
     }
     setSaveState(id, "error");
     if (!retry) return;
+    const stale = Object.fromEntries(Object.entries(pending.patch).filter(([k]) => !superseded.has(k))) as Partial<Run>;
+    if (!Object.keys(stale).length) return;
     // Try again in 3 s, under any newer edit (the newer values win).
     const newer = pendingSaves.get(id);
-    if (newer) newer.patch = { ...pending.patch, ...newer.patch };
-    else pendingSaves.set(id, { patch: pending.patch, done: [], timer: setTimeout(() => flushRun(id), 3000) });
+    if (newer) newer.patch = { ...stale, ...newer.patch };
+    else pendingSaves.set(id, { patch: stale, done: [], timer: setTimeout(() => flushRun(id), 3000) });
   });
 }
 
