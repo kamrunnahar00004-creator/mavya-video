@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { PLANS, priceOf, type BillingCycle, type Plan } from "@/lib/plans";
+import { PLANS, money, priceOf, type BillingCycle, type Plan } from "@/lib/plans";
 
 /**
  * The plans side by side (pricing page and Billing), Alura style: price for the chosen billing cycle, the yearly
@@ -10,7 +10,7 @@ export function PlanCards({ action, current, cycle = "monthly" }: { action: (pla
     <div className="grid grid-cols-1 overflow-hidden rounded-2xl border border-line bg-panel md:grid-cols-3">
       {PLANS.map((plan, i) => {
         const price = priceOf(plan, cycle);
-        const save = Math.round((1 - plan.annual / plan.price) * 100);
+        const save = Math.round((1 - plan.yearly / (plan.price * 12)) * 100);
         return (
           <div key={plan.id} className={`relative flex flex-col p-7 ${i > 0 ? "border-t border-line md:border-l md:border-t-0" : ""} ${plan.popular ? "bg-accent-tint/50" : ""}`}>
             {plan.popular && <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-accent" />}
@@ -21,13 +21,13 @@ export function PlanCards({ action, current, cycle = "monthly" }: { action: (pla
             </div>
             <p className="mt-1 text-[14px] text-muted">{plan.line}</p>
             <div className="mt-6 flex items-baseline gap-1">
-              <span className="text-[44px] font-semibold leading-none tracking-[-0.03em] tabular-nums">${price}</span>
+              <span className="text-[44px] font-semibold leading-none tracking-[-0.03em] tabular-nums">{money(price)}</span>
               <span className="text-[15px] font-semibold text-soft">/ month</span>
             </div>
             <p className="mt-2 h-5 text-[13.5px] text-muted">
               {cycle === "annual" ? (
                 <>
-                  ${plan.annual * 12} billed yearly, <span className="font-semibold text-accent">save {save}%</span>
+                  ${plan.yearly} billed yearly, <span className="font-semibold text-accent">save {save}%</span>
                 </>
               ) : (
                 "Billed monthly"

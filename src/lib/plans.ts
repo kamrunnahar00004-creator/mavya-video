@@ -1,7 +1,8 @@
 /**
  * Plans: the pricing page and the Billing page both read these (one place to change them).
- * AI hooks are the cost (each is one generation); editing and exporting are not. No free plan.
- * Draft numbers until the founder sets them; checkout is not connected yet.
+ * Prices match mavya.app: $29 / $59 / $99 a month, or $290 / $590 / $990 a year (two months free).
+ * Every plan makes the same videos; higher plans add our team's review and guidance. No free plan.
+ * Checkout is not connected yet.
  */
 export type PlanId = "starter" | "pro" | "studio";
 export type BillingCycle = "monthly" | "annual";
@@ -11,9 +12,9 @@ export type Plan = {
   name: string;
   /** USD per month, billed monthly. */
   price: number;
-  /** USD per month, billed yearly (two months free). */
-  annual: number;
-  /** AI hook generations per month. */
+  /** USD per year, billed yearly. */
+  yearly: number;
+  /** AI video hooks per month. */
   hooks: number;
   /** One line under the name. */
   line: string;
@@ -23,46 +24,67 @@ export type Plan = {
   popular?: boolean;
 };
 
+/** What every plan includes. */
+export const EVERY_PLAN = [
+  "20 AI video hooks a month",
+  "Unlimited text on screen",
+  "Unlimited shot-by-shot scripts for your app",
+  "Unlimited AI characters, or your own face",
+  "Hooks that already pulled millions of views",
+  "Trending songs or the hook's original sound",
+  "Built-in editor and unlimited exports",
+];
+
 export const PLANS: Plan[] = [
   {
     id: "starter",
     name: "Starter",
     price: 29,
-    annual: 24,
+    yearly: 290,
     hooks: 20,
-    line: "For your first videos",
-    features: ["20 AI hooks a month", "Viral hook library", "Shot-by-shot demo scripts", "70 AI characters or your own photo", "Editor, trending songs, unlimited exports"],
+    line: "Everything you need to go viral",
+    features: EVERY_PLAN,
   },
   {
     id: "pro",
     name: "Pro",
     price: 59,
-    annual: 49,
-    hooks: 60,
-    line: "For testing hooks every day",
+    yearly: 590,
+    hooks: 20,
+    line: "Our team in your corner every week",
     plus: "Starter",
     popular: true,
-    features: ["60 AI hooks a month", "Reuse any hook on every demo", "Priority generation"],
+    features: ["Weekly review of your videos by our team", "Written feedback: what to keep, what to change", "Hook picks for your app, every week", "Priority generation"],
   },
   {
     id: "studio",
     name: "Studio",
     price: 99,
-    annual: 82,
-    hooks: 150,
-    line: "For many products and clients",
+    yearly: 990,
+    hooks: 20,
+    line: "Every video reviewed before you post",
     plus: "Pro",
-    features: ["150 AI hooks a month", "Several products and brands", "Priority support"],
+    features: ["We review every video before you post", "Notes on the hook, the script and the edit", "1:1 guidance on what to make next", "Priority support"],
   },
 ];
 
-/** Business: done for you, priced per project. */
+/** Business: we run your short-form for you, paid on performance. */
 export const BUSINESS = {
   name: "Business",
   line: "Done for you",
-  features: ["We find the hooks for your niche", "We write and storyboard every demo", "We make, edit and deliver the videos", "A dedicated producer and a weekly batch"],
+  price: "Pay for results",
+  note: "Minimum applies. Miss the quota, you don't pay.",
+  features: [
+    "Send us your website. That's it.",
+    "A dedicated marketing team runs your short-form",
+    "We pick the hooks, make the demos, edit and post",
+    "A monthly views quota, agreed up front",
+    "Miss the quota, you don't pay for that month",
+  ],
   contact: "mailto:hello@mavya.app?subject=Mavya%20Business",
 };
 
 export const planById = (id: PlanId) => PLANS.find((p) => p.id === id) ?? PLANS[0];
-export const priceOf = (p: Plan, cycle: BillingCycle) => (cycle === "annual" ? p.annual : p.price);
+/** Price per month for the cycle (yearly shown as its monthly equivalent). */
+export const priceOf = (p: Plan, cycle: BillingCycle) => (cycle === "annual" ? p.yearly / 12 : p.price);
+export const money = (n: number) => (Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`);

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Minus, Plus } from "lucide-react";
 import { MarketingFooter, MarketingHeader } from "@/components/marketing-chrome";
-import { BUSINESS, PLANS, planById, type BillingCycle, type Plan } from "@/lib/plans";
+import { BUSINESS, PLANS, money, planById, priceOf, type BillingCycle, type Plan } from "@/lib/plans";
 
 /*
  * The pricing page, laid out like the Etsy Mavya /subscribe page (2026-10-19): centered title, Monthly / Yearly
@@ -31,37 +31,30 @@ const COMPARE: { group: string; rows: { label: string; cells: (string | boolean)
   {
     group: "Make videos",
     rows: [
-      { label: "AI hooks a month", cells: [...PLANS.map((p) => String(p.hooks)), "Custom"] },
-      { label: "Exports", cells: [...PLANS.map(() => "Unlimited"), "Unlimited"] },
+      { label: "AI video hooks a month", cells: [...PLANS.map((p) => String(p.hooks)), "Custom"] },
+      { label: "Text on screen", cells: ["Unlimited", "Unlimited", "Unlimited", "Unlimited"] },
+      { label: "Shot-by-shot scripts for your app", cells: ["Unlimited", "Unlimited", "Unlimited", "Unlimited"] },
+      { label: "AI characters, or your own face", cells: ["Unlimited", "Unlimited", "Unlimited", "Unlimited"] },
       { label: "Viral hook library", cells: [true, true, true, true] },
-      { label: "Shot-by-shot demo scripts", cells: [true, true, true, true] },
-      { label: "Built-in editor", cells: [true, true, true, true] },
+      { label: "Editor, trending songs, exports", cells: [true, true, true, true] },
       { label: "Priority generation", cells: [false, true, true, true] },
     ],
   },
   {
-    group: "Characters and sound",
+    group: "Our team",
     rows: [
-      { label: "70 AI characters", cells: [true, true, true, true] },
-      { label: "Your own photo as the character", cells: [true, true, true, true] },
-      { label: "Trending songs and the hook's sound", cells: [true, true, true, true] },
+      { label: "Weekly review and feedback", cells: [false, true, true, true] },
+      { label: "Weekly hook picks for your app", cells: [false, true, true, true] },
+      { label: "Every video reviewed before you post", cells: [false, false, true, true] },
+      { label: "1:1 guidance", cells: [false, false, true, true] },
     ],
   },
   {
     group: "Done for you",
     rows: [
-      { label: "Hooks researched for your niche", cells: [false, false, false, true] },
-      { label: "Demos written and storyboarded", cells: [false, false, false, true] },
-      { label: "Videos made, edited and delivered", cells: [false, false, false, true] },
-      { label: "Dedicated producer", cells: [false, false, false, true] },
-    ],
-  },
-  {
-    group: "Reuse and support",
-    rows: [
-      { label: "Every hook, demo and song saved to reuse", cells: [true, true, true, true] },
-      { label: "Several products and brands", cells: [false, false, true, true] },
-      { label: "Priority support", cells: [false, false, true, true] },
+      { label: "A dedicated marketing team", cells: [false, false, false, true] },
+      { label: "We make, edit and post the videos", cells: [false, false, false, true] },
+      { label: "Paid on performance", cells: [false, false, false, true] },
     ],
   },
 ];
@@ -69,10 +62,11 @@ const COMPARE: { group: string; rows: { label: string; cells: (string | boolean)
 const FAQ = [
   { q: "What counts as an AI hook?", a: "Each hook Mavya generates with your character. Editing, exporting and reusing a hook you already made are free." },
   { q: "Is there a free plan?", a: "No. Every plan includes AI hooks from day one, so you can post your first video the day you sign up." },
-  { q: "How does yearly billing work?", a: "You pay for the year up front and get two months free. Switch between monthly and yearly any time." },
+  { q: "How does yearly billing work?", a: "You pay for the year up front: $290, $590 or $990, two months free. Switch between monthly and yearly any time." },
   { q: "Can I change plans?", a: "Yes, any time from Billing. Upgrades start right away." },
   { q: "Can I cancel?", a: "Yes, any time from Billing. Your plan keeps working until the end of the period you paid for." },
-  { q: "What is Business?", a: "We make the videos for you: hooks for your niche, the demo storyboards, the edit and delivery. Priced per project after a short call." },
+  { q: "What do the Pro and Studio reviews include?", a: "On Pro, our team reviews your week of videos and sends written feedback and hook picks for your app. On Studio, we review every video before you post it, with notes on the hook, the script and the edit." },
+  { q: "How does Business work?", a: "Send us your website. A dedicated team makes and posts your short-form videos against a monthly views quota agreed up front. If we miss the quota, you don't pay for that month. A minimum applies; book a call for details." },
 ];
 
 const cardBtn = "inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg text-[14.5px] font-semibold transition-colors";
@@ -94,21 +88,21 @@ function FeatureList({ lead, items, strong }: { lead?: string; items: string[]; 
 }
 
 function PlanCard({ plan, cycle }: { plan: Plan; cycle: BillingCycle }) {
-  const price = cycle === "annual" ? plan.annual : plan.price;
+  const price = priceOf(plan, cycle);
   return (
     <div className={`flex flex-col rounded-2xl bg-panel p-6 ${plan.popular ? "border-2 border-accent shadow-[0_1px_2px_rgba(21,18,31,0.04),0_16px_40px_-16px_rgba(123,76,250,0.35)]" : "border border-line"}`}>
       <span className="flex h-6 items-start">{plan.popular && <span className="rounded-md bg-accent px-2 py-0.5 text-[11.5px] font-semibold text-white">Most popular</span>}</span>
       <p className="text-[17px] font-semibold">{plan.name}</p>
       <p className="mt-1 min-h-[40px] text-[13.5px] text-muted">{plan.line}</p>
       <p className="mt-4 flex items-baseline gap-1">
-        <span className="text-[40px] font-semibold leading-none tracking-[-0.03em] tabular-nums">${price}</span>
+        <span className="text-[40px] font-semibold leading-none tracking-[-0.03em] tabular-nums">{money(price)}</span>
         <span className="text-[14px] text-muted">/ month</span>
       </p>
-      <p className="mt-1.5 text-[12.5px] text-soft">{cycle === "annual" ? `$${plan.annual * 12} billed yearly, save $${(plan.price - plan.annual) * 12}` : "Billed monthly"}</p>
+      <p className="mt-1.5 text-[12.5px] text-soft">{cycle === "annual" ? `$${plan.yearly} billed yearly, save $${plan.price * 12 - plan.yearly}` : "Billed monthly"}</p>
       <Link href="/studio" className={`${cardBtn} mt-5 ${plan.popular ? "bg-accent text-white hover:bg-accent-hover" : "bg-text text-white hover:opacity-90"}`}>
         Choose {plan.name}
       </Link>
-      <FeatureList lead={plan.plus ? `Everything in ${plan.plus}, plus:` : undefined} items={plan.features} strong={plan.popular} />
+      <FeatureList lead={plan.plus ? `Everything in ${plan.plus}, plus:` : "Includes:"} items={plan.features} strong={plan.popular} />
     </div>
   );
 }
@@ -119,15 +113,15 @@ function BusinessCard() {
       <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 h-[260px] w-[260px] rounded-full bg-[radial-gradient(closest-side,rgba(123,76,250,0.45),transparent)]" />
       <span className="relative flex h-6 items-start"><span className="rounded-md bg-white/12 px-2 py-0.5 text-[11.5px] font-semibold text-[#b69cff]">{BUSINESS.line}</span></span>
       <p className="relative text-[17px] font-semibold">{BUSINESS.name}</p>
-      <p className="relative mt-1 min-h-[40px] text-[13.5px] text-white/70">We make the videos for you</p>
-      <p className="relative mt-4 text-[40px] font-semibold leading-none tracking-[-0.03em]">Custom</p>
-      <p className="relative mt-1.5 text-[12.5px] text-white/55">Priced per project</p>
+      <p className="relative mt-1 min-h-[40px] text-[13.5px] text-white/70">We run your short-form for you</p>
+      <p className="relative mt-4 text-[30px] font-semibold leading-[1.05] tracking-[-0.03em]">{BUSINESS.price}</p>
+      <p className="relative mt-1.5 text-[12.5px] text-white/60">{BUSINESS.note}</p>
       <a href={BUSINESS.contact} className={`${cardBtn} relative mt-5 bg-white text-[#15121f] hover:bg-white/90`}>
         Book a call
         <ArrowRight className="h-4 w-4" />
       </a>
       <div className="relative mt-6 border-t border-white/10 pt-5">
-        <p className="mb-3 text-[13px] font-semibold">Everything in Studio, plus:</p>
+        <p className="mb-3 text-[13px] font-semibold">Everything in Studio, and:</p>
         <ul className="space-y-2.5">
           {BUSINESS.features.map((f) => (
             <li key={f} className="flex items-start gap-2.5 text-[14px] leading-snug text-white/85">
