@@ -8,7 +8,7 @@ import type { Run } from "@/lib/types";
 
 /**
  * Billing: the current plan and this month's use (AI hooks and exports), the plans to switch to, and invoices.
- * Accounts and Stripe are not connected yet: everyone is on Free, and the buttons say so.
+ * Accounts and Stripe are not connected yet: nobody has a plan, and the buttons say so.
  */
 export function BillingView() {
   // Accounts and checkout are not connected yet: nobody has a plan.

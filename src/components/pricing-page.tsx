@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Minus, Plus } from "lucide-react";
+import { ContactDialog } from "@/components/contact-dialog";
 import { MarketingFooter, MarketingHeader, MavyaMark } from "@/components/marketing-chrome";
 import { BUSINESS, PLANS, money, planById, priceOf, type BillingCycle, type Plan } from "@/lib/plans";
 
@@ -47,7 +48,7 @@ const COMPARE: { group: string; rows: { label: string; cells: (string | boolean)
     rows: [
       { label: "Weekly review and feedback", cells: [false, true, true, true] },
       { label: "Weekly hook picks for your app", cells: [false, true, true, true] },
-      { label: "Every video reviewed before you post", cells: [false, false, true, true] },
+      { label: "Your own social media consultant", cells: [false, false, true, true] },
       { label: "1:1 guidance", cells: [false, false, true, true] },
     ],
   },
@@ -67,8 +68,8 @@ const FAQ = [
   { q: "How does yearly billing work?", a: "You pay for the year up front: $290, $590 or $990, two months free. Switch between monthly and yearly any time." },
   { q: "Can I change plans?", a: "Yes, any time from Billing. Upgrades start right away." },
   { q: "Can I cancel?", a: "Yes, any time from Billing. Your plan keeps working until the end of the period you paid for." },
-  { q: "What do the Pro and Studio reviews include?", a: "On Pro, our team reviews your week of videos and sends written feedback and hook picks for your app. On Studio, we review every video before you post it, with notes on the hook, the script and the edit." },
-  { q: "How does Business work?", a: "Send us your website. A dedicated team makes and posts your short-form videos against a monthly views quota agreed up front. If we miss the quota, you don't pay for that month. A minimum applies; book a call for details." },
+  { q: "What do the Pro and Studio reviews include?", a: "On Pro, our team reviews your week of videos and sends written feedback and hook picks for your app. On Studio, you get your own social media consultant: strategy, hook picks and 1:1 guidance when you need it." },
+  { q: "How does Business work?", a: "Send us your website. A dedicated team makes and posts your short-form videos against a monthly views quota agreed up front. If we miss the quota, you don't pay for that month. A minimum applies; contact us for details." },
 ];
 
 const cardBtn = "inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg text-[14.5px] font-semibold transition-colors";
@@ -110,6 +111,8 @@ function PlanCard({ plan, cycle }: { plan: Plan; cycle: BillingCycle }) {
 }
 
 function BusinessCard() {
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
   return (
     <div className="relative flex flex-col overflow-hidden rounded-2xl bg-[#15121f] p-6 text-white">
       <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 h-[260px] w-[260px] rounded-full bg-[radial-gradient(closest-side,rgba(123,76,250,0.45),transparent)]" />
@@ -118,10 +121,11 @@ function BusinessCard() {
       <p className="relative mt-1 min-h-[40px] text-[13.5px] text-white/70">We run your short-form for you</p>
       <p className="relative mt-4 text-[30px] font-semibold leading-[1.05] tracking-[-0.03em]">{BUSINESS.price}</p>
       <p className="relative mt-1.5 text-[12.5px] text-white/60">Minimum applies</p>
-      <a href={BUSINESS.contact} className={`${cardBtn} relative mt-5 bg-white text-[#15121f] hover:bg-white/90`}>
-        Book a call
+      <button type="button" onClick={() => setOpen(true)} className={`${cardBtn} relative mt-5 cursor-pointer bg-white text-[#15121f] hover:bg-white/90`}>
+        Contact us
         <ArrowRight className="h-4 w-4" />
-      </a>
+      </button>
+      <ContactDialog open={open} onClose={close} />
       <div className="relative mt-6 border-t border-white/10 pt-5">
         <p className="mb-3 text-[13px] font-semibold">Everything in Studio, plus:</p>
         <ul className="space-y-2.5">

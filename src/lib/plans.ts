@@ -1,7 +1,7 @@
 /**
  * Plans: the pricing page and the Billing page both read these (one place to change them).
  * Prices match mavya.app: $29 / $59 / $99 a month, or $290 / $590 / $990 a year (two months free).
- * Every plan makes the same videos; higher plans add our team's review and guidance. No free plan.
+ * Every plan makes the same videos; Pro adds a weekly review, Studio a social media consultant. No free plan.
  * Checkout is not connected yet.
  */
 export type PlanId = "starter" | "pro" | "studio";
@@ -51,9 +51,9 @@ export const PLANS: Plan[] = [
     price: 99,
     yearly: 990,
     hooks: 150,
-    line: "Every video reviewed before you post",
+    line: "One on one with a short-form expert",
     plus: "Pro",
-    features: ["150 AI video hooks a month", "We review every video", "1:1 guidance and priority support"],
+    features: ["150 AI video hooks a month", "Your own social media consultant", "1:1 guidance and priority support"],
   },
 ];
 
@@ -64,7 +64,6 @@ export const BUSINESS = {
   price: "Pay for results",
   note: "Minimum applies. Miss the quota, you don't pay.",
   features: ["Send us your website. That's it.", "A dedicated team runs your short-form", "A views quota, agreed up front", "Miss it, you don't pay"],
-  contact: "mailto:hello@mavya.app?subject=Mavya%20Business",
 };
 
 export const planById = (id: PlanId) => PLANS.find((p) => p.id === id) ?? PLANS[0];
