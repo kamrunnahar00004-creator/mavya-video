@@ -42,7 +42,7 @@ export function HowItWorks() {
         <h2 className="mt-2 max-w-[680px] text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">From viral hook to finished video.</h2>
         <p className="mt-4 max-w-[600px] text-[18px] leading-relaxed text-muted">Mavya walks you through every step. You only film the demo.</p>
 
-        <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,0.6fr)_minmax(0,1.4fr)] lg:gap-12" onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
+        <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,0.74fr)_minmax(0,1.26fr)] lg:gap-16" onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
           <div role="tablist" aria-orientation="vertical" aria-label="How it works" className="flex flex-col">
             {STEPS.map((s, i) => {
               const on = i === active;
@@ -57,10 +57,10 @@ export function HowItWorks() {
                       style={running ? { animationDuration: `${ROTATE_MS}ms` } : undefined}
                     />
                   )}
-                  <button type="button" role="tab" aria-selected={on} aria-controls="hiw-panel" onClick={() => pick(i)} className="group block w-full cursor-pointer py-5 text-left">
+                  <button type="button" role="tab" aria-selected={on} aria-controls="hiw-panel" onClick={() => pick(i)} className="group block w-full cursor-pointer py-6 text-left">
                     <span className={`block text-[13px] font-semibold tabular-nums transition-colors ${on ? "text-accent" : "text-soft"}`}>Step {i + 1}</span>
                     <span className={`mt-1 block text-[20px] font-semibold tracking-[-0.015em] transition-colors ${on ? "text-text" : "text-muted group-hover:text-text"}`}>{s.title}</span>
-                    <span className={`mt-2 block text-[16px] leading-relaxed transition-colors ${on ? "text-muted" : "text-soft"}`}>{s.body}</span>
+                    <span className={`mt-2.5 block max-w-[400px] text-[16px] leading-[1.65] transition-colors ${on ? "text-muted" : "text-soft"}`}>{s.body}</span>
                   </button>
                   {on && (
                     <Link href="/studio" className="-mt-2 mb-5 inline-flex items-center gap-1.5 text-[16px] font-semibold text-accent hover:underline">
@@ -77,7 +77,7 @@ export function HowItWorks() {
             <div aria-hidden className="pointer-events-none absolute -inset-12 bg-[radial-gradient(50%_45%_at_55%_50%,rgba(123,76,250,0.16)_0%,transparent_100%)]" />
             <div id="hiw-panel" role="tabpanel" key={current.key} className="relative animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none">
               <AppWindow url={current.url}>
-                <div className="h-[566px] overflow-hidden text-left">
+                <div className="h-[600px] overflow-hidden text-left">
                   <current.Panel />
                 </div>
               </AppWindow>
@@ -166,7 +166,7 @@ function LibraryPanel() {
             key={x.code}
             type="button"
             onClick={() => pick(i)}
-            className={`grid w-full cursor-pointer grid-cols-[1fr_64px_56px] items-center gap-3 rounded-lg px-2 py-1 text-left transition-colors ${i === sel ? "bg-accent-tint" : "hover:bg-raised"}`}
+            className={`grid w-full cursor-pointer grid-cols-[1fr_64px_56px] items-center gap-3 rounded-lg px-2.5 py-1.5 text-left transition-colors ${i === sel ? "bg-accent-tint" : "hover:bg-raised"}`}
           >
             <span className="flex min-w-0 items-center gap-2.5">
               <span className="h-[30px] w-[17px] shrink-0 rounded-[4px] bg-cover bg-center" style={{ backgroundImage: `url(/landing/lib-${x.code}.jpg)` }} />
@@ -202,7 +202,7 @@ function useCycle(count: number, ms: number) {
 /** The facts strip under a featured item: small label, big value (same as the library's Views / Likes / Comments). */
 function Facts({ items }: { items: [string, string][] }) {
   return (
-    <div className="mt-5 grid grid-cols-3 gap-4 border-t border-line pt-4">
+    <div className="mt-5 grid grid-cols-[1fr_1.5fr_1fr] gap-4 border-t border-line pt-4">
       {items.map(([label, value], i) => (
         <div key={label} className={`min-w-0 ${i === 1 ? "text-center" : i === 2 ? "text-right" : ""}`}>
           <p className="text-[12px] text-soft">{label}</p>
@@ -213,7 +213,7 @@ function Facts({ items }: { items: [string, string][] }) {
   );
 }
 /** Every step screen: a big 9:16 media column on the left, the facts and the list on the right. */
-const BODY = "mt-6 grid min-h-0 grid-cols-[248px_minmax(0,1fr)] items-stretch gap-10";
+const BODY = "mt-6 grid min-h-0 grid-cols-[224px_minmax(0,1fr)] items-stretch gap-9";
 const FADE_IN = "animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none";
 const MEDIA = "relative aspect-[9/16] w-full overflow-hidden rounded-2xl bg-ink shadow-[0_24px_48px_-20px_rgba(21,18,31,0.55)] ring-1 ring-black/5";
 const TAG = "rounded-full px-2 py-0.5 text-[12px] font-semibold";
@@ -346,9 +346,9 @@ function DemoPanel() {
       </div>
       <div className="mt-1">
         {SHOTS.map((x, i) => (
-          <button key={x.title} type="button" onClick={() => seek(i)} className={`grid w-full cursor-pointer grid-cols-[28px_1fr_48px] items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors ${i === at ? "bg-accent-tint" : "hover:bg-raised"}`}>
+          <button key={x.title} type="button" onClick={() => seek(i)} className={`grid w-full cursor-pointer grid-cols-[28px_1fr_48px] items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors ${i === at ? "bg-accent-tint" : "hover:bg-raised"}`}>
             <span className={`text-[13px] font-semibold tabular-nums ${i === at ? "text-accent" : "text-soft"}`}>{i === 0 ? "H" : i}</span>
-            <span className={`truncate text-[13px] ${i === at ? "font-semibold text-text" : "text-muted"}`}>{x.title} <span className="text-soft">· {x.text}</span></span>
+            <span className={`truncate text-[13.5px] ${i === at ? "font-semibold text-text" : "text-muted"}`}>{x.title}</span>
             <span className="text-right text-[13px] tabular-nums text-muted">{Math.round(x.to - x.from)}s</span>
           </button>
         ))}
@@ -413,7 +413,7 @@ function SoundPanel() {
       </div>
       <div className="mt-1">
         {SOUNDS.map((o, i) => (
-          <button key={o.title} type="button" onClick={() => pick(i)} className={`grid w-full cursor-pointer grid-cols-[1fr_90px] items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors ${i === sel ? "bg-accent-tint" : "hover:bg-raised"}`}>
+          <button key={o.title} type="button" onClick={() => pick(i)} className={`grid w-full cursor-pointer grid-cols-[1fr_90px] items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors ${i === sel ? "bg-accent-tint" : "hover:bg-raised"}`}>
             <span className="flex min-w-0 items-center gap-2.5">
               <span className="h-[26px] w-[26px] shrink-0 rounded-md" style={{ background: o.art }} />
               <span className={`truncate text-[13px] ${i === sel ? "font-semibold text-text" : "text-muted"}`}>{o.title} <span className="font-normal text-soft">· {o.by}</span></span>
