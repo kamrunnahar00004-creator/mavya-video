@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MAINTENANCE } from "@/lib/maintenance";
 
 /** A five-point star path centred on (cx, cy). */
 const star = (cx: number, cy: number, r: number) =>
@@ -46,6 +47,11 @@ export function MarketingHeader({ active }: { active?: "pricing" }) {
   const link = (on: boolean) => `hover:text-text ${on ? "text-text" : ""}`;
   return (
     <header className="sticky top-0 z-30 px-3 pt-3">
+      {MAINTENANCE && (
+        <p role="status" className="mx-auto mb-2 max-w-[1160px] rounded-lg bg-accent px-4 py-2 text-center text-[13.5px] font-semibold text-white">
+          We&apos;re doing some maintenance. Mavya will be back soon.
+        </p>
+      )}
       <div className="mx-auto flex max-w-[1160px] items-center gap-6 rounded-xl border border-line bg-panel/85 px-5 py-2.5 shadow-[0_1px_2px_rgba(28,26,23,0.05),0_8px_24px_-12px_rgba(28,26,23,0.12)] backdrop-blur">
         <Logo />
         <nav className="ml-4 hidden items-center gap-5 text-[14px] font-semibold text-muted md:flex">
@@ -53,14 +59,16 @@ export function MarketingHeader({ active }: { active?: "pricing" }) {
           <Link href="/pricing" className={link(active === "pricing")}>Pricing</Link>
           <Link href="/#faq" className={link(false)}>FAQ</Link>
         </nav>
-        <div className="ml-auto flex items-center gap-3">
-          <Link href="/studio" className="text-[14px] font-semibold text-muted hover:text-text">
-            Log in
-          </Link>
-          <Link href="/studio" className="btn-primary px-4 py-2 text-[14px]">
-            Sign up
-          </Link>
-        </div>
+        {!MAINTENANCE && (
+          <div className="ml-auto flex items-center gap-3">
+            <Link href="/studio" className="text-[14px] font-semibold text-muted hover:text-text">
+              Log in
+            </Link>
+            <Link href="/studio" className="btn-primary px-4 py-2 text-[14px]">
+              Sign up
+            </Link>
+          </div>
+        )}
       </div>
     </header>
   );

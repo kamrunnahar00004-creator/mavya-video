@@ -28,11 +28,19 @@ export async function POST(request: Request) {
   recent.set(ip, [...times, now]);
 
   const entry = { at: new Date(now).toISOString(), email, message };
-  await mkdir(DATA_DIR, { recursive: true });
-  await appendFile(path.join(DATA_DIR, "inquiries.jsonl"), JSON.stringify(entry) + "\n");
+  // The local copy works on a normal server; on Vercel the disk is read-only, so email is the delivery there.
+  let kept = false;
+  try {
+    await mkdir(DATA_DIR, { recursive: true });
+    await appendFile(path.join(DATA_DIR, "inquiries.jsonl"), JSON.stringify(entry) + "\n");
+    kept = true;
+  } catch (error) {
+    console.error("contact: could not keep a local copy", error);
+  }
 
   const key = process.env.RESEND_API_KEY;
   const to = process.env.CONTACT_TO;
+  let sent = false;
   if (key && to) {
     try {
       const res = await fetch("https://api.resend.com/emails", {
@@ -47,10 +55,12 @@ export async function POST(request: Request) {
         }),
         signal: AbortSignal.timeout(10_000),
       });
-      if (!res.ok) console.error("contact: email failed", res.status, await res.text().catch(() => ""));
+      if (res.ok) sent = true;
+      else console.error("contact: email failed", res.status, await res.text().catch(() => ""));
     } catch (error) {
       console.error("contact: email failed", error);
     }
   }
+  if (!kept && !sent) return Response.json({ error: "Couldn't send. Email hello@mavya.app instead." }, { status: 500 });
   return Response.json({ ok: true });
 }
