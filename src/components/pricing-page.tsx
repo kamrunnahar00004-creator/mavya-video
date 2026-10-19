@@ -1,69 +1,145 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Minus, Sparkles } from "lucide-react";
+import { ArrowRight, Check, Minus, Plus } from "lucide-react";
 import { MarketingFooter, MarketingHeader } from "@/components/marketing-chrome";
-import { PlanCards } from "@/components/plan-cards";
-import { BUSINESS, PLANS, planById, type BillingCycle } from "@/lib/plans";
+import { BUSINESS, PLANS, planById, type BillingCycle, type Plan } from "@/lib/plans";
 
 /*
- * The pricing page (2026-10-19): what the same videos cost with separate tools (a receipt that adds up, then
- * Mavya at under a quarter of it), the plans, a full comparison, and billing questions.
+ * The pricing page, laid out like the Etsy Mavya /subscribe page (2026-10-19): centered title, Monthly / Yearly
+ * toggle, four cards (Starter, Pro, Studio, and Business done for you), then what the same videos cost with
+ * separate tools, the compare table and the FAQ. No free plan.
  * Competitor prices: lowest commonly listed monthly prices from public pricing roundups, October 2026
- * (Higgsfield, Arcads, CapCut, Epidemic Sound, Virlo, ChatGPT). Re-check before launch; prices change.
+ * (Virlo, ChatGPT, Higgsfield, Arcads, CapCut, Epidemic Sound). Re-check before launch; prices change.
  */
-const STACK: { job: string; tool: string; price: number }[] = [
-  { job: "Viral hook research", tool: "Virlo Starter", price: 49 },
-  { job: "Scripts and shot lists", tool: "ChatGPT Plus", price: 20 },
-  { job: "AI video for the hook", tool: "Higgsfield Plus", price: 49 },
-  { job: "AI creators to star in it", tool: "Arcads Starter", price: 110 },
-  { job: "Video editor", tool: "CapCut Pro", price: 19.99 },
-  { job: "Music you can post", tool: "Epidemic Sound Creator", price: 17.99 },
+/** Each tool with its site icon (public/landing/logos, saved locally). */
+const STACK: { job: string; tool: string; logo: string; price: number }[] = [
+  { job: "Viral hook research", tool: "Virlo Starter", logo: "virlo", price: 49 },
+  { job: "Scripts and shot lists", tool: "ChatGPT Plus", logo: "chatgpt", price: 20 },
+  { job: "AI video for the hook", tool: "Higgsfield Plus", logo: "higgsfield", price: 49 },
+  { job: "AI creators to star in it", tool: "Arcads Starter", logo: "arcads", price: 110 },
+  { job: "Video editor", tool: "CapCut Pro", logo: "capcut", price: 19.99 },
+  { job: "Music you can post", tool: "Epidemic Sound Creator", logo: "epidemic", price: 17.99 },
 ];
 const STACK_TOTAL = STACK.reduce((t, x) => t + x.price, 0);
 const MAVYA = planById("pro");
 const usd = (n: number) => `$${n % 1 ? n.toFixed(2) : n}`;
 
-/** Every plan, every row: a value, a check, or a dash. */
-const COMPARE: { group: string; rows: { label: string; values: (string | boolean)[] }[] }[] = [
+const COLUMNS = [...PLANS.map((p) => p.name), BUSINESS.name];
+const COMPARE: { group: string; rows: { label: string; cells: (string | boolean)[] }[] }[] = [
   {
     group: "Make videos",
     rows: [
-      { label: "AI hooks a month", values: PLANS.map((p) => String(p.hooks)) },
-      { label: "Exports", values: PLANS.map(() => "Unlimited") },
-      { label: "Viral hook library", values: PLANS.map(() => true) },
-      { label: "Shot-by-shot demo scripts", values: PLANS.map(() => true) },
-      { label: "Built-in editor", values: PLANS.map(() => true) },
-      { label: "Priority generation", values: PLANS.map((p) => p.id !== "starter") },
+      { label: "AI hooks a month", cells: [...PLANS.map((p) => String(p.hooks)), "Custom"] },
+      { label: "Exports", cells: [...PLANS.map(() => "Unlimited"), "Unlimited"] },
+      { label: "Viral hook library", cells: [true, true, true, true] },
+      { label: "Shot-by-shot demo scripts", cells: [true, true, true, true] },
+      { label: "Built-in editor", cells: [true, true, true, true] },
+      { label: "Priority generation", cells: [false, true, true, true] },
     ],
   },
   {
     group: "Characters and sound",
     rows: [
-      { label: "70 AI characters", values: PLANS.map(() => true) },
-      { label: "Your own photo as the character", values: PLANS.map(() => true) },
-      { label: "Trending songs and the hook's sound", values: PLANS.map(() => true) },
+      { label: "70 AI characters", cells: [true, true, true, true] },
+      { label: "Your own photo as the character", cells: [true, true, true, true] },
+      { label: "Trending songs and the hook's sound", cells: [true, true, true, true] },
+    ],
+  },
+  {
+    group: "Done for you",
+    rows: [
+      { label: "Hooks researched for your niche", cells: [false, false, false, true] },
+      { label: "Demos written and storyboarded", cells: [false, false, false, true] },
+      { label: "Videos made, edited and delivered", cells: [false, false, false, true] },
+      { label: "Dedicated producer", cells: [false, false, false, true] },
     ],
   },
   {
     group: "Reuse and support",
     rows: [
-      { label: "Every hook, demo and song saved to reuse", values: PLANS.map(() => true) },
-      { label: "Several products and brands", values: PLANS.map((p) => p.id === "studio") },
-      { label: "Priority support", values: PLANS.map((p) => p.id === "studio") },
+      { label: "Every hook, demo and song saved to reuse", cells: [true, true, true, true] },
+      { label: "Several products and brands", cells: [false, false, true, true] },
+      { label: "Priority support", cells: [false, false, true, true] },
     ],
   },
 ];
 
-const BILLING_FAQ = [
+const FAQ = [
   { q: "What counts as an AI hook?", a: "Each hook Mavya generates with your character. Editing, exporting and reusing a hook you already made are free." },
-  { q: "Can I change plans?", a: "Yes, any time from Billing. Upgrades start right away." },
-  { q: "Can I cancel?", a: "Yes, any time from Billing. Your plan keeps working until the end of the month you paid for." },
   { q: "Is there a free plan?", a: "No. Every plan includes AI hooks from day one, so you can post your first video the day you sign up." },
-  { q: "How does annual billing work?", a: "You pay for the year up front and get two months free. Switch between monthly and yearly any time." },
+  { q: "How does yearly billing work?", a: "You pay for the year up front and get two months free. Switch between monthly and yearly any time." },
+  { q: "Can I change plans?", a: "Yes, any time from Billing. Upgrades start right away." },
+  { q: "Can I cancel?", a: "Yes, any time from Billing. Your plan keeps working until the end of the period you paid for." },
   { q: "What is Business?", a: "We make the videos for you: hooks for your niche, the demo storyboards, the edit and delivery. Priced per project after a short call." },
 ];
+
+const cardBtn = "inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg text-[14.5px] font-semibold transition-colors";
+
+function FeatureList({ lead, items, strong }: { lead?: string; items: string[]; strong?: boolean }) {
+  return (
+    <div className="mt-6 border-t border-line pt-5">
+      {lead && <p className="mb-3 text-[13px] font-semibold">{lead}</p>}
+      <ul className="space-y-2.5">
+        {items.map((item) => (
+          <li key={item} className="flex items-start gap-2.5 text-[14px] leading-snug">
+            <Check className={`mt-0.5 h-4 w-4 shrink-0 ${strong ? "text-accent" : "text-muted"}`} aria-hidden />
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function PlanCard({ plan, cycle }: { plan: Plan; cycle: BillingCycle }) {
+  const price = cycle === "annual" ? plan.annual : plan.price;
+  return (
+    <div className={`flex flex-col rounded-2xl bg-panel p-6 ${plan.popular ? "border-2 border-accent shadow-[0_1px_2px_rgba(21,18,31,0.04),0_16px_40px_-16px_rgba(123,76,250,0.35)]" : "border border-line"}`}>
+      <span className="flex h-6 items-start">{plan.popular && <span className="rounded-md bg-accent px-2 py-0.5 text-[11.5px] font-semibold text-white">Most popular</span>}</span>
+      <p className="text-[17px] font-semibold">{plan.name}</p>
+      <p className="mt-1 min-h-[40px] text-[13.5px] text-muted">{plan.line}</p>
+      <p className="mt-4 flex items-baseline gap-1">
+        <span className="text-[40px] font-semibold leading-none tracking-[-0.03em] tabular-nums">${price}</span>
+        <span className="text-[14px] text-muted">/ month</span>
+      </p>
+      <p className="mt-1.5 text-[12.5px] text-soft">{cycle === "annual" ? `$${plan.annual * 12} billed yearly, save $${(plan.price - plan.annual) * 12}` : "Billed monthly"}</p>
+      <Link href="/studio" className={`${cardBtn} mt-5 ${plan.popular ? "bg-accent text-white hover:bg-accent-hover" : "bg-text text-white hover:opacity-90"}`}>
+        Choose {plan.name}
+      </Link>
+      <FeatureList lead={plan.plus ? `Everything in ${plan.plus}, plus:` : undefined} items={plan.features} strong={plan.popular} />
+    </div>
+  );
+}
+
+function BusinessCard() {
+  return (
+    <div className="relative flex flex-col overflow-hidden rounded-2xl bg-[#15121f] p-6 text-white">
+      <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 h-[260px] w-[260px] rounded-full bg-[radial-gradient(closest-side,rgba(123,76,250,0.45),transparent)]" />
+      <span className="relative flex h-6 items-start"><span className="rounded-md bg-white/12 px-2 py-0.5 text-[11.5px] font-semibold text-[#b69cff]">{BUSINESS.line}</span></span>
+      <p className="relative text-[17px] font-semibold">{BUSINESS.name}</p>
+      <p className="relative mt-1 min-h-[40px] text-[13.5px] text-white/70">We make the videos for you</p>
+      <p className="relative mt-4 text-[40px] font-semibold leading-none tracking-[-0.03em]">Custom</p>
+      <p className="relative mt-1.5 text-[12.5px] text-white/55">Priced per project</p>
+      <a href={BUSINESS.contact} className={`${cardBtn} relative mt-5 bg-white text-[#15121f] hover:bg-white/90`}>
+        Book a call
+        <ArrowRight className="h-4 w-4" />
+      </a>
+      <div className="relative mt-6 border-t border-white/10 pt-5">
+        <p className="mb-3 text-[13px] font-semibold">Everything in Studio, plus:</p>
+        <ul className="space-y-2.5">
+          {BUSINESS.features.map((f) => (
+            <li key={f} className="flex items-start gap-2.5 text-[14px] leading-snug text-white/85">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#b69cff]" aria-hidden />
+              {f}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
 
 export function PricingPage() {
   const [cycle, setCycle] = useState<BillingCycle>("annual");
@@ -71,145 +147,93 @@ export function PricingPage() {
     <div className="landing-theme min-h-full bg-bg">
       <MarketingHeader active="pricing" />
 
-      {/* Header */}
-      <section className="relative overflow-hidden">
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[560px] bg-[radial-gradient(50%_60%_at_50%_0%,rgba(123,76,250,0.16)_0%,transparent_100%)]" />
-        <div className="relative mx-auto max-w-[1160px] px-5 pb-16 pt-20 text-center sm:pt-24">
-          <p className="text-[14px] font-semibold text-accent">Pricing</p>
-          <h1 className="mx-auto mt-3 max-w-[760px] text-[40px] font-semibold leading-[1.08] tracking-[-0.035em] sm:text-[56px]">One tool instead of six.</h1>
-          <p className="mx-auto mt-5 max-w-[560px] text-[18px] leading-relaxed text-muted">
-            Hooks, scripts, AI creators, editing and music, in one place. For less than a quarter of what the separate tools cost.
-          </p>
+      <main className="mx-auto max-w-[1240px] px-5 pb-24 pt-14 sm:pt-20">
+        <h1 className="text-center text-[34px] font-semibold leading-[1.08] tracking-[-0.025em] sm:text-[44px]">Plans for every creator</h1>
+        <p className="mx-auto mt-3 max-w-[52ch] text-center text-[16px] text-muted">Every plan makes AI hooks from day one. Editing and exporting are unlimited.</p>
+
+        {/* Monthly / Yearly */}
+        <div className="mt-8 flex items-center justify-center gap-2.5">
+          <div role="tablist" aria-label="Billing" className="inline-flex rounded-lg border border-line bg-panel p-1">
+            {(["monthly", "annual"] as const).map((c) => (
+              <button key={c} type="button" role="tab" aria-selected={cycle === c} onClick={() => setCycle(c)} className={`cursor-pointer rounded-md px-4 py-1.5 text-[13.5px] font-semibold transition-colors ${cycle === c ? "bg-text text-white" : "text-muted hover:text-text"}`}>
+                {c === "monthly" ? "Monthly" : "Yearly"}
+              </button>
+            ))}
+          </div>
+          <span className="rounded-md bg-accent-tint px-2.5 py-1 text-[12px] font-semibold text-accent">2 months free</span>
         </div>
-      </section>
 
-      {/* The receipt */}
-      <section className="mx-auto max-w-[1160px] px-5 pb-24">
-        <CostStack />
-      </section>
-
-      {/* Plans */}
-      <section id="plans" className="scroll-mt-24 border-y border-line bg-panel">
-        <div className="mx-auto max-w-[1160px] px-5 py-20">
-          <div className="flex flex-col items-center text-center">
-            <h2 className="text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">Pick your plan</h2>
-            <p className="mt-4 max-w-[520px] text-[18px] leading-relaxed text-muted">You pay for AI hooks. Editing and exporting are unlimited on every plan.</p>
-            <div role="radiogroup" aria-label="Billing" className="mt-8 inline-flex rounded-full border border-line bg-raised p-1">
-              {(["monthly", "annual"] as const).map((c) => (
-                <button key={c} type="button" role="radio" aria-checked={cycle === c} onClick={() => setCycle(c)} className={`cursor-pointer rounded-full px-5 py-2 text-[14px] font-semibold transition-colors ${cycle === c ? "bg-panel text-text shadow-[0_1px_3px_rgba(21,18,31,0.12)]" : "text-muted hover:text-text"}`}>
-                  {c === "monthly" ? "Monthly" : "Yearly"}
-                </button>
-              ))}
-            </div>
-            <p className="mt-3 text-[13.5px] text-muted"><span className="font-semibold text-accent">2 months free</span> on yearly billing</p>
-          </div>
-          <div className="mt-12">
-            <PlanCards
-              cycle={cycle}
-              action={(plan) => (
-                <Link
-                  href="/studio"
-                  className={plan.popular ? "btn-primary h-11 w-full text-[14.5px]" : "flex h-11 w-full items-center justify-center rounded-lg border border-line-strong bg-panel text-[14.5px] font-bold text-text transition-colors hover:border-ink"}
-                >
-                  Choose {plan.name}
-                </Link>
-              )}
-            />
-          </div>
-
-          {/* Business: done for you */}
-          <div className="relative mt-6 grid overflow-hidden rounded-2xl bg-[#15121f] text-white md:grid-cols-[0.9fr_1.1fr]">
-            <div aria-hidden className="pointer-events-none absolute -left-24 -top-24 h-[420px] w-[420px] rounded-full bg-[radial-gradient(closest-side,rgba(123,76,250,0.4),transparent)]" />
-            <div className="relative p-8">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[12px] font-semibold text-[#b69cff]"><Sparkles className="h-3.5 w-3.5" />{BUSINESS.line}</span>
-              <h3 className="mt-4 text-[26px] font-semibold tracking-[-0.02em] text-white!">{BUSINESS.name}</h3>
-              <p className="mt-2 max-w-[360px] text-[15.5px] leading-relaxed text-white/70">Don&apos;t want to make them yourself? Our team makes your hook + demo videos, ready to post.</p>
-              <p className="mt-6 text-[30px] font-semibold tracking-[-0.02em]">Custom</p>
-              <p className="text-[13.5px] text-white/60">Priced per project</p>
-              <a href={BUSINESS.contact} className="mt-6 inline-flex h-11 items-center gap-2 rounded-lg bg-white px-5 text-[14.5px] font-bold text-[#15121f] transition-colors hover:bg-white/90">
-                Book a call
-                <ArrowRight className="h-4 w-4" />
-              </a>
-            </div>
-            <div className="relative border-t border-white/10 p-8 md:border-l md:border-t-0">
-              <p className="text-[14px] font-semibold text-white/90">Everything in Studio, plus:</p>
-              <ul className="mt-4 space-y-3.5">
-                {BUSINESS.features.map((f) => (
-                  <li key={f} className="flex gap-3 text-[15.5px] text-white/80">
-                    <Check className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#b69cff]" strokeWidth={2.6} />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+        {/* The four cards */}
+        <div className="mt-9 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:items-stretch">
+          {PLANS.map((plan) => <PlanCard key={plan.id} plan={plan} cycle={cycle} />)}
+          <BusinessCard />
         </div>
-      </section>
+        <p className="mt-5 text-center text-[12.5px] text-soft">Plans renew automatically; cancel anytime in Billing.</p>
 
-      {/* Compare */}
-      <section className="mx-auto max-w-[1160px] px-5 py-20">
-        <h2 className="text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">Compare plans</h2>
-        <div className="mt-10 overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-left">
-            <thead>
-              <tr className="border-b border-line">
-                <th className="w-[36%] pb-4 text-[14px] font-semibold text-soft">Feature</th>
-                {PLANS.map((p) => (
-                  <th key={p.id} className="pb-4 text-center">
-                    <span className={`text-[16px] font-semibold ${p.popular ? "text-accent" : "text-text"}`}>{p.name}</span>
-                    <span className="mt-0.5 block text-[13px] font-semibold text-soft">${cycle === "annual" ? p.annual : p.price} / month</span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
+        {/* One tool instead of six */}
+        <section className="mt-24">
+          <CostStack />
+        </section>
+
+        {/* Compare plans */}
+        <section className="mt-24" aria-labelledby="compare-h">
+          <h2 id="compare-h" className="text-center text-[28px] font-semibold tracking-[-0.02em]">Compare plans</h2>
+          <div className="mt-6 overflow-x-auto rounded-2xl border border-line bg-panel">
+            <table className="w-full min-w-[760px] text-[14px]">
+              <thead>
+                <tr className="border-b border-line text-left">
+                  <th scope="col" className="px-5 py-4 font-medium text-muted">Features</th>
+                  {COLUMNS.map((name, i) => (
+                    <th key={name} scope="col" className={`w-[140px] px-4 py-4 text-center text-[14.5px] font-semibold ${PLANS[i]?.popular ? "text-accent" : ""}`}>{name}</th>
+                  ))}
+                </tr>
+              </thead>
               {COMPARE.map((g) => (
-                <Fragment key={g.group}>
-                  <tr>
-                    <td colSpan={PLANS.length + 1} className="pb-2 pt-8 text-[13px] font-semibold text-accent">{g.group}</td>
+                <tbody key={g.group}>
+                  <tr className="bg-raised">
+                    <th scope="colgroup" colSpan={COLUMNS.length + 1} className="px-5 py-2.5 text-left text-[13px] font-semibold">{g.group}</th>
                   </tr>
                   {g.rows.map((r) => (
-                    <tr key={r.label} className="border-b border-line">
-                      <td className="py-3.5 pr-4 text-[15px] text-text">{r.label}</td>
-                      {r.values.map((v, i) => (
-                        <td key={i} className={`py-3.5 text-center text-[15px] ${PLANS[i].popular ? "bg-accent-tint/60" : ""}`}>
-                          {v === true ? <Check className="mx-auto h-[18px] w-[18px] text-accent" strokeWidth={2.6} /> : v === false ? <Minus className="mx-auto h-4 w-4 text-line-strong" /> : <span className="font-semibold tabular-nums">{v}</span>}
+                    <tr key={r.label} className="border-t border-line">
+                      <th scope="row" className="px-5 py-3 text-left font-normal">{r.label}</th>
+                      {r.cells.map((c, i) => (
+                        <td key={i} className="px-4 py-3 text-center tabular-nums">
+                          {c === true ? <Check className="mx-auto h-4 w-4 text-accent" aria-label="Included" /> : c === false ? <Minus className="mx-auto h-4 w-4 text-line-strong" aria-label="Not included" /> : c}
                         </td>
                       ))}
                     </tr>
                   ))}
-                </Fragment>
+                </tbody>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+            </table>
+          </div>
+        </section>
 
-      {/* Billing questions */}
-      <section className="border-t border-line bg-panel">
-        <div className="mx-auto grid max-w-[1160px] gap-10 px-5 py-20 lg:grid-cols-[0.8fr_1.2fr]">
-          <h2 className="text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">Billing questions</h2>
-          <div className="divide-y divide-line rounded-2xl border border-line">
-            {BILLING_FAQ.map((f) => (
-              <div key={f.q} className="px-6 py-5">
-                <p className="text-[16px] font-semibold">{f.q}</p>
-                <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{f.a}</p>
-              </div>
+        {/* FAQ */}
+        <section className="mx-auto mt-24 max-w-[760px]" aria-labelledby="faq-h">
+          <p className="text-center text-[13px] font-semibold text-accent">FAQ</p>
+          <h2 id="faq-h" className="mt-1.5 text-center text-[28px] font-semibold tracking-[-0.02em]">Have any questions?</h2>
+          <div className="mt-7 border-t border-line">
+            {FAQ.map((item) => (
+              <details key={item.q} className="group border-b border-line">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-[16px] font-medium [&::-webkit-details-marker]:hidden">
+                  {item.q}
+                  <Plus className="h-[18px] w-[18px] shrink-0 text-muted transition-transform group-open:rotate-45" aria-hidden />
+                </summary>
+                <p className="pb-5 pr-8 text-[14.5px] leading-relaxed text-muted">{item.a}</p>
+              </details>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="px-5 py-20">
-        <div className="relative mx-auto flex max-w-[1120px] flex-col items-center overflow-hidden rounded-[28px] bg-[#15121f] px-6 py-20 text-center">
-          <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 h-[460px] w-[760px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-[radial-gradient(closest-side,rgba(123,76,250,0.38),transparent)]" />
-          <h2 className="relative max-w-[640px] text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] text-white! sm:text-[44px]">Your first video, today.</h2>
-          <Link href="#plans" className="btn-primary relative mt-8 h-12 px-7 text-[16px]">
-            See plans
+        <section className="mx-auto mt-20 max-w-[620px] text-center">
+          <h2 className="text-[26px] font-semibold tracking-[-0.02em]">Your first video, today</h2>
+          <Link href="/studio" className="mx-auto mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-7 text-[14.5px] font-semibold text-white transition-colors hover:bg-accent-hover">
+            Sign up
             <ArrowRight className="h-4 w-4" />
           </Link>
-        </div>
-      </section>
+        </section>
+      </main>
 
       <MarketingFooter />
     </div>
@@ -256,7 +280,7 @@ function CostStack() {
   return (
     <div ref={ref} className="grid items-center gap-12 lg:grid-cols-[1fr_1fr]">
       <div>
-        <h2 className="text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">What the same videos cost without Mavya</h2>
+        <h2 className="text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">One tool instead of six.</h2>
         <p className="mt-5 max-w-[480px] text-[18px] leading-relaxed text-muted">
           A hook + demo video takes six jobs: finding the hook, writing the script, making the hook video, the AI creator, the edit and the music. Most people pay a separate tool for each.
         </p>
@@ -282,8 +306,10 @@ function CostStack() {
           </div>
           <ul className="mt-2">
             {STACK.map((x, i) => (
-              <li key={x.tool} className={`flex items-center justify-between gap-4 py-2.5 transition-[opacity,transform] duration-300 ${i < shown ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"}`}>
-                <span className="min-w-0">
+              <li key={x.tool} className={`flex items-center gap-3.5 py-2.5 transition-[opacity,transform] duration-300 ${i < shown ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/landing/logos/${x.logo}.png`} alt="" width={36} height={36} className="h-9 w-9 shrink-0 rounded-lg border border-line bg-panel object-contain p-1" />
+                <span className="min-w-0 flex-1">
                   <span className="block text-[15px] font-semibold">{x.job}</span>
                   <span className="block text-[13px] text-soft">{x.tool}</span>
                 </span>
