@@ -18,6 +18,7 @@ import { AVATAR_TONES, TEXT_Y, clipFromFile, saveStateOf, subscribeSaves, flushR
 import { PLATFORM_LABEL, commentCta, fmtTime, fmtViews, isLikelyBoosted, type DemoClip, type Frame, type Part, type Reference, type SoundPiece, type Run, type TextLayer, type TextPos } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
 import { HistoryPanel } from "@/components/history-panel";
+import { ProductStep, ScriptCard } from "@/components/product-step";
 import { RunPreview, SyncedAudio, SyncedVideo, TextOverlay, WarmthFilter, claimPlayback, soundAt, usePlaybackClaims } from "@/components/run-preview";
 
 const PRODUCT_KEY = "mavya-product-v1";
@@ -96,6 +97,8 @@ export function RunView() {
     },
     [id]
   );
+  /** The product brief and the script are written on the server (Gemini); take only those two sections back. */
+  const takeAI = useCallback((u: Pick<Run, "product" | "script">) => setRun((r) => (r?.id === id ? { ...r, product: u.product ?? null, script: u.script ?? null } : r)), [id]);
 
   /** Text edits from the preview: applied live, saved shortly after (coalesced). */
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -216,6 +219,7 @@ export function RunView() {
   const toggleStep = (n: number) => setPicked(openSteps.includes(n) ? openSteps.filter((x) => x !== n) : [...openSteps, n]);
   const faceName = hook.face?.kind === "character" ? characterById(hook.face.id)?.name : hook.face?.kind === "photo" ? "Your photo" : hook.face?.kind === "described" ? hook.face.text : undefined;
   const stepSummary = [
+    run.product?.brief.name,
     (source ? (source.author ? `Hook from @${source.author}` : source.title) : undefined) ?? (hook.source === "describe" && hook.describeReady ? hook.describe : undefined),
     faceName,
     hook.generated ? "Hook ready" : undefined,
@@ -492,7 +496,11 @@ export function RunView() {
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:grid xl:grid-cols-[minmax(0,1fr)_400px] xl:overflow-hidden">
         <div className="shrink-0 xl:min-h-0 xl:overflow-y-auto">
           <div className="mx-auto max-w-[760px] divide-y divide-line px-8">
-            <Block n={1} title="Steal a hook that already works" done={stepDone[0]} open={openSteps.includes(1)} summary={stepSummary[0]} onToggle={() => toggleStep(1)}>
+            <Block n={1} title="Your product" done={stepDone[0]} open={openSteps.includes(1)} summary={stepSummary[0]} onToggle={() => toggleStep(1)}>
+              <ProductStep runId={run.id} product={run.product ?? null} onDone={takeAI} />
+            </Block>
+
+            <Block n={2} title="Steal a hook that already works" done={stepDone[1]} open={openSteps.includes(2)} summary={stepSummary[1]} onToggle={() => toggleStep(2)}>
               {!source && hook.source === "describe" && hook.describeReady && hook.describe?.trim() ? (
                 <div className="flex items-center gap-4 rounded-2xl border border-line bg-panel p-4">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-tint text-[22px] font-black leading-none text-accent">&ldquo;</span>
@@ -589,10 +597,19 @@ export function RunView() {
                   )}
                 </div>
               )}
+              {run.product?.brief && (source || (hook.source === "describe" && hook.describeReady)) && (
+                <ScriptCard
+                  runId={run.id}
+                  script={run.script && run.script.refId === (source?.id ?? null) ? run.script : null}
+                  hookText={texts.find((x) => x.id === "hook")?.text ?? hook.text}
+                  onDone={takeAI}
+                  onUseHookText={(text) => save({ hook: { ...hook, text }, texts: withHookText({ text }) })}
+                />
+              )}
               {source?.analysis && <HookTiming duration={source.analysis.duration} start={hook.start ?? 0} end={hook.end ?? 3} onChange={(start, end) => save({ hook: { ...hook, start, end } })} />}
             </Block>
 
-            <Block n={2} title="Choose your character" done={stepDone[1]} open={openSteps.includes(2)} summary={stepSummary[1]} onToggle={() => toggleStep(2)}>
+            <Block n={3} title="Choose your character" done={stepDone[2]} open={openSteps.includes(3)} summary={stepSummary[2]} onToggle={() => toggleStep(3)}>
               <CharacterStep
                 face={hook.face ?? null}
                 mode={hook.faceMode}
@@ -604,7 +621,7 @@ export function RunView() {
               />
             </Block>
 
-            <Block n={3} title="Generate your hook" done={stepDone[2]} open={openSteps.includes(3)} summary={stepSummary[2]} onToggle={() => toggleStep(3)}>
+            <Block n={4} title="Generate your hook" done={stepDone[3]} open={openSteps.includes(4)} summary={stepSummary[3]} onToggle={() => toggleStep(4)}>
               <GenerateStep
                 run={run}
                 source={source}
@@ -620,18 +637,18 @@ export function RunView() {
               />
             </Block>
 
-            <Block n={4} title="Add your demo" done={stepDone[3]} open={openSteps.includes(4)} summary={stepSummary[3]} onToggle={() => toggleStep(4)}>
+            <Block n={5} title="Add your demo" done={stepDone[4]} open={openSteps.includes(5)} summary={stepSummary[4]} onToggle={() => toggleStep(5)}>
               <DemoStep
                 run={run}
                 segs={segs}
                 renderEditor={clipEditor}
                 onFiles={async (files) => {
-                  setPicked((p) => Array.from(new Set([...(p ?? openSteps), 4])));
+                  setPicked((p) => Array.from(new Set([...(p ?? openSteps), 5])));
                   await addVideos(files);
                 }}
-                onClips={() => save({ demo: { ...run.demo, mode: "clips", clips: shotList(source).map((x) => ({ ...x, id: uid() })) } })}
+                onClips={() => save({ demo: { ...run.demo, mode: "clips", clips: shotList(source, run).map((x) => ({ ...x, id: uid() })) } })}
                 onUpload={async (cid, f) => {
-                  setPicked((p) => Array.from(new Set([...(p ?? openSteps), 4])));
+                  setPicked((p) => Array.from(new Set([...(p ?? openSteps), 5])));
                   await fillClip(cid, f);
                 }}
                 onRename={(cid, label) => save({ demo: { ...run.demo, clips: demoClips(run).map((c) => (c.id === cid ? { ...c, label } : c)) } })}
@@ -641,7 +658,7 @@ export function RunView() {
               />
             </Block>
 
-            <Block n={5} title="Add sound" done={stepDone[4]} open={openSteps.includes(5)} summary={stepSummary[4]} onToggle={() => toggleStep(5)}>
+            <Block n={6} title="Add sound" done={stepDone[5]} open={openSteps.includes(6)} summary={stepSummary[5]} onToggle={() => toggleStep(6)}>
               <SoundStep run={run} source={source} segs={segs} texts={texts} videoLen={videoLen} onPieces={(sounds) => save({ sounds, sound: null })} />
             </Block>
 
@@ -1094,7 +1111,7 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
     setStartedAt(Date.now());
     // TODO(Runway): send the reference video + character photo (+ `note` as extra prompt); this stand-in waits, then uses a sample clip.
     await new Promise((r) => setTimeout(r, STANDIN_SECONDS * 1000));
-    const original = source?.recipe?.onScreenText?.[0]?.text ?? source?.title ?? "";
+    const original = (run.script && run.script.refId === (source?.id ?? null) ? run.script.hookText : "") || source?.recipe?.onScreenText?.[0]?.text || source?.title || "";
     onGenerated({ src: "/samples/hook-sample.mp4", seconds: 4.2, at: new Date().toISOString(), ...(note?.trim() ? { note: note.trim().slice(0, 300) } : {}) }, described ? "" : original);
     setBusy(false);
   }

@@ -271,7 +271,11 @@ export function moveClipPiece(run: Run, texts: TextLayer[], segId: string, partI
 
 /** Shot list for "Build it clip by clip": from the hook's analysis when there is one, else a proven default
  *  for the reaction + demo format (phone filming the laptop). Suggested texts are samples until the AI writes them per product. */
-export function shotList(source: Reference | null): Omit<DemoClip, "id">[] {
+export function shotList(source: Reference | null, run?: Run): Omit<DemoClip, "id">[] {
+  // The script written for this product and this hook comes first; then the hook's own recipe; then a default.
+  const script = run?.script;
+  if (script?.shots.length && script.refId === (source?.id ?? null))
+    return script.shots.map((s) => ({ label: s.label, hint: s.hint, target: s.seconds, camera: s.camera, steps: s.steps, text: s.text }));
   const fromRecipe = source?.recipe?.demo?.shots;
   if (fromRecipe?.length) return fromRecipe.map((s) => ({ label: s.label, hint: s.hint, target: s.seconds, camera: s.camera, steps: s.steps, text: s.text }));
   return [
@@ -282,10 +286,10 @@ export function shotList(source: Reference | null): Omit<DemoClip, "id">[] {
   ];
 }
 
-/** The five steps of a video, done or not, in order (the run page and the videos grid both use this). */
+/** The six steps of a video, done or not, in order (the run page and the videos grid both use this). */
 export function runSteps(run: Run): boolean[] {
   const h = run.hook;
   const hasDemo = demoClips(run).some((c) => clipSrc(c));
   const hasSound = run.sounds ? run.sounds.length > 0 : Boolean(run.sound);
-  return [Boolean(run.sourceRefId) || Boolean(h.source === "describe" && h.describeReady && h.describe?.trim()), Boolean(h.face), Boolean(h.generated), hasDemo, hasSound];
+  return [Boolean(run.product?.brief), Boolean(run.sourceRefId) || Boolean(h.source === "describe" && h.describeReady && h.describe?.trim()), Boolean(h.face), Boolean(h.generated), hasDemo, hasSound];
 }

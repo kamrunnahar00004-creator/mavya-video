@@ -184,6 +184,35 @@ export type HookMode = "upload" | "avatar";
 export type TextPos = "top" | "center" | "bottom";
 /** Which face goes on the hook: the user's photo or one of the AI faces (face swap, not connected yet). */
 export type Face = { kind: "photo"; mediaId: string } | { kind: "ai"; index: number } | { kind: "character"; id: string } | { kind: "described"; text: string };
+/** What a product is and how to show it, read from its website. */
+export type ProductBrief = {
+  name: string;
+  oneLiner: string;
+  audience: string;
+  problem: string;
+  features: string[];
+  /** The single most impressive thing to show on screen. */
+  wowMoment: string;
+  /** The screens to show in the demo, in order. */
+  demoFlow: string[];
+};
+
+/** One demo shot to film (same shape the "Film your demo" clips use). */
+export type ScriptShot = { label: string; hint: string; steps: string[]; camera: string; text: string; seconds: number };
+
+/** A video script for one product and one hook: the hook's on-screen text and action, then the demo shot by shot. */
+export type VideoScript = {
+  /** The hook's on-screen text for this product, plus two alternatives. */
+  hookText: string;
+  hookAlternatives: string[];
+  /** What the character does in the hook, beat by beat. */
+  hookBeats: { start: number; end: number; action: string }[];
+  shots: ScriptShot[];
+  /** The library hook it was modelled on (null when the user described their own hook). */
+  refId: string | null;
+  at: string;
+};
+
 export type Run = {
   id: string;
   title: string;
@@ -258,6 +287,10 @@ export type Run = {
   sounds?: SoundPiece[];
   /** Finished videos exported from this run, oldest first (shown in My files). */
   exports?: { src: string; seconds: number; at: string }[];
+  /** Step 1: the user's product, read from its website by Gemini (POST /api/runs/[id]/product, on an explicit click). */
+  product?: { url: string; brief: ProductBrief; at: string } | null;
+  /** The script for this product and hook (POST /api/runs/[id]/script), modelled on the library's analyzed hooks. */
+  script?: VideoScript | null;
   /** On-screen texts with timing. The one with id "hook" mirrors hook.text. Absent on older runs. */
   texts?: TextLayer[];
   /** Editor state. Older runs may hold the slot-based Project; the editor rebuilds those. */
