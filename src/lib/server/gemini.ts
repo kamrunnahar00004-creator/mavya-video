@@ -8,11 +8,14 @@ const MODEL = "gemini-flash-latest";
 
 export class GeminiError extends Error {}
 
-export async function geminiJSON<T>(prompt: string, opts: { schema?: object; urlContext?: boolean; temperature?: number } = {}): Promise<T> {
+/** A prompt part: text, or a file sent inline (a short video or an image, base64). */
+export type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
+
+export async function geminiJSON<T>(prompt: string | GeminiPart[], opts: { schema?: object; urlContext?: boolean; temperature?: number } = {}): Promise<T> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new GeminiError("GEMINI_API_KEY is not set.");
   const body = {
-    contents: [{ parts: [{ text: prompt }] }],
+    contents: [{ parts: typeof prompt === "string" ? [{ text: prompt }] : prompt }],
     ...(opts.urlContext ? { tools: [{ url_context: {} }] } : {}),
     generationConfig: {
       temperature: opts.temperature ?? 0.4,
