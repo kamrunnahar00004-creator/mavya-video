@@ -1,4 +1,6 @@
-"""Full recipe for a library hook: hook + on-screen text + demo style + CTA + why it works + hook generation prompt.
+"""Full recipe for a library hook, HOOK + DEMO only (no CTA, founder 2026-10-21: it is part of the video).
+- hook: where it ends (the cut point for the hook clip) and how to recreate it (beats, camera, setting, prompt).
+- demo.shots: the shot-by-shot steps the app shows in "Film your demo", written for the user's OWN product.
 Gemini watches the full video (normal resolution: timing and detail matter here). Writes ref["recipe"].
 Usage: recipe.py [N | <shortcode> ...]   N = sample size; shortcodes = specific videos; default all without a recipe."""
 import base64, json, os, random, sys, threading, time, urllib.request
@@ -22,11 +24,17 @@ that another creator can follow to recreate the same video for THEIR OWN softwar
 Be concrete and time-coded (seconds). Describe what the camera sees, not the identity of the person
 (never describe the person's face, ethnicity or name; say "the creator"). Keep the person's actions, expression, outfit style and setting.
 
+The video has two parts and only two: the HOOK (a person, until the first cut to the software) and the DEMO
+(the software being shown, until the end). Any call to action is part of the demo; do not treat it separately.
+
 Sections:
-- hook: the opening until the first cut to the demo.
+- hook: the opening until the first cut to the demo. "end" must be the exact second of that cut.
 - onScreenText: every text overlay in the whole video, exact words, when it shows, where on screen, style.
-- demo: how the software is shown and each shot.
-- cta: the call to action, if any.
+- demo: how the software is shown, and the demo split into 3 to 6 SHOTS. Each shot is a step another founder will
+  film for THEIR OWN app: "label" is a 2 to 4 word title ("The question", "Say yes"), "hint" says what to film in one
+  plain sentence written to them ("Film your laptop over your shoulder as the link pops up"), "steps" are 1 to 3 short
+  actions to do on screen, "camera" is how to hold the phone, "text" is the original on-screen text during that shot
+  (exact words, empty if none), "seconds" is its length.
 - whyItWorks: 1 or 2 sentences from a marketer's angle (the tension, the payoff, why people watch to the end).
 - hookPrompt: a prompt for an AI video model to generate a NEW hook clip in the same style. Use {CHARACTER} where the person goes.
   Include setting, lighting, framing, camera movement and the action beat by beat with timings. NO on-screen text in this prompt.
@@ -58,21 +66,20 @@ SCHEMA = {
             "spoken": {"type": "STRING", "description": "voiceover during the demo, empty if none"},
             "shots": {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {
                 "start": {"type": "NUMBER"}, "end": {"type": "NUMBER"},
-                "onScreen": {"type": "STRING", "description": "what the software screen shows"},
-                "interaction": {"type": "STRING", "description": "typing, clicking, scrolling, hands visible..."},
-                "camera": {"type": "STRING", "description": "static, zoom in, pan, tilt..."}},
-                "required": ["start", "end", "onScreen", "interaction", "camera"]}},
+                "label": {"type": "STRING", "description": "2 to 4 word title of the step"},
+                "hint": {"type": "STRING", "description": "one sentence: what to film, written to the founder, for their own app"},
+                "steps": {"type": "ARRAY", "items": {"type": "STRING"}, "description": "1 to 3 short on-screen actions"},
+                "camera": {"type": "STRING", "description": "how to hold the phone: over the shoulder, close on the screen..."},
+                "text": {"type": "STRING", "description": "original on-screen text during this shot, exact words, empty if none"},
+                "seconds": {"type": "NUMBER"}},
+                "required": ["start", "end", "label", "hint", "steps", "camera", "text", "seconds"]}},
             "resultReveal": {"type": "STRING"},
         }, "required": ["method", "product", "duration", "pacing", "spoken", "shots", "resultReveal"]},
-        "cta": {"type": "OBJECT", "properties": {
-            "type": {"type": "STRING", "enum": ["comment_keyword", "link_in_bio", "follow", "none", "other"]},
-            "text": {"type": "STRING"}, "at": {"type": "NUMBER", "description": "seconds, -1 if none"}},
-            "required": ["type", "text", "at"]},
         "sound": {"type": "STRING", "description": "trending music, voiceover, sound effects"},
         "whyItWorks": {"type": "STRING"},
         "hookPrompt": {"type": "STRING"},
     },
-    "required": ["hook", "onScreenText", "demo", "cta", "sound", "whyItWorks", "hookPrompt"],
+    "required": ["hook", "onScreenText", "demo", "sound", "whyItWorks", "hookPrompt"],
 }
 
 

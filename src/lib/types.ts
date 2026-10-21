@@ -48,7 +48,14 @@ export type Reference = {
   /** Two-line description of the video for the library preview (scripts/curation/summarize.py). */
   summary?: string;
   /** Production recipe (scripts/curation/recipe.py); only the parts the app reads are typed. */
-  recipe?: { onScreenText?: { text: string }[]; hook?: { end?: number }; demo?: { label: string; hint?: string; seconds?: number; camera?: string; steps?: string[]; text?: string }[] };
+  recipe?: {
+    onScreenText?: { text: string }[];
+    hook?: { end?: number };
+    /** The demo split into steps a founder films for their own app ("Film your demo"). */
+    demo?: { shots?: { label: string; hint?: string; seconds?: number; camera?: string; steps?: string[]; text?: string }[] };
+    /** Prompt for generating a new hook in the same style; {CHARACTER} marks the person. */
+    hookPrompt?: string;
+  };
   postedAt?: string;
   /** Curated but not yet fit-checked: hidden from users. */
   pending?: boolean;

@@ -272,7 +272,7 @@ export function moveClipPiece(run: Run, texts: TextLayer[], segId: string, partI
 /** Shot list for "Build it clip by clip": from the hook's analysis when there is one, else a proven default
  *  for the reaction + demo format (phone filming the laptop). Suggested texts are samples until the AI writes them per product. */
 export function shotList(source: Reference | null): Omit<DemoClip, "id">[] {
-  const fromRecipe = source?.recipe?.demo;
+  const fromRecipe = source?.recipe?.demo?.shots;
   if (fromRecipe?.length) return fromRecipe.map((s) => ({ label: s.label, hint: s.hint, target: s.seconds, camera: s.camera, steps: s.steps, text: s.text }));
   return [
     { label: "Show the problem", target: 2, camera: "Over your shoulder, screen fills the frame", steps: ["Open the old, messy way", "Scroll so it looks endless"], text: "doing this by hand again 😩" },
