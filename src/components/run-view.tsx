@@ -1077,8 +1077,8 @@ function lookBefore(texts: TextLayer[], at: number): TextLayer | undefined {
 const optionBtn = (on: boolean) =>
   `flex items-center gap-1.5 rounded-lg border px-3.5 py-2.5 text-[14px] font-semibold ${on ? "border-accent bg-accent-tint text-accent" : "border-line-strong bg-panel text-text hover:border-accent hover:text-accent"}`;
 
-/** Step 3: the hook clip, in the shared clip editor. Before generating, the video box shows the inputs and a Generate button.
- * Generation is a stand-in (a sample clip) until the Runway API is connected. */
+/** Step 4: the hook clip, in the shared clip editor. Before generating, the video box shows the inputs and a Generate button.
+ * Generate runs Runway (Veo 3.1 Fast) on the server: POST /api/runs/[id]/generate, then poll until the clip is saved. */
 function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, onRemove, onParts, onAdjust, onApplyAll }: {
   run: Run;
   source: Reference | null;
@@ -1094,6 +1094,7 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
 }) {
   const hook = run.hook;
   const [busy, setBusy] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState(0);
   const described = hook.source === "describe" && hook.describeReady ? hook.describe : null;
   const face = hook.face ?? null;
@@ -1107,22 +1108,40 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
   async function generate(note?: string) {
     setRegen(false);
     setFix("");
+    setGenError(null);
     setBusy(true);
     setStartedAt(Date.now());
-    // TODO(Runway): send the reference video + character photo (+ `note` as extra prompt); this stand-in waits, then uses a sample clip.
-    await new Promise((r) => setTimeout(r, STANDIN_SECONDS * 1000));
-    const original = (run.script && run.script.refId === (source?.id ?? null) ? run.script.hookText : "") || source?.recipe?.onScreenText?.[0]?.text || source?.title || "";
-    onGenerated({ src: "/samples/hook-sample.mp4", seconds: 4.2, at: new Date().toISOString(), ...(note?.trim() ? { note: note.trim().slice(0, 300) } : {}) }, described ? "" : original);
-    setBusy(false);
+    // Runway (Veo 3.1 Fast): start the task, then check on it until the video is saved (about a minute).
+    const fail = (msg: string) => {
+      setGenError(msg);
+      setBusy(false);
+    };
+    const res = await fetch(`/api/runs/${run.id}/generate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ note }) }).catch(() => null);
+    const started = (await res?.json().catch(() => null)) as { taskId?: string; error?: string } | null;
+    if (!res?.ok || !started?.taskId) return fail(started?.error ?? "Couldn't start the generation. Try again.");
+    for (let i = 0; i < 90; i++) {
+      await new Promise((r) => setTimeout(r, 4000));
+      const check = (await fetch(`/api/runs/${run.id}/generate?task=${started.taskId}`)
+        .then((r) => r.json())
+        .catch(() => null)) as { state?: string; error?: string; generated?: { src: string; seconds: number; at: string } } | null;
+      if (check?.state === "failed") return fail(check.error ?? "The generation failed. Try again.");
+      if (check?.state === "done" && check.generated) {
+        const original = (run.script && run.script.refId === (source?.id ?? null) ? run.script.hookText : "") || source?.recipe?.onScreenText?.[0]?.text || source?.title || "";
+        onGenerated({ ...check.generated, ...(note?.trim() ? { note: note.trim().slice(0, 300) } : {}) }, described ? "" : original);
+        setBusy(false);
+        return;
+      }
+    }
+    fail("This is taking too long. Try again.");
   }
 
   const mini = "h-[42px] w-[26px] rounded-[5px] border-2 border-white bg-ink object-cover object-top shadow-sm";
   const facePhoto = ch ? ch.src : face?.kind === "photo" ? `/api/media/${face.mediaId}` : null;
   const who = ch ? ch.name : "your character";
   const cover = busy ? (
-    <GenerateProgress photo={facePhoto} who={who} startedAt={startedAt} estimate={STANDIN_SECONDS} />
+    <GenerateProgress photo={facePhoto} who={who} startedAt={startedAt} estimate={GENERATE_SECONDS} />
   ) : !hook.generated ? (
-    <div className="absolute inset-0 flex items-center justify-center">
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4">
       {facePhoto && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={facePhoto} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover object-top opacity-60 blur-md" />
@@ -1131,6 +1150,7 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
       <button type="button" disabled={!ready} title={ready ? undefined : "Pick a hook and a character first"} onClick={() => void generate()} className="btn-primary relative px-4 py-2.5 text-[14px] disabled:opacity-50">
         Generate hook
       </button>
+      {genError && <p role="alert" className="relative rounded-md bg-ink/80 px-2.5 py-1.5 text-center text-[12.5px] font-semibold text-white">{genError}</p>}
     </div>
   ) : null;
 
@@ -1160,6 +1180,9 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
               <img src={`/api/media/${face.mediaId}`} alt="" className={mini} />
             ) : null}
           </div>
+          {hook.generated && !busy && genError && (
+            <p role="alert" className="absolute inset-x-2 bottom-2 rounded-md bg-ink/80 px-2.5 py-1.5 text-center text-[12.5px] font-semibold text-white">{genError}</p>
+          )}
           {hook.generated && !busy && (
             <button type="button" onClick={() => setRegen((o) => !o)} aria-expanded={regen} className="absolute right-2 top-2 flex items-center gap-1 rounded-lg bg-black/60 px-2 py-1 text-[12px] font-bold text-white hover:bg-black/75">
               <RefreshCw className="h-3.5 w-3.5" />
@@ -3976,8 +3999,8 @@ function ClipControls({ label, src, speed = 1, playing, onPlay, t, len, pieces, 
   );
 }
 
-/** Stand-in generation length; the Runway job will report its own progress. */
-const STANDIN_SECONDS = 10;
+/** About how long one Runway (Veo 3.1 Fast) hook takes, for the progress cover. */
+const GENERATE_SECONDS = 70;
 const GEN_STAGES = ["Reading the hook", "Matching {who}", "Animating the moves", "Finishing up"];
 
 /** While a hook generates: the character with a scan line, the current stage, a timer and an easing progress bar. */
