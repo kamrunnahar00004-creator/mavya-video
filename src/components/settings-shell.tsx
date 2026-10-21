@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { BarChart3, ChevronLeft, CreditCard, LayoutList, User } from "lucide-react";
+import { BarChart3, ChevronLeft, CreditCard, LayoutList, LogOut, User } from "lucide-react";
+import { AUTH_ENABLED, signOut } from "@/lib/profile";
 import { PLANS, type Plan } from "@/lib/plans";
 import type { Run } from "@/lib/types";
 
@@ -30,7 +31,7 @@ export function SettingsNav() {
   const pathname = usePathname();
   const { q } = usePreviewPlan();
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-1 flex-col">
       <Link href="/studio" className="flex items-center gap-1.5 px-2 py-2 text-[16px] font-bold">
         <ChevronLeft className="h-4.5 w-4.5" />
         Settings
@@ -57,6 +58,12 @@ export function SettingsNav() {
           </div>
         </div>
       ))}
+      {AUTH_ENABLED && (
+        <button type="button" onClick={() => void signOut()} className="mt-auto flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[14px] font-semibold text-muted hover:bg-raised hover:text-text">
+          <LogOut className="h-[17px] w-[17px]" />
+          Sign out
+        </button>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Upload } from "lucide-react";
 import { SettingsPage } from "@/components/settings-shell";
-import { NO_PROFILE, PROFILE_EVENT, initials, type Profile } from "@/lib/profile";
+import { NO_PROFILE, PROFILE_EVENT, initials, signOut, type Profile } from "@/lib/profile";
 
 /** Settings > Profile: picture, email (from sign-in), first and last name, and deleting the account. */
 export function ProfileView() {
@@ -68,6 +68,16 @@ export function ProfileView() {
       setToast((e as Error).message);
     }
     setBusy(null);
+  };
+
+  const deleteAccount = async () => {
+    setConfirm(false);
+    const res = await fetch("/api/account", { method: "DELETE" }).catch(() => null);
+    if (!res?.ok) {
+      setToast(((await res?.json().catch(() => null)) as { error?: string } | null)?.error ?? "Couldn't delete the account.");
+      return;
+    }
+    await signOut();
   };
 
   const dirty = saved !== null && (first.trim() !== saved.firstName || last.trim() !== saved.lastName);
@@ -140,10 +150,7 @@ export function ProfileView() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setConfirm(false);
-                  setToast("Accounts are not connected yet.");
-                }}
+                onClick={() => void deleteAccount()}
                 className="rounded-lg bg-red-600 px-4 py-2 text-[14px] font-bold text-white hover:bg-red-700"
               >
                 Delete account

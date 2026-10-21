@@ -62,10 +62,10 @@ export function MarketingHeader({ active }: { active?: "pricing" }) {
         </nav>
         {!MAINTENANCE && (
           <div className="ml-auto flex items-center gap-3">
-            <Link href="/studio" className="text-[14px] font-semibold text-muted hover:text-text">
+            <Link href="/login" className="text-[14px] font-semibold text-muted hover:text-text">
               Log in
             </Link>
-            <Link href="/studio" className="btn-primary px-4 py-2 text-[14px]">
+            <Link href="/login" className="btn-primary px-4 py-2 text-[14px]">
               Sign up
             </Link>
           </div>
