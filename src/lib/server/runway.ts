@@ -31,7 +31,7 @@ const runway = () => (client ??= new RunwayML());
 const exec = promisify(execFile);
 
 const NO_TEXT = "No text, captions, subtitles, stickers or watermarks anywhere in the frame.";
-const BODY = "Natural, anatomically correct hands with five fingers, no extra limbs, no props or accessories that are not in the photo.";
+const BODY = "Natural hands with five fingers, no extra limbs.";
 const NEGATIVE = "text, captions, subtitles, watermark, logo, new objects, nail polish, extra fingers, deformed hands, distorted face, morphing, outfit change";
 
 type Beat = { start: number; end: number; action: string };
@@ -95,21 +95,45 @@ async function hookVideo(run: Run, source: Reference | null, dir: string): Promi
   return out;
 }
 
-type Plan = { motion: Beat[]; outfit: string; endAt: number };
+type Plan = { motion: Beat[]; camera: string; handheld: boolean; outfit: string; endAt: number };
 const PLAN_SCHEMA = {
   type: "OBJECT",
   properties: {
     motion: { type: "ARRAY", items: { type: "OBJECT", properties: { start: { type: "NUMBER" }, end: { type: "NUMBER" }, action: { type: "STRING" } }, required: ["start", "end", "action"] } },
+    camera: { type: "STRING" },
+    handheld: { type: "BOOLEAN" },
     outfit: { type: "STRING" },
     endAt: { type: "NUMBER" },
   },
-  required: ["motion", "outfit", "endAt"],
+  required: ["motion", "camera", "handheld", "outfit", "endAt"],
 };
 const PLAN_PROMPT = (who: string) => `VIDEO 1 is a short selfie hook. ${who} will re-perform it exactly.
 Write the plan in JSON:
-- motion: the performance second by second, 4 to 7 segments covering the whole video. For each: what the head, eyes, mouth and EACH hand do, any object they hold, and camera movement. Concrete and physical ("right hand lifts the glass to the lips, eyes stay wide on the lens"). Never describe who the person is. All segments together under 550 characters.
+- motion: the performance second by second, 4 to 7 segments covering the whole video. For each: what the head, eyes, mouth and EACH hand do and any object they hold. Concrete and physical ("right hand lifts the glass to the lips, eyes stay wide on the lens"). Never describe who the person is. All segments together under 480 characters.
+- camera: how the phone camera itself moves over time, with seconds: handheld shake, drift, a quick push-in toward the face, pulling back, a zoom, a tilt or pan, or steady. Under 170 characters.
+- handheld: true if VIDEO 1 is filmed on a phone held by hand (front or back camera) with any visible camera movement or shake.
 - outfit: what the new person wears: the same garment colors and style as in VIDEO 1, unless that garment does not suit this person (for example a tank top, halter, crop top or dress on a man, or anything revealing), then the closest equivalent that suits them, same colors. No jewelry or nail polish unless the new person already has it. Under 120 characters.
 - endAt: the second when the last action has finished and the pose is settled (not mid-motion), within the video.`;
+
+/** The real-UGC look (founder 2026-10-21: Veo alone is too polished; no post-processing, it must be in the prompt). */
+const UGC =
+  "It must look like real UGC filmed by the person on their own phone front camera: handheld and NOT stabilized, natural micro-shake and small wobbles, slight autofocus and exposure shifts, casual framing. Not cinematic, no smooth gimbal or dolly moves, no studio lighting.";
+
+/** Gemini's plan for re-performing the hook: the motion, the camera, the outfit for this person, the end frame. */
+async function planFor(clip: string, who: { image: string | null; words: string }): Promise<Plan> {
+  return geminiJSON<Plan>(
+    [
+      { text: "VIDEO 1:" },
+      { inline_data: { mime_type: "video/mp4", data: (await readFile(clip)).toString("base64") } },
+      ...(who.image ? [{ text: "IMAGE 2 (the new person):" }, { inline_data: { mime_type: who.image.slice(5, who.image.indexOf(";")), data: who.image.slice(who.image.indexOf(",") + 1) } }] : []),
+      { text: PLAN_PROMPT(who.image ? "The person in IMAGE 2" : `A new person (${who.words})`) },
+    ],
+    { schema: PLAN_SCHEMA, temperature: 0.2 },
+  );
+}
+const motionText = (plan: Plan) => (plan.motion ?? []).map((m) => `${m.start.toFixed(1)}-${m.end.toFixed(1)}s ${m.action}`).join(" ").slice(0, 520);
+/** The camera part of the prompt: the original's camera moves, and the UGC look whenever it was handheld. */
+const cameraText = (camera: string, handheld: boolean) => `Camera: ${camera.slice(0, 200)}.${handheld ? ` ${UGC}` : ""}`;
 
 /**
  * Start one hook generation; returns the Runway task id. `note` is what went wrong last time (Regenerate).
@@ -133,24 +157,19 @@ async function startHookInner(run: Run, source: Reference | null, note: string |
   const fix = note?.trim() ? ` Fix this from the last try: ${note.trim().slice(0, 200)}.` : "";
   const dir = await mkdtemp(path.join(tmpdir(), "mavya-hook-"));
   try {
-    const clip = simple ? null : await hookVideo(run, source, dir);
+    const clip = await hookVideo(run, source, dir);
+    // The plan comes from the original video when there is one; in the fallback a refused plan is not fatal.
+    let plan: Plan | null = null;
+    if (clip) {
+      if (simple) plan = await planFor(clip, who).catch(() => null);
+      else plan = await planFor(clip, who);
+    }
 
     // A hook with a video: recreate it in its own scene.
-    if (clip) {
-      const plan = await geminiJSON<Plan>(
-        [
-          { text: "VIDEO 1:" },
-          { inline_data: { mime_type: "video/mp4", data: (await readFile(clip)).toString("base64") } },
-          ...(who.image ? [{ text: "IMAGE 2 (the new person):" }, { inline_data: { mime_type: who.image.slice(5, who.image.indexOf(";")), data: who.image.slice(who.image.indexOf(",") + 1) } }] : []),
-          { text: PLAN_PROMPT(who.image ? "The person in IMAGE 2" : `A new person (${who.words})`) },
-        ],
-        { schema: PLAN_SCHEMA, temperature: 0.2 },
-      );
+    if (clip && plan && !simple) {
       const length = (await clipSeconds(clip)) || 3;
       const endAt = Math.min(Math.max(Number(plan.endAt) || length - 0.2, 0.8), length - 0.05);
       const outfit = String(plan.outfit ?? "").slice(0, 160) || "the same clothes as in the scene";
-      const motion = (plan.motion ?? []).map((m) => `${m.start.toFixed(1)}-${m.end.toFixed(1)}s ${m.action}`).join(" ").slice(0, 650);
-
       const first = path.join(dir, "first.jpg");
       const last = path.join(dir, "last.jpg");
       await ff("-ss", "0.05", "-i", clip, "-frames:v", "1", "-q:v", "3", first);
@@ -170,7 +189,7 @@ async function startHookInner(run: Run, source: Reference | null, note: string |
       const task = await runway().imageToVideo.create({
         model: "veo3.1_fast",
         promptImage: [{ uri: firstUrl, position: "first" }, { uri: lastUrl, position: "last" }],
-        promptText: `Vertical handheld phone selfie video. Same person, outfit, held objects, room and light from the first to the last frame; no new objects; natural unpolished nails. ${motion}${fix} ${BODY} ${NO_TEXT}`.slice(0, 1000),
+        promptText: `Vertical phone selfie video. Same person, outfit, held objects, room and light from the first to the last frame; no new objects; natural unpolished nails. ${motionText(plan)} ${cameraText(plan.camera, plan.handheld)}${fix} ${BODY} ${NO_TEXT}`.slice(0, 1000),
         negativePrompt: NEGATIVE,
         ratio: "720:1280",
         duration: HOOK_SECONDS,
@@ -179,15 +198,17 @@ async function startHookInner(run: Run, source: Reference | null, note: string |
       return task.id;
     }
 
-    // A described hook: create it from the character photo (or words) and the beats.
+    // From the character photo (the fallback, or a described hook): the plan's motion and camera when there is an
+    // original video, else the script's beats; always the phone-filmed UGC look.
     const recipe = recipeOf(source);
-    const camera = recipe?.camera ?? "handheld front-facing selfie, close-up";
+    const doing = plan ? motionText(plan) : action(run, source);
+    const camera = cameraText(plan?.camera ?? recipe?.camera ?? "front-facing selfie, close-up, held at arm's length", plan ? plan.handheld : true);
     const mood = recipe?.mood ? `Mood: ${recipe.mood}.` : "";
     if (who.image) {
       const task = await runway().imageToVideo.create({
         model: "veo3.1_fast",
         promptImage: [{ uri: who.image, position: "first" }],
-        promptText: `Vertical selfie video filmed on a phone, ${camera}. The person in the image, in the same place as in the image. ${mood} Action: ${action(run, source)} Realistic, natural motion.${fix} ${BODY} ${NO_TEXT}`.slice(0, 1000),
+        promptText: `Vertical phone selfie video. The person in the image, in the same place as in the image. ${mood} ${doing} ${camera}${fix} ${BODY} ${NO_TEXT}`.slice(0, 1000),
         negativePrompt: NEGATIVE,
         ratio: "720:1280",
         duration: HOOK_SECONDS,
@@ -197,7 +218,7 @@ async function startHookInner(run: Run, source: Reference | null, note: string |
     }
     const task = await runway().textToVideo.create({
       model: "veo3.1_fast",
-      promptText: `Vertical selfie video filmed on a phone, ${camera}. ${who.words}. ${mood} Action: ${action(run, source)} Realistic, natural motion.${fix} ${BODY} ${NO_TEXT}`.slice(0, 1000),
+      promptText: `Vertical phone selfie video. ${who.words}. ${mood} ${doing} ${camera}${fix} ${BODY} ${NO_TEXT}`.slice(0, 1000),
       ratio: "720:1280",
       duration: HOOK_SECONDS,
       audio: false,
