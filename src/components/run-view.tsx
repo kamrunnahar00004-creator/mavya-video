@@ -1093,6 +1093,7 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
   onApplyAll?: (id: string) => void;
 }) {
   const hook = run.hook;
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState(0);
@@ -1117,7 +1118,13 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
       setBusy(false);
     };
     const res = await fetch(`/api/runs/${run.id}/generate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ note }) }).catch(() => null);
-    const started = (await res?.json().catch(() => null)) as { taskId?: string; generationId?: string | null; error?: string } | null;
+    const started = (await res?.json().catch(() => null)) as { taskId?: string; generationId?: string | null; error?: string; needsPlan?: boolean } | null;
+    // No plan, or this month's hooks used up: the plans page (the video is saved).
+    if (res?.status === 402 && started?.needsPlan) {
+      setBusy(false);
+      router.push("/settings/plans");
+      return;
+    }
     if (!res?.ok || !started?.taskId) return fail(started?.error ?? "Couldn't start the generation. Try again.");
     // If a model refuses, the server starts the simpler version and hands back its task.
     let taskId = started.taskId;

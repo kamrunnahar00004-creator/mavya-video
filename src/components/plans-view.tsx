@@ -2,20 +2,45 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import { ContactDialog } from "@/components/contact-dialog";
 import { PlanCards } from "@/components/plan-cards";
-import { SettingsPage, usePreviewPlan, useToast } from "@/components/settings-shell";
-import { BUSINESS, type BillingCycle } from "@/lib/plans";
+import { BTN_OUTLINE, SettingsPage, billingAction, useAccount, useToast } from "@/components/settings-shell";
+import { BUSINESS, type BillingCycle, type Plan } from "@/lib/plans";
 
-/** Settings > Plans: monthly / yearly switch, the plan cards with Business last, and a link to the full comparison. */
+/**
+ * Settings > Plans: monthly / yearly switch, the plan cards with Business last, and a link to the full comparison.
+ * No plan: a card's button opens Stripe Checkout. With a plan: it switches the subscription (prorated) after a confirm.
+ */
 export function PlansView() {
-  const { plan: current } = usePreviewPlan();
-  const [cycle, setCycle] = useState<BillingCycle>("monthly");
+  const router = useRouter();
+  const { billing, plan: current, loaded, reload } = useAccount({ billing: true });
+  const currentCycle = billing?.subscription?.cycle ?? "monthly";
+  const [cycle, setCycle] = useState<BillingCycle | null>(null);
+  const shown = cycle ?? currentCycle;
   const [toast, setToast] = useToast();
   const [contact, setContact] = useState(false);
+  const [confirm, setConfirm] = useState<Plan | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const closeContact = useCallback(() => setContact(false), []);
-  const yearly = cycle === "annual";
+  const yearly = shown === "annual";
+
+  const choose = async (p: Plan) => {
+    setBusy(p.id);
+    const error = await billingAction(current ? "change" : "checkout", { plan: p.id, cycle: shown });
+    if (error) {
+      setToast(error);
+      setBusy(null);
+      return;
+    }
+    if (current) {
+      await reload();
+      setBusy(null);
+      router.push("/settings/billing");
+    }
+    // Checkout: the page is leaving for Stripe, so the button stays busy.
+  };
 
   const toggle = (
     <div className="text-right">
@@ -37,22 +62,29 @@ export function PlansView() {
     </div>
   );
 
+  const label = (p: Plan) => {
+    if (!current) return `Choose ${p.name}`;
+    if (p.id === current.id) return shown === "annual" ? "Switch to yearly" : "Switch to monthly";
+    return p.price > current.price ? "Upgrade" : "Downgrade";
+  };
+
   return (
     <SettingsPage title="Plans" subtitle="Choose the plan that best fits your needs" wide aside={toggle}>
       <div className="mt-8">
         <PlanCards
           current={current?.id}
-          cycle={cycle}
+          cycle={shown}
           action={(p) =>
-            p.id === current?.id ? (
+            p.id === current?.id && shown === currentCycle ? (
               <span className="flex w-full items-center justify-center rounded-lg border border-line py-2.5 text-[14px] font-bold text-soft">Current plan</span>
             ) : (
               <button
                 type="button"
-                onClick={() => setToast("Checkout is not connected yet.")}
-                className={p.popular ? "btn-primary w-full py-2.5 text-[14px]" : "flex w-full items-center justify-center rounded-lg border border-line-strong py-2.5 text-[14px] font-bold text-text hover:border-ink"}
+                disabled={!loaded || busy !== null}
+                onClick={() => (current ? setConfirm(p) : void choose(p))}
+                className={`${p.popular ? "btn-primary w-full py-2.5 text-[14px]" : "flex w-full items-center justify-center rounded-lg border border-line-strong py-2.5 text-[14px] font-bold text-text hover:border-ink"} disabled:opacity-60`}
               >
-                {!current ? `Choose ${p.name}` : p.price > current.price ? "Upgrade" : "Downgrade"}
+                {busy === p.id ? "Opening..." : label(p)}
               </button>
             )
           }
@@ -82,6 +114,34 @@ export function PlansView() {
       <p className="mt-6 text-[13.5px] text-muted">
         <Link href="/pricing#compare-h" className="font-semibold text-accent hover:underline">Compare all features</Link>
       </p>
+
+      {confirm && current && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#15121f]/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && setConfirm(null)}>
+          <div role="alertdialog" aria-modal="true" aria-labelledby="change-title" className="w-full max-w-[420px] rounded-2xl bg-panel p-6 shadow-[0_24px_64px_-16px_rgba(21,18,31,0.45)]">
+            <h2 id="change-title" className="text-[19px] font-bold">Switch to {confirm.name}?</h2>
+            <p className="mt-2 text-[14px] text-muted">
+              {shown === "annual" ? `$${confirm.yearly} a year` : `$${confirm.price} a month`}. The difference is prorated on your next invoice.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" onClick={() => setConfirm(null)} className={BTN_OUTLINE}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => {
+                  const p = confirm;
+                  setConfirm(null);
+                  void choose(p);
+                }}
+                className="btn-primary px-4 py-2 text-[14px]"
+              >
+                Switch plan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <ContactDialog open={contact} onClose={closeContact} />
       {toast}
     </SettingsPage>

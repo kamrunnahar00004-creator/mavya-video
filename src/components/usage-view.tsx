@@ -1,27 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { BTN_OUTLINE, SettingsPage, renewsOn, useMonthUsage, usePreviewPlan } from "@/components/settings-shell";
+import { BTN_OUTLINE, SettingsPage, formatDate, useAccount } from "@/components/settings-shell";
 
-/** Settings > Usage: this month's AI hooks, a bar that fills against the plan's limit. */
+/** Settings > Usage: this period's AI hooks, a bar that fills against the plan's limit. */
 export function UsageView() {
-  const { plan } = usePreviewPlan();
-  const used = useMonthUsage();
-  const hooks = used?.hooks ?? 0;
-  const pct = plan ? Math.min(100, (hooks / plan.hooks) * 100) : 0;
+  const { usage, plan, loaded } = useAccount();
+  const used = usage?.used ?? 0;
+  const limit = usage?.limit ?? null;
+  const pct = limit ? Math.min(100, (used / limit) * 100) : 0;
+  const unlimited = Boolean(usage && limit === null);
   return (
-    <SettingsPage title="Usage" subtitle={plan ? `This month, resets on ${renewsOn()}` : "This month"}>
+    <SettingsPage title="Usage" subtitle={plan && usage?.resetsAt ? `Resets on ${formatDate(usage.resetsAt)}` : "This month"}>
       <div className="mt-6 rounded-2xl border border-line bg-panel p-5">
         <div className="flex items-baseline justify-between gap-4">
           <p className="text-[15px] font-bold">AI video hooks</p>
-          <p className="text-[14px] font-semibold tabular-nums text-muted">
-            {used === null ? "..." : plan ? `${hooks} / ${plan.hooks}` : "No plan"}
-          </p>
+          <p className="text-[14px] font-semibold tabular-nums text-muted">{!loaded ? "..." : unlimited ? `${used} used` : plan ? `${used} / ${limit}` : "No plan"}</p>
         </div>
         <span className="mt-3 block h-2 overflow-hidden rounded-full bg-raised">
           <span className={`block h-full rounded-full ${pct >= 100 ? "bg-red-600" : "bg-accent"}`} style={{ width: `${pct}%` }} />
         </span>
-        {!plan && (
+        {loaded && !plan && !unlimited && (
           <Link href="/settings/plans" className={`${BTN_OUTLINE} mt-4`}>
             View plans
           </Link>

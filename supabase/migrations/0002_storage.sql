@@ -64,9 +64,19 @@ create table public.subscriptions (
   current_period_start timestamptz,
   current_period_end timestamptz,
   cancel_at_period_end boolean not null default false,
+  price_id text,
   stripe_customer_id text unique,
   stripe_subscription_id text unique,
+  -- The Stripe event time that last wrote this row: an older event arriving late never overwrites a newer state.
+  last_event_created bigint not null default 0,
   updated_at timestamptz not null default now()
+);
+
+-- Stripe webhook events already handled (a duplicate delivery is acknowledged without reprocessing).
+create table public.billing_events (
+  id text primary key,
+  type text not null,
+  created_at timestamptz not null default now()
 );
 
 alter table public.runs enable row level security;
@@ -75,4 +85,5 @@ alter table public.media enable row level security;
 alter table public.assets enable row level security;
 alter table public.generations enable row level security;
 alter table public.subscriptions enable row level security;
-grant all on public.runs, public.library, public.media, public.assets, public.generations, public.subscriptions to service_role;
+alter table public.billing_events enable row level security;
+grant all on public.runs, public.library, public.media, public.assets, public.generations, public.subscriptions, public.billing_events to service_role;

@@ -1,18 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { BarChart3, ChevronLeft, CreditCard, LayoutList, LogOut, User } from "lucide-react";
 import { AUTH_ENABLED, signOut } from "@/lib/profile";
-import { PLANS, type Plan } from "@/lib/plans";
-import type { Run } from "@/lib/types";
+import { planById, type BillingCycle, type Plan, type PlanId } from "@/lib/plans";
 
 /*
  * Settings, laid out like Alura's: its own sidebar (back to the app, then Profile, Plans, Billing, Usage) and on
- * each page a title, one line under it and a rule, then plain cards.
- * Accounts and Stripe are not connected yet, so nobody has a plan. `?plan=pro` (or starter / studio) previews every
- * settings page as a paying customer; the settings links keep it.
+ * each page a title, one line under it and a rule, then plain cards. The plan, usage, card and invoices come from
+ * /api/usage and /api/billing (our `subscriptions` row, written by the Stripe webhook, and Stripe itself).
  */
 const GROUPS = [
   { label: "Account", items: [{ href: "/settings", label: "Profile", icon: User }] },
@@ -29,7 +27,6 @@ const GROUPS = [
 /** The settings sidebar (replaces the app nav while in Settings). */
 export function SettingsNav() {
   const pathname = usePathname();
-  const { q } = usePreviewPlan();
   return (
     <div className="flex flex-1 flex-col">
       <Link href="/studio" className="flex items-center gap-1.5 px-2 py-2 text-[16px] font-bold">
@@ -46,7 +43,7 @@ export function SettingsNav() {
               return (
                 <Link
                   key={href}
-                  href={href + q}
+                  href={href}
                   aria-current={on ? "page" : undefined}
                   className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[14px] font-semibold ${on ? "bg-raised text-text" : "text-muted hover:bg-raised hover:text-text"}`}
                 >
@@ -86,43 +83,52 @@ export function SettingsPage({ title, subtitle, wide, aside, children }: { title
   );
 }
 
-/** The previewed plan (`?plan=`) and the query to keep it on settings links. */
-export function usePreviewPlan(): { plan: Plan | null; q: string } {
-  const id = useSearchParams().get("plan");
-  const plan = PLANS.find((p) => p.id === id) ?? null;
-  return { plan, q: plan ? `?plan=${plan.id}` : "" };
-}
-
 /** One date format on server and browser (a locale default would differ and break hydration). */
-export const formatDate = (d: Date, month: "long" | "short" = "long") => d.toLocaleDateString("en-US", { month, day: "numeric", year: "numeric" });
+export const formatDate = (d: Date | string, month: "long" | "short" = "long") => new Date(d).toLocaleDateString("en-US", { month, day: "numeric", year: "numeric" });
 
-/** The first of next month, when a monthly plan renews and the month's AI hooks reset. */
-export const renewsOn = () => {
-  const now = new Date();
-  return formatDate(new Date(now.getFullYear(), now.getMonth() + 1, 1));
+export type Usage = { plan: PlanId | null; admin: boolean; used: number; limit: number | null; resetsAt: string | null };
+export type Subscription = { plan: PlanId; cycle: BillingCycle | null; status: string; periodEnd: string | null; cancelAtPeriodEnd: boolean };
+export type Billing = {
+  enabled: boolean;
+  subscription: Subscription | null;
+  card: { brand: string; last4: string; expMonth: number; expYear: number } | null;
+  invoices: { id: string; date: string; amount: number; currency: string; status: string; plan: string; pdf: string | null }[];
 };
 
-/** This month's use, counted from the saved videos (generated hooks, including older versions, and exports). */
-export function useMonthUsage() {
-  const [used, setUsed] = useState<{ hooks: number; exports: number } | null>(null);
+const get = <T,>(url: string) => fetch(url, { cache: "no-store" }).then((r) => (r.ok ? (r.json() as Promise<T>) : null)).catch(() => null);
+
+/** The plan with usage (and, with `billing`, the card and invoices). `reload` after a change. */
+export function useAccount({ billing: withBilling = false } = {}) {
+  const [usage, setUsage] = useState<Usage | null>(null);
+  const [billing, setBilling] = useState<Billing | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const reload = useCallback(async () => {
+    const [u, b] = await Promise.all([get<Usage>("/api/usage"), withBilling ? get<Billing>("/api/billing") : null]);
+    setUsage(u);
+    setBilling(b);
+    setLoaded(true);
+    return { usage: u, billing: b };
+  }, [withBilling]);
   useEffect(() => {
-    let alive = true;
-    fetch("/api/runs")
-      .then((r) => r.json() as Promise<Run[]>)
-      .then((runs) => {
-        if (!alive) return;
-        const month = new Date().toISOString().slice(0, 7);
-        const thisMonth = (at?: string) => Boolean(at?.startsWith(month));
-        const hooks = runs.reduce((n, r) => n + [...(r.hook.versions ?? []), ...(r.hook.generated ? [r.hook.generated] : [])].filter((g) => thisMonth(g.at)).length, 0);
-        const exports = runs.reduce((n, r) => n + (r.exports ?? []).filter((x) => thisMonth(x.at)).length, 0);
-        setUsed({ hooks, exports });
-      })
-      .catch(() => alive && setUsed({ hooks: 0, exports: 0 }));
-    return () => {
-      alive = false;
-    };
-  }, []);
-  return used;
+    // Fetch on mount; the setState calls happen after the await.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void reload();
+  }, [reload]);
+  const plan: Plan | null = usage?.plan ? planById(usage.plan) : billing?.subscription ? planById(billing.subscription.plan) : null;
+  return { usage, billing, plan, loaded, reload };
+}
+
+/** POST an action to /api/billing; a returned url (Checkout, card page) is opened. Returns an error message or null. */
+export async function billingAction(action: string, extra: Record<string, unknown> = {}): Promise<string | null> {
+  try {
+    const r = await fetch("/api/billing", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, ...extra }) });
+    const j = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
+    if (!r.ok) return j.error ?? "Something went wrong. Try again.";
+    if (j.url) window.location.assign(j.url);
+    return null;
+  } catch {
+    return "Something went wrong. Try again.";
+  }
 }
 
 /** A short message at the bottom of the screen. */
@@ -137,5 +143,5 @@ export function useToast() {
   return [node, setToast] as const;
 }
 
-export const BTN_OUTLINE = "inline-flex items-center justify-center gap-2 rounded-lg border border-line-strong bg-panel px-4 py-2 text-[14px] font-bold text-text hover:border-ink";
-export const BTN_DANGER = "inline-flex items-center justify-center gap-2 rounded-lg border border-red-300 bg-panel px-4 py-2 text-[14px] font-bold text-red-700 hover:bg-red-50";
+export const BTN_OUTLINE = "inline-flex items-center justify-center gap-2 rounded-lg border border-line-strong bg-panel px-4 py-2 text-[14px] font-bold text-text hover:border-ink disabled:opacity-50";
+export const BTN_DANGER = "inline-flex items-center justify-center gap-2 rounded-lg border border-red-300 bg-panel px-4 py-2 text-[14px] font-bold text-red-700 hover:bg-red-50 disabled:opacity-50";

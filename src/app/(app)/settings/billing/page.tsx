@@ -4,7 +4,7 @@ import { BillingView } from "@/components/billing-view";
 
 export const metadata: Metadata = { title: "Billing · Mavya" };
 
-/** Reads `?plan=` (preview), so it renders inside a Suspense boundary. */
+/** Reads `?paid=` (back from Checkout), so it renders inside a Suspense boundary. */
 export default function Page() {
   return (
     <Suspense fallback={<div className="card h-full" />}>
