@@ -111,13 +111,29 @@ Write the plan in JSON:
 - outfit: what the new person wears: the same garment colors and style as in VIDEO 1, unless that garment does not suit this person (for example a tank top, halter, crop top or dress on a man, or anything revealing), then the closest equivalent that suits them, same colors. No jewelry or nail polish unless the new person already has it. Under 120 characters.
 - endAt: the second when the last action has finished and the pose is settled (not mid-motion), within the video.`;
 
-/** Start one hook generation; returns the Runway task id. `note` is what went wrong last time (Regenerate). */
-export async function startHook(run: Run, source: Reference | null, note?: string): Promise<string> {
+/**
+ * Start one hook generation; returns the Runway task id. `note` is what went wrong last time (Regenerate).
+ * `simple`: skip the scene recreation and create from the character photo (the fallback when a model refuses).
+ * If the recreation itself fails to start (a refusal in the plan or the frames), it falls back on its own.
+ */
+export async function startHook(run: Run, source: Reference | null, note?: string, simple = false): Promise<string> {
+  if (!simple) {
+    try {
+      return await startHookInner(run, source, note, false);
+    } catch (e) {
+      if (e instanceof Error && /character|photo/i.test(e.message)) throw e;
+      console.error("hook recreation failed, falling back to the photo", e);
+    }
+  }
+  return startHookInner(run, source, note, true);
+}
+
+async function startHookInner(run: Run, source: Reference | null, note: string | undefined, simple: boolean): Promise<string> {
   const who = await characterOf(run);
   const fix = note?.trim() ? ` Fix this from the last try: ${note.trim().slice(0, 200)}.` : "";
   const dir = await mkdtemp(path.join(tmpdir(), "mavya-hook-"));
   try {
-    const clip = await hookVideo(run, source, dir);
+    const clip = simple ? null : await hookVideo(run, source, dir);
 
     // A hook with a video: recreate it in its own scene.
     if (clip) {

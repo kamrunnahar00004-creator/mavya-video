@@ -1119,11 +1119,19 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
     const res = await fetch(`/api/runs/${run.id}/generate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ note }) }).catch(() => null);
     const started = (await res?.json().catch(() => null)) as { taskId?: string; error?: string } | null;
     if (!res?.ok || !started?.taskId) return fail(started?.error ?? "Couldn't start the generation. Try again.");
-    for (let i = 0; i < 90; i++) {
+    // If a model refuses, the server starts the simpler version and hands back its task.
+    let taskId = started.taskId;
+    let fallback = false;
+    for (let i = 0; i < 120; i++) {
       await new Promise((r) => setTimeout(r, 4000));
-      const check = (await fetch(`/api/runs/${run.id}/generate?task=${started.taskId}`)
+      const check = (await fetch(`/api/runs/${run.id}/generate?task=${taskId}${fallback ? "&fallback=1" : ""}`)
         .then((r) => r.json())
-        .catch(() => null)) as { state?: string; error?: string; generated?: { src: string; seconds: number; at: string } } | null;
+        .catch(() => null)) as { state?: string; error?: string; taskId?: string; fallback?: boolean; generated?: { src: string; seconds: number; at: string } } | null;
+      if (check?.taskId && check.fallback) {
+        taskId = check.taskId;
+        fallback = true;
+        continue;
+      }
       if (check?.state === "failed") return fail(check.error ?? "The generation failed. Try again.");
       if (check?.state === "done" && check.generated) {
         const original = (run.script && run.script.refId === (source?.id ?? null) ? run.script.hookText : "") || source?.recipe?.onScreenText?.[0]?.text || source?.title || "";
