@@ -1,5 +1,6 @@
 import { GeminiError, geminiJSON } from "@/lib/server/gemini";
 import { getRun, updateRun } from "@/lib/server/store";
+import { currentUser, signInFirst } from "@/lib/server/who";
 import type { ProductBrief } from "@/lib/types";
 
 /**
@@ -27,7 +28,9 @@ If the site cannot be opened or is not a software product, answer {"name": ""}.`
 
 export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/product">) {
   const { id } = await ctx.params;
-  const run = await getRun(id);
+  const who = await currentUser();
+  if (!who) return signInFirst();
+  const run = await getRun(id, who);
   if (!run) return Response.json({ error: "Not found" }, { status: 404 });
   const body = (await request.json().catch(() => null)) as { url?: unknown } | null;
   let raw = typeof body?.url === "string" ? body.url.trim() : "";
@@ -60,12 +63,14 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/p
   };
   if (!clean.name) return Response.json({ error: "Couldn't read a product on that site. Check the link." }, { status: 422 });
   // A new product makes the old script stale.
-  const updated = await updateRun(id, { product: { url: url.toString(), brief: clean, at: new Date().toISOString() }, script: null });
+  const updated = await updateRun(id, { product: { url: url.toString(), brief: clean, at: new Date().toISOString() }, script: null }, who);
   return Response.json(updated);
 }
 
 export async function DELETE(_request: Request, ctx: RouteContext<"/api/runs/[id]/product">) {
   const { id } = await ctx.params;
-  const updated = await updateRun(id, { product: null, script: null });
+  const who = await currentUser();
+  if (!who) return signInFirst();
+  const updated = await updateRun(id, { product: null, script: null }, who);
   return updated ? Response.json(updated) : Response.json({ error: "Not found" }, { status: 404 });
 }

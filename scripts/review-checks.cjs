@@ -20,7 +20,7 @@ async function main() {
   const { soundPieces } = load('lib/sound.ts');
   const run = { hook: { mode: 'upload', text: '', clip: null }, demo: { clip: null, frame: 'none' }, sound: { kind: 'upload', src: '/api/media/a.mp3', start: 1, at: 2, end: 4, volume: 80 }, sounds: [] };
   assert.deepEqual(soundPieces(run, 8), []);
-  assert.equal(runSteps(run)[4], false);
+  assert.equal(runSteps(run)[5], false);
   delete run.sounds;
   assert.equal(soundPieces(run, 8)[0].at, 2);
   assert.equal(soundPieces(run, 8)[0].end, 4);
@@ -66,22 +66,22 @@ async function main() {
   try {
     process.chdir(dir);
     const store = load('lib/server/store.ts');
-    const runs = await Promise.all(Array.from({length: 8}, () => store.createRun()));
-    assert.equal((await store.listRuns()).length, 8);
+    const runs = await Promise.all(Array.from({length: 8}, () => store.createRun('local')));
+    assert.equal((await store.listRuns('local')).length, 8);
 
-    const shared = await store.saveMedia(new File(['video'],'demo.mp4',{type:'video/mp4'}),true);
-    await store.updateRun(runs[0].id,{hook:{...runs[0].hook,generated:{src:'/api/media/'+shared.mediaId,seconds:1,at:'now'}}});
-    await store.deleteAsset(shared.mediaId);
-    assert.ok(await store.mediaInfo(shared.mediaId));
-    const unused = await store.saveMedia(new File(['unused'],'unused.mp4',{type:'video/mp4'}),true);
-    await store.deleteAsset(unused.mediaId);
-    assert.equal(await store.mediaInfo(unused.mediaId),null);
+    const shared = await store.saveMedia(new File(['video'],'demo.mp4',{type:'video/mp4'}),true,'local');
+    await store.updateRun(runs[0].id,{hook:{...runs[0].hook,generated:{src:'/api/media/'+shared.mediaId,seconds:1,at:'now'}}},'local');
+    await store.deleteAsset(shared.mediaId,'local');
+    assert.ok(await store.mediaAccess(shared.mediaId,'local'));
+    const unused = await store.saveMedia(new File(['unused'],'unused.mp4',{type:'video/mp4'}),true,'local');
+    await store.deleteAsset(unused.mediaId,'local');
+    assert.equal(await store.mediaAccess(unused.mediaId,'local'),null);
     fs.writeFileSync('.data/db.json', '{broken');
-    await assert.rejects(store.updateRun(runs[0].id, {title: 'Do not erase'}));
+    await assert.rejects(store.updateRun(runs[0].id, {title: 'Do not erase'},'local'));
     assert.equal(fs.readFileSync('.data/db.json', 'utf8'), '{broken');
     fs.writeFileSync('.data/db.json', JSON.stringify({references: [], runs, assets: []}));
-    assert.equal((await store.updateRun(runs[0].id, {title: 'Recovered'})).title, 'Recovered');
-    assert.equal((await store.listRuns()).length, 8);
+    assert.equal((await store.updateRun(runs[0].id, {title: 'Recovered'},'local')).title, 'Recovered');
+    assert.equal((await store.listRuns('local')).length, 8);
 
     const { fileResponse } = load('lib/server/file-response.ts');
     fs.writeFileSync('audio', '0123456789');

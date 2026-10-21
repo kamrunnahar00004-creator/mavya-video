@@ -1,13 +1,13 @@
 import "server-only";
 import { execFile } from "node:child_process";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import RunwayML from "@runwayml/sdk";
 import { geminiJSON } from "@/lib/server/gemini";
-import { mediaInfo } from "@/lib/server/store";
+import { libraryFile, mediaToFile } from "@/lib/server/store";
 import type { Reference, Run } from "@/lib/types";
 
 /**
@@ -48,7 +48,6 @@ function ffmpegPath(): string {
   return bin;
 }
 const ff = (...args: string[]) => exec(ffmpegPath(), ["-nostdin", "-v", "error", "-y", ...args], { timeout: 60_000 });
-const exists = (p: string) => access(p).then(() => true, () => false);
 const dataUri = async (file: string, mime: string) => `data:${mime};base64,${(await readFile(file)).toString("base64")}`;
 
 /** The action, beat by beat: the script written for this product first, then the hook's recipe, then the user's own words. */
@@ -60,30 +59,30 @@ function action(run: Run, source: Reference | null): string {
 }
 
 /** The character as an image (data URI), or their description when they were described in words. */
-async function characterOf(run: Run): Promise<{ image: string | null; words: string }> {
+async function characterOf(run: Run, who: string, dir: string): Promise<{ image: string | null; words: string }> {
   const face = run.hook.face;
   if (face?.kind === "character") {
     if (!/^[a-z0-9-]+$/.test(face.id)) throw new Error("Unknown character");
     return { image: await dataUri(path.join(process.cwd(), "public", "characters", `${face.id}.jpg`), "image/jpeg"), words: "" };
   }
   if (face?.kind === "photo") {
-    const info = await mediaInfo(face.mediaId);
-    if (!info) throw new Error("Your photo is missing. Upload it again.");
-    return { image: await dataUri(info.file, info.mime), words: "" };
+    const photo = await mediaToFile(face.mediaId, who, dir);
+    if (!photo) throw new Error("Your photo is missing. Upload it again.");
+    return { image: await dataUri(photo.file, photo.mime), words: "" };
   }
   if (face?.kind === "described" && face.text.trim()) return { image: null, words: face.text.trim().slice(0, 300) };
   throw new Error("Choose a character first.");
 }
 
 /** The hook's video: the library's cut hook clip, else the hook part of an uploaded video (cut into `dir`). */
-async function hookVideo(run: Run, source: Reference | null, dir: string): Promise<string | null> {
+async function hookVideo(run: Run, source: Reference | null, who: string, dir: string): Promise<string | null> {
   if (!source) return null;
   const code = source.sourceUrl ? source.sourceUrl.replace(/\/+$/, "").split("/").pop() : "";
-  if (code && /^[A-Za-z0-9_-]+$/.test(code)) {
-    const clip = path.join(process.cwd(), ".data", "hooks", `${code}.mp4`);
-    if (await exists(clip)) return clip;
+  if (code && /^[A-Za-z0-9_-]{5,40}$/.test(code)) {
+    const clip = await libraryFile("hooks", code, dir);
+    if (clip) return clip;
   }
-  const info = source.mediaId ? await mediaInfo(source.mediaId) : null;
+  const info = source.mediaId ? await mediaToFile(source.mediaId, who, dir) : null;
   if (!info || !info.mime.startsWith("video/")) return null;
   const start = Math.max(0, run.hook.start ?? 0);
   const end = Math.max(start + 1, Math.min(start + 8, run.hook.end ?? start + 3));
@@ -135,24 +134,24 @@ const cameraText = (camera: string, handheld: boolean) => `Camera: ${camera.slic
  * `simple`: skip the scene recreation and create from the character photo (the fallback when a model refuses).
  * If the recreation itself fails to start (a refusal in the plan or the frames), it falls back on its own.
  */
-export async function startHook(run: Run, source: Reference | null, note?: string, simple = false): Promise<string> {
+export async function startHook(run: Run, source: Reference | null, who: string, note?: string, simple = false): Promise<string> {
   if (!simple) {
     try {
-      return await startHookInner(run, source, note, false);
+      return await startHookInner(run, source, who, note, false);
     } catch (e) {
       if (e instanceof Error && /character|photo/i.test(e.message)) throw e;
       console.error("hook recreation failed, falling back to the photo", e);
     }
   }
-  return startHookInner(run, source, note, true);
+  return startHookInner(run, source, who, note, true);
 }
 
-async function startHookInner(run: Run, source: Reference | null, note: string | undefined, simple: boolean): Promise<string> {
-  const who = await characterOf(run);
+async function startHookInner(run: Run, source: Reference | null, user: string, note: string | undefined, simple: boolean): Promise<string> {
   const fix = note?.trim() ? ` Fix this from the last try: ${note.trim().slice(0, 200)}.` : "";
   const dir = await mkdtemp(path.join(tmpdir(), "mavya-hook-"));
   try {
-    const clip = await hookVideo(run, source, dir);
+    const who = await characterOf(run, user, dir);
+    const clip = await hookVideo(run, source, user, dir);
     // The plan comes from the original video when there is one; in the fallback a refused plan is not fatal.
     let plan: Plan | null = null;
     if (clip) {

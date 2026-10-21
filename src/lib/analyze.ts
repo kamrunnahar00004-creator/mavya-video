@@ -36,6 +36,8 @@ async function seek(video: HTMLVideoElement, t: number) {
  */
 export async function analyzeVideo(src: string, onProgress?: (p: number) => void): Promise<Analysis> {
   const video = document.createElement("video");
+  // Files come from storage on another origin; reading pixels needs a CORS request.
+  video.crossOrigin = "anonymous";
   video.muted = true;
   video.preload = "auto";
   video.playsInline = true;

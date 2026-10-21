@@ -1,16 +1,21 @@
 import { deleteRun, getRun, updateRun } from "@/lib/server/store";
 import type { Run } from "@/lib/types";
 import { validRunPatch } from "@/lib/server/run-validation";
+import { currentUser, signInFirst } from "@/lib/server/who";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/runs/[id]">) {
   const { id } = await ctx.params;
-  const run = await getRun(id);
+  const who = await currentUser();
+  if (!who) return signInFirst();
+  const run = await getRun(id, who);
   return run ? Response.json(run) : Response.json({ error: "Not found" }, { status: 404 });
 }
 
 /** Local prototype: the browser sends whole run sections (title, hook, demo, project). */
 export async function PATCH(request: Request, ctx: RouteContext<"/api/runs/[id]">) {
   const { id } = await ctx.params;
+  const who = await currentUser();
+  if (!who) return signInFirst();
   const body = (await request.json().catch(() => null)) as Partial<Run> | null;
   if (!validRunPatch(body)) return Response.json({ error: "Invalid run sections" }, { status: 400 });
   if (!body) return Response.json({ error: "Bad request" }, { status: 400 });
@@ -60,12 +65,14 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/runs/[id]"
       };
     }
   }
-  const run = await updateRun(id, patch);
+  const run = await updateRun(id, patch, who);
   return run ? Response.json(run) : Response.json({ error: "Not found" }, { status: 404 });
 }
 
 export async function DELETE(_request: Request, ctx: RouteContext<"/api/runs/[id]">) {
   const { id } = await ctx.params;
-  await deleteRun(id);
+  const who = await currentUser();
+  if (!who) return signInFirst();
+  await deleteRun(id, who);
   return new Response(null, { status: 204 });
 }

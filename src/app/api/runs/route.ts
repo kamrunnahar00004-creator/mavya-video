@@ -1,11 +1,16 @@
 import { connection } from "next/server";
 import { createRun, listRuns } from "@/lib/server/store";
+import { currentUser, signInFirst } from "@/lib/server/who";
 
 export async function GET() {
   await connection();
-  return Response.json(await listRuns());
+  const who = await currentUser();
+  if (!who) return signInFirst();
+  return Response.json(await listRuns(who));
 }
 
 export async function POST() {
-  return Response.json(await createRun(), { status: 201 });
+  const who = await currentUser();
+  if (!who) return signInFirst();
+  return Response.json(await createRun(who), { status: 201 });
 }

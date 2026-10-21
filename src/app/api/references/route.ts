@@ -1,5 +1,6 @@
 import { connection } from "next/server";
-import { createReference, listReferences, mediaInfo } from "@/lib/server/store";
+import { createReference, listReferences, mediaAccess } from "@/lib/server/store";
+import { currentUser, signInFirst } from "@/lib/server/who";
 import { HOOK_STYLES, NICHES } from "@/lib/taxonomy";
 import type { Platform } from "@/lib/types";
 
@@ -8,7 +9,9 @@ const pick = <T extends readonly string[]>(list: T, v: unknown) => (typeof v ===
 
 export async function GET(request: Request) {
   await connection();
-  const refs = await listReferences();
+  const who = await currentUser();
+  if (!who) return signInFirst();
+  const refs = await listReferences(who);
   const view = new URL(request.url).searchParams.get("view");
   if (view === "covers") return Response.json(refs.map((r) => ({ id: r.id, thumbUrl: r.analysis?.segments[0]?.thumb ?? r.thumbUrl })));
   if (view === "studio") {
@@ -21,9 +24,11 @@ export async function GET(request: Request) {
 
 /** Add a video file as a reference. `owner: "curated"` puts it in the hook library (curator only). */
 export async function POST(request: Request) {
+  const who = await currentUser();
+  if (!who) return signInFirst();
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const mediaId = typeof body?.mediaId === "string" ? body.mediaId : "";
-  const info = await mediaInfo(mediaId);
+  const info = await mediaAccess(mediaId, who);
   if (!info || !info.mime.startsWith("video/")) return Response.json({ error: "Upload the video first" }, { status: 400 });
 
   const platform = PLATFORMS.has(body?.platform as Platform) ? (body?.platform as Platform) : "other";
@@ -39,6 +44,6 @@ export async function POST(request: Request) {
     owner: body?.owner === "curated" && process.env.CURATOR === "1" ? "curated" : "user",
     niche: pick(NICHES, body?.niche),
     hookStyle: pick(HOOK_STYLES, body?.hookStyle),
-  });
+  }, who);
   return Response.json(ref, { status: 201 });
 }

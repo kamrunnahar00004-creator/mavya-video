@@ -1,5 +1,6 @@
 import { GeminiError, geminiJSON } from "@/lib/server/gemini";
 import { getRun, listReferences, updateRun } from "@/lib/server/store";
+import { currentUser, signInFirst } from "@/lib/server/who";
 import type { Reference, VideoScript } from "@/lib/types";
 
 /**
@@ -57,12 +58,14 @@ const SCHEMA = {
 
 export async function POST(_request: Request, ctx: RouteContext<"/api/runs/[id]/script">) {
   const { id } = await ctx.params;
-  const run = await getRun(id);
+  const who = await currentUser();
+  if (!who) return signInFirst();
+  const run = await getRun(id, who);
   if (!run) return Response.json({ error: "Not found" }, { status: 404 });
   const brief = run.product?.brief;
   if (!brief) return Response.json({ error: "Add your product first (step 1)." }, { status: 400 });
 
-  const refs = await listReferences();
+  const refs = await listReferences(who);
   const source = run.sourceRefId ? refs.find((r) => r.id === run.sourceRefId) ?? null : null;
   const described = !source && run.hook.source === "describe" ? run.hook.describe?.trim() : "";
   if (!source && !described) return Response.json({ error: "Pick a hook first (step 2)." }, { status: 400 });
@@ -118,6 +121,6 @@ Write:
     at: new Date().toISOString(),
   };
   if (!script.hookText || !script.shots.length) return Response.json({ error: "Couldn't write the script. Try again." }, { status: 502 });
-  const updated = await updateRun(id, { script });
+  const updated = await updateRun(id, { script }, who);
   return Response.json(updated);
 }

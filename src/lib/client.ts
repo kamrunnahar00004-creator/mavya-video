@@ -15,7 +15,23 @@ export function remixHook(original: string, product: string, audience: string): 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 export const round1 = (n: number) => Math.round(n * 10) / 10;
 
+/**
+ * Upload a file. With cloud storage the browser sends it straight to storage (no size limit from the server);
+ * without it (local), through POST /api/media.
+ */
 export async function uploadFile(file: File, asAsset: boolean): Promise<{ mediaId: string; mime: string }> {
+  const json = (body: unknown) => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const start = await fetch("/api/uploads", json({ step: "start", mime: file.type, size: file.size }));
+  if (start.status !== 501) {
+    const s = (await start.json().catch(() => ({}))) as { mediaId?: string; url?: string; error?: string };
+    if (!start.ok || !s.mediaId || !s.url) throw new Error(s.error ?? "Upload failed");
+    const put = await fetch(s.url, { method: "PUT", headers: { "content-type": file.type }, body: file }).catch(() => null);
+    if (!put?.ok) throw new Error("Upload failed. Check your connection and try again.");
+    const done = await fetch("/api/uploads", json({ step: "finish", mediaId: s.mediaId, mime: file.type, name: file.name, asset: asAsset }));
+    const d = (await done.json().catch(() => ({}))) as { mediaId?: string; error?: string };
+    if (!done.ok || !d.mediaId) throw new Error(d.error ?? "Upload failed");
+    return { mediaId: d.mediaId, mime: file.type };
+  }
   const form = new FormData();
   form.append("file", file);
   if (asAsset) form.append("asset", "1");

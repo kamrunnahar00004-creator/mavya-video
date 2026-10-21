@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Upload } from "lucide-react";
 import { SettingsPage } from "@/components/settings-shell";
+import { uploadFile } from "@/lib/client";
 import { NO_PROFILE, PROFILE_EVENT, initials, signOut, type Profile } from "@/lib/profile";
 
 /** Settings > Profile: picture, email (from sign-in), first and last name, and deleting the account. */
@@ -58,11 +59,9 @@ export function ProfileView() {
     if (f.size > 5 * 1024 * 1024) return setToast("Use a picture under 5 MB.");
     setBusy("photo");
     try {
-      const form = new FormData();
-      form.append("file", f);
-      const res = await fetch("/api/media", { method: "POST", body: form });
-      if (!res.ok) throw new Error("Couldn't upload the picture.");
-      const { mediaId } = (await res.json()) as { mediaId: string };
+      const { mediaId } = await uploadFile(f, false).catch(() => {
+        throw new Error("Couldn't upload the picture.");
+      });
       await save({ avatar: `/api/media/${mediaId}` }, "Picture updated");
     } catch (e) {
       setToast((e as Error).message);

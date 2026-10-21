@@ -27,6 +27,8 @@ function grab(src: string, t: number): Promise<string | null> {
   let entry = players.get(src);
   if (!entry) {
     const video = document.createElement("video");
+    // Files come from storage on another origin; reading pixels needs a CORS request.
+    video.crossOrigin = "anonymous";
     video.muted = true;
     video.preload = "auto";
     entry = { video, busy: false };
