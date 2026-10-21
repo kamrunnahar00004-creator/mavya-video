@@ -4008,7 +4008,7 @@ function ClipControls({ label, src, speed = 1, playing, onPlay, t, len, pieces, 
 }
 
 /** About how long one hook takes (Gemini plan, two swapped frames, then Veo 3.1 Fast), for the progress cover. */
-const GENERATE_SECONDS = 90;
+const GENERATE_SECONDS = 110;
 const GEN_STAGES = ["Reading the hook", "Matching {who}", "Animating the moves", "Finishing up"];
 
 /** While a hook generates: the character with a scan line, the current stage, a timer and an easing progress bar. */

@@ -17,22 +17,25 @@ import type { Reference, Run } from "@/lib/types";
  *   1. Gemini watches the hook and looks at the character: the motion second by second (head, eyes, mouth, each
  *      hand, objects, camera), the outfit for THIS person (same colors and style; anything that does not suit them,
  *      like a halter on a man, becomes the closest equivalent), and the moment the action has finished.
- *   2. Gemini 3.1 Flash Image puts the character, in that outfit, into the hook's first and end frames: same scene,
- *      objects, pose, expression and light, natural nails, nothing added, no captions.
- *   3. Veo 3.1 Fast animates from the first to the end frame with the motion script.
+ *   2. Gemini 3.1 Flash Image puts the character, in that outfit, into the hook's first frame: same scene, objects,
+ *      pose, expression and light, natural nails, nothing added, no captions.
+ *   3. Veo 3.1 Fast animates from that frame with the motion and camera script, one continuous take.
  *   It works on every hook (Gemini Omni and Seedance refuse some) and keeps the original scene; the motion is very
  *   close, not frame-identical. About $0.52 and 80 s.
  * A described hook (no video): Veo 3.1 Fast from the character photo, the script's beats as the prompt ($0.40).
  * Never the original's captions: Mavya adds the product's own text on top.
  */
-export const HOOK_SECONDS = 4;
+/** Generated hook length (Veo makes 4, 6 or 8 s; founder chose 6 s on 2026-10-21, $0.60 of Veo per hook). */
+export const HOOK_SECONDS = 6;
 let client: RunwayML | null = null;
 const runway = () => (client ??= new RunwayML());
 const exec = promisify(execFile);
 
 const NO_TEXT = "No text, captions, subtitles, stickers or watermarks anywhere in the frame.";
+/** Founder: the generated hooks had camera cuts; a hook is one take. */
+const ONE_TAKE = "One continuous shot from the first to the last frame: no cuts, no jump cuts, no scene or angle changes, no transitions.";
 const BODY = "Natural hands with five fingers, no extra limbs.";
-const NEGATIVE = "text, captions, subtitles, watermark, logo, new objects, nail polish, extra fingers, deformed hands, distorted face, morphing, outfit change";
+const NEGATIVE = "text, captions, subtitles, watermark, logo, cut, jump cut, scene change, transition, new objects, nail polish, extra fingers, deformed hands, distorted face, morphing, outfit change";
 
 type Beat = { start: number; end: number; action: string };
 type Recipe = { hook?: { camera?: string; mood?: string; setting?: string; beats?: Beat[] } };
@@ -46,12 +49,6 @@ function ffmpegPath(): string {
 }
 const ff = (...args: string[]) => exec(ffmpegPath(), ["-nostdin", "-v", "error", "-y", ...args], { timeout: 60_000 });
 const exists = (p: string) => access(p).then(() => true, () => false);
-/** A video's length in seconds (ffmpeg prints it, then exits with an error because no output is given). */
-async function clipSeconds(file: string): Promise<number> {
-  const out = await exec(ffmpegPath(), ["-nostdin", "-hide_banner", "-i", file]).then((r) => r.stderr, (e: { stderr?: string }) => e.stderr ?? "");
-  const m = /Duration: (\d+):(\d+):([\d.]+)/.exec(out);
-  return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : 0;
-}
 const dataUri = async (file: string, mime: string) => `data:${mime};base64,${(await readFile(file)).toString("base64")}`;
 
 /** The action, beat by beat: the script written for this product first, then the hook's recipe, then the user's own words. */
@@ -95,7 +92,7 @@ async function hookVideo(run: Run, source: Reference | null, dir: string): Promi
   return out;
 }
 
-type Plan = { motion: Beat[]; camera: string; handheld: boolean; outfit: string; endAt: number };
+type Plan = { motion: Beat[]; camera: string; handheld: boolean; outfit: string };
 const PLAN_SCHEMA = {
   type: "OBJECT",
   properties: {
@@ -103,23 +100,21 @@ const PLAN_SCHEMA = {
     camera: { type: "STRING" },
     handheld: { type: "BOOLEAN" },
     outfit: { type: "STRING" },
-    endAt: { type: "NUMBER" },
   },
-  required: ["motion", "camera", "handheld", "outfit", "endAt"],
+  required: ["motion", "camera", "handheld", "outfit"],
 };
-const PLAN_PROMPT = (who: string) => `VIDEO 1 is a short selfie hook. ${who} will re-perform it exactly.
+const PLAN_PROMPT = (who: string) => `VIDEO 1 is a short selfie hook. ${who} will re-perform it exactly, in ONE continuous ${HOOK_SECONDS}-second take with no cuts.
 Write the plan in JSON:
-- motion: the performance second by second, 4 to 7 segments covering the whole video. For each: what the head, eyes, mouth and EACH hand do and any object they hold. Concrete and physical ("right hand lifts the glass to the lips, eyes stay wide on the lens"). Never describe who the person is. All segments together under 480 characters.
-- camera: how the phone camera itself moves over time, with seconds: handheld shake, drift, a quick push-in toward the face, pulling back, a zoom, a tilt or pan, or steady. Under 170 characters.
+- motion: the performance second by second over the new ${HOOK_SECONDS} seconds (0 to ${HOOK_SECONDS}), 4 to 7 segments: the same actions in the same order as VIDEO 1, spread at a natural, slightly slower pace so they fill the whole ${HOOK_SECONDS} seconds, ending on the settled final pose. If VIDEO 1 has a cut, keep only its first continuous shot's performance. For each: what the head, eyes, mouth and EACH hand do and any object they hold. Concrete and physical ("right hand lifts the glass to the lips, eyes stay wide on the lens"). Never describe who the person is. All segments together under 480 characters.
+- camera: how the phone camera itself moves over the new ${HOOK_SECONDS} seconds, with seconds: handheld shake, drift, a quick push-in toward the face, pulling back, a zoom, a tilt or pan, or steady. Never a cut. Under 170 characters.
 - handheld: true if VIDEO 1 is filmed on a phone held by hand (front or back camera) with any visible camera movement or shake.
-- outfit: what the new person wears: the same garment colors and style as in VIDEO 1, unless that garment does not suit this person (for example a tank top, halter, crop top or dress on a man, or anything revealing), then the closest equivalent that suits them, same colors. No jewelry or nail polish unless the new person already has it. Under 120 characters.
-- endAt: the second when the last action has finished and the pose is settled (not mid-motion), within the video.`;
+- outfit: what the new person wears: the same garment colors and style as in VIDEO 1, unless that garment does not suit this person (for example a tank top, halter, crop top or dress on a man, or anything revealing), then the closest equivalent that suits them, same colors. No jewelry or nail polish unless the new person already has it. Under 120 characters.`;
 
 /** The real-UGC look (founder 2026-10-21: Veo alone is too polished; no post-processing, it must be in the prompt). */
 const UGC =
   "It must look like real UGC filmed by the person on their own phone front camera: handheld and NOT stabilized, natural micro-shake and small wobbles, slight autofocus and exposure shifts, casual framing. Not cinematic, no smooth gimbal or dolly moves, no studio lighting.";
 
-/** Gemini's plan for re-performing the hook: the motion, the camera, the outfit for this person, the end frame. */
+/** Gemini's plan for re-performing the hook: the motion, the camera and the outfit for this person. */
 async function planFor(clip: string, who: { image: string | null; words: string }): Promise<Plan> {
   return geminiJSON<Plan>(
     [
@@ -167,29 +162,22 @@ async function startHookInner(run: Run, source: Reference | null, note: string |
 
     // A hook with a video: recreate it in its own scene.
     if (clip && plan && !simple) {
-      const length = (await clipSeconds(clip)) || 3;
-      const endAt = Math.min(Math.max(Number(plan.endAt) || length - 0.2, 0.8), length - 0.05);
       const outfit = String(plan.outfit ?? "").slice(0, 160) || "the same clothes as in the scene";
       const first = path.join(dir, "first.jpg");
-      const last = path.join(dir, "last.jpg");
       await ff("-ss", "0.05", "-i", clip, "-frames:v", "1", "-q:v", "3", first);
-      await ff("-ss", endAt.toFixed(2), "-i", clip, "-frames:v", "1", "-q:v", "3", last);
       const person = who.image ? "@person" : `a person (${who.words})`;
       const swapPrompt = `Edit @scene: replace the person in it with ${person}${who.image ? " (their face, hair, skin tone and body)" : ""}, wearing ${outfit}. Keep everything else exactly as in @scene: every object they hold with the same shape, size and material, the same hand position, pose, expression, framing, camera angle, lighting, background and people behind them. Their hands have natural, unpolished nails and no rings. Remove all on-screen text and captions. Photorealistic phone selfie.`;
       // Gemini 3.1 Flash Image: of gen4_image, Gemini 3 Pro Image and GPT Image 2 it kept the scene, the held objects,
       // the expression and natural nails best (test 2026-10-21), and it is the fastest.
-      const swap = async (frame: string) => {
-        const refs = [{ uri: await dataUri(frame, "image/jpeg"), tag: "scene" }, ...(who.image ? [{ uri: who.image, tag: "person", subject: "human" as const }] : [])];
-        const task = await runway().textToImage.create({ model: "gemini_image3.1_flash", ratio: "768:1344", promptText: swapPrompt, referenceImages: refs }).waitForTaskOutput({ timeout: 3 * 60 * 1000 });
-        const url = task.output?.[0];
-        if (!url) throw new Error("frame swap failed");
-        return url;
-      };
-      const [firstUrl, lastUrl] = await Promise.all([swap(first), swap(last)]);
+      const refs = [{ uri: await dataUri(first, "image/jpeg"), tag: "scene" }, ...(who.image ? [{ uri: who.image, tag: "person", subject: "human" as const }] : [])];
+      const frame = await runway().textToImage.create({ model: "gemini_image3.1_flash", ratio: "768:1344", promptText: swapPrompt, referenceImages: refs }).waitForTaskOutput({ timeout: 3 * 60 * 1000 });
+      const firstUrl = frame.output?.[0];
+      if (!firstUrl) throw new Error("frame swap failed");
+      // Only a first frame: a forced last frame made Veo dissolve into it when the motion ended elsewhere (not one take).
       const task = await runway().imageToVideo.create({
         model: "veo3.1_fast",
-        promptImage: [{ uri: firstUrl, position: "first" }, { uri: lastUrl, position: "last" }],
-        promptText: `Vertical phone selfie video. Same person, outfit, held objects, room and light from the first to the last frame; no new objects; natural unpolished nails. ${motionText(plan)} ${cameraText(plan.camera, plan.handheld)}${fix} ${BODY} ${NO_TEXT}`.slice(0, 1000),
+        promptImage: [{ uri: firstUrl, position: "first" }],
+        promptText: `Vertical phone selfie video. ${ONE_TAKE} Same person, outfit, held objects, room and light throughout; no new objects; natural unpolished nails. ${motionText(plan)} ${cameraText(plan.camera, plan.handheld)}${fix} ${BODY} ${NO_TEXT}`.slice(0, 1000),
         negativePrompt: NEGATIVE,
         ratio: "720:1280",
         duration: HOOK_SECONDS,
@@ -208,7 +196,7 @@ async function startHookInner(run: Run, source: Reference | null, note: string |
       const task = await runway().imageToVideo.create({
         model: "veo3.1_fast",
         promptImage: [{ uri: who.image, position: "first" }],
-        promptText: `Vertical phone selfie video. The person in the image, in the same place as in the image. ${mood} ${doing} ${camera}${fix} ${BODY} ${NO_TEXT}`.slice(0, 1000),
+        promptText: `Vertical phone selfie video. ${ONE_TAKE} The person in the image, in the same place as in the image. ${mood} ${doing} ${camera}${fix} ${BODY} ${NO_TEXT}`.slice(0, 1000),
         negativePrompt: NEGATIVE,
         ratio: "720:1280",
         duration: HOOK_SECONDS,
@@ -218,7 +206,7 @@ async function startHookInner(run: Run, source: Reference | null, note: string |
     }
     const task = await runway().textToVideo.create({
       model: "veo3.1_fast",
-      promptText: `Vertical phone selfie video. ${who.words}. ${mood} ${doing} ${camera}${fix} ${BODY} ${NO_TEXT}`.slice(0, 1000),
+      promptText: `Vertical phone selfie video. ${ONE_TAKE} ${who.words}. ${mood} ${doing} ${camera}${fix} ${BODY} ${NO_TEXT}`.slice(0, 1000),
       ratio: "720:1280",
       duration: HOOK_SECONDS,
       audio: false,
