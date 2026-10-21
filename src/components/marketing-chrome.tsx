@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import Link from "next/link";
+import { AuthModalHost } from "@/components/auth-modal";
 import { MAINTENANCE } from "@/lib/maintenance";
 
 /** A five-point star path centred on (cx, cy). */
@@ -62,16 +64,21 @@ export function MarketingHeader({ active }: { active?: "pricing" }) {
         </nav>
         {!MAINTENANCE && (
           <div className="ml-auto flex items-center gap-3">
-            <Link href="/login" className="text-[14px] font-semibold text-muted hover:text-text">
+            <Link href="?auth=login" scroll={false} className="text-[14px] font-semibold text-muted hover:text-text">
               Log in
             </Link>
-            <Link href="/login" className="btn-primary px-4 py-2 text-[14px]">
+            <Link href="?auth=signup" scroll={false} className="btn-primary px-4 py-2 text-[14px]">
               Sign up
             </Link>
           </div>
         )}
       </div>
       </div>
+      {!MAINTENANCE && (
+        <Suspense fallback={null}>
+          <AuthModalHost />
+        </Suspense>
+      )}
     </header>
   );
 }
