@@ -1,4 +1,4 @@
-import { HOOK_SECONDS, checkHook, handheld, startHook } from "@/lib/server/runway";
+import { HOOK_SECONDS, checkHook, startHook } from "@/lib/server/runway";
 import { getReference, getRun, saveMedia } from "@/lib/server/store";
 
 /**
@@ -41,10 +41,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/runs/[id]/ge
       }
     }
     if (t.state !== "done") return Response.json(t);
-    // The original hook's handheld camera movement on top, so it looks filmed on a phone, not polished.
-    const run = await getRun(id);
-    const video = run ? await handheld(t.video, run, run.sourceRefId ? await getReference(run.sourceRefId) : null) : t.video;
-    const { mediaId } = await saveMedia(new File([new Uint8Array(video)], "hook.mp4", { type: "video/mp4" }), false);
+    const { mediaId } = await saveMedia(new File([new Uint8Array(t.video)], "hook.mp4", { type: "video/mp4" }), false);
     return Response.json({ state: "done", generated: { src: `/api/media/${mediaId}`, seconds: HOOK_SECONDS, at: new Date().toISOString() } });
   } catch (e) {
     console.error("generate check", e);

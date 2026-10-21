@@ -1,6 +1,6 @@
 import "server-only";
 import { execFile } from "node:child_process";
-import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -208,37 +208,7 @@ async function startHookInner(run: Run, source: Reference | null, note: string |
   }
 }
 
-/**
- * Make a generated hook look filmed on a phone (founder: Veo is too polished, real UGC is shaky with quick push-ins).
- * The original hook's own camera movement (handheld shake, drift, push-ins) is measured with ffmpeg's vid.stab,
- * stretched to the generated clip's length, and applied to it; plus light grain. Free, ~5 s. Without an original
- * video (a described hook) or on any error, the clip is returned as it is.
- */
-export async function handheld(video: Buffer, run: Run, source: Reference | null): Promise<Buffer> {
-  const dir = await mkdtemp(path.join(tmpdir(), "mavya-ugc-"));
-  try {
-    const original = await hookVideo(run, source, dir);
-    if (!original) return video;
-    const generated = path.join(dir, "generated.mp4");
-    await writeFile(generated, video);
-    const [g, o] = await Promise.all([clipSeconds(generated), clipSeconds(original)]);
-    if (!g || !o) return video;
-    const stretched = path.join(dir, "original.mp4");
-    const motion = path.join(dir, "motion.trf");
-    const out = path.join(dir, "handheld.mp4");
-    await ff("-i", original, "-vf", `setpts=PTS*${(g / o).toFixed(4)},fps=24`, "-an", "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", stretched);
-    await ff("-i", stretched, "-vf", `vidstabdetect=shakiness=8:accuracy=15:result=${motion}`, "-f", "null", "-");
-    await ff("-i", generated, "-vf", `vidstabtransform=input=${motion}:invert=1:relative=1:smoothing=0:optzoom=0:zoom=8:interpol=bicubic,noise=alls=5:allf=t,eq=saturation=0.95`, "-an", "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-movflags", "+faststart", out);
-    return await readFile(out);
-  } catch (e) {
-    console.error("handheld look failed, keeping the clip as it is", e);
-    return video;
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-}
-
-export type HookTask ={ state: "running"; progress: number } | { state: "done"; video: Buffer } | { state: "failed"; error: string };
+export type HookTask = { state: "running"; progress: number } | { state: "done"; video: Buffer } | { state: "failed"; error: string };
 
 /** Where a generation is; when it is done, the video itself (Runway's link expires within a day or two). */
 export async function checkHook(taskId: string): Promise<HookTask> {
