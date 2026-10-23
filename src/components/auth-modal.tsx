@@ -1,4 +1,5 @@
 "use client";
+import { safeNext } from "@/lib/auth-next";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -15,11 +16,6 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 type Mode = "login" | "signup";
 const noop = () => () => undefined;
 
-/** Only same-origin paths may be a destination after sign-in. */
-function safeNext(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\")) return "/studio";
-  return raw;
-}
 
 /** Renders the popup when the URL asks for it; closing removes the parameters. */
 export function AuthModalHost() {

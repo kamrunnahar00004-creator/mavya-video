@@ -1,16 +1,7 @@
+import { safeNext } from "@/lib/auth-next";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-/** Only same-origin paths may be a destination after sign-in. */
-function safeNext(raw: string | null, origin: string): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\")) return "/studio";
-  try {
-    const parsed = new URL(raw, origin);
-    return parsed.origin === origin ? `${parsed.pathname}${parsed.search}` : "/studio";
-  } catch {
-    return "/studio";
-  }
-}
 
 /** Google sends people back here with a `code`: swap it for the session cookie, then continue to `next`. */
 export async function GET(request: NextRequest) {
