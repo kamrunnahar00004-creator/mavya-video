@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["ffmpeg-static"],
   outputFileTracingIncludes: {
     "/api/runs/*/generate": ["./node_modules/ffmpeg-static/ffmpeg"],
+    "/api/internal/generations": ["./node_modules/ffmpeg-static/ffmpeg"],
     "/api/sounds/*": ["./node_modules/ffmpeg-static/ffmpeg"],
   },
   turbopack: {

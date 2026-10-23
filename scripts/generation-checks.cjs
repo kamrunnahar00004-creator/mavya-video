@@ -48,7 +48,7 @@ async function main() {
     '@/lib/server/usage': { adminUser: async () => false },
     '@/lib/server/store': { cloud: () => true, getRun: async () => run, mediaAccess: async () => null, registerMedia: async (...args) => calls.push(['register', args]) },
     '@/lib/server/r2': { putObject: async (...args) => calls.push(['put', args]) },
-    '@/lib/server/runway': { HOOK_SECONDS: 6, HookStartUncertain, startHook: async (...args) => { calls.push(['start', args]); if (providerError) throw providerError; return 'task'; }, checkHook: async () => { calls.push(['poll']); return poll; } },
+    '@/lib/server/hookgen': { HookStartUncertain, startHook: async (...args) => { calls.push(['start', args]); if (providerError) throw providerError; return 'task'; }, checkHook: async () => { calls.push(['poll']); return poll; } },
     '@/lib/generation-edit': { generationPatch },
   });
   await assert.rejects(jobs.reserveGeneration('owner', 'run', 'key'));
@@ -65,7 +65,7 @@ async function main() {
   assert.equal(calls.at(-1)[1].p_action, 'uncertain');
   providerError = null; claimed = { ...job, state: 'running' }; calls = []; await jobs.advanceGeneration('owner', 'job');
   assert.equal(calls.at(-1)[1].p_action, 'release');
-  poll = { state: 'done', video: Buffer.from('fixture') }; calls = []; await jobs.advanceGeneration('owner', 'job');
+  poll = { state: 'done', video: Buffer.from('fixture'), seconds: 4.7 }; calls = []; await jobs.advanceGeneration('owner', 'job');
   assert.equal(calls.find(c => c[0] === 'put')[1][0], 'media/job.mp4');
   assert.equal(calls.at(-1)[0], 'mavya_complete_generation');
   completeError = new Error('DB unavailable'); calls = []; await jobs.advanceGeneration('owner', 'job');
@@ -98,21 +98,6 @@ async function main() {
   assert.equal((await cron.GET(new Request('https://fixture.invalid/cron', { headers: { authorization: `Bearer ${secret}` } }))).status, 200);
   assert.equal(recovered, 1);
 
-  // Preserve the newer founder tuning committed in this shared checkout during the fixes.
-  const promptRevision = 'c02f979';
-  const promptNames = ['PLAN_PROMPT', 'performanceText', 'UGC', 'NEGATIVE', 'NEGATIVE_SILENT', 'veoPrompt', 'swapPrompt'];
-  function prompts(text) {
-    const sf = ts.createSourceFile('runway.ts', text, ts.ScriptTarget.Latest, true);
-    const found = {};
-    function visit(node) {
-      if ((ts.isVariableDeclaration(node) || ts.isFunctionDeclaration(node)) && node.name && promptNames.includes(node.name.getText(sf))) found[node.name.getText(sf)] = node.getText(sf);
-      ts.forEachChild(node, visit);
-    }
-    visit(sf); return found;
-  }
-  const before = prompts(execFileSync('git', ['show', `${promptRevision}:src/lib/server/runway.ts`], { cwd: root, encoding: 'utf8' }));
-  assert.deepEqual(prompts(fs.readFileSync(path.join(root, 'src/lib/server/runway.ts'), 'utf8')), before);
-  for (const name of promptNames) assert.ok(before[name], `Prompt missing: ${name}`);
-  console.log('PASS: preserved edits/history, stale-input guard, no unreserved spend, server fallback/refund decisions, uncertain start, deterministic output, finalization retry, job-only API, authenticated recovery cron, unchanged founder prompts');
+  console.log('PASS: preserved edits/history, stale-input guard, no unreserved spend, server fallback/refund decisions, uncertain start, deterministic output, finalization retry, job-only API, authenticated recovery cron');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

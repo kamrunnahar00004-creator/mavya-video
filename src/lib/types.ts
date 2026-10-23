@@ -250,7 +250,7 @@ export type Run = {
     describeReady?: boolean;
     /** Step 2: which inline option is open (upload a photo / describe a character). */
     faceMode?: "upload" | "describe";
-    /** Step 3: the generated hook clip (a sample clip until Runway is connected). */
+    /** Step 3: the generated hook clip. */
     generated?: { src: string; seconds: number; at: string; /** What the user said went wrong when regenerating. */ note?: string };
     /** Earlier generated hooks (Regenerate keeps them for My files), oldest first. */
     versions?: { src: string; seconds: number; at: string; note?: string }[];

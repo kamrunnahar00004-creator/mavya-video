@@ -1077,7 +1077,7 @@ const optionBtn = (on: boolean) =>
   `flex items-center gap-1.5 rounded-lg border px-3.5 py-2.5 text-[14px] font-semibold ${on ? "border-accent bg-accent-tint text-accent" : "border-line-strong bg-panel text-text hover:border-accent hover:text-accent"}`;
 
 /** Step 4: the hook clip, in the shared clip editor. Before generating, the video box shows the inputs and a Generate button.
- * Generate runs Runway (Veo 3.1 Fast) on the server: POST /api/runs/[id]/generate, then poll until the clip is saved. */
+ * Generate runs Kling Motion Control (fal.ai) on the server, as a background job: POST /api/runs/[id]/generate, then poll until the clip is saved. */
 function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, onRemove, onParts, onAdjust, onApplyAll }: {
   run: Run;
   source: Reference | null;
@@ -4056,8 +4056,8 @@ function ClipControls({ label, src, speed = 1, playing, onPlay, t, len, pieces, 
   );
 }
 
-/** About how long one hook takes (Gemini plan, two swapped frames, then Veo 3.1 Fast), for the progress cover. */
-const GENERATE_SECONDS = 110;
+/** About how long one hook takes (outfit, swapped first frame, then Kling Motion Control), for the progress cover. */
+const GENERATE_SECONDS = 220;
 const GEN_STAGES = ["Reading the hook", "Matching {who}", "Animating the moves", "Finishing up"];
 
 /** While a hook generates: the character with a scan line, the current stage, a timer and an easing progress bar. */

@@ -3,7 +3,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { adminUser } from "@/lib/server/usage";
 import { cloud, getRun, mediaAccess, registerMedia } from "@/lib/server/store";
 import { putObject } from "@/lib/server/r2";
-import { HOOK_SECONDS, HookStartUncertain, checkHook, startHook } from "@/lib/server/runway";
+import { HookStartUncertain, checkHook, startHook } from "@/lib/server/hookgen";
 import { generationPatch } from "@/lib/generation-edit";
 import type { Reference, Run } from "@/lib/types";
 
@@ -65,7 +65,7 @@ export async function advanceGeneration(who: string, id: string): Promise<void> 
       try { await registerMedia(mediaId, "video/mp4", task.video.length, who, null); }
       catch (error) { if ((error as { code?: string }).code !== "23505") throw error; }
     }
-    const generated = { src: `/api/media/${mediaId}`, seconds: HOOK_SECONDS, at: job.created_at, ...(job.note ? { note: job.note } : {}) };
+    const generated = { src: `/api/media/${mediaId}`, seconds: task.seconds, at: job.created_at, ...(job.note ? { note: job.note } : {}) };
     const suggested = job.input.hook.source === "describe" ? "" : (job.input.script?.refId === (job.reference?.id ?? null) ? job.input.script?.hookText : "") || job.reference?.recipe?.onScreenText?.[0]?.text || job.reference?.title || "";
     for (let i = 0; i < 5; i++) {
       const run = await getRun(job.run_id, who);
