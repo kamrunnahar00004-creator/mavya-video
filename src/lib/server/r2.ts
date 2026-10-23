@@ -40,9 +40,10 @@ export async function objectSize(key: string): Promise<number | null> {
 /** Download an object to a local file (for ffmpeg and the AI models); false when it does not exist. */
 export async function downloadTo(key: string, file: string): Promise<boolean> {
   try {
-    const out = await r2().send(new GetObjectCommand({ Bucket: Bucket(), Key: key }));
+    const signal = AbortSignal.timeout(60_000);
+    const out = await r2().send(new GetObjectCommand({ Bucket: Bucket(), Key: key }), { abortSignal: signal });
     if (!out.Body) return false;
-    await pipeline(out.Body as Readable, createWriteStream(file));
+    await pipeline(out.Body as Readable, createWriteStream(file), { signal });
     return true;
   } catch {
     return false;

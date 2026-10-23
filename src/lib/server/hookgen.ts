@@ -1,4 +1,5 @@
 import "server-only";
+import { checkBudget, withWorkBudget, workSignal } from "@/lib/server/work-budget";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
@@ -54,7 +55,7 @@ function ffmpegPath(): string {
   if (!bin) throw new Error("ffmpeg unavailable");
   return bin;
 }
-const ff = (...args: string[]) => exec(ffmpegPath(), ["-nostdin", "-v", "error", "-y", ...args], { timeout: 60_000 });
+const ff = (...args: string[]) => exec(ffmpegPath(), ["-nostdin", "-v", "error", "-y", ...args], { timeout: 60_000, signal: workSignal(60_000) });
 
 /** A lost create response may represent paid work. Never blindly replay it or launch a fallback. */
 export class HookStartUncertain extends Error {}
@@ -68,9 +69,10 @@ const falHeaders = () => ({ Authorization: `Key ${falKey()}`, "content-type": "a
 
 /** Queue one fal request; the task id carries the model so it can be polled later ("<model>|<request id>"). */
 async function falSubmit(model: string, input: Record<string, unknown>): Promise<string> {
+  checkBudget();
   let res: Response;
   try {
-    res = await fetch(`${FAL}/${model}`, { method: "POST", headers: falHeaders(), body: JSON.stringify(input), signal: AbortSignal.timeout(60_000) });
+    res = await fetch(`${FAL}/${model}`, { method: "POST", headers: falHeaders(), body: JSON.stringify(input), signal: workSignal(60_000) });
   } catch {
     throw new HookStartUncertain("Provider task acceptance is unknown");
   }
@@ -82,8 +84,10 @@ async function falSubmit(model: string, input: Record<string, unknown>): Promise
 
 /** Temporary file for the provider to read (R2 tmp/, a signed link). */
 async function share(bytes: Buffer, ext: "jpg" | "mp4"): Promise<string> {
+  checkBudget();
   const key = `tmp/gen/${randomUUID()}.${ext}`;
   await putObject(key, bytes, ext === "jpg" ? "image/jpeg" : "video/mp4");
+  checkBudget();
   return signedGet(key, LINK_SECONDS);
 }
 
@@ -144,7 +148,7 @@ async function outfitFor(clip: string, who: Character): Promise<string> {
         text: `${who.image ? "The person in IMAGE 2" : `A new person (${who.words})`} will take the place of the person in VIDEO 1. Write in JSON what the new person wears ("outfit"): the same garment colors and style as in VIDEO 1, unless that garment does not suit this person (for example a tank top, halter, crop top or dress on a man, or anything revealing), then the closest equivalent that suits them, same colors. No jewelry or nail polish unless the new person already has it. Under 120 characters.`,
       },
     ],
-    { schema: OUTFIT_SCHEMA, temperature: 0.2 },
+    { schema: OUTFIT_SCHEMA, temperature: 0.2, signal: workSignal(120_000) },
   );
   return String(plan.outfit ?? "").slice(0, 160) || "the same clothes as in the scene";
 }
@@ -163,7 +167,7 @@ async function swapFirstFrame(firstFrame: Buffer, who: Character, outfit: string
     method: "POST",
     headers: { "x-goog-api-key": process.env.GEMINI_API_KEY ?? "", "content-type": "application/json" },
     body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "9:16" } } }),
-    signal: AbortSignal.timeout(180_000),
+    signal: workSignal(180_000),
   });
   const out = (await res.json().catch(() => null)) as { candidates?: { content?: { parts?: { inlineData?: { data?: string }; inline_data?: { data?: string } }[] } }[] } | null;
   const data = out?.candidates?.[0]?.content?.parts?.map((p) => p.inlineData?.data ?? p.inline_data?.data).find(Boolean);
@@ -176,7 +180,8 @@ async function swapFirstFrame(firstFrame: Buffer, who: Character, outfit: string
  * `simple` is the job's single fallback attempt (Kling v2.6 motion control, or the same text/image path).
  * The durable generation job owns fallback and retry decisions.
  */
-export async function startHook(run: Run, source: Reference | null, who: string, note?: string, simple = false): Promise<string> {
+export const startHook = (run: Run, source: Reference | null, who: string, note?: string, simple = false) => withWorkBudget(() => startHookInner(run, source, who, note, simple));
+async function startHookInner(run: Run, source: Reference | null, who: string, note?: string, simple = false): Promise<string> {
   const fix = note?.trim() ? ` Fix this from the last try: ${note.trim().slice(0, 200)}.` : "";
   const dir = await mkdtemp(path.join(tmpdir(), "mavya-hook-"));
   try {

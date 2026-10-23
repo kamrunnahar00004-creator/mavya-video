@@ -11,7 +11,7 @@ export class GeminiError extends Error {}
 /** A prompt part: text, or a file sent inline (a short video or an image, base64). */
 export type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
 
-export async function geminiJSON<T>(prompt: string | GeminiPart[], opts: { schema?: object; urlContext?: boolean; temperature?: number } = {}): Promise<T> {
+export async function geminiJSON<T>(prompt: string | GeminiPart[], opts: { schema?: object; urlContext?: boolean; temperature?: number; signal?: AbortSignal } = {}): Promise<T> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new GeminiError("GEMINI_API_KEY is not set.");
   const body = {
@@ -26,7 +26,7 @@ export async function geminiJSON<T>(prompt: string | GeminiPart[], opts: { schem
     method: "POST",
     headers: { "x-goog-api-key": key, "content-type": "application/json" },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(120_000),
+    signal: opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000),
   });
   if (!res.ok) throw new GeminiError(`Gemini ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const out = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
