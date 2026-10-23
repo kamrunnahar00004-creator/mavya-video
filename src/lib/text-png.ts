@@ -14,11 +14,11 @@ const H = 1920;
 /** The built-in fonts are next/font copies of these Google families. */
 const GOOGLE_NAME: Record<keyof typeof FONTS, string> = { anton: "Anton", montserrat: "Montserrat", poppins: "Poppins", bebas: "Bebas Neue", marker: "Permanent Marker", geist: "Geist" };
 
-const kebab = (k: string) => (k.startsWith("Webkit") ? `-webkit-${k.slice(6)}` : k).replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
-const css = (s: CSSProperties) =>
+export const cssProperty = (k: string) => k.replace(/^Webkit/, "webkit").replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`).replace(/^webkit-/, "-webkit-");
+export const textCss = (s: CSSProperties) =>
   Object.entries(s)
     .filter(([, v]) => v !== undefined && v !== null && v !== "")
-    .map(([k, v]) => `${kebab(k)}:${String(v).replace(/"/g, "'")}`)
+    .map(([k, v]) => `${cssProperty(k)}:${String(v).replace(/"/g, "'")}`)
     .join(";");
 const xml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -55,12 +55,13 @@ async function fontFor(font: string, text: string): Promise<{ family: string; fa
 
 /** The drawn text cropped to what it covers, with where it sits on the 1080x1920 frame (null: nothing drawn). */
 export async function textPng(x: TextLayer): Promise<{ png: string; x: number; y: number } | null> {
+  if (!x.text.trim()) return null;
   const { family, face } = await fontFor(x.font, x.text);
   const look = textLook(x.style, x.color, x.second);
   const base: CSSProperties = { fontFamily: family, fontSize: `${(x.size / 100) * H}px`, fontWeight: 800, lineHeight: 1.12, textAlign: "center", whiteSpace: "pre-wrap", overflowWrap: "break-word", display: "block" };
   const inner = look.box
-    ? `<span style="${css({ ...base, lineHeight: 1.45 })}"><span style="${css({ ...look.text, ...look.box })}">${xml(x.text)}</span></span>`
-    : `<span style="${css({ ...base, ...look.text })}">${xml(x.text)}</span>`;
+    ? `<span style="${textCss({ ...base, lineHeight: 1.45 })}"><span style="${textCss({ ...look.text, ...look.box })}">${xml(x.text)}</span></span>`
+    : `<span style="${textCss({ ...base, ...look.text })}">${xml(x.text)}</span>`;
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject x="0" y="0" width="${W}" height="${H}">` +
     `<div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:${W}px;height:${H}px;margin:0">` +
@@ -87,7 +88,7 @@ export async function textPng(x: TextLayer): Promise<{ png: string; x: number; y
       bottom = py;
     }
   }
-  if (right < 0) return null;
+  if (right < 0) throw new Error("Text could not be drawn. Check its position and style.");
   const out = document.createElement("canvas");
   out.width = right - left + 1;
   out.height = bottom - top + 1;
