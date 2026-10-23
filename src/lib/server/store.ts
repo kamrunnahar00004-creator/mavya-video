@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { r2Enabled, deleteObject, downloadTo, objectSize, putObject, signedGet, signedPut } from "@/lib/server/r2";
+import { r2Enabled, downloadTo, objectSize, putObject, signedGet, signedPut } from "@/lib/server/r2";
 import { authEnabled, createSupabaseAdminClient } from "@/lib/supabase/server";
 import type { Asset, Reference, Run } from "@/lib/types";
 
@@ -358,12 +358,10 @@ async function deleteMediaFile(mediaId: string, who: string): Promise<void> {
     await unlink(path.join(MEDIA_DIR, mediaId)).catch(() => undefined);
     return;
   }
-  const [runs, refs] = await Promise.all([listRuns(who), listReferences(who)]);
-  if (usedBy(runs) || usedBy(refs.filter((r) => r.owner !== "curated"))) return;
-  const { data } = await db().from("media").select("user_id").eq("id", mediaId).maybeSingle<{ user_id: string | null }>();
-  if (!data || data.user_id !== who) return;
-  await db().from("media").delete().eq("id", mediaId);
-  await deleteObject(mediaKey(mediaId));
+  // A display-list scan cannot prove absence of references, especially during concurrent edits.
+  // Cloud media stay owned/readable until account deletion; removing My files only unlists the asset.
+  // Temporary export PNGs have their own bounded lifecycle and never appear in My files.
+  return;
 }
 
 
