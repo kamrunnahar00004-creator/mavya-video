@@ -65,6 +65,7 @@ export async function GET() {
         }));
     } catch (e) {
       console.error("billing details", e);
+      return Response.json({error:"Billing is unavailable. Try again."},{status:503});
     }
   }
   return Response.json({

@@ -150,13 +150,13 @@ export async function deleteReference(id: string, who: string): Promise<void> {
       mediaId = d.references.find((r) => r.id === id)?.mediaId ?? null;
       d.references = d.references.filter((r) => r.id !== id);
     });
-    if (mediaId) await deleteMediaFile(mediaId, who);
+    if (mediaId) await deleteMediaFile(mediaId);
     return;
   }
   const ref = await getReference(id, who);
   if (!ref) return;
   await db().from("library").delete().eq("id", id);
-  if (ref.mediaId) await deleteMediaFile(ref.mediaId, who);
+  if (ref.mediaId) await deleteMediaFile(ref.mediaId);
 }
 
 /* ---------- Runs ---------- */
@@ -278,11 +278,11 @@ export async function deleteAsset(mediaId: string, who: string): Promise<void> {
     await writeDb((d) => {
       d.assets = d.assets.filter((a) => a.mediaId !== mediaId);
     });
-    await deleteMediaFile(mediaId, who);
+    await deleteMediaFile(mediaId);
     return;
   }
   await db().from("assets").delete().eq("media_id", mediaId).eq("user_id", who);
-  await deleteMediaFile(mediaId, who);
+  await deleteMediaFile(mediaId);
 }
 
 /** Whether `who` may read this file (their own, or shared library media), with its type and size. */
@@ -345,7 +345,7 @@ export async function libraryFile(kind: LibraryKind, code: string, dir: string):
 /** Cloud: a short-lived link to a library file (the hook's sound for the player). */
 export const libraryLink = (kind: LibraryKind, code: string, seconds?: number) => signedGet(libraryKey(kind, code), seconds);
 
-async function deleteMediaFile(mediaId: string, who: string): Promise<void> {
+async function deleteMediaFile(mediaId: string): Promise<void> {
   if (!isMediaId(mediaId)) return;
   // Removing an asset or history entry must not break a run or another reference that still uses the file.
   const usedBy = (value: unknown): boolean => {

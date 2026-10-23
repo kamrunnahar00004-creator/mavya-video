@@ -15,7 +15,7 @@ import { BUSINESS, type BillingCycle, type Plan } from "@/lib/plans";
  */
 export function PlansView() {
   const router = useRouter();
-  const { billing, plan: current, loaded, reload } = useAccount({ billing: true });
+  const { billing, plan: current, loaded, error, reload } = useAccount({ billing: true });
   const currentCycle = billing?.subscription?.cycle ?? "monthly";
   const [cycle, setCycle] = useState<BillingCycle | null>(null);
   const shown = cycle ?? currentCycle;
@@ -42,6 +42,7 @@ export function PlansView() {
     // Checkout: the page is leaving for Stripe, so the button stays busy.
   };
 
+  if(error)return <SettingsPage title="Plans" subtitle="Choose your plan"><p>Plans are unavailable.</p><button className={BTN_OUTLINE} onClick={()=>void reload()}>Retry</button></SettingsPage>;
   const toggle = (
     <div className="text-right">
       <div className="flex items-center gap-3 text-[14px] font-semibold">

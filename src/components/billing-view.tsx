@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CreditCard, Zap } from "lucide-react";
@@ -16,13 +16,14 @@ const money = (amount: number, currency: string) => (currency === "USD" ? `$${am
 const brandName = (b: string) => ({ visa: "Visa", mastercard: "Mastercard", amex: "Amex", discover: "Discover", jcb: "JCB", diners: "Diners", unionpay: "UnionPay" })[b] ?? b.charAt(0).toUpperCase() + b.slice(1);
 
 export function BillingView() {
-  const { billing, plan, loaded, reload } = useAccount({ billing: true });
+  const { billing, plan, loaded, error, reload } = useAccount({ billing: true });
   const paid = useSearchParams().get("paid") === "1";
   const [toast, setToast] = useToast();
   const [cancel, setCancel] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(paid);
   const sub = billing?.subscription ?? null;
+  const confirmUntil=useRef<number|null>(null);
 
   // The webhook usually lands within a few seconds of Checkout.
   useEffect(() => {
@@ -32,11 +33,11 @@ export function BillingView() {
       setWaiting(false);
       return;
     }
-    let tries = 0;
+    confirmUntil.current ??= Date.now()+30_000;
     const t = setInterval(() => {
-      tries += 1;
+
       void reload();
-      if (tries >= 15) {
+      if (Date.now() >= confirmUntil.current!) {
         clearInterval(t);
         setWaiting(false);
       }
@@ -61,7 +62,7 @@ export function BillingView() {
 
   return (
     <SettingsPage title="Billing" subtitle="Manage your subscription and payment details">
-      {!loaded || (waiting && !sub) ? (
+      {error ? <div className={`${card} p-5 text-[14px] text-muted`}>Billing is unavailable. <button className={BTN_OUTLINE} onClick={() => void reload()}>Retry</button></div> : paid && !waiting && !sub ? <div className={`${card} p-5 text-[14px] text-muted`}>Payment confirmation is delayed. <button className={BTN_OUTLINE} onClick={() => void reload()}>Refresh</button></div> : !loaded || (waiting && !sub) ? (
         <div className={`${card} p-5 text-[14px] text-muted`}>{waiting ? "Confirming your payment..." : "Loading..."}</div>
       ) : !sub || !plan ? (
         <div className={`${card} flex flex-wrap items-center gap-4 p-5`}>

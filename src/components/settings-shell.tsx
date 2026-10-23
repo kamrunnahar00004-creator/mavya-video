@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BarChart3, ChevronLeft, CreditCard, LayoutList, LogOut, User } from "lucide-react";
@@ -86,7 +86,7 @@ export function SettingsPage({ title, subtitle, wide, aside, children }: { title
 /** One date format on server and browser (a locale default would differ and break hydration). */
 export const formatDate = (d: Date | string, month: "long" | "short" = "long") => new Date(d).toLocaleDateString("en-US", { month, day: "numeric", year: "numeric" });
 
-export type Usage = { plan: PlanId | null; admin: boolean; used: number; limit: number | null; resetsAt: string | null };
+export type Usage = { plan: PlanId | null; admin: boolean; used: number; limit: number | null; resetsAt: string | null; billingStatus?: string | null };
 export type Subscription = { plan: PlanId; cycle: BillingCycle | null; status: string; periodEnd: string | null; cancelAtPeriodEnd: boolean; pendingChange?: { plan: PlanId; cycle: BillingCycle; at: string } | null };
 export type Billing = {
   enabled: boolean;
@@ -95,33 +95,41 @@ export type Billing = {
   invoices: { id: string; date: string; amount: number; currency: string; status: string; plan: string; pdf: string | null }[];
 };
 
-const get = <T,>(url: string) => fetch(url, { cache: "no-store" }).then((r) => (r.ok ? (r.json() as Promise<T>) : null)).catch(() => null);
+const get = <T,>(url: string) => fetch(url, { cache: "no-store", signal: AbortSignal.timeout(15_000) }).then((r) => (r.ok ? (r.json() as Promise<T>) : null)).catch(() => null);
 
 /** The plan with usage (and, with `billing`, the card and invoices). `reload` after a change. */
 export function useAccount({ billing: withBilling = false } = {}) {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [billing, setBilling] = useState<Billing | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const reload = useCallback(async () => {
-    const [u, b] = await Promise.all([get<Usage>("/api/usage"), withBilling ? get<Billing>("/api/billing") : null]);
-    setUsage(u);
-    setBilling(b);
-    setLoaded(true);
-    return { usage: u, billing: b };
-  }, [withBilling]);
+  const [error, setError] = useState(false);
+  const inFlight=useRef<Promise<{usage:Usage|null;billing:Billing|null}>|null>(null);
+  const reload = useCallback(() => {
+    if(inFlight.current)return inFlight.current;
+    const operation=(async()=>{
+      const [u,b]=await Promise.all([get<Usage>("/api/usage"),withBilling?get<Billing>("/api/billing"):null]);
+      setError(!u||(withBilling&&!b));
+      if(u)setUsage(u);
+      if(b)setBilling(b);
+      setLoaded(true);
+      return {usage:u,billing:b};
+    })();
+    inFlight.current=operation;
+    void operation.finally(()=>{if(inFlight.current===operation)inFlight.current=null;});
+    return operation;
+  },[withBilling]);
   useEffect(() => {
     // Fetch on mount; the setState calls happen after the await.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void reload();
   }, [reload]);
   const plan: Plan | null = usage?.plan ? planById(usage.plan) : billing?.subscription ? planById(billing.subscription.plan) : null;
-  return { usage, billing, plan, loaded, reload };
+  return { usage, billing, plan, loaded, error, reload };
 }
 
 /** POST an action to /api/billing; a returned url (Checkout, card page) is opened. Returns an error message or null. */
 export async function billingAction(action: string, extra: Record<string, unknown> = {}): Promise<string | null> {
   try {
-    const r = await fetch("/api/billing", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, ...extra }) });
+    const r = await fetch("/api/billing", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, ...extra }), signal: AbortSignal.timeout(90_000) });
     const j = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
     if (!r.ok) return j.error ?? "Something went wrong. Try again.";
     if (j.url) window.location.assign(j.url);
