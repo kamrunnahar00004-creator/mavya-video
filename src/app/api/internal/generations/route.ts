@@ -2,7 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { advanceGeneration } from "@/lib/server/generation-jobs";
 
-export const maxDuration = 800;
+// Hobby plan maximum (founder 2026-10-23: stay on Hobby for now); one Kling start or check fits well inside it.
+export const maxDuration = 300;
 /** Scheduled recovery continues only previously reserved, explicit-click jobs. */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;

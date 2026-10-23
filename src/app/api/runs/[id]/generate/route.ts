@@ -3,7 +3,8 @@ import { advanceGeneration, generationJob, generationReply, reserveGeneration } 
 import { cloud, getRun } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 
-export const maxDuration = 800;
+// Hobby plan maximum (founder 2026-10-23: stay on Hobby for now); one Kling start or check fits well inside it.
+export const maxDuration = 300;
 const uuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const continueJob = (who: string, job: string) => after(async () => {
   try { await advanceGeneration(who, job); } catch (error) { console.error("generation worker", job, error); }
