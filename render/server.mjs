@@ -203,6 +203,6 @@ const server = createServer(async (req, res) => {
   } catch (e) {
     send(res, 400, { error: String(e?.message ?? e) });
   }
-}).listen(PORT, () => console.log(`render server on ${PORT}`));
+}).listen(PORT, () => console.log(`render server on ${server.address().port}`));
 server.requestTimeout = 30_000;
 server.headersTimeout = 15_000;
