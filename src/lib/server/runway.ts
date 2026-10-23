@@ -131,7 +131,9 @@ Write the plan in JSON:
 const UGC = "Handheld phone front camera, unstabilized micro-shake, casual real UGC, not cinematic.";
 
 /** The style lock: same intensity and mouth as the original, nothing added or exaggerated. */
-const performanceText = (plan: Plan) => `Same performance as the original: ${String(plan.energy ?? "").slice(0, 70)}. Mouth: ${String(plan.mouth ?? "").slice(0, 90)}. No overacting.`;
+/** A plan field as a clause: capped, without its own closing full stop (the prompt adds one). */
+const clause = (s: unknown, max: number) => String(s ?? "").slice(0, max).trim().replace(/[.\s]+$/, "");
+const performanceText = (plan: Plan) => `Same performance as the original: ${clause(plan.energy, 70)}. Mouth: ${clause(plan.mouth, 90)}. No overacting.`;
 
 /** Gemini's plan for re-performing the hook: the motion, the camera and the outfit for this person. */
 async function planFor(clip: string, who: { image: string | null; words: string }): Promise<Plan> {
@@ -147,7 +149,7 @@ async function planFor(clip: string, who: { image: string | null; words: string 
 }
 const motionText = (plan: Plan) => (plan.motion ?? []).map((m) => `${m.start.toFixed(1)}-${m.end.toFixed(1)}s ${m.action}`).join(" ").slice(0, 440);
 /** The camera part of the prompt: the original's camera moves, and the UGC look whenever it was handheld. */
-const cameraText = (camera: string, handheld: boolean) => `Camera: ${camera.slice(0, 100)}.${handheld ? ` ${UGC}` : ""}`;
+const cameraText = (camera: string, handheld: boolean) => `Camera: ${clause(camera, 100)}.${handheld ? ` ${UGC}` : ""}`;
 
 /**
  * Veo's prompt within its 1000 characters. The rules (one take, no text, hands) and the performance lock always fit;
