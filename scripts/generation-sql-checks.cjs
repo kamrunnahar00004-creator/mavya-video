@@ -32,7 +32,7 @@ async function main() {
     sql(`create role anon; create role authenticated; create role service_role;
       create schema auth; create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb default '{}');
       create function auth.uid() returns uuid language sql stable as $$select null::uuid$$;`);
-    for (const file of ['0001_profiles.sql', '0002_storage.sql', '0003_generation_jobs.sql', '0003_generation_jobs.sql']) {
+    for (const file of ['0001_profiles.sql', '0002_storage.sql', '0003_generation_jobs.sql', '0003_generation_jobs.sql', '0004_billing_state.sql', '0005_generation_provider_ids.sql', '0005_generation_provider_ids.sql']) {
       sql(fs.readFileSync(path.join(root, 'supabase/migrations', file), 'utf8'));
     }
     sql(`insert into auth.users(id,email) values('${user}','one@fixture.invalid'),('${other}','two@fixture.invalid');
@@ -47,13 +47,17 @@ async function main() {
     const lease = claim(j.id);
     assert.equal(claim(j.id), null);
     assert.equal(transition(j.id, key, 'fallback'), 'f');
+    assert.throws(() => transition(j.id, lease.lease_token, 'started', 'https://attacker.invalid/task'));
+    assert.throws(() => transition(j.id, lease.lease_token, 'started', 'model|id|extra'));
     assert.equal(transition(j.id, lease.lease_token, 'started', key), 't');
     const polling = claim(j.id);
     assert.equal(transition(j.id, polling.lease_token, 'fallback'), 't');
     assert.equal(transition(j.id, polling.lease_token, 'fallback'), 'f');
     const fallback = claim(j.id);
     assert.equal(fallback.fallback_used, true);
-    assert.equal(transition(j.id, fallback.lease_token, 'started', key), 't');
+    const falTask = `fal-ai/kling-video/v2.6/pro/motion-control|${key}`;
+    assert.equal(transition(j.id, fallback.lease_token, 'started', falTask), 't');
+    assert.equal(sql(`select fallback_task_id from generations where id='${j.id}'`), falTask);
     const failed = claim(j.id);
     assert.equal(transition(j.id, failed.lease_token, 'failed'), 't');
     assert.equal(transition(j.id, failed.lease_token, 'failed'), 'f');
@@ -102,7 +106,7 @@ async function main() {
     assert.equal(sql(`select state from generations where id='${uncertain.id}'`), 'uncertain');
     assert.equal(sql(`select has_function_privilege('authenticated','mavya_reserve_generation(uuid,uuid,uuid,text,boolean)','execute')`), 'f');
     assert.equal(sql(`select has_function_privilege('service_role','mavya_reserve_generation(uuid,uuid,uuid,text,boolean)','execute')`), 't');
-    console.log('PASS: migration replay, ownership, request replay, parallel quota, shared monthly window, leases, one fallback/refund, completion CAS/replay, uncertain recovery, RPC grants');
+    console.log('PASS: migration replay, ownership, request replay, parallel quota, shared monthly window, leases, bound legacy/fal task IDs, one fallback/refund, completion CAS/replay, uncertain recovery, RPC grants');
   } finally { docker('rm', '--force', name); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
