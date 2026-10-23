@@ -147,6 +147,8 @@ async function main() {
     assert.equal(sql(`select mavya_deletion_event('${user}','evt_deleted_cancel','fixture','late_sub',false)`),'closed');
     assert.equal(sql(`select mavya_deletion_event('${user}','evt_deleted_live','fixture','late_sub',true)`),'cancel');
     assert.equal(sql(`select 'late_sub'=any(subscription_ids) from account_deletions where user_id='${user}'`),'t');
+    for(let i=0;i<2;i++)sql(fs.readFileSync(path.join(root,'supabase/migrations/0014_deletion_grant_grace.sql'),'utf8'));
+    assert.equal(sql(`select cleanup_after>=created_at+interval '6 hours 2 minutes' from account_deletions where user_id='${other}'`),'t');
     assert.equal(sql("select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'mavya_%' and has_function_privilege('authenticated',p.oid,'execute')"),'0');
     console.log('PASS: billing/deletion/upload/run/AI/export/contact migrations replay, leases/order/CAS, ownership, atomic merge/append, entitlement/rate limits, source changes, cleanup snapshots and service grants');
   } finally { docker('rm', '--force', name); }
