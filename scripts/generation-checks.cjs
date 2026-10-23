@@ -91,9 +91,10 @@ async function main() {
   const secret = 'fixture-only-cron-secret-32-characters';
   const cron = load('src/app/api/internal/generations/route.ts', {
     'node:crypto': require('node:crypto'),
-    '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from(table) { queries++; return table === 'account_deletions' ? {...chain, async limit(){return {data:[],error:null};}} : chain; } }) },
+    '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from(table) { queries++; return table === 'account_deletions' || table === 'export_jobs' ? {...chain, async limit(){return {data:[],error:null};}} : chain; } }) },
     '@/lib/server/account-deletion': { advanceDeletion: async () => {throw Error('unexpected deletion');} },
     '@/lib/server/uploads': { expireUploads: async () => 0 },
+    '@/lib/server/export-jobs': { advanceExport: async () => { throw Error('unexpected export'); } },
     '@/lib/server/generation-jobs': { advanceGeneration: async (who, id) => { assert.equal(who, 'owner'); assert.equal(id, 'job'); recovered++; } },
   }, { CRON_SECRET: secret });
   assert.equal((await cron.GET(new Request('https://fixture.invalid/cron'))).status, 401);

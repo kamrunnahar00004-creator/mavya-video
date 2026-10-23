@@ -1,29 +1,17 @@
+import { after } from "next/server";
+import { exportLayers } from "@/lib/export-layers";
+import { billingRpc } from "@/lib/server/billing-state";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { advanceExport, exportJob } from "@/lib/server/export-jobs";
 import { randomUUID } from "node:crypto";
 import { fullAdjust } from "@/lib/adjust";
 import { segSpeed, timeline, videoLength } from "@/lib/edit";
-import { deleteObject, putObject, signedGet } from "@/lib/server/r2";
-import { cloud, getRun, isMediaId, libraryLink, mediaAccess, mediaLink, mediaUploadLink, newUpload, registerMedia, appendExport, uploadedSize } from "@/lib/server/store";
+import { cloud, getRun, libraryLink, mediaAccess, mediaLink, mediaUploadLink, newUpload } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 
-/**
- * Export: the finished MP4, built by the render server (render/server.mjs on Render.com, RENDER_URL + RENDER_SECRET).
- * POST {texts: [{png, start, end}]}: the browser draws each on-screen text as a full-frame transparent PNG (the same
- * CSS as the preview). This route stores them, turns the run into a render spec with short-lived R2 links (the
- * server never sees our keys), gives the server one signed upload link for the result and returns {job}.
- * GET ?job=<id>: the job's state; once done, the MP4 is recorded as the user's media and added to the run's exports.
- */
-export const maxDuration = 60;
-
-const W = 1080;
-const H = 1920;
-const FPS = 30;
-const LINK_SECONDS = 6 * 3600;
-const MAX_TEXTS = 40;
-const MAX_PNG = 3_000_000;
-
-type Meta = { who: string; runId: string; mediaId: string; tmp: string; overlays: number; seconds: number };
-
+export const maxDuration = 300;
+const W = 1080, H = 1920, FPS = 30, LINK_SECONDS = 6 * 3600;
 const renderer = () => (process.env.RENDER_URL && process.env.RENDER_SECRET ? { url: process.env.RENDER_URL.replace(/\/+$/, ""), secret: process.env.RENDER_SECRET } : null);
 
 /** A link the render server can download a run's file from (null when it is not this user's). */
@@ -47,8 +35,24 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   if (!run) return Response.json({ error: "Not found" }, { status: 404 });
   if (!run.hook.generated) return Response.json({ error: "Generate the hook first." }, { status: 400 });
 
-  const body = (await request.json().catch(() => null)) as { texts?: unknown } | null;
-  const texts = Array.isArray(body?.texts) ? (body.texts as { png?: unknown; x?: unknown; y?: unknown; start?: unknown; end?: unknown }[]).slice(0, MAX_TEXTS) : [];
+  const existing = await exportJob(who, id);
+  if (existing) return Response.json({job:existing.id});
+  const body = await request.json().catch(()=>null) as {snapshot?:unknown;texts?:{id?:unknown;mediaId?:unknown;x?:unknown;y?:unknown}[]} | null;
+  if(body?.snapshot!==run.updatedAt || !Array.isArray(body.texts) || body.texts.length>200) return Response.json({error:"Your run changed. Save and try again."},{status:409});
+  const texts=body.texts;
+  const expected=exportLayers(run);
+  if(texts.length!==expected.length || new Set(texts.map(t=>t?.id)).size!==texts.length || expected.some(t=>!texts.some(p=>p?.id===t.id)))return Response.json({error:"Text images are incomplete. Try again."},{status:400});
+  const ids=texts.map(t=>typeof t.mediaId==="string"?t.mediaId:"");
+  if(new Set(ids).size!==ids.length)return Response.json({error:"Invalid text images."},{status:400});
+  if(ids.length){
+    const db=createSupabaseAdminClient();
+    const [owned,uploads]=await Promise.all([
+      db.from("media").select("id").eq("user_id",who).eq("mime","image/png").lte("size",3_000_000).in("id",ids),
+      db.from("upload_reservations").select("media_id").eq("user_id",who).eq("temporary",true).eq("state","done").in("media_id",ids)
+    ]);
+    if(owned.error||uploads.error)throw owned.error??uploads.error;
+    if(owned.data.length!==ids.length||uploads.data.length!==ids.length)return Response.json({error:"Text images expired. Try again."},{status:400});
+  }
   const origin = new URL(request.url).origin;
   const segs = timeline(run, null).filter((s) => s.src);
   const total = videoLength(segs);
@@ -79,82 +83,28 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
     if (url) sounds.push({ url, at: p.at, dur: end - p.at, start: p.start, volume: p.volume / 100 });
   }
 
-  // The texts' PNGs, kept only for this export.
-  const tmp = randomUUID();
-  const overlays = [];
-  for (const [i, t] of texts.entries()) {
-    const m = typeof t.png === "string" ? /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(t.png) : null;
-    const [start, end, x, y] = [Number(t.start), Number(t.end), Number(t.x), Number(t.y)];
-    if (!m || ![start, end, x, y].every(Number.isFinite) || end <= start || start >= total) continue;
-    const png = Buffer.from(m[1], "base64");
-    if (png.length > MAX_PNG || png.subarray(1, 4).toString() !== "PNG") continue;
-    const key = `tmp/exports/${tmp}/${i}.png`;
-    await putObject(key, png, "image/png");
-    overlays.push({ url: await signedGet(key, LINK_SECONDS), start: Math.max(0, start), end: Math.min(total, end), x: Math.max(0, Math.min(W, x)), y: Math.max(0, Math.min(H, y)) });
+  const overlays=[];
+  for(const t of texts){
+    if(typeof t.x!=="number"||typeof t.y!=="number"||!Number.isFinite(t.x)||!Number.isFinite(t.y)||t.x<0||t.x>W||t.y<0||t.y>H)return Response.json({error:"Invalid text position."},{status:400});
+    const layer=expected.find(x=>x.id===t.id)!;
+    overlays.push({url:await mediaLink(t.mediaId as string,LINK_SECONDS),start:Math.max(0,layer.start),end:Math.min(total,layer.end),x:t.x,y:t.y});
   }
-
-  const { mediaId } = newUpload("video/mp4");
-  const meta: Meta = { who, runId: run.id, mediaId, tmp, overlays: texts.length, seconds: Math.round(total * 10) / 10 };
-  try {
-    const res = await fetch(`${render.url}/jobs`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${render.secret}`, "content-type": "application/json" },
-      body: JSON.stringify({ spec: { width: W, height: H, fps: FPS, total, segments, sounds, overlays }, output: { url: await mediaUploadLink(mediaId, "video/mp4", LINK_SECONDS), contentType: "video/mp4" }, meta }),
-      // A sleeping server takes up to a minute to wake.
-      signal: AbortSignal.timeout(55_000),
-    });
-    const job = (await res.json().catch(() => null)) as { id?: string } | null;
-    if (!res.ok || !job?.id) throw new Error(`render ${res.status}`);
-    return Response.json({ job: job.id });
-  } catch (e) {
-    console.error("export start", e);
-    await cleanup(tmp, texts.length);
-    return Response.json({ error: "Export is busy. Try again in a minute." }, { status: 502 });
-  }
-}
-
-async function cleanup(tmp: string, n: number) {
-  await Promise.all(Array.from({ length: n }, (_, i) => deleteObject(`tmp/exports/${tmp}/${i}.png`)));
+  const {mediaId}=newUpload("video/mp4"), job=randomUUID();
+  const meta={who,runId:id,mediaId,seconds:Math.round(total*10)/10};
+  const payload={id:job,spec:{width:W,height:H,fps:FPS,total,segments,sounds,overlays},output:{url:await mediaUploadLink(mediaId,"video/mp4",LINK_SECONDS),contentType:"video/mp4"},meta};
+  const reserved=await billingRpc<boolean>("mavya_reserve_export",{p_user:who,p_run:id,p_expected:run.updatedAt,p_id:job,p_media:mediaId,p_payload:payload,p_overlays:ids});
+  if(!reserved)return Response.json({error:"Your run changed. Try again."},{status:409});
+  after(async()=>{try{await advanceExport(who,job);}catch(error){console.error("export worker",job,error);}});
+  return Response.json({job});
 }
 
 export async function GET(request: Request, ctx: RouteContext<"/api/runs/[id]/export">) {
-  const { id } = await ctx.params;
-  const who = await currentUser();
-  if (!who) return signInFirst();
-  const render = renderer();
-  const jobId = new URL(request.url).searchParams.get("job") ?? "";
-  if (!render || !/^[0-9a-f-]{36}$/.test(jobId)) return Response.json({ error: "Not found" }, { status: 404 });
-  const res = await fetch(`${render.url}/jobs/${jobId}`, { headers: { authorization: `Bearer ${render.secret}` }, cache: "no-store", signal: AbortSignal.timeout(55_000) }).catch(() => null);
-  if (res?.status === 404) return Response.json({ state: "failed", error: "The export was interrupted. Try again." });
-  const job = (await res?.json().catch(() => null)) as { state?: string; progress?: number; meta?: Meta; error?: string; ahead?: number } | null;
-  if (!res?.ok || !job?.state) return Response.json({ state: "running", progress: 0 });
-  const meta = job.meta;
-  // Only the user who started it, for this run.
-  if (!meta || meta.who !== who || meta.runId !== id || !isMediaId(meta.mediaId)) return Response.json({ error: "Not found" }, { status: 404 });
-
-  if (job.state === "failed") {
-    console.error("export failed", jobId, job.error);
-    await cleanup(meta.tmp, meta.overlays);
-    return Response.json({ state: "failed", error: "The export failed. Try again." });
-  }
-  if (job.state !== "done") return Response.json({ state: job.state, progress: job.progress ?? 0, ahead: job.ahead ?? 0 });
-
-  const src = `/api/media/${meta.mediaId}`;
-  const run = await getRun(id, who);
-  if (!run) return Response.json({ error: "Not found" }, { status: 404 });
-  if (!run.exports?.some((x) => x.src === src)) {
-    const size = await uploadedSize(meta.mediaId);
-    if (!size) return Response.json({ state: "failed", error: "The export failed. Try again." });
-    try {
-      await registerMedia(meta.mediaId, "video/mp4", size, who, null);
-    } catch (e) {
-      // Already recorded by an earlier check.
-      if ((e as { code?: string }).code !== "23505") throw e;
-    }
-    const done = { src, seconds: meta.seconds, at: new Date().toISOString() };
-    await appendExport(id, meta.mediaId, done, who);
-    await cleanup(meta.tmp, meta.overlays);
-    return Response.json({ state: "done", export: done });
-  }
-  return Response.json({ state: "done", export: run.exports.find((x) => x.src === src) });
+  const {id}=await ctx.params,who=await currentUser();
+  if(!who)return signInFirst();
+  const key=new URL(request.url).searchParams.get("job");
+  if(key&&!/^[0-9a-f-]{36}$/i.test(key))return Response.json({error:"Not found"},{status:404});
+  const job=await exportJob(who,id,key??undefined);
+  if(!job)return key?Response.json({error:"Not found"},{status:404}):Response.json({state:"idle"});
+  if(["pending","running"].includes(job.state)||!job.cleaned)after(async()=>{try{await advanceExport(who,job.id);}catch(error){console.error("export recovery",job.id,error);}});
+  return Response.json({job:job.id,state:job.state==="done"?"done":job.state==="failed"?"failed":"running",progress:job.progress,export:job.result,error:job.state==="failed"?"The export failed. Try again.":undefined});
 }

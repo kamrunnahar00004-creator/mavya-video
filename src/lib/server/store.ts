@@ -173,7 +173,8 @@ export async function listRuns(who: string): Promise<Run[]> {
 export async function getRun(id: string, who: string): Promise<Run | null> {
   if (!cloud()) return (await readDb()).runs.find((r) => r.id === id) ?? null;
   if (!/^[0-9a-f-]{36}$/.test(id)) return null;
-  const { data } = await db().from("runs").select("data").eq("id", id).eq("user_id", who).maybeSingle<Pick<RunRow, "data">>();
+  const { data, error } = await db().from("runs").select("data").eq("id", id).eq("user_id", who).maybeSingle<Pick<RunRow, "data">>();
+  if (error) throw error;
   return data?.data ?? null;
 }
 

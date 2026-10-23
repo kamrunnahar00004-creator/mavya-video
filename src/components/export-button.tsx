@@ -2,32 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Download, Loader2, X } from "lucide-react";
-import { flushRunSaves, saveStateOf, subscribeSaves } from "@/lib/client";
+import { uploadFile, waitRunSaves } from "@/lib/client";
 import { textPng } from "@/lib/text-png";
-import type { Run, TextLayer } from "@/lib/types";
+import { exportLayers } from "@/lib/export-layers";
+import type { Run } from "@/lib/types";
 
 type Done = { src: string; seconds: number; at: string };
-
-/** Waits for this run's pending edits to reach the server (the export reads the saved run). */
-function saved(id: string): Promise<void> {
-  flushRunSaves();
-  return new Promise((resolve) => {
-    const check = () => {
-      if (saveStateOf(id) !== "saving") {
-        stop();
-        resolve();
-      }
-    };
-    const stop = subscribeSaves(check);
-    check();
-  });
-}
 
 /**
  * Export in the run header: draws the texts (text-png.ts), starts the render (POST /api/runs/[id]/export), shows
  * the progress on the button, then opens the finished video with Download. The video is also kept in My files.
  */
-export function ExportButton({ run, texts, ready, onToast, onDone }: { run: Run; texts: TextLayer[]; ready: boolean; onToast: (msg: string) => void; onDone: (x: Done) => void }) {
+export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { run: Run; beforeExport: () => Promise<void>; ready: boolean; onToast: (msg: string) => void; onDone: (x: Done) => void }) {
   const [progress, setProgress] = useState<number | null>(null);
   const [done, setDone] = useState<Done | null>(null);
   const alive = useRef(true);
@@ -38,47 +24,62 @@ export function ExportButton({ run, texts, ready, onToast, onDone }: { run: Run;
     };
   }, []);
 
-  async function start() {
-    setProgress(0);
-    const fail = (msg: string) => {
-      if (!alive.current) return;
-      setProgress(null);
-      onToast(msg);
-    };
-    try {
-      await saved(run.id);
-      const shown = texts.filter((t) => t.text.trim() && t.end > t.start);
-      let pngs: { png: string; x: number; y: number; start: number; end: number }[];
-      try {
-        const drawn = await Promise.all(shown.map(async (t) => {
-          const d = await textPng(t);
-          return d ? { ...d, start: t.start, end: t.end } : null;
-        }));
-        pngs = drawn.filter((d) => d !== null);
-      } catch {
-        return fail("This browser can't draw the texts. Export in Chrome, Edge or Firefox.");
-      }
-      const res = await fetch(`/api/runs/${run.id}/export`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ texts: pngs }) });
-      const job = (await res.json().catch(() => null)) as { job?: string; error?: string } | null;
-      if (!res.ok || !job?.job) return fail(job?.error ?? "Couldn't start the export. Try again.");
-      for (let i = 0; i < 400 && alive.current; i++) {
-        await new Promise((r) => setTimeout(r, 2500));
-        const s = (await fetch(`/api/runs/${run.id}/export?job=${job.job}`, { cache: "no-store" })
-          .then((r) => r.json())
-          .catch(() => null)) as { state?: string; progress?: number; error?: string; export?: Done } | null;
-        if (s?.state === "failed") return fail(s.error ?? "The export failed. Try again.");
-        if (s?.state === "done" && s.export) {
-          if (!alive.current) return;
-          setProgress(null);
-          setDone(s.export);
-          onDone(s.export);
-          return;
+  const [jobId,setJobId]=useState<string|null>(null);
+  const blocked=useRef(false);
+  const callback=useRef(onDone);
+  useEffect(()=>{callback.current=onDone;},[onDone]);
+  useEffect(()=>{
+    let stop=false;
+    void fetch(`/api/runs/${run.id}/export`,{cache:"no-store",signal:AbortSignal.timeout(30_000)}).then(r=>r.ok?r.json():null).then(reply=>{
+      if(!stop&&!blocked.current&&reply?.job){blocked.current=true;setProgress(0);setJobId(reply.job);}
+    }).catch(()=>undefined);
+    return ()=>{stop=true;};
+  },[run.id]);
+  useEffect(()=>{
+    if(!jobId)return;
+    let stop=false;
+    void(async()=>{
+      for(let i=0;i<400&&!stop;i++){
+        await new Promise(r=>setTimeout(r,2500));
+        const response=await fetch(`/api/runs/${run.id}/export?job=${jobId}`,{cache:"no-store",signal:AbortSignal.timeout(30_000)}).catch(()=>null);
+        const reply=await response?.json().catch(()=>null);
+        if(stop)return;
+        if(reply?.state==="done"&&reply.export){
+          setProgress(null);setJobId(null);blocked.current=false;setDone(reply.export);callback.current(reply.export);return;
         }
-        if (typeof s?.progress === "number") setProgress(Math.max(0.02, s.progress));
+        if(reply?.state==="failed"||response?.status===404){setProgress(null);setJobId(null);blocked.current=false;onToast(reply?.error??"The export failed. Try again.");return;}
+        if(typeof reply?.progress==="number")setProgress(Math.max(0.02,reply.progress));
       }
-      fail("This is taking too long. Try again.");
-    } catch {
-      fail("Couldn't start the export. Try again.");
+      if(!stop){setProgress(null);setJobId(null);blocked.current=false;onToast("This is taking too long. Reopen this run to continue.");}
+    })();
+    return ()=>{stop=true;};
+  },[jobId,run.id,onToast]);
+
+  async function start() {
+    if(blocked.current)return;
+    blocked.current=true;setProgress(0);
+    try{
+      await beforeExport();
+      if(!(await waitRunSaves(run.id)))throw Error("Couldn't save your changes. Try again.");
+      const response=await fetch(`/api/runs/${run.id}`,{cache:"no-store",signal:AbortSignal.timeout(30_000)});
+      if(!response.ok)throw Error("Couldn't load the saved run.");
+      const snapshot=await response.json() as Run;
+      const manifest=[];
+      // Draw/upload one at a time, avoiding 200 simultaneous full-resolution canvases.
+      for(const t of exportLayers(snapshot)){
+        const drawn=await textPng(t);
+        if(!drawn)throw Error("A text image could not be drawn.");
+        const blob=await (await fetch(drawn.png)).blob();
+        const uploaded=await uploadFile(new File([blob],"text.png",{type:"image/png"}),false,"export-text");
+        manifest.push({id:t.id,mediaId:uploaded.mediaId,x:drawn.x,y:drawn.y});
+      }
+      const sent=await fetch(`/api/runs/${run.id}/export`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({snapshot:snapshot.updatedAt,texts:manifest}),signal:AbortSignal.timeout(60_000)});
+      const reply=await sent.json().catch(()=>null);
+      if(!sent.ok||!reply?.job)throw Error(reply?.error??"Couldn't start the export. Try again.");
+      if(alive.current)setJobId(reply.job);
+    }catch(error){
+      blocked.current=false;
+      if(alive.current){setProgress(null);onToast(error instanceof Error?error.message:"Couldn't start the export. Try again.");}
     }
   }
 

@@ -18,7 +18,7 @@ export function validJob(b) {
  }
  if(pieces>200||len>181||Math.abs(len-s.total)>1)return false;
  for(const a of s.sounds)if(!link(a.url)||!number(a.at,0,s.total)||!number(a.start,0,3600)||!number(a.dur,0.01,s.total)||!number(a.volume,0,1))return false;
- for(const o of s.overlays)if(!link(o.url)||!number(o.start,0,s.total)||!number(o.end,o.start+0.01,s.total)||!number(o.x,0,1080)||!number(o.y,0,1920))return false;
+ for(const o of s.overlays)if(!link(o.url)||!number(o.start,0,s.total)||!number(o.end,0,s.total)||o.end<=o.start||!number(o.x,0,1080)||!number(o.y,0,1920))return false;
  return true;
 }
 export function validProbe(width,height,duration) {

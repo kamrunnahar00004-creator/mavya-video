@@ -19,9 +19,9 @@ export const round1 = (n: number) => Math.round(n * 10) / 10;
  * Upload a file. With cloud storage the browser sends it straight to storage (no size limit from the server);
  * without it (local), through POST /api/media.
  */
-export async function uploadFile(file: File, asAsset: boolean): Promise<{ mediaId: string; mime: string }> {
+export async function uploadFile(file: File, asAsset: boolean, purpose?: "export-text"): Promise<{ mediaId: string; mime: string }> {
   const json = (body: unknown) => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  const start = await fetch("/api/uploads", json({ step: "start", mime: file.type, size: file.size }));
+  const start = await fetch("/api/uploads", json({ step: "start", mime: file.type, size: file.size, purpose }));
   if (start.status !== 501) {
     const s = (await start.json().catch(() => ({}))) as { mediaId?: string; url?: string; error?: string };
     if (!start.ok || !s.mediaId || !s.url) throw new Error(s.error ?? "Upload failed");

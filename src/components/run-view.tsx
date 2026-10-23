@@ -145,6 +145,18 @@ export function RunView() {
     [id]
   );
 
+  const beforeExport = useCallback(async () => {
+    const dirty=saveTimer.current||adjustTimer.current;
+    if(saveTimer.current)clearTimeout(saveTimer.current);
+    if(adjustTimer.current)clearTimeout(adjustTimer.current);
+    saveTimer.current=adjustTimer.current=null;
+    const cur=runRef.current;
+    if(dirty&&cur?.id===id){
+      const saved=await patchRun(id,{hook:cur.hook,demo:cur.demo,texts:runTexts(cur),project:null});
+      if(!saved)throw Error("Couldn't save your changes. Try again.");
+    }
+  },[id]);
+
   useEffect(() => {
     const flush = () => {
       const dirty = saveTimer.current || adjustTimer.current;
@@ -468,7 +480,7 @@ export function RunView() {
         </button>
         <ExportButton
           run={run}
-          texts={texts}
+          beforeExport={beforeExport}
           ready={ready}
           onToast={setToast}
           // Saved on the server already; only the page's copy needs it (My files).

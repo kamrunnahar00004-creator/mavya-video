@@ -4,10 +4,10 @@ import { billingRpc } from "@/lib/server/billing-state";
 import { newUpload } from "@/lib/server/store";
 import { copyObject, deleteObjectStrict, objectInfo, signedPut } from "@/lib/server/r2";
 type Reservation = { media_id: string; mime: string; staging_key: string; declared_size: number; state: string; lease_token: string };
-export async function startUpload(who: string, mime: string, size: number) {
+export async function startUpload(who: string, mime: string, size: number, temporary = false) {
  const { mediaId } = newUpload(mime);
  const key = `tmp/uploads/${mediaId}`;
- const { error } = await createSupabaseAdminClient().from("upload_reservations").insert({ media_id: mediaId, user_id: who, mime, declared_size: size, staging_key: key });
+ const { error } = await createSupabaseAdminClient().from("upload_reservations").insert({ media_id: mediaId, user_id: who, mime, declared_size: size, staging_key: key, temporary });
  if (error) throw error;
  return { mediaId, url: await signedPut(key, mime, 900, size) };
 }
@@ -24,11 +24,15 @@ export async function finishUpload(who: string, id: string, mime: string, name: 
 }
 export async function expireUploads() {
  const db = createSupabaseAdminClient();
- const { data, error } = await db.from("upload_reservations").select("media_id,staging_key,state").lt("expires_at", new Date().toISOString()).or(`lease_until.is.null,lease_until.lt.${new Date().toISOString()}`).limit(5);
+ const { data, error } = await db.from("upload_reservations").select("media_id,staging_key,state,temporary").lt("expires_at", new Date().toISOString()).or(`lease_until.is.null,lease_until.lt.${new Date().toISOString()}`).limit(5);
  if (error) throw error;
  for (const r of data ?? []) {
   await deleteObjectStrict(r.staging_key);
-  if (r.state !== "done") await deleteObjectStrict(`media/${r.media_id}`);
+  if (r.state !== "done" || r.temporary) await deleteObjectStrict(`media/${r.media_id}`);
+  if (r.temporary) {
+   const removedMedia = await db.from("media").delete().eq("id", r.media_id);
+   if (removedMedia.error) throw removedMedia.error;
+  }
   const removed = await db.from("upload_reservations").delete().eq("media_id", r.media_id);
   if (removed.error) throw removed.error;
  }

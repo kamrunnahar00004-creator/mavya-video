@@ -115,6 +115,14 @@ async function main() {
     sql(`insert into media(id,user_id,mime) values('export.mp4','${other}','video/mp4')`);
     await Promise.all(Array.from({length:8},()=>parallel(`select mavya_append_export('${other}','${project}','export.mp4','{"seconds":3}')`)));
     assert.equal(sql(`select jsonb_array_length(data->'exports') from runs where id='${project}'`),'1');
+    for(let i=0;i<2;i++)sql(fs.readFileSync(path.join(root,'supabase/migrations/0009_export_jobs.sql'),'utf8'));
+    const exportId='40000000-0000-4000-8000-000000000009';
+    const stamp=sql(`select data->>'updatedAt' from runs where id='${project}'`);
+    assert.equal(sql(`select mavya_reserve_export('${other}','${project}','stale','${exportId}','output.mp4','{}','{}')`),'f');
+    assert.equal(sql(`select mavya_reserve_export('${other}','${project}','${stamp}','${exportId}','output.mp4','{}','{upload.png}')`),'t');
+    assert.equal(sql(`select mavya_claim_export('${user}','${exportId}')`),'');
+    assert.ok(JSON.parse(sql(`select mavya_claim_export('${other}','${exportId}')`)).lease_token);
+    assert.equal(sql(`select mavya_claim_export('${other}','${exportId}')`),'');
     console.log('PASS: billing migration replay, parallel account lease, transactional event replay/rollback/order, equal-second apply, action CAS/watermark, expired leases, duplicate subscription audit, retired identity isolation, persisted Checkout identity/params, expiry/resubscribe, RPC grants');
   } finally { docker('rm', '--force', name); }
 }
