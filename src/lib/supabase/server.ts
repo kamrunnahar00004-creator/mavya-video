@@ -1,5 +1,6 @@
 import "server-only";
 import { assertProductionConfig } from "@/lib/production-config";
+import { workSignal } from "@/lib/server/work-budget";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
@@ -15,6 +16,7 @@ export async function createSupabaseServerClient() {
   if (!url || !anonKey) throw new Error("Supabase env not set. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.");
   const cookieStore = await cookies();
   return createServerClient(url, anonKey, {
+    global: { fetch: (url, options) => fetch(url, { ...options, signal: options?.signal ? AbortSignal.any([options.signal, workSignal(15_000)]) : workSignal(15_000) }) },
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -47,6 +49,6 @@ export function createSupabaseAdminClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("Supabase admin env not set. Add SUPABASE_SERVICE_ROLE_KEY.");
-  admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: (url, options) => fetch(url, { ...options, signal: options?.signal ? AbortSignal.any([options.signal, workSignal(15_000)]) : workSignal(15_000) }) } });
   return admin;
 }

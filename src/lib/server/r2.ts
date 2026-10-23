@@ -1,5 +1,6 @@
 import "server-only";
 import { assertProductionConfig } from "@/lib/production-config";
+import { workSignal } from "@/lib/server/work-budget";
 import { createWriteStream } from "node:fs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -26,7 +27,7 @@ function r2(): S3Client {
 const Bucket = () => process.env.R2_BUCKET!;
 
 export async function putObject(key: string, body: Buffer | Uint8Array, contentType: string): Promise<void> {
-  await r2().send(new PutObjectCommand({ Bucket: Bucket(), Key: key, Body: body, ContentType: contentType }));
+  await r2().send(new PutObjectCommand({ Bucket: Bucket(), Key: key, Body: body, ContentType: contentType }), { abortSignal: workSignal(20_000) });
 }
 
 export async function objectSize(key: string): Promise<number | null> {
@@ -41,7 +42,7 @@ export async function objectSize(key: string): Promise<number | null> {
 /** Download an object to a local file (for ffmpeg and the AI models); false when it does not exist. */
 export async function downloadTo(key: string, file: string): Promise<boolean> {
   try {
-    const signal = AbortSignal.timeout(60_000);
+    const signal = workSignal(60_000);
     const out = await r2().send(new GetObjectCommand({ Bucket: Bucket(), Key: key }), { abortSignal: signal });
     if (!out.Body) return false;
     await pipeline(out.Body as Readable, createWriteStream(file), { signal });

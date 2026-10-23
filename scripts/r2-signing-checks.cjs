@@ -8,6 +8,7 @@ async function main(){
  }
  const api=load('src/lib/server/r2.ts',{
   '@/lib/production-config':{assertProductionConfig(){}},'node:fs':require('node:fs'),'node:stream':require('node:stream'),'node:stream/promises':require('node:stream/promises'),
+  '@/lib/server/work-budget':{workSignal:ms=>AbortSignal.timeout(ms)},
   '@aws-sdk/client-s3':{...aws,S3Client:FixtureClient},'@aws-sdk/s3-request-presigner':require('@aws-sdk/s3-request-presigner')
  },{R2_ACCOUNT_ID:'fixture',R2_ACCESS_KEY_ID:'fixture',R2_SECRET_ACCESS_KEY:'fixture-only',R2_BUCKET:'fixture'});
  const url=new URL(await api.signedPut('tmp/uploads/fixture.png','image/png',900,123));
