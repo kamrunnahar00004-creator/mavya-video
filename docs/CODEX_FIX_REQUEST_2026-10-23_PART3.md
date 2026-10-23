@@ -5,6 +5,13 @@ Part 2 reviewed and accepted by Claude (all suites pass, 0005 catch on fal task 
 per finding or coupled group, new migrations `0006_*` and up, stubbed tests, all existing suites passing, no paid
 calls, no price/limit/prompt/model/UI-style changes, short copy without em dashes).
 
+**Hosting stays on Vercel Hobby for now (founder decision 2026-10-23), commit `f261cce`:** every function
+`maxDuration` must be **300 s or less**, crons at most **once a day** (the recovery cron is now daily at 04:00;
+an open or reopened run page advances its own generation job), and nothing may assume per-minute scheduling or
+Pro-only features. Design any new background work (export finalization, deletion, temp cleanup) to be advanced
+by the user's next request or the daily cron, not a per-minute scheduler. Note these limits in the report where
+they matter; the founder will move to Pro later.
+
 **Please work through the whole list below in one session.** Stopping after each group costs the founder a full
 review round every time. Only stop early for something you truly cannot do safely, and then still continue with the
 *other* independent items (they do not depend on each other) before writing the report. A clean, smaller policy
