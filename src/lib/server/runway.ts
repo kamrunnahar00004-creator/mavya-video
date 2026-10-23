@@ -19,7 +19,9 @@ import type { Reference, Run } from "@/lib/types";
  *      like a halter on a man, becomes the closest equivalent), and the moment the action has finished.
  *   2. Gemini 3.1 Flash Image puts the character, in that outfit, into the hook's first frame: same scene, objects,
  *      pose, expression and light, natural nails, nothing added, no captions.
- *   3. Veo 3.1 Fast animates from that frame with the motion and camera script, one continuous take.
+ *   3. Veo 3.1 Fast animates from that frame with the motion and camera script, one continuous take, locked to the
+ *      original's style (2026-10-23): same size of movements, same expression strength, same mouth (a calm or
+ *      silent original stays calm or silent; talking is a negative prompt when the original does not speak).
  *   It works on every hook (Gemini Omni and Seedance refuse some) and keeps the original scene; the motion is very
  *   close, not frame-identical. About $0.52 and 80 s.
  * A described hook (no video): Veo 3.1 Fast from the character photo, the script's beats as the prompt ($0.40).
@@ -31,11 +33,17 @@ let client: RunwayML | null = null;
 const runway = () => (client ??= new RunwayML());
 const exec = promisify(execFile);
 
-const NO_TEXT = "No text, captions, subtitles, stickers or watermarks anywhere in the frame.";
+/*
+ * Veo's prompt is capped at 1000 characters (anything longer is cut off, which used to drop the rules at the end),
+ * so every fixed piece below is short and the plan's parts have their own budgets (see veoPrompt).
+ */
+const NO_TEXT = "No text, captions or watermarks.";
 /** Founder: the generated hooks had camera cuts; a hook is one take. */
-const ONE_TAKE = "One continuous shot from the first to the last frame: no cuts, no jump cuts, no scene or angle changes, no transitions.";
-const BODY = "Natural hands with five fingers, no extra limbs.";
-const NEGATIVE = "text, captions, subtitles, watermark, logo, cut, jump cut, scene change, transition, new objects, nail polish, extra fingers, deformed hands, distorted face, morphing, outfit change";
+const ONE_TAKE = "One continuous take: no cuts, jump cuts, angle or scene changes.";
+const BODY = "Natural five-finger hands.";
+/** Founder 2026-10-23: the character overacted (big mouth and face moves) where the original was calm. */
+const NEGATIVE = "text, captions, subtitles, watermark, logo, cut, jump cut, scene change, transition, new objects, nail polish, extra fingers, deformed hands, distorted face, morphing, outfit change, exaggerated expressions, overacting, mugging, theatrical gestures";
+const NEGATIVE_SILENT = `${NEGATIVE}, talking, speaking, lip movement, mouthing words`;
 
 type Beat = { start: number; end: number; action: string };
 type Recipe = { hook?: { camera?: string; mood?: string; setting?: string; beats?: Beat[] } };
@@ -91,27 +99,39 @@ async function hookVideo(run: Run, source: Reference | null, who: string, dir: s
   return out;
 }
 
-type Plan = { motion: Beat[]; camera: string; handheld: boolean; outfit: string };
+type Plan = { motion: Beat[]; energy: string; mouth: string; talking: boolean; camera: string; handheld: boolean; outfit: string };
 const PLAN_SCHEMA = {
   type: "OBJECT",
   properties: {
     motion: { type: "ARRAY", items: { type: "OBJECT", properties: { start: { type: "NUMBER" }, end: { type: "NUMBER" }, action: { type: "STRING" } }, required: ["start", "end", "action"] } },
+    energy: { type: "STRING" },
+    mouth: { type: "STRING" },
+    talking: { type: "BOOLEAN" },
     camera: { type: "STRING" },
     handheld: { type: "BOOLEAN" },
     outfit: { type: "STRING" },
   },
-  required: ["motion", "camera", "handheld", "outfit"],
+  required: ["motion", "energy", "mouth", "talking", "camera", "handheld", "outfit"],
 };
-const PLAN_PROMPT = (who: string) => `VIDEO 1 is a short selfie hook. ${who} will re-perform it exactly, in ONE continuous ${HOOK_SECONDS}-second take with no cuts.
+/**
+ * Founder 2026-10-23: the recreation must match the original's style exactly, hands to mouth: same size of movements,
+ * same expression strength, same mouth (a calm original must not become a big, talky performance).
+ */
+const PLAN_PROMPT = (who: string) => `VIDEO 1 is a short selfie hook. ${who} will re-perform it EXACTLY, in ONE continuous ${HOOK_SECONDS}-second take with no cuts. Study VIDEO 1 frame by frame: the goal is the same performance, same style and same intensity, by a different person. Copy what is there; never add an action, gesture, expression or word that is not in VIDEO 1, and never make anything bigger or more dramatic than it is.
 Write the plan in JSON:
-- motion: the performance second by second over the new ${HOOK_SECONDS} seconds (0 to ${HOOK_SECONDS}), 4 to 7 segments: the same actions in the same order as VIDEO 1, spread at a natural, slightly slower pace so they fill the whole ${HOOK_SECONDS} seconds, ending on the settled final pose. If VIDEO 1 has a cut, keep only its first continuous shot's performance. For each: what the head, eyes, mouth and EACH hand do and any object they hold. Concrete and physical ("right hand lifts the glass to the lips, eyes stay wide on the lens"). Never describe who the person is. All segments together under 480 characters.
-- camera: how the phone camera itself moves over the new ${HOOK_SECONDS} seconds, with seconds: handheld shake, drift, a quick push-in toward the face, pulling back, a zoom, a tilt or pan, or steady. Never a cut. Under 170 characters.
+- motion: the performance over the new ${HOOK_SECONDS} seconds (0 to ${HOOK_SECONDS}), 4 to 7 segments in the same order as VIDEO 1, at the same pace stretched only as needed to fill ${HOOK_SECONDS} seconds, ending on the settled final pose. If VIDEO 1 has a cut, keep only its first continuous shot. In each segment cover, in this order and only where something happens: head (tilt, turn, nod, how far), eyes (where they look, blinks, widening), eyebrows, mouth (closed, slightly open, smiling, speaking), EACH hand (exact position relative to the face or body, path, speed, what it touches or holds), shoulders and body lean. Concrete, physical, with the SIZE of each move ("small", "slight", "quick", "slow"), e.g. "right hand slowly rises to cover the mouth, eyes stay on the lens, slight head tilt left". Never describe who the person is. All segments together under 420 characters.
+- energy: how big and intense the whole performance is in VIDEO 1, to match exactly: e.g. "calm and understated, small natural expressions" or "big surprised reaction, wide eyes, quick moves". Under 70 characters.
+- mouth: exactly what the mouth does over time in VIDEO 1, with seconds: kept closed, a slight smile, lips parted in surprise, or speaking (how much: a few words or continuous, normal pace, how wide the mouth opens). Under 90 characters.
+- talking: true only if the person in VIDEO 1 visibly speaks or mouths words.
+- camera: how the phone camera itself moves over the new ${HOOK_SECONDS} seconds, with seconds: handheld shake, drift, a quick push-in toward the face, pulling back, a zoom, a tilt or pan, or steady. Never a cut. Under 100 characters.
 - handheld: true if VIDEO 1 is filmed on a phone held by hand (front or back camera) with any visible camera movement or shake.
 - outfit: what the new person wears: the same garment colors and style as in VIDEO 1, unless that garment does not suit this person (for example a tank top, halter, crop top or dress on a man, or anything revealing), then the closest equivalent that suits them, same colors. No jewelry or nail polish unless the new person already has it. Under 120 characters.`;
 
 /** The real-UGC look (founder 2026-10-21: Veo alone is too polished; no post-processing, it must be in the prompt). */
-const UGC =
-  "It must look like real UGC filmed by the person on their own phone front camera: handheld and NOT stabilized, natural micro-shake and small wobbles, slight autofocus and exposure shifts, casual framing. Not cinematic, no smooth gimbal or dolly moves, no studio lighting.";
+const UGC = "Handheld phone front camera, unstabilized micro-shake, casual real UGC, not cinematic.";
+
+/** The style lock: same intensity and mouth as the original, nothing added or exaggerated. */
+const performanceText = (plan: Plan) => `Same performance as the original: ${String(plan.energy ?? "").slice(0, 70)}. Mouth: ${String(plan.mouth ?? "").slice(0, 90)}. No overacting.`;
 
 /** Gemini's plan for re-performing the hook: the motion, the camera and the outfit for this person. */
 async function planFor(clip: string, who: { image: string | null; words: string }): Promise<Plan> {
@@ -125,9 +145,20 @@ async function planFor(clip: string, who: { image: string | null; words: string 
     { schema: PLAN_SCHEMA, temperature: 0.2 },
   );
 }
-const motionText = (plan: Plan) => (plan.motion ?? []).map((m) => `${m.start.toFixed(1)}-${m.end.toFixed(1)}s ${m.action}`).join(" ").slice(0, 520);
+const motionText = (plan: Plan) => (plan.motion ?? []).map((m) => `${m.start.toFixed(1)}-${m.end.toFixed(1)}s ${m.action}`).join(" ").slice(0, 440);
 /** The camera part of the prompt: the original's camera moves, and the UGC look whenever it was handheld. */
-const cameraText = (camera: string, handheld: boolean) => `Camera: ${camera.slice(0, 200)}.${handheld ? ` ${UGC}` : ""}`;
+const cameraText = (camera: string, handheld: boolean) => `Camera: ${camera.slice(0, 100)}.${handheld ? ` ${UGC}` : ""}`;
+
+/**
+ * Veo's prompt within its 1000 characters. The rules (one take, no text, hands) and the performance lock always fit;
+ * only the motion is shortened when everything together would be too long.
+ */
+function veoPrompt(lead: string, motion: string, rest: string): string {
+  const fixed = `${lead} ${rest} ${BODY} ${NO_TEXT}`;
+  const room = Math.max(120, 1000 - fixed.length - 2);
+  const m = motion.length > room ? `${motion.slice(0, room - 1).replace(/\s+\S*$/, "")}…` : motion;
+  return `${lead} ${m} ${rest} ${BODY} ${NO_TEXT}`.replace(/\s+/g, " ").trim().slice(0, 1000);
+}
 
 /**
  * Start one hook generation; returns the Runway task id. `note` is what went wrong last time (Regenerate).
@@ -165,7 +196,7 @@ async function startHookInner(run: Run, source: Reference | null, user: string, 
       const first = path.join(dir, "first.jpg");
       await ff("-ss", "0.05", "-i", clip, "-frames:v", "1", "-q:v", "3", first);
       const person = who.image ? "@person" : `a person (${who.words})`;
-      const swapPrompt = `Edit @scene: replace the person in it with ${person}${who.image ? " (their face, hair, skin tone and body)" : ""}, wearing ${outfit}. Keep everything else exactly as in @scene: every object they hold with the same shape, size and material, the same hand position, pose, expression, framing, camera angle, lighting, background and people behind them. Their hands have natural, unpolished nails and no rings. Remove all on-screen text and captions. Photorealistic phone selfie.`;
+      const swapPrompt = `Edit @scene: replace the person in it with ${person}${who.image ? " (their face, hair, skin tone and body)" : ""}, wearing ${outfit}. Keep everything else exactly as in @scene: every object they hold with the same shape, size and material, the same hand position, pose, head angle, gaze, the same facial expression at the same strength (mouth open or closed exactly as in @scene, no bigger smile or surprise), framing, camera angle, lighting, background and people behind them. Their hands have natural, unpolished nails and no rings. Remove all on-screen text and captions. Photorealistic phone selfie.`;
       // Gemini 3.1 Flash Image: of gen4_image, Gemini 3 Pro Image and GPT Image 2 it kept the scene, the held objects,
       // the expression and natural nails best (test 2026-10-21), and it is the fastest.
       const refs = [{ uri: await dataUri(first, "image/jpeg"), tag: "scene" }, ...(who.image ? [{ uri: who.image, tag: "person", subject: "human" as const }] : [])];
@@ -176,8 +207,12 @@ async function startHookInner(run: Run, source: Reference | null, user: string, 
       const task = await runway().imageToVideo.create({
         model: "veo3.1_fast",
         promptImage: [{ uri: firstUrl, position: "first" }],
-        promptText: `Vertical phone selfie video. ${ONE_TAKE} Same person, outfit, held objects, room and light throughout; no new objects; natural unpolished nails. ${motionText(plan)} ${cameraText(plan.camera, plan.handheld)}${fix} ${BODY} ${NO_TEXT}`.slice(0, 1000),
-        negativePrompt: NEGATIVE,
+        promptText: veoPrompt(
+          `Vertical phone selfie. ${ONE_TAKE} Same person, outfit, objects, room, light; natural nails.`,
+          motionText(plan),
+          `${performanceText(plan)} ${cameraText(plan.camera, plan.handheld)}${fix}`,
+        ),
+        negativePrompt: plan.talking ? NEGATIVE : NEGATIVE_SILENT,
         ratio: "720:1280",
         duration: HOOK_SECONDS,
         audio: false,
@@ -195,8 +230,8 @@ async function startHookInner(run: Run, source: Reference | null, user: string, 
       const task = await runway().imageToVideo.create({
         model: "veo3.1_fast",
         promptImage: [{ uri: who.image, position: "first" }],
-        promptText: `Vertical phone selfie video. ${ONE_TAKE} The person in the image, in the same place as in the image. ${mood} ${doing} ${camera}${fix} ${BODY} ${NO_TEXT}`.slice(0, 1000),
-        negativePrompt: NEGATIVE,
+        promptText: veoPrompt(`Vertical phone selfie video. ${ONE_TAKE} The person in the image, in the same place as in the image. ${mood}`, doing, `${plan ? performanceText(plan) : ""} ${camera}${fix}`),
+        negativePrompt: plan && !plan.talking ? NEGATIVE_SILENT : NEGATIVE,
         ratio: "720:1280",
         duration: HOOK_SECONDS,
         audio: false,
@@ -205,7 +240,7 @@ async function startHookInner(run: Run, source: Reference | null, user: string, 
     }
     const task = await runway().textToVideo.create({
       model: "veo3.1_fast",
-      promptText: `Vertical phone selfie video. ${ONE_TAKE} ${who.words}. ${mood} ${doing} ${camera}${fix} ${BODY} ${NO_TEXT}`.slice(0, 1000),
+      promptText: veoPrompt(`Vertical phone selfie video. ${ONE_TAKE} ${who.words}. ${mood}`, doing, `${plan ? performanceText(plan) : ""} ${camera}${fix}`),
       ratio: "720:1280",
       duration: HOOK_SECONDS,
       audio: false,
