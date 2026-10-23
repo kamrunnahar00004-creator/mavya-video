@@ -40,8 +40,12 @@ export async function advanceExport(who: string, id: string) {
     if (!base || !process.env.RENDER_SECRET) throw new Error("Render unavailable");
     const read = await fetch(`${base}/jobs/${j.id}`, { headers, signal: AbortSignal.timeout(55_000), cache: "no-store" });
     if (read.status === 404) {
+     const health = await fetch(`${base}/health`, { signal: AbortSignal.timeout(10_000), cache: "no-store" });
+     const capability = await health.json().catch(() => null) as { protocol?: number } | null;
+     if (!health.ok || capability?.protocol !== 2) throw new Error("Render worker update required");
      const sent = await fetch(`${base}/jobs`, { method: "POST", headers, body: JSON.stringify(j.payload), signal: AbortSignal.timeout(55_000) });
-     if (!sent.ok) throw new Error(`Render dispatch ${sent.status}`);
+     const dispatched = await sent.json().catch(() => null) as { id?: string } | null;
+     if (!sent.ok || dispatched?.id !== j.id) throw new Error(`Render dispatch identity ${sent.status}`);
      await save({ state: "running" });
     } else if (read.ok) {
      const remote = await read.json() as { state?: string; progress?: number };
