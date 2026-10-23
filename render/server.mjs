@@ -19,7 +19,7 @@ import { finalArgs, plan, stepArgs } from "./render.mjs";
 const SECRET = process.env.RENDER_SECRET ?? "";
 const PORT = Number(process.env.PORT ?? 3200);
 const KEEP_MS = 6 * 3600_000;
-import { JOB_MS, MAX_QUEUE, MAX_FILE_BYTES, MAX_JOB_BYTES, validJob, validProbe } from "./limits.mjs";
+import { JOB_MS, MAX_QUEUE, MAX_FILE_BYTES, MAX_JOB_BYTES, validJob, validProbe, countOverlayPixels } from "./limits.mjs";
 
 /** @type {Map<string, {state: string, progress: number, meta: unknown, error?: string, at: number, spec: any, output: any}>} */
 const jobs = new Map();
@@ -71,7 +71,7 @@ async function probe(file, signal) {
   const dim=/Video:.*?(\d{2,5})x(\d{2,5})/.exec(out);
   const duration=d?+d[1]*3600 + +d[2]*60 + +d[3]:null;
   if(!validProbe(dim?+dim[1]:0,dim?+dim[2]:0,duration))throw new Error("Input dimensions or duration exceed limits");
-  return {file,hasAudio:/Stream #.*Audio:/.test(out),duration};
+  return {file,hasAudio:/Stream #.*Audio:/.test(out),duration,width:dim?+dim[1]:0,height:dim?+dim[2]:0};
 }
 
 async function download(url, file, signal, budget) {
@@ -120,7 +120,7 @@ async function work(id) {
     const [segments, sounds, overlays] = await Promise.all([
       Promise.all(spec.segments.map((s) => get(s.url))),
       Promise.all(spec.sounds.map((s) => get(s.url))),
-      Promise.all(spec.overlays.map((o) => get(o.url).then((p) => p.file))),
+      Promise.all(spec.overlays.map((o) => get(o.url).then((p) => { countOverlayPixels(budget,p.width,p.height); return p.file; }))),
     ]);
     job.progress = 0.05;
     // Pieces one by one (60% of the bar), then the final pass (35%).
@@ -172,7 +172,7 @@ setInterval(() => {
   }
 }, 600_000).unref();
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? "/", "http://x");
     if (url.pathname === "/health") return send(res, 200, { ok: true, queued: queue.length, busy });
@@ -204,3 +204,5 @@ createServer(async (req, res) => {
     send(res, 400, { error: String(e?.message ?? e) });
   }
 }).listen(PORT, () => console.log(`render server on ${PORT}`));
+server.requestTimeout = 30_000;
+server.headersTimeout = 15_000;

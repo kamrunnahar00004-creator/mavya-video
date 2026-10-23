@@ -2,6 +2,12 @@ export const MAX_QUEUE = 8;
 export const MAX_FILE_BYTES = 300 * 1024 * 1024;
 export const MAX_JOB_BYTES = 600 * 1024 * 1024;
 export const JOB_MS = 15 * 60_000;
+export const MAX_OVERLAY_PIXELS = 32 * 1024 * 1024;
+export function countOverlayPixels(budget, width, height) {
+ if(!Number.isInteger(width)||!Number.isInteger(height)||width<=0||height<=0)throw new Error('Invalid text image');
+ budget.overlayPixels=(budget.overlayPixels??0)+width*height;
+ if(budget.overlayPixels>MAX_OVERLAY_PIXELS)throw new Error('Text images exceed the render memory budget');
+}
 const number = (x, lo, hi) => typeof x === 'number' && Number.isFinite(x) && x >= lo && x <= hi;
 const link = x => typeof x === 'string' && x.length <= 8192 && /^https:\/\//.test(x);
 export function validJob(b) {
