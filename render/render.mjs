@@ -54,8 +54,9 @@ function look(a, p0, W, H, fps) {
   // Same numbers as the preview's CSS (src/lib/adjust.ts videoStyle / ffmpegAdjust).
   const b = 1 + v.brightness / 100;
   const k = (v.warmth / 50) * 0.12;
-  if (v.brightness || v.warmth) out.push(`colorchannelmixer=rr=${r(b * (1 + k))}:gg=${r(b * (1 + k * 0.25))}:bb=${r(b * (1 - k))}`);
+  if (v.brightness) out.push(`colorchannelmixer=rr=${r(b)}:gg=${r(b)}:bb=${r(b)}`);
   if (v.contrast || v.saturation) out.push(`eq=contrast=${r(1 + v.contrast / 100)}:saturation=${r(1 + v.saturation / 50)}`);
+  if (v.warmth) out.push(`colorchannelmixer=rr=${r(1 + k)}:gg=${r(1 + k * 0.25)}:bb=${r(1 - k)}`);
   return out;
 }
 

@@ -153,7 +153,8 @@ export function ffmpegAdjust(a: Partial<Adjust> | null | undefined, w: number, h
   }
   const b = 1 + v.brightness / 100;
   const k = warmGain(v.warmth);
-  if (v.brightness || v.warmth) out.push(`colorchannelmixer=rr=${b * (1 + k)}:gg=${b * (1 + k * 0.25)}:bb=${b * (1 - k)}`);
+  if (v.brightness) out.push(`colorchannelmixer=rr=${b}:gg=${b}:bb=${b}`);
   if (v.contrast || v.saturation) out.push(`eq=contrast=${1 + v.contrast / 100}:saturation=${1 + v.saturation / 50}`);
+  if (v.warmth) out.push(`colorchannelmixer=rr=${1 + k}:gg=${1 + k * 0.25}:bb=${1 - k}`);
   return out;
 }

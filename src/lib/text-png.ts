@@ -34,16 +34,19 @@ const toDataUrl = (blob: Blob) =>
 async function fontFace(family: string, text: string): Promise<string> {
   const chars = [...new Set(text.replace(/\s/g, ""))].join("");
   for (const spec of [`${family}:wght@800`, family]) {
-    const res = await fetch(`https://fonts.googleapis.com/css2?family=${encodeURIComponent(spec).replace(/%20/g, "+")}&text=${encodeURIComponent(chars)}&display=block`).catch(() => null);
+    const res = await fetch(`https://fonts.googleapis.com/css2?family=${encodeURIComponent(spec).replace(/%20/g, "+")}&text=${encodeURIComponent(chars)}&display=block`, { signal: AbortSignal.timeout(10_000) }).catch(() => null);
     if (!res?.ok) continue;
     let sheet = await res.text();
-    for (const url of new Set(sheet.match(/https:\/\/fonts\.gstatic\.com\/[^)'"]+/g) ?? [])) {
-      const file = await fetch(url).then((r) => (r.ok ? r.blob() : null)).catch(() => null);
-      if (file) sheet = sheet.split(url).join(await toDataUrl(file));
+    const urls = new Set(sheet.match(/https:\/\/fonts\.gstatic\.com\/[^)'"]+/g) ?? []);
+    if (!urls.size) continue;
+    for (const url of urls) {
+      const file = await fetch(url, { signal: AbortSignal.timeout(20_000) }).then((r) => (r.ok ? r.blob() : null)).catch(() => null);
+      if (!file) throw new Error("The font couldn't load. Try again.");
+      sheet = sheet.split(url).join(await toDataUrl(file));
     }
     return sheet;
   }
-  return "";
+  throw new Error("The font couldn't load. Try again.");
 }
 
 /** The family name to draw with, and the @font-face rules it needs. */
@@ -56,8 +59,8 @@ async function fontFor(font: string, text: string): Promise<{ family: string; fa
 /** The drawn text cropped to what it covers, with where it sits on the 1080x1920 frame (null: nothing drawn). */
 export async function textPng(x: TextLayer): Promise<{ png: string; x: number; y: number } | null> {
   if (!x.text.trim()) return null;
-  const { family, face } = await fontFor(x.font, x.text);
   const look = textLook(x.style, x.color, x.second);
+  const { family, face } = await fontFor(x.font, look.text.textTransform === "uppercase" ? x.text.toUpperCase() : x.text);
   const base: CSSProperties = { fontFamily: family, fontSize: `${(x.size / 100) * H}px`, fontWeight: 800, lineHeight: 1.12, textAlign: "center", whiteSpace: "pre-wrap", overflowWrap: "break-word", display: "block" };
   const inner = look.box
     ? `<span style="${textCss({ ...base, lineHeight: 1.45 })}"><span style="${textCss({ ...look.text, ...look.box })}">${xml(x.text)}</span></span>`
