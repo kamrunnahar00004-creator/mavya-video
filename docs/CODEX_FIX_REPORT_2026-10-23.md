@@ -239,3 +239,157 @@ Reference checks used official Stripe documentation: [webhook ordering and retri
 5. A Stripe action can succeed while the following database commit fails. The route returns an error; a webhook must reconcile the remote state. Do not infer a failed remote mutation solely from the HTTP error. Durable payment-operation identity is part of the next H5 work before immediate collection is introduced.
 6. Fal submissions made before 0005 may already have lost their returned ID when 0003 rejected it. Applying 0005 does not repair those jobs or establish whether they were charged. Correlate the provider's request/spend history with the job's owner/input/time before binding a verified task or issuing a credit. Never automatically resubmit an uncertain job.
 7. Production migrations, RLS, actual Stripe API/restricted-key behavior, webhook delivery/retries, sandbox payment failures, UI polling and closed-tab cloud recovery were not exercised. No live paid calls, production writes, pushes, merges or deployment occurred. The local identity remains kamrunnahar00004-creator.
+
+## Part 3: remaining findings, Hobby hosting
+
+Continued on `codex/launch-fixes-2026-10-23` from `0b013a7`. Worked through every independent item in the brief in this session. No push, merge, deployment, production database mutation, live payment, paid fal.ai/Gemini call or email was performed. No browser or audio playback was started. No repository `.data` or `.env*` file was committed or deleted, and the founder's `.next` directory was not replaced.
+
+**Hosting policy supersedes the older sections:** Vercel stays on Hobby. Every declared Next function budget is at most 300 seconds. The existing recovery schedule remains `0 4 * * *`, once daily. User requests/polls advance their own work; no per-minute or Pro-only infrastructure is assumed. The separate render service's job deadline is 15 minutes; that is not a Vercel function budget.
+
+### Part 3 finding status
+
+"Fixed" below describes the repository behavior covered by the listed source checks, fixtures and tests. It does not certify deployed settings or live vendor behavior. Remaining limits are listed afterward.
+
+| ID | Status | Changes/files, verification and commits |
+| --- | --- | --- |
+| C1 | fixed | Existing owned, leased generation jobs retained. `hookgen.ts` now treats a successful submit without a valid task ID as uncertain, and unknown status/transient result HTTP failures do not authorize another paid fallback. `provider-safety-checks` exercises these cases with fake responses; generation and SQL suites PASS. `e355c10`. |
+| H1 | fixed | Atomic quota reservation and single fallback/refund retained. Closing-account triggers additionally reject new reservations. Generation SQL race/grant checks PASS. Part 1 fix retained; `a11d163`, `68edf7f` add deletion safety. |
+| H2 | fixed | Monthly anniversary allowance for annual plans unchanged. Existing SQL allowance/clamping checks PASS. No Part 3 price or allowance change. |
+| H3 | fixed | Part 2 lease and transactional event ordering retained. Late events for deleting/deleted accounts use an atomic deletion-tombstone event claim instead of trying to recreate an auth-bound subscription row. `stripe/webhook/route.ts`, 0013; billing stub and SQL suites PASS, including rollback under an active deletion lease and post-auth events. `2596843`. |
+| H4 | fixed | Part 2 subscription/revision/watermark CAS remains the action writer; collected upgrades also use that writer. Stale-action/ordering SQL and billing stub checks PASS. `ea3cee1` builds on the accepted Part 2 fix. |
+| H5 | fixed | `billing-change.ts` applies same-cycle upgrades with always_invoice + error_if_incomplete and a stable retry key; only successful active, matching-price results are applied. Lower plans and all cycle switches become schedule phases at renewal with no immediate proration. Cancel/resume release pending schedules. Billing displays the scheduled target/date; confirmation copy describes the actual selected policy. Declined-payment fixture preserves both old plan and pending schedule; schedule/cycle tests PASS. `ea3cee1`, `3245897`. Advanced/manual subscription configurations fail safely for support rather than being rewritten. |
+| H6 | fixed | Part 2 persistent Checkout identity/session reuse retained. Late paid subscriptions belonging to a deleted account are queued on its durable deletion record and canceled without refund; ordinary duplicate active subscriptions still require support review. Billing and SQL suites PASS. `2596843`, accepted Part 2 fixes retained. |
+| H7 | fixed | `account-deletion.ts`, `account-state.ts`, account route, generation worker, 0006/0007/0009/0012/0013/0014: durable request survives auth deletion, cancellation/Checkout expiry precede cleanup, writes are blocked, strict R2 deletion precedes auth removal, and cursor/lease state permits retries. Snapshot includes registered media, reservations/staging, export outputs/overlays, deterministic late generation outputs and owned provider staging keys. Current subscription is prioritized. Cancellation failures retain the account and return a clear error. Cleanup waits six hours plus two minutes for grants and bounded in-flight renderer uploads, then advances in batches. Late Stripe lifecycle events use the tombstone. Deletion stubs and full SQL checks PASS. `a11d163`, `4f81b7b`, `c1f0e4f`, `68edf7f`, `2596843`, `33b6199`. |
+| H8 | partly | Existing durable recovery retained; owned provider staging and ambiguous fal response handling strengthen it. Truncated MP4 v1 headers no longer throw during duration parsing. Generation/provider/budget/SQL checks PASS. `e355c10`, `68edf7f`. Lost submit identity still requires manual reconciliation; Hobby daily recovery and same-section editing conflicts are not an assurance of immediate unattended completion. |
+| H9 | fixed | `uploads.ts`, uploads route, `r2.ts`, 0007/0009: reservations bind owner, MIME, exact declared size and expiry. Browser uploads go to staging; finish uses an owned lease, HEAD size/type and ETag-conditional copy into the canonical key, then atomically records media/assets. Replaying the PUT cannot overwrite finalized media. Expired work is collected in bounded batches. Offline real AWS signing verifies Content-Length is signed and avoids an empty-body checksum; no HTTP is allowed in that signing fixture. Upload, signing and SQL checks PASS. `4f81b7b`, `f92960c`, temporary export handling in `c1f0e4f`. |
+| H10 | fixed | `store.ts`, `ai-budget.ts`, product/script/export routes, 0008/0011: Postgres merges run sections atomically and appends exports once by owned media ID. AI results require the latest request token and unchanged saved run timestamp; script completion also locks/checks the source reference snapshot. Different-section writes, repeated export append, superseded AI requests, edited runs and changed reference input are covered by SQL tests. All PASS. `6eb2619`, `e3c2c61`. Same-section editor writes remain last-writer-wins; the AI guard deliberately rejects even unrelated run edits during a request. |
+| H11 | fixed | `text-png.ts`: correct single Webkit prefix for stroke/fill/clip/box decoration; non-empty text producing no pixels throws instead of being omitted. `text-checks` verifies every property emitted by all 50 style presets, with explicit stroke/fill/clip assertions. PASS. `b0854bb`. Actual cross-browser pixels remain an unverified coverage limit. |
+| H12 | fixed | `render/limits.mjs`, `render/server.mjs`: fixed output envelope, segment/piece/sound/overlay count and duration bounds, 300 MiB/file and 600 MiB/job input bytes, four concurrent downloads, input dimension/duration checks, 32 Mi decoded overlay-pixel budget, eight queued jobs, one active job/user, request/body budgets, job/process deadlines, bounded stderr, streamed output upload and correct queue expiry. Job IDs replay only identical payloads. Pure limit tests and a real local HTTP worker test cover auth, replay/conflict, per-user exclusion and queue saturation; all external fetches are blocked in that worker. PASS. `510a183`, `0e5bcf8`, `987d1cd`. Host load/RAM measurements remain outstanding. |
+| M1 | fixed | Product/script routes require a paid entitlement or checked admin, then atomically reserve a daily per-user budget: 30 product reads, 60 scripts, UTC day. Failures still consume their request budget. Admin bypass is entitlement-only, not a rate bypass. New AI guard/SQL tests cover no plan, limit exhaustion and stale completion. PASS. `6eb2619`. |
+| M2 | fixed | `run-view.tsx` flushes its local text/adjustment timers before export; `ExportButton` waits for successful queued writes, loads the saved run and draws that snapshot. The server checks snapshot equality again when reserving the job. Save-barrier regressions and stale export-reservation SQL checks PASS. `c1f0e4f`. No real browser editor-click matrix was run. |
+| M3 | fixed | `ExportButton`, `export-layers.ts`, upload/export routes, 0009: PNGs upload individually through owner reservations; POST carries a small manifest, not base64. Every visible saved text ID must have exactly one owned temporary PNG; missing/duplicate/expired manifests fail the whole export. No .slice(0,40) or silently skipped invalid image remains. Existing 200-layer validation ceiling is retained; resource excess fails explicitly rather than dropping layers. Export/upload/SQL tests and type checks PASS. `c1f0e4f`. |
+| M4 | fixed | `auth-next.ts` is shared by client modal and server callback. It rejects controls, protocol-relative and backslash destinations before parsing, then verifies origin. URL normalization regression cases PASS. `6410a72`. |
+| M5 | fixed | `export-jobs.ts`, export/recovery routes, 0009/0012: persist job/output/manifest identity before dispatch, resume by owned job from another session, recover from the actual R2 output even if renderer memory is gone, append once, and retry bounded temporary cleanup. Worker protocol 2 is required before dispatch, preventing retries against an older worker that ignores job IDs. Temporary PNGs and provider staging have owned expiry ledgers. Output-recovery, cleanup-replay, SQL, worker admission and protocol checks PASS. `c1f0e4f`, `68edf7f`, `45f4100`. Unattended daily-cron throughput is limited below. |
+| M6 | partly | `text-png.ts` subsets uppercase glyphs for transformed styles and fails on missing required font CSS/files; fetches have deadlines. `adjust.ts` and renderer now apply brightness, contrast/saturation, then warmth in preview order. Serializer/filter-order assertions PASS. `46ac666`. Transparent text PNGs still cannot implement Glass/Dark glass backdrop blur against video, and no full golden-pixel/browser/font matrix was run. No substitute style was silently chosen. |
+| M7 | fixed | `production-config.ts`, proxy, Supabase and R2 helpers refuse protected production service when required auth, service-role or storage settings are missing. Local mode remains development-only. Each missing setting is tested independently; PASS. `df405db`. Actual deployed values remain uninspected. |
+| M8 | partly | Hobby budgets checked across all route files; daily schedule unchanged. `work-budget.ts` gives generation setup a 210-second deadline propagated through Gemini, fal, ffmpeg, R2 and bounded database HTTP; provider acceptance uncertainty remains durable. Export dispatch/finalization is resumable within 300-second requests. Budget/prompt-preservation and existing suites PASS. `ff1deb5`, `2a34b97`, `c1f0e4f`. Real cold starts, vendor latency, deployment kill behavior and recovery capacity were not measured. |
+| M9 | partly | Chosen safe policy: removing a cloud asset unlists it but retains owned canonical media until account deletion. It no longer scans capped run/library lists to decide destruction, so profile use, older projects and concurrent new references cannot be broken by that deletion path. Dedicated cloud fixture confirms only the assets table is changed; PASS. `d159440`. Active-account garbage reclamation is deliberately deferred; storage growth remains a cost risk. |
+| L1 | fixed | Settings reloads use deadlines and single-flight requests, retain prior successful data and expose failure distinctly. Plans cannot invite another purchase while loading failed. Checkout confirmation has a fixed 30-second deadline and a refresh path; Usage distinguishes past_due from no plan. Billing detail failures return unavailable. Reload/concurrency/error and billing checks PASS. `2d65873`. Live payment/portal polling remains untested. |
+| L2 | partly | `bounded-fetch.ts`, songs/contact routes, 0010: deadline and streamed decompressed-byte limits for catalog/preview transfers; contact messages persist in cloud storage under an atomic five-per-hour HMAC-IP budget even when disk/email fail. Shared limiter concurrency and no-email/read-only-disk fixtures PASS. `f732b15`. Resend sender/recipient/delivery configuration is unverified, and pending inquiries need operational monitoring/manual delivery; no email was sent. |
+| L3 | fixed | Updated stale account/billing/storage/runtime comments; root package and lockfile select Node 22.x. Final suites run under installed Node 22.23.4 without the former Node 20 warning. Plan file diff is comment-only. `c28ac56`. Deployed runtime selection still needs review. |
+
+### Part 3 verification output
+
+Final required checks and the additional scripts ran under Node 22.23.4. `review-checks` explicitly unset Supabase/R2 credentials and used NODE_ENV=test, so its local file tests could not select production storage. No `.env` file was loaded. SQL containers use postgres:16 already present locally, `--network none`, no host ports and fixture-only credentials. They are removed after tests. Readiness now checks container-loopback TCP, avoiding PostgreSQL's temporary initialization-server restart race.
+
+```text
+$ node --version
+v22.23.4
+$ npx tsc --noEmit -p .
+[exit 0, no output]
+$ npx eslint src render
+[exit 0, no output or warnings]
+$ node scripts/review-checks.cjs
+PASS: sound migration, piece/gap timing, malformed sections, storage recovery/concurrency, byte ranges, coalesced saves, bounded filmstrip cleanup
+$ node scripts/generation-checks.cjs
+PASS: preserved edits/history, stale-input guard, no unreserved spend, server fallback/refund decisions, uncertain start, deterministic output, finalization retry, job-only API, authenticated recovery cron
+$ node scripts/generation-sql-checks.cjs
+PASS: migration replay, ownership, request replay, parallel quota, shared monthly window, leases, bound legacy/fal task IDs, one fallback/refund, completion CAS/replay, uncertain recovery, RPC grants
+$ node scripts/billing-checks.cjs
+PASS: lost Checkout response reuses persisted parameters/key, existing session reuse, old unknown-create recovery, busy lease, lookup fail closed, action CAS failure, webhook fresh state under lease, owner mismatch/signature guards, no paid imports
+$ node scripts/billing-sql-checks.cjs
+PASS: billing/deletion/upload/run/AI/export/contact migrations replay, leases/order/CAS, ownership, atomic merge/append, entitlement/rate limits, source changes, cleanup snapshots and service grants
+$ node scripts/text-checks.cjs
+PASS: valid CSS property names across all 50 styles and Webkit stroke/fill/clip
+$ node scripts/deletion-checks.cjs
+PASS: deletion cancellation/expiry ordering, no refund/proration, Stripe failure blocks auth deletion, grant wait, strict R2 retry, auth last, terminal replay
+$ node scripts/billing-change-checks.cjs
+PASS: declined upgrade leaves plan/schedule intact, immediate collected upgrade with retry key, downgrade/cycle switch at renewal, cancel/resume schedule clearing
+$ node scripts/upload-checks.cjs
+PASS: unreserved/foreign finish rejected, exact HEAD size/type, immutable conditional copy, finalized replay
+$ node scripts/ai-checks.cjs
+PASS: AI entitlement/rate failures, reserved snapshot/token, stale completion rejection
+$ node scripts/auth-next-checks.cjs
+PASS: shared same-origin auth destination rejects control characters and browser-normalized external paths
+$ node scripts/render-checks.cjs
+PASS: render spec count/time/size/identity bounds, decode dimension/duration limits and queue/byte budgets
+$ node scripts/render-admission-checks.cjs
+PASS: real worker HTTP auth, idempotent dispatch, changed-payload conflict, one active export per user and queue cap; all external fetches blocked
+$ node scripts/export-checks.cjs
+PASS: durable export recovers from output without worker/browser, owned registration, single append, bounded resumable PNG cleanup and terminal replay
+$ node scripts/config-checks.cjs
+PASS: every missing production auth/storage/accounting setting fails closed; development local mode retained
+$ node scripts/budget-checks.cjs
+PASS: isolated work deadline abort, unchanged Kling models/prompts, all function budgets <=300s and daily Hobby cron
+$ node scripts/media-retention-checks.cjs
+PASS: cloud asset removal only unlists assets; no capped reference scans or destructive media/R2 deletion
+$ node scripts/settings-checks.cjs
+PASS: settings reload deduplicates concurrent requests, uses deadlines and distinguishes transport failure from no subscription
+$ node scripts/network-checks.cjs
+PASS: streamed response cap/cancellation and deadline, bounded JSON response, contact survives read-only disk/email outage in durable storage
+$ node scripts/provider-safety-checks.cjs
+PASS: truncated MP4 v1 header is safe, unknown provider status and transient result failure never become paid fallbacks
+$ node scripts/r2-signing-checks.cjs
+PASS: offline upload signature binds Content-Length, avoids empty-body checksum and copies only the HEAD-verified object version
+$ node --check render/server.mjs
+[exit 0]
+$ git diff --check
+[exit 0]
+```
+
+Every listed command exited 0. Generation SQL emits expected replay notices and two caught Invalid provider task errors from negative assertions. The extended SQL suite applies each new migration twice and verifies authenticated has no execute privilege on any public mavya_* RPC. It additionally checks deletion write blocking, request survival after auth cascade, upload ownership/replay, parallel section merging, one export append, AI budgets/input CAS, concurrent contact admission and late deletion billing events. Node-only fixtures block unknown imports. The worker test uses only its own localhost HTTP service with all external fetches replaced before startup; no input reaches ffmpeg or a paid API in that test. The signing test uses real signing middleware with an HTTP handler that forbids network access.
+
+No complete production build, live Stripe sandbox workflow, cloud R2 transfer, real generation or multi-browser visual export was run. No full-resolution load test or vendor cost measurement is implied by the passing fixtures. No prompts or model constants changed; the AST check compares Kling prompt/model definitions with `0b013a7`. Prices, plan counts and plan features are unchanged.
+
+### Part 3 migrations to apply, in order
+
+Apply after existing 0001-0005. Never edit/reapply 0001-0005 for this delivery, and do not replay older function definitions out of order after later migrations.
+
+| Migration | Purpose |
+| --- | --- |
+| `0006_account_deletion.sql` | Durable deletion record without auth cascade, closing-account write triggers, deletion lease and billing-lock exclusion. |
+| `0007_upload_reservations.sql` | Owned, expiring upload reservations and leased atomic registration; deletion captures pending canonical/staging identities and prioritizes the current subscription. |
+| `0008_atomic_runs_ai.sql` | Atomic run section merge, idempotent export append, daily product/script budgets and latest-request/input CAS. |
+| `0009_export_jobs.sql` | Durable export identity/payload/cleanup cursor, one active export per user, snapshot reservation, temporary PNG expiry and deletion capture. |
+| `0010_contact_inquiries.sql` | Durable contact inbox with shared atomic hourly admission; no public read/write policy. |
+| `0011_script_source_cas.sql` | Script completion also checks the locked current reference snapshot. |
+| `0012_generation_temp_ownership.sql` | Owner/expiry ledger for new provider staging; deletion includes these keys and deterministic late generation outputs. |
+| `0013_deletion_billing_events.sql` | Retained billing identities on deletion tombstones and transactional late-event handling without recreating auth-bound rows. |
+| `0014_deletion_grant_grace.sql` | Adds a two-minute streaming grace after six-hour grants; adjusts unfinished deletion requests without shortening any existing wait. |
+
+All new tables enable RLS and grant server access to service_role only; new callable RPCs revoke PUBLIC/anon/authenticated execution and grant service_role. Migrations are transaction-wrapped, use IF NOT EXISTS/replacement functions where appropriate, and pass ordered local replay. They do not delete the founder's runs or change prices/allowances. None were applied to production here.
+
+### Part 3 environment, Stripe and rollout notes
+
+- No new environment variables. Existing Supabase public settings/service-role key and all four R2 settings are mandatory for protected production routes. Existing FAL_KEY/GEMINI_API_KEY, Stripe settings, RENDER_URL/RENDER_SECRET and CRON_SECRET remain feature requirements. Secrets were not inspected or changed.
+- Keep Hobby's once-daily `0 4 * * *` recovery schedule and supported function budgets. Node 22.x is now selected by package engines; verify the actual Vercel and render-service runtime selections when deploying. No hosting plan upgrade is assumed or performed.
+- Stripe restricted keys need **Subscription Schedules create/read/update/release**, **Subscriptions cancel** as well as read/update, and **Checkout Sessions expire/read/create**. Upgrades use the subscription update API's immediate invoice/payment behavior, not separate invoice-pay/refund calls. Existing customer/invoice reads and payment-method portal permissions remain necessary. Verify these permissions and payment-decline/3DS cases in a separate authorized sandbox review before rollout; no live charge was used to validate them.
+- Deploy the reviewed **render worker before the app**. `/health` must report protocol 2 and POST /jobs must retain the supplied idempotent job ID. The app now refuses dispatch to an older worker instead of repeatedly starting untracked renders. Keep the shared secret configured on both services.
+- Apply all new migrations before enabling the new app routes. Plan a controlled cutover for old open Checkout links, in-flight jobs and old export clients; old base64 export requests are no longer accepted. Reload old tabs. This report is a review handoff, not authorization to deploy automatically.
+- Verify browser-to-R2 CORS still permits the PUT/Content-Type flow and that signed Content-Length uploads plus ETag-conditional copy work in the actual bucket. HEAD/type/size and signatures are covered locally; live R2 behavior was not exercised. A bucket lifecycle policy for abandoned legacy tmp/ keys remains a useful independent backstop, but no policy was silently installed.
+- Review `contact_inquiries.status='pending'` operationally. Messages are safely stored if Resend fails, but this commit does not implement automatic outbox delivery or establish that the configured sender/recipient works. CONTACT_FROM must be a verified sender for actual delivery; no test email was sent.
+
+### Part 3 changes users can notice
+
+- Outline/Hollow/Gradient export CSS is valid. Missing fonts, invisible non-empty text, missing PNGs and resource excess produce an error rather than a partly rendered video.
+- Deletion cancels billing without refund/proration, blocks new work, and continues durably. Storage/auth removal waits at least six hours and two minutes, then cleanup runs. A failed cancellation retains the account and asks for another attempt/support. Multiple known subscriptions may need repeated bounded cancellation work before deletion can complete.
+- Same-cycle upgrades collect the prorated difference now. Downgrades and monthly/yearly switches start at renewal; pending changes are shown in Billing and are cleared by cancel/resume. Failed payment shows "Payment failed. Update your card."
+- Uploads expire and cannot be claimed by another user; finalized content is isolated from the replayable staging PUT. Export PNGs upload separately, so large text projects do not require a single base64 request.
+- Export waits for successful saves and uses the saved snapshot. Reopening a run can resume its export. Render admission may ask users to wait when one export is active or the queue/resource budget is full. Export does not require the original browser to register a completed output.
+- Product/script requests require entitlement, have the stated daily request budgets and reject stale results. Changing a run during a read/write may require retrying the AI request rather than applying an outdated result.
+- Removing a file from My files no longer destroys its cloud media while another screen/project may use it. Canonical media remain until account deletion; this is a retention/cost tradeoff.
+- Settings distinguish payment due and transport failure from no subscription. Contact inquiries can be retained despite email outage. Marketing copy, prices, plan features, general page styling and the founder's generation models/prompts remain unchanged.
+
+### Part 3 remaining limits and risks
+
+1. **M6 remains partly open.** True Glass/Dark glass backdrop blur needs video pixels under the text layer; a transparent isolated PNG cannot provide them. I did not change the preview style or choose a visual substitute. Filter ordering is aligned, but CSS and ffmpeg color implementations still need golden-pixel testing. Safari/Firefox/mobile, all 50 styles rendered as actual images, Google-font failure and a full-resolution export matrix are unverified.
+2. **Hobby recovery has real capacity limits.** Daily cron advances one bounded category/job or cleanup batch per invocation, with deletion/expired temporary work before exports/generations. It is not a per-minute queue processor and cannot promise rapid unattended recovery or a strict cleanup SLA under backlog. An open/reopened run advances its own job; later upload requests also trigger expired-upload cleanup. Large deletions or many abandoned jobs can take multiple requests/days. Provider result expiry and a prolonged closed-browser backlog remain risks. Monitor these queues; moving to a stronger scheduler/hosting plan later is an explicit founder decision, not assumed here.
+3. **Ambiguous provider acceptance remains manual.** Network loss or missing identity after submit never launches another paid video blindly. Reconcile uncertain jobs against fal request/spend records before binding a verified task or refunding. New ownership ledgers do not reconstruct old unrecorded task IDs or historical unowned tmp/gen objects. fal's documented queue lifecycle has IN_QUEUE, IN_PROGRESS and COMPLETED; an unknown response or transient result failure is retried as unavailable, not treated as a refusal. [Official queue lifecycle](https://fal.ai/docs/documentation/model-apis/inference/queue).
+4. **Same-section edits remain last-writer-wins.** Atomic section merging prevents unrelated section loss. It is not full collaborative editing or an assurance that a stale browser's whole hook section cannot replace a newer hook section. Durable generation/export results remain separately recorded. AI CAS is conservative: any intervening saved run edit rejects completion, even if unrelated, and the request budget remains consumed.
+5. **Advanced billing and real payments need review.** The implemented simple policy supports standard active one-item, quantity-one, automatic-charge subscriptions created by this product. Paused, trialing, multi-item, manual-invoice or advanced schedule configurations fail safely for support. Live restricted-key behavior, tax/discount combinations, 3DS, renewal webhooks, external portal edits, ambiguous payment responses and production API-version details were not exercised. A remote change can succeed while the local conditional write fails; reconciliation must then come from Stripe, not an assumed second charge. No duplicate-subscription refunds were introduced.
+6. **Legacy and storage cleanup need operational cutover.** Already-issued old Checkout links and unowned old storage keys cannot be invalidated merely by adding these tables. Account cleanup snapshots all new owned identities before removing auth; old unindexed objects require a separate inventory/lifecycle review. Existing signed grants delay deletion. Batch failures retain cursor/ownership information. Contact inquiries and deletion tombstones retain necessary support/audit data; define and operate their retention policy separately.
+7. **Active-account media retention costs storage.** The M9 policy prevents destructive reference races by retaining canonical media. It does not implement a transactional reference graph or reclaim every unreferenced object from an active account. Temporary export/provider data have bounded cleanup paths, but daily throughput can lag. Do not claim that removing My files instantly frees R2 storage.
+8. **Worker bounds are code/tested, not capacity-certified.** The local HTTP test exercises admission with external I/O blocked; it is not a production memory/disk/CPU benchmark or a full-resolution ffmpeg run. The renderer needs sufficient disk/RAM for its admitted envelope. Worker restarts lose in-memory status, but the app's persistent output/job identity can recover or safely redispatch identical work. Resource rejection fails the whole export; text is not silently omitted.
+9. **Delivery/deployment remain unverified.** No migrations, RLS, CORS, credentials, cron delivery, Node deployment settings, Resend delivery, cloud transfer or live end-to-end generation/payment/export was tested against production. All required and new local checks pass. Review the branch and these nine migrations before any merge/deployment.
+
+Part 3 code is committed in finding-scoped commits on the existing branch. This report is committed separately for Claude's review. Nothing has been pushed or merged into main.
