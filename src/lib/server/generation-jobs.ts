@@ -1,4 +1,5 @@
 import "server-only";
+import { accountClosing } from "@/lib/server/account-state";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { adminUser } from "@/lib/server/usage";
 import { cloud, getRun, mediaAccess, registerMedia } from "@/lib/server/store";
@@ -34,6 +35,7 @@ async function transition(job: GenerationJob, action: string, value?: string) {
 
 /** Work is claimed in Postgres, not in browser state or a per-instance mutex. */
 export async function advanceGeneration(who: string, id: string): Promise<void> {
+  if (await accountClosing(who)) return;
   const claimed = await db().rpc("mavya_claim_generation", { p_user: who, p_job: id });
   if (claimed.error) throw claimed.error;
   const job = claimed.data as GenerationJob | null;
@@ -60,6 +62,7 @@ export async function advanceGeneration(who: string, id: string): Promise<void> 
     if (task.state === "running") return transition(job, "release");
     // Deterministic output key: retrying finalization cannot create another file or history entry.
     const mediaId = `${job.id}.mp4`;
+    if (await accountClosing(who)) return;
     if (!(await mediaAccess(mediaId, who))) {
       await putObject(`media/${mediaId}`, task.video, "video/mp4");
       try { await registerMedia(mediaId, "video/mp4", task.video.length, who, null); }

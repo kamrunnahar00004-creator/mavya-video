@@ -78,6 +78,17 @@ async function main() {
     assert.equal(lock(), ''); // Stale unlock cannot release a newer lease.
     assert.equal(sql("select has_function_privilege('authenticated','mavya_billing_event(uuid,uuid,text,text,bigint,jsonb,text)','execute')"), 'f');
     assert.equal(sql("select has_function_privilege('service_role','mavya_billing_event(uuid,uuid,text,text,bigint,jsonb,text)','execute')"), 't');
+    for (let i=0;i<2;i++) sql(fs.readFileSync(path.join(root,'supabase/migrations/0006_account_deletion.sql'),'utf8'));
+    sql(`insert into media(id,user_id,mime) values('fixture.mp4','${user}','video/mp4')`);
+    sql(`select mavya_begin_deletion('${user}','${token}')`);
+    assert.equal(sql(`select array_length(media_ids,1) from account_deletions where user_id='${user}'`),'1');
+    assert.throws(()=>sql(`insert into media(id,user_id,mime) values('blocked.mp4','${user}','video/mp4')`));
+    assert.throws(()=>sql(`insert into generations(user_id) values('${user}')`));
+    assert.equal(lock(),'');
+    assert.ok(JSON.parse(sql(`select mavya_claim_deletion('${user}')`)).lease_token);
+    assert.equal(sql(`select mavya_claim_deletion('${user}')`),'');
+    sql(`delete from auth.users where id='${user}'`);
+    assert.equal(sql(`select count(*) from account_deletions where user_id='${user}'`),'1');
     console.log('PASS: billing migration replay, parallel account lease, transactional event replay/rollback/order, equal-second apply, action CAS/watermark, expired leases, duplicate subscription audit, retired identity isolation, persisted Checkout identity/params, expiry/resubscribe, RPC grants');
   } finally { docker('rm', '--force', name); }
 }

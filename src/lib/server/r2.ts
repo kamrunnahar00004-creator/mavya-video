@@ -50,6 +50,9 @@ export async function downloadTo(key: string, file: string): Promise<boolean> {
 export async function deleteObject(key: string): Promise<void> {
   await r2().send(new DeleteObjectCommand({ Bucket: Bucket(), Key: key })).catch(() => undefined);
 }
+export async function deleteObjectStrict(key: string): Promise<void> {
+  await r2().send(new DeleteObjectCommand({ Bucket: Bucket(), Key: key }));
+}
 
 /** A link the browser can read the object from, for `seconds`; with `download`, it saves as that file name. */
 export function signedGet(key: string, seconds = 3600, download?: string): Promise<string> {

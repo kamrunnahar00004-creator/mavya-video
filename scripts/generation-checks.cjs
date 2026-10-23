@@ -44,6 +44,7 @@ async function main() {
     throw new Error(name);
   } };
   const jobs = load('src/lib/server/generation-jobs.ts', {
+    '@/lib/server/account-state': { accountClosing: async () => false },
     '@/lib/supabase/server': { createSupabaseAdminClient: () => db },
     '@/lib/server/usage': { adminUser: async () => false },
     '@/lib/server/store': { cloud: () => true, getRun: async () => run, mediaAccess: async () => null, registerMedia: async (...args) => calls.push(['register', args]) },
@@ -86,11 +87,12 @@ async function main() {
   assert.equal(reserved, 1); assert.equal(scheduled, 0);
 
   let queries = 0, recovered = 0;
-  const chain = { select() { return this; }, in() { return this; }, or() { return this; }, order() { return this; }, async limit() { return { data: [{ id: 'job', user_id: 'owner' }], error: null }; } };
+  const chain = { select() { return this; }, neq() { return this; }, in() { return this; }, or() { return this; }, order() { return this; }, async limit() { return { data: [{ id: 'job', user_id: 'owner' }], error: null }; } };
   const secret = 'fixture-only-cron-secret-32-characters';
   const cron = load('src/app/api/internal/generations/route.ts', {
     'node:crypto': require('node:crypto'),
-    '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from() { queries++; return chain; } }) },
+    '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from(table) { queries++; return table === 'account_deletions' ? {...chain, async limit(){return {data:[],error:null};}} : chain; } }) },
+    '@/lib/server/account-deletion': { advanceDeletion: async () => {throw Error('unexpected deletion');} },
     '@/lib/server/generation-jobs': { advanceGeneration: async (who, id) => { assert.equal(who, 'owner'); assert.equal(id, 'job'); recovered++; } },
   }, { CRON_SECRET: secret });
   assert.equal((await cron.GET(new Request('https://fixture.invalid/cron'))).status, 401);
