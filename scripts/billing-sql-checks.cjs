@@ -126,7 +126,15 @@ async function main() {
     for(let i=0;i<2;i++)sql(fs.readFileSync(path.join(root,'supabase/migrations/0010_contact_inquiries.sql'),'utf8'));
     const inquiries=await Promise.all(Array.from({length:12},()=>parallel("select mavya_contact_inquiry('fixture-hash','user@example.test','Test inquiry')")));
     assert.equal(inquiries.filter(Boolean).length,5);
-    console.log('PASS: billing migration replay, parallel account lease, transactional event replay/rollback/order, equal-second apply, action CAS/watermark, expired leases, duplicate subscription audit, retired identity isolation, persisted Checkout identity/params, expiry/resubscribe, RPC grants');
+    for(let i=0;i<2;i++)sql(fs.readFileSync(path.join(root,'supabase/migrations/0011_script_source_cas.sql'),'utf8'));
+    const reference='50000000-0000-4000-8000-000000000011';
+    sql(`insert into library(id,owner,data) values('${reference}','curated','{"title":"before"}')`);
+    const source={id:reference,owner:'curated',title:'before'};
+    const scriptToken=JSON.parse(sql(`select mavya_begin_ai('${other}','${project}','script',(select data->>'updatedAt' from runs where id='${project}'),${literal({source})},true)`)).token;
+    sql(`update library set data='{"title":"after"}' where id='${reference}'`);
+    assert.equal(sql(`select mavya_finish_ai('${other}','${project}','script','${scriptToken}','{"script":{}}')`),'');
+    assert.equal(sql("select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'mavya_%' and has_function_privilege('authenticated',p.oid,'execute')"),'0');
+    console.log('PASS: billing/deletion/upload/run/AI/export/contact migrations replay, leases/order/CAS, ownership, atomic merge/append, entitlement/rate limits, source changes, cleanup snapshots and service grants');
   } finally { docker('rm', '--force', name); }
 }
 main().catch(e => { console.error(e); process.exitCode = 1; });
