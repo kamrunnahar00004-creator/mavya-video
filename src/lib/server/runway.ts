@@ -30,7 +30,7 @@ import type { Reference, Run } from "@/lib/types";
 /** Generated hook length (Veo makes 4, 6 or 8 s; founder chose 6 s on 2026-10-21, $0.60 of Veo per hook). */
 export const HOOK_SECONDS = 6;
 let client: RunwayML | null = null;
-const runway = () => (client ??= new RunwayML());
+const runway = () => (client ??= new RunwayML({ maxRetries: 0, timeout: 60_000 }));
 const exec = promisify(execFile);
 
 /*
@@ -165,18 +165,20 @@ function veoPrompt(lead: string, motion: string, rest: string): string {
 /**
  * Start one hook generation; returns the Runway task id. `note` is what went wrong last time (Regenerate).
  * `simple`: skip the scene recreation and create from the character photo (the fallback when a model refuses).
- * If the recreation itself fails to start (a refusal in the plan or the frames), it falls back on its own.
+ * The durable generation job owns fallback and retry decisions.
  */
-export async function startHook(run: Run, source: Reference | null, who: string, note?: string, simple = false): Promise<string> {
-  if (!simple) {
-    try {
-      return await startHookInner(run, source, who, note, false);
-    } catch (e) {
-      if (e instanceof Error && /character|photo/i.test(e.message)) throw e;
-      console.error("hook recreation failed, falling back to the photo", e);
+export const startHook = (run: Run, source: Reference | null, who: string, note?: string, simple = false) => startHookInner(run, source, who, note, simple);
+
+/** A lost create response may represent paid work. Never blindly replay it or launch a fallback. */
+export class HookStartUncertain extends Error {}
+async function createVideo<T>(create: () => PromiseLike<T>): Promise<T> {
+  try { return await create(); }
+  catch (error) {
+    if (error instanceof RunwayML.APIConnectionError || (error instanceof RunwayML.APIError && (!error.status || error.status >= 500))) {
+      throw new HookStartUncertain("Provider task acceptance is unknown");
     }
+    throw error;
   }
-  return startHookInner(run, source, who, note, true);
 }
 
 async function startHookInner(run: Run, source: Reference | null, user: string, note: string | undefined, simple: boolean): Promise<string> {
@@ -206,7 +208,7 @@ async function startHookInner(run: Run, source: Reference | null, user: string, 
       const firstUrl = frame.output?.[0];
       if (!firstUrl) throw new Error("frame swap failed");
       // Only a first frame: a forced last frame made Veo dissolve into it when the motion ended elsewhere (not one take).
-      const task = await runway().imageToVideo.create({
+      const task = await createVideo(() => runway().imageToVideo.create({
         model: "veo3.1_fast",
         promptImage: [{ uri: firstUrl, position: "first" }],
         promptText: veoPrompt(
@@ -218,7 +220,7 @@ async function startHookInner(run: Run, source: Reference | null, user: string, 
         ratio: "720:1280",
         duration: HOOK_SECONDS,
         audio: false,
-      });
+      }));
       return task.id;
     }
 
@@ -229,24 +231,24 @@ async function startHookInner(run: Run, source: Reference | null, user: string, 
     const camera = cameraText(plan?.camera ?? recipe?.camera ?? "front-facing selfie, close-up, held at arm's length", plan ? plan.handheld : true);
     const mood = recipe?.mood ? `Mood: ${recipe.mood}.` : "";
     if (who.image) {
-      const task = await runway().imageToVideo.create({
+      const task = await createVideo(() => runway().imageToVideo.create({
         model: "veo3.1_fast",
-        promptImage: [{ uri: who.image, position: "first" }],
+        promptImage: [{ uri: who.image!, position: "first" }],
         promptText: veoPrompt(`Vertical phone selfie video. ${ONE_TAKE} The person in the image, in the same place as in the image. ${mood}`, doing, `${plan ? performanceText(plan) : ""} ${camera}${fix}`),
         negativePrompt: plan && !plan.talking ? NEGATIVE_SILENT : NEGATIVE,
         ratio: "720:1280",
         duration: HOOK_SECONDS,
         audio: false,
-      });
+      }));
       return task.id;
     }
-    const task = await runway().textToVideo.create({
+    const task = await createVideo(() => runway().textToVideo.create({
       model: "veo3.1_fast",
       promptText: veoPrompt(`Vertical phone selfie video. ${ONE_TAKE} ${who.words}. ${mood}`, doing, `${plan ? performanceText(plan) : ""} ${camera}${fix}`),
       ratio: "720:1280",
       duration: HOOK_SECONDS,
       audio: false,
-    });
+    }));
     return task.id;
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -262,7 +264,7 @@ export async function checkHook(taskId: string): Promise<HookTask> {
     const url = task.output?.[0];
     if (!url) return { state: "failed", error: "The generation came back empty. Try again." };
     const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
-    if (!res.ok) return { state: "failed", error: "Couldn't download the result. Try again." };
+    if (!res.ok) throw new Error("Couldn't download the result");
     return { state: "done", video: Buffer.from(await res.arrayBuffer()) };
   }
   if (task.status === "FAILED" || task.status === "CANCELLED") {

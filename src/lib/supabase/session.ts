@@ -7,7 +7,7 @@ import { createServerClient } from "@supabase/ssr";
  * open). Signed in, /login goes to the app. Without Supabase keys this is a passthrough, so the app still runs
  * locally with no accounts.
  */
-const PUBLIC_API = ["/api/contact", "/api/stripe/webhook"];
+const PUBLIC_API = ["/api/contact", "/api/stripe/webhook", "/api/internal/generations"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });

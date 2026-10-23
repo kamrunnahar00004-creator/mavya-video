@@ -14,7 +14,7 @@ import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundP
 import type { Song } from "@/app/api/songs/route";
 import { type Seg, clipSrc, demoClips, fileAt, moveClipPiece, removeDemoClip, segAt, videoLength, pieceSpans, relAt, remapTexts, retimeTexts, runSteps, shotList, storeParts, timeline } from "@/lib/edit";
 import { STYLE_GROUPS, STYLE_PRESETS, autoSecond, stylePreset } from "@/lib/text-styles";
-import { AVATAR_TONES, TEXT_Y, clipFromFile, saveStateOf, subscribeSaves, flushRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
+import { AVATAR_TONES, TEXT_Y, clipFromFile, saveStateOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { PLATFORM_LABEL, commentCta, fmtTime, fmtViews, isLikelyBoosted, type DemoClip, type Frame, type Part, type Reference, type SoundPiece, type Run, type TextLayer, type TextPos } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
 import { ExportButton } from "@/components/export-button";
@@ -626,7 +626,7 @@ export function RunView() {
                 source={source}
                 seg={segs[0]}
                 texts={texts}
-                onGenerated={(generated, text) => applyGenerated(generated, text)}
+                onGenerated={(updated) => setRun((r) => r?.id === updated.id ? { ...r, hook: updated.hook, texts: updated.texts, project: null } : r)}
                 onPatch={patchText}
                 onAdd={addText}
                 onAdjust={(a) => liveAdjust("hook", a)}
@@ -1083,7 +1083,7 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
   source: Reference | null;
   seg: Seg;
   texts: TextLayer[];
-  onGenerated: (g: NonNullable<Run["hook"]["generated"]>, text: string) => void;
+  onGenerated: (updated: Run) => void;
   onPatch: (id: string, patch: Partial<TextLayer>) => void;
   onAdd: (afterId: string | null, window: [number, number]) => void;
   onRemove: (id: string) => void;
@@ -1105,49 +1105,91 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
   const [regen, setRegen] = useState(false);
   const [fix, setFix] = useState("");
 
+  const [jobId, setJobId] = useState<string | null>(null);
+  const submitting = useRef(false);
+  const requestKey = useRef<string | null>(null);
+  const doneCallback = useRef(onGenerated);
+  useEffect(() => { doneCallback.current = onGenerated; }, [onGenerated]);
+
+  // Resume only a previously reserved explicit request. Provider task IDs never enter browser state.
+  useEffect(() => {
+    const abort = new AbortController();
+    void fetch(`/api/runs/${run.id}/generate`, { signal: abort.signal, cache: "no-store" })
+      .then((r) => r.json())
+      .then((reply) => {
+        if (abort.signal.aborted || submitting.current || !reply.job) return;
+        setStartedAt(Date.now());
+        setBusy(true);
+        setJobId(reply.job);
+      }).catch(() => undefined);
+    return () => abort.abort();
+  }, [run.id]);
+
+  useEffect(() => {
+    if (!jobId) return;
+    const abort = new AbortController();
+    const storageKey = `mavya-generation:${run.id}`;
+    void (async () => {
+      for (let i = 0; i < 400 && !abort.signal.aborted; i++) {
+        const response = await fetch(`/api/runs/${run.id}/generate?job=${jobId}`, { signal: abort.signal, cache: "no-store" }).catch(() => null);
+        const check = await response?.json().catch(() => null) as { state?: string; error?: string; run?: Run } | null;
+        if (abort.signal.aborted) return;
+        if (check?.state === "done" || check?.state === "failed" || response?.status === 404) {
+          if (check?.state === "done" && check.run) doneCallback.current(check.run);
+          else setGenError(check?.error ?? "The generation failed. Try again.");
+          setBusy(false);
+          setJobId(null);
+          requestKey.current = null;
+          try { sessionStorage.removeItem(storageKey); } catch { /* Storage can be unavailable. */ }
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 4000));
+      }
+      if (!abort.signal.aborted) {
+        setBusy(false);
+        setJobId(null);
+        setGenError("This is taking too long. Try again.");
+      }
+    })();
+    return () => abort.abort();
+  }, [jobId, run.id]);
+
   async function generate(note?: string) {
+    if (busy || submitting.current) return;
+    submitting.current = true;
     setRegen(false);
     setFix("");
     setGenError(null);
     setBusy(true);
     setStartedAt(Date.now());
-    // Runway (Veo 3.1 Fast): start the task, then check on it until the video is saved (about a minute).
-    const fail = (msg: string) => {
-      setGenError(msg);
-      setBusy(false);
-    };
-    const res = await fetch(`/api/runs/${run.id}/generate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ note }) }).catch(() => null);
-    const started = (await res?.json().catch(() => null)) as { taskId?: string; generationId?: string | null; error?: string; needsPlan?: boolean } | null;
-    // No plan, or this month's hooks used up: the plans page (the video is saved).
-    if (res?.status === 402 && started?.needsPlan) {
-      setBusy(false);
-      router.push("/settings/plans");
-      return;
+    const storageKey = `mavya-generation:${run.id}`;
+    if (!requestKey.current) {
+      try { requestKey.current = sessionStorage.getItem(storageKey); } catch { /* Storage can be unavailable. */ }
+      requestKey.current ??= crypto.randomUUID();
+      try { sessionStorage.setItem(storageKey, requestKey.current); } catch { /* Storage can be unavailable. */ }
     }
-    if (!res?.ok || !started?.taskId) return fail(started?.error ?? "Couldn't start the generation. Try again.");
-    // If a model refuses, the server starts the simpler version and hands back its task.
-    let taskId = started.taskId;
-    let fallback = false;
-    const gen = started.generationId ? `&gen=${started.generationId}` : "";
-    for (let i = 0; i < 120; i++) {
-      await new Promise((r) => setTimeout(r, 4000));
-      const check = (await fetch(`/api/runs/${run.id}/generate?task=${taskId}${gen}${fallback ? "&fallback=1" : ""}`)
-        .then((r) => r.json())
-        .catch(() => null)) as { state?: string; error?: string; taskId?: string; fallback?: boolean; generated?: { src: string; seconds: number; at: string } } | null;
-      if (check?.taskId && check.fallback) {
-        taskId = check.taskId;
-        fallback = true;
-        continue;
-      }
-      if (check?.state === "failed") return fail(check.error ?? "The generation failed. Try again.");
-      if (check?.state === "done" && check.generated) {
-        const original = (run.script && run.script.refId === (source?.id ?? null) ? run.script.hookText : "") || source?.recipe?.onScreenText?.[0]?.text || source?.title || "";
-        onGenerated({ ...check.generated, ...(note?.trim() ? { note: note.trim().slice(0, 300) } : {}) }, described ? "" : original);
+    try {
+      if (!(await waitRunSaves(run.id))) throw new Error("Couldn't save your changes. Try again.");
+      const response = await fetch(`/api/runs/${run.id}/generate`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ key: requestKey.current, note }),
+      });
+      const started = await response.json().catch(() => null) as { job?: string; error?: string; needsPlan?: boolean } | null;
+      if (response.status === 402 && started?.needsPlan) {
         setBusy(false);
+        requestKey.current = null;
+        try { sessionStorage.removeItem(storageKey); } catch { /* Storage can be unavailable. */ }
+        router.push("/settings/plans");
         return;
       }
+      if (!response.ok || !started?.job) throw new Error(started?.error ?? "Couldn't start the generation. Try again.");
+      setJobId(started.job);
+    } catch (error) {
+      setGenError(error instanceof Error ? error.message : "Couldn't start the generation. Try again.");
+      setBusy(false);
+    } finally {
+      submitting.current = false;
     }
-    fail("This is taking too long. Try again.");
   }
 
   const mini = "h-[42px] w-[26px] rounded-[5px] border-2 border-white bg-ink object-cover object-top shadow-sm";

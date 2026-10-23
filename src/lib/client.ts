@@ -157,6 +157,15 @@ export function patchRun(id: string, patch: Partial<Run>): Promise<Run | null> {
 export function flushRunSaves() {
   for (const id of pendingSaves.keys()) flushRun(id);
 }
+/** Wait for queued edits before reserving work against the server's input snapshot. */
+export async function waitRunSaves(id: string): Promise<boolean> {
+  flushRun(id);
+  const operation = saveChains.get(id);
+  if (!operation) return saveStateOf(id) !== "error";
+  if (!(await operation)) return false;
+  if (pendingSaves.has(id) || saveChains.has(id)) return waitRunSaves(id);
+  return true;
+}
 if (typeof window !== "undefined") window.addEventListener("pagehide", flushRunSaves);
 
 const DEFAULT_SUGGESTION: Record<Slot["role"], string> = {

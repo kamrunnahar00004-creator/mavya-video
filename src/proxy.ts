@@ -12,7 +12,7 @@ export async function proxy(request: NextRequest) {
   if (MAINTENANCE) {
     if (pathname.startsWith("/api/")) {
       // Stripe keeps delivering plan changes during maintenance.
-      if (pathname === "/api/contact" || pathname === "/api/stripe/webhook") return NextResponse.next();
+      if (["/api/contact", "/api/stripe/webhook", "/api/internal/generations"].includes(pathname)) return NextResponse.next();
       return Response.json({ error: "Mavya is under maintenance." }, { status: 503 });
     }
     return NextResponse.redirect(new URL("/", request.url));

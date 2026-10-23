@@ -100,7 +100,7 @@ async function main() {
     return Response.json({id:'test'});
   };
   try {
-    const { patchRun } = load('lib/client.ts');
+    const { patchRun, waitRunSaves } = load('lib/client.ts');
     await Promise.all(Array.from({length:21}, (_, volume) => patchRun('test', {sounds:[{volume}]})));
     assert.equal(calls.length, 1); assert.equal(calls[0].sounds[0].volume, 20);
     await Promise.all([patchRun('test', {title:'last'}), patchRun('test', {texts:[text]})]);
@@ -109,6 +109,13 @@ async function main() {
     await patchRun('test',{texts:[{...text,text:'あ'.repeat(30000)}]});
     assert.equal(keepaliveValues.at(-1),false);
     assert.equal(calls.at(-1).texts[0].text.length,30000);
+    const queued = patchRun('barrier', {title:'Saved before generation'});
+    assert.equal(await waitRunSaves('barrier'), true);
+    assert.ok(await queued);
+    global.fetch = async () => new Response(null, {status:400});
+    const rejected = patchRun('barrier-rejected', {title:'Rejected'});
+    assert.equal(await waitRunSaves('barrier-rejected'), false);
+    assert.equal(await rejected, null);
   } finally { global.fetch = fetchBefore; }
   const documentBefore = global.document;
   let drawings = 0, retained = 0;
