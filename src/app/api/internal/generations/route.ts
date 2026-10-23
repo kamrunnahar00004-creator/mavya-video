@@ -7,7 +7,7 @@ import { advanceExport } from "@/lib/server/export-jobs";
 
 // Hobby plan maximum (founder 2026-10-23: stay on Hobby for now); one Kling start or check fits well inside it.
 export const maxDuration = 300;
-/** Scheduled recovery continues only previously reserved, explicit-click jobs. */
+/** Daily Hobby recovery advances existing deletion/cleanup/export/generation work, never new spend requests. */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   const got = Buffer.from(request.headers.get("authorization") ?? "");

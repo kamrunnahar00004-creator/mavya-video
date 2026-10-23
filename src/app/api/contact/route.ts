@@ -7,8 +7,8 @@ import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 
 /**
- * Business inquiries from the pricing page. Every message is kept in .data/inquiries.jsonl; when RESEND_API_KEY and
- * CONTACT_TO are set it is also emailed there (reply goes straight to the sender). CONTACT_FROM is a sender on a
+ * Business inquiries: cloud records persist in contact_inquiries; local records use .data/inquiries.jsonl.
+ * With RESEND_API_KEY and CONTACT_TO they are also emailed (reply goes to the sender). CONTACT_FROM is a sender on a
  * domain verified in Resend; without one, Resend's test sender only delivers to the account owner's address.
  */
 const DATA_DIR = path.join(process.cwd(), ".data");

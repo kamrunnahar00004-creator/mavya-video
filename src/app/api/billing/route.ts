@@ -13,7 +13,7 @@ export const maxDuration = 120;
  * GET: the plan (from our `subscriptions`, written by the webhook), the card on file and the invoices (from Stripe).
  * POST {action}:
  *   "checkout" {plan, cycle}  -> {url}  Stripe Checkout for a first plan
- *   "change"   {plan, cycle}  -> {ok}   switch plan, prorated (an active subscription)
+ *   "change"   {plan, cycle}  -> {ok}   collect same-cycle upgrades; schedule other changes at renewal
  *   "cancel"                  -> {ok}   ends at the period end; access stays until then
  *   "resume"                  -> {ok}   undo a cancel before it ends
  *   "card"                    -> {url}  Stripe's page to update the card

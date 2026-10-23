@@ -145,7 +145,7 @@ export function ffmpegAdjust(a: Partial<Adjust> | null | undefined, w: number, h
   const out: string[] = [];
   if (v.speed !== 1) out.push(`setpts=PTS/${v.speed}`);
   if (v.flip) out.push("hflip");
-  // TODO(export): keyframes (v.keys) need a time-based zoompan instead of the static scale/crop below.
+  // Static helper; the hosted renderer applies keyframes with zoompan in render/render.mjs.
   if (v.zoom) {
     const s = 1 + v.zoom / 100;
     // Picture moves with pan, so the crop window moves the other way.

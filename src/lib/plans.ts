@@ -2,7 +2,7 @@
  * Plans: the pricing page and the Billing page both read these (one place to change them).
  * Prices match mavya.app: $29 / $59 / $99 a month, or $290 / $590 / $990 a year (two months free).
  * Every plan makes the same videos; Pro adds a weekly review, Studio a social media consultant. No free plan.
- * Checkout is not connected yet.
+ * Checkout uses these plan IDs with the server's configured Stripe price IDs.
  */
 export type PlanId = "starter" | "pro" | "studio";
 export type BillingCycle = "monthly" | "annual";

@@ -3,7 +3,7 @@
 //   GET  /jobs/:id                                          -> {state: queued|running|done|failed, progress, meta, error?}
 //   GET  /health
 // A job downloads its inputs (short-lived R2 links), runs ffmpeg (render.mjs) and uploads the MP4 to the signed PUT
-// link it was given. Jobs live in memory for 6 hours; the app treats a missing job as failed.
+// link it was given. The app persists dispatch/output identities; this process retains job status for 6 hours.
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
