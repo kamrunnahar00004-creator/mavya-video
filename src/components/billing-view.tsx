@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CreditCard, Zap } from "lucide-react";
+import { planById } from "@/lib/plans";
 import { BTN_DANGER, BTN_OUTLINE, SettingsPage, billingAction, formatDate, useAccount, useToast } from "@/components/settings-shell";
 
 /**
@@ -97,6 +98,7 @@ export function BillingView() {
                   {sub.cycle === "annual" ? `$${plan.yearly} a year` : `$${plan.price} a month`}
                   {ends && (sub.cancelAtPeriodEnd ? ` · Ends on ${ends}` : ` · Renews on ${ends}`)}
                 </p>
+                {sub.pendingChange && <p className="mt-0.5 text-[13.5px] text-muted">{planById(sub.pendingChange.plan).name} ({sub.pendingChange.cycle === "annual" ? "yearly" : "monthly"}) starts on {formatDate(sub.pendingChange.at)}.</p>}
               </div>
               <Link href="/settings/plans" className={BTN_OUTLINE}>
                 Change plan

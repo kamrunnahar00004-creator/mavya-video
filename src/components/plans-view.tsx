@@ -120,7 +120,7 @@ export function PlansView() {
           <div role="alertdialog" aria-modal="true" aria-labelledby="change-title" className="w-full max-w-[420px] rounded-2xl bg-panel p-6 shadow-[0_24px_64px_-16px_rgba(21,18,31,0.45)]">
             <h2 id="change-title" className="text-[19px] font-bold">Switch to {confirm.name}?</h2>
             <p className="mt-2 text-[14px] text-muted">
-              {shown === "annual" ? `$${confirm.yearly} a year` : `$${confirm.price} a month`}. The difference is prorated on your next invoice.
+              {shown === "annual" ? `$${confirm.yearly} a year` : `$${confirm.price} a month`}. Upgrades are charged now. Other changes start at renewal.
             </p>
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={() => setConfirm(null)} className={BTN_OUTLINE}>

@@ -70,7 +70,7 @@ async function main() {
   assert.equal(calls.some(c=>c[0]==='mavya_billing_event'),false);
   assert.equal((await webhook.POST(new Request('https://app.fixture.invalid/webhook',{method:'POST',body:'fixture'}))).status,400);
 
-  const route=load('src/app/api/billing/route.ts',{'next/server':{connection:async()=>{}},'@/lib/plans':{PLANS:[{id:'starter'}]},'@/lib/server/stripe':stripeStub,'@/lib/supabase/server':supabase,'@/lib/server/billing-state':state});
+  const route=load('src/app/api/billing/route.ts',{'next/server':{connection:async()=>{}},'@/lib/plans':{PLANS:[{id:'starter'}]},'@/lib/server/stripe':stripeStub,'@/lib/supabase/server':supabase,'@/lib/server/billing-state':state,'@/lib/server/billing-change':{changeSubscription(){throw Error('unexpected');},clearPendingChange(){throw Error('unexpected');}}});
   dbError=true; calls=[];
   assert.equal((await route.POST(new Request('https://app.fixture.invalid/billing',{method:'POST',body:JSON.stringify({action:'checkout',plan:'starter'})}))).status,502);
   assert.equal(calls.some(c=>['create','update'].includes(c[0])),false);
