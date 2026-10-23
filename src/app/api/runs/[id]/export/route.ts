@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { fullAdjust } from "@/lib/adjust";
 import { segSpeed, timeline, videoLength } from "@/lib/edit";
 import { deleteObject, putObject, signedGet } from "@/lib/server/r2";
-import { cloud, getRun, isMediaId, libraryLink, mediaAccess, mediaLink, mediaUploadLink, newUpload, registerMedia, updateRun, uploadedSize } from "@/lib/server/store";
+import { cloud, getRun, isMediaId, libraryLink, mediaAccess, mediaLink, mediaUploadLink, newUpload, registerMedia, appendExport, uploadedSize } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 
@@ -152,7 +152,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/runs/[id]/ex
       if ((e as { code?: string }).code !== "23505") throw e;
     }
     const done = { src, seconds: meta.seconds, at: new Date().toISOString() };
-    await updateRun(id, { exports: [...(run.exports ?? []), done] }, who);
+    await appendExport(id, meta.mediaId, done, who);
     await cleanup(meta.tmp, meta.overlays);
     return Response.json({ state: "done", export: done });
   }

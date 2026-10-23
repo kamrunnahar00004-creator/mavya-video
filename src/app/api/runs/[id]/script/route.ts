@@ -1,5 +1,6 @@
+import { beginAI, finishAI } from "@/lib/server/ai-budget";
 import { GeminiError, geminiJSON } from "@/lib/server/gemini";
-import { getRun, listReferences, updateRun } from "@/lib/server/store";
+import { getRun, listReferences } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import type { Reference, VideoScript } from "@/lib/types";
 
@@ -10,6 +11,7 @@ import type { Reference, VideoScript } from "@/lib/types";
  * hooks in the library (same style, most views) are the patterns. A described hook ("Describe your own") is turned
  * into beats the same way, so it follows what already worked.
  */
+export const maxDuration = 180;
 type Recipe = {
   hook?: { end?: number; camera?: string; setting?: string; mood?: string; spoken?: string; beats?: { start: number; end: number; action: string }[] };
   onScreenText?: { text: string; start?: number; end?: number }[];
@@ -96,6 +98,8 @@ Write:
 - hookBeats: what the person does in the hook, beat by beat with seconds, same timing as the hook to recreate. Say "the creator", never describe a real person.
 - shots: the demo for THIS product, 3 to 6 shots, following the hook's demo structure and pacing and the product's demoFlow, ending on the wow moment. For each: label (2 to 4 words), hint (one sentence written to the founder: what to film), steps (1 to 3 short on-screen actions in the real product), camera (how to hold the phone), text (the on-screen caption for that shot, same voice as the hook), seconds.`;
 
+  const budget = await beginAI(who, run, "script", { product: run.product, source: source, described });
+  if (budget.response) return budget.response;
   let out: Omit<VideoScript, "refId" | "at">;
   try {
     out = await geminiJSON(prompt, { schema: SCHEMA, temperature: 0.6 });
@@ -121,6 +125,5 @@ Write:
     at: new Date().toISOString(),
   };
   if (!script.hookText || !script.shots.length) return Response.json({ error: "Couldn't write the script. Try again." }, { status: 502 });
-  const updated = await updateRun(id, { script }, who);
-  return Response.json(updated);
+  return finishAI(who, run, "script", budget.token!, { script });
 }

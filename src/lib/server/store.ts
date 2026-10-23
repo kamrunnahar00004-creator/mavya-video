@@ -198,8 +198,7 @@ export async function createRun(who: string): Promise<Run> {
   return run;
 }
 
-// One update at a time per run on this server, so two quick saves of different sections never overwrite each other.
-const runLocks = new Map<string, Promise<unknown>>();
+// Cloud merges sections under the database row lock, across all server instances.
 export async function updateRun(id: string, patch: Partial<Omit<Run, "id" | "createdAt">>, who: string): Promise<Run | null> {
   if (!cloud()) {
     let updated: Run | null = null;
@@ -212,22 +211,9 @@ export async function updateRun(id: string, patch: Partial<Omit<Run, "id" | "cre
     });
     return updated;
   }
-  const previous = runLocks.get(id) ?? Promise.resolve();
-  const operation = previous.catch(() => undefined).then(async () => {
-    const current = await getRun(id, who);
-    if (!current) return null;
-    const now = new Date().toISOString();
-    const next: Run = { ...current, ...patch, updatedAt: now };
-    const { error } = await db().from("runs").update({ data: next, updated_at: now }).eq("id", id).eq("user_id", who);
-    if (error) throw error;
-    return next;
-  });
-  runLocks.set(id, operation);
-  try {
-    return await operation;
-  } finally {
-    if (runLocks.get(id) === operation) runLocks.delete(id);
-  }
+  const { data, error } = await db().rpc("mavya_patch_run", { p_user: who, p_run: id, p_patch: patch });
+  if (error) throw error;
+  return data as Run | null;
 }
 
 export async function deleteRun(id: string, who: string): Promise<void> {
@@ -379,3 +365,21 @@ async function deleteMediaFile(mediaId: string, who: string): Promise<void> {
   await deleteObject(mediaKey(mediaId));
 }
 
+
+
+/** Append under the database lock, never from a browser/read-modify-write array snapshot. */
+export async function appendExport(id: string, mediaId: string, result: {src: string; seconds: number; at: string}, who: string) {
+  if (cloud()) {
+    const {data,error} = await db().rpc("mavya_append_export", {p_user:who,p_run:id,p_media:mediaId,p_result:result});
+    if (error) throw error;
+    return data as typeof result | null;
+  }
+  let done: typeof result | null = null;
+  await writeDb(d => {
+    const run=d.runs.find(r=>r.id===id);
+    if (!run) return;
+    done=run.exports?.find(x=>x.src===result.src) ?? result;
+    if (!run.exports?.some(x=>x.src===result.src)) run.exports=[...(run.exports??[]),result];
+  });
+  return done;
+}

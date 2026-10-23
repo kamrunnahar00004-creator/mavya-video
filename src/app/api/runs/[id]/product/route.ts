@@ -1,3 +1,4 @@
+import { beginAI, finishAI } from "@/lib/server/ai-budget";
 import { GeminiError, geminiJSON } from "@/lib/server/gemini";
 import { getRun, updateRun } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
@@ -8,6 +9,7 @@ import type { ProductBrief } from "@/lib/types";
  * what it is, who it is for, the features, the wow moment and the screens to show. Runs only on the Analyze click.
  * DELETE clears it.
  */
+export const maxDuration = 180;
 const PROMPT = `Open this website and read it: {URL}
 
 It is a software product (an app, a website, a SaaS or an AI tool). Its founder will film a short-form marketing video:
@@ -43,6 +45,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/p
     return Response.json({ error: "Enter your website, e.g. yourapp.com" }, { status: 400 });
   }
 
+  const budget = await beginAI(who, run, "product", { url: url.toString() });
+  if (budget.response) return budget.response;
   let brief: ProductBrief;
   try {
     brief = await geminiJSON<ProductBrief>(PROMPT.replace("{URL}", url.toString()), { urlContext: true, temperature: 0.2 });
@@ -63,8 +67,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/p
   };
   if (!clean.name) return Response.json({ error: "Couldn't read a product on that site. Check the link." }, { status: 422 });
   // A new product makes the old script stale.
-  const updated = await updateRun(id, { product: { url: url.toString(), brief: clean, at: new Date().toISOString() }, script: null }, who);
-  return Response.json(updated);
+  return finishAI(who, run, "product", budget.token!, { product: { url: url.toString(), brief: clean, at: new Date().toISOString() }, script: null });
 }
 
 export async function DELETE(_request: Request, ctx: RouteContext<"/api/runs/[id]/product">) {

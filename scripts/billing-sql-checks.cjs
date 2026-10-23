@@ -98,6 +98,23 @@ async function main() {
     assert.equal(sql(`select mavya_finish_upload('${other}','upload.png','${upload.lease_token}','Picture')`),'t');
     assert.equal(sql("select count(*) from media where id='upload.png'"),'1');
     assert.equal(sql("select count(*) from assets where media_id='upload.png'"),'1');
+    for(let i=0;i<2;i++)sql(fs.readFileSync(path.join(root,'supabase/migrations/0008_atomic_runs_ai.sql'),'utf8'));
+    const project='20000000-0000-4000-8000-000000000008';
+    sql(`insert into runs(id,user_id,data) values('${project}','${other}','{"updatedAt":"original","hook":{},"exports":[]}')`);
+    const beginAI=()=>JSON.parse(sql(`select mavya_begin_ai('${other}','${project}','product',(select data->>'updatedAt' from runs where id='${project}'),'{}',true)`));
+    assert.equal(JSON.parse(sql(`select mavya_begin_ai('${other}','${project}','product','original','{}',false)`)).error,'plan');
+    const ai1=beginAI(),ai2=beginAI();
+    assert.equal(sql(`select mavya_finish_ai('${other}','${project}','product','${ai1.token}','{"product":{}}')`),'');
+    await Promise.all([parallel(`select mavya_patch_run('${other}','${project}','{"title":"parallel"}')`),parallel(`select mavya_patch_run('${other}','${project}','{"texts":[]}')`)]);
+    assert.equal(sql(`select data->>'title' from runs where id='${project}'`),'parallel');
+    assert.equal(sql(`select data->>'texts' from runs where id='${project}'`),'[]');
+    assert.equal(sql(`select mavya_finish_ai('${other}','${project}','product','${ai2.token}','{"product":{}}')`),'');
+    const ai3=beginAI();assert.ok(JSON.parse(sql(`select mavya_finish_ai('${other}','${project}','product','${ai3.token}','{"product":{"url":"fixture"}}')`)).product);
+    for(let i=0;i<27;i++)assert.ok(beginAI().token);
+    assert.equal(beginAI().error,'limit');
+    sql(`insert into media(id,user_id,mime) values('export.mp4','${other}','video/mp4')`);
+    await Promise.all(Array.from({length:8},()=>parallel(`select mavya_append_export('${other}','${project}','export.mp4','{"seconds":3}')`)));
+    assert.equal(sql(`select jsonb_array_length(data->'exports') from runs where id='${project}'`),'1');
     console.log('PASS: billing migration replay, parallel account lease, transactional event replay/rollback/order, equal-second apply, action CAS/watermark, expired leases, duplicate subscription audit, retired identity isolation, persisted Checkout identity/params, expiry/resubscribe, RPC grants');
   } finally { docker('rm', '--force', name); }
 }
