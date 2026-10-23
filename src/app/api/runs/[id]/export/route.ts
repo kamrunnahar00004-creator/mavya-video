@@ -48,7 +48,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   if (!run.hook.generated) return Response.json({ error: "Generate the hook first." }, { status: 400 });
 
   const body = (await request.json().catch(() => null)) as { texts?: unknown } | null;
-  const texts = Array.isArray(body?.texts) ? (body.texts as { png?: unknown; start?: unknown; end?: unknown }[]).slice(0, MAX_TEXTS) : [];
+  const texts = Array.isArray(body?.texts) ? (body.texts as { png?: unknown; x?: unknown; y?: unknown; start?: unknown; end?: unknown }[]).slice(0, MAX_TEXTS) : [];
   const origin = new URL(request.url).origin;
   const segs = timeline(run, null).filter((s) => s.src);
   const total = videoLength(segs);
@@ -84,14 +84,13 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   const overlays = [];
   for (const [i, t] of texts.entries()) {
     const m = typeof t.png === "string" ? /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(t.png) : null;
-    const start = Number(t.start);
-    const end = Number(t.end);
-    if (!m || !Number.isFinite(start) || !Number.isFinite(end) || end <= start || start >= total) continue;
+    const [start, end, x, y] = [Number(t.start), Number(t.end), Number(t.x), Number(t.y)];
+    if (!m || ![start, end, x, y].every(Number.isFinite) || end <= start || start >= total) continue;
     const png = Buffer.from(m[1], "base64");
     if (png.length > MAX_PNG || png.subarray(1, 4).toString() !== "PNG") continue;
     const key = `tmp/exports/${tmp}/${i}.png`;
     await putObject(key, png, "image/png");
-    overlays.push({ url: await signedGet(key, LINK_SECONDS), start: Math.max(0, start), end: Math.min(total, end) });
+    overlays.push({ url: await signedGet(key, LINK_SECONDS), start: Math.max(0, start), end: Math.min(total, end), x: Math.max(0, Math.min(W, x)), y: Math.max(0, Math.min(H, y)) });
   }
 
   const { mediaId } = newUpload("video/mp4");

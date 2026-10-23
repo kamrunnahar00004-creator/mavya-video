@@ -6,12 +6,15 @@
 // link it was given. Jobs live in memory for 6 hours; the app treats a missing job as failed.
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile, readFile, stat } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { mkdtemp, readFile, rm, writeFile, stat } from "node:fs/promises";
+import { Readable, Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import ffmpegPath from "ffmpeg-static";
-import { ffmpegArgs } from "./render.mjs";
+import { finalArgs, plan, stepArgs } from "./render.mjs";
 
 const SECRET = process.env.RENDER_SECRET ?? "";
 const PORT = Number(process.env.PORT ?? 3200);
@@ -72,10 +75,15 @@ async function download(url, file) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`input download failed (${res.status})`);
   const len = Number(res.headers.get("content-length") ?? 0);
-  if (len > MAX_INPUT) throw new Error("input too large");
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > MAX_INPUT) throw new Error("input too large");
-  await writeFile(file, buf);
+  if (len > MAX_INPUT || !res.body) throw new Error("input too large");
+  let seen = 0;
+  const cap = new Transform({
+    transform(chunk, _enc, done) {
+      seen += chunk.length;
+      done(seen > MAX_INPUT ? new Error("input too large") : null, chunk);
+    },
+  });
+  await pipeline(Readable.fromWeb(res.body), cap, createWriteStream(file));
   return file;
 }
 
@@ -98,10 +106,21 @@ async function work(id) {
       Promise.all(spec.overlays.map((o) => get(o.url).then((p) => p.file))),
     ]);
     job.progress = 0.05;
+    // Pieces one by one (60% of the bar), then the final pass (35%).
+    const steps = plan(spec);
+    const files = [];
+    for (const [i, step] of steps.entries()) {
+      const file = path.join(dir, `step${i}.mkv`);
+      await run(stepArgs(spec, step, step.kind === "piece" ? segments[step.si] : null, file));
+      files.push(file);
+      job.progress = 0.05 + ((i + 1) / steps.length) * 0.6;
+    }
+    const list = path.join(dir, "list.txt");
+    await writeFile(list, files.map((f) => `file '${f}'`).join("\n"));
     const out = path.join(dir, "out.mp4");
-    await run(ffmpegArgs(spec, { segments, sounds, overlays }, out), (text) => {
+    await run(finalArgs(spec, list, { sounds, overlays }, out), (text) => {
       const m = /out_time_us=(\d+)/.exec(text.split("\n").filter((l) => l.startsWith("out_time_us=")).pop() ?? "");
-      if (m && spec.total > 0) job.progress = Math.min(0.95, 0.05 + (Number(m[1]) / 1e6 / spec.total) * 0.9);
+      if (m && spec.total > 0) job.progress = Math.min(0.97, 0.65 + (Number(m[1]) / 1e6 / spec.total) * 0.32);
     });
     const size = (await stat(out)).size;
     const put = await fetch(output.url, { method: "PUT", headers: { "content-type": output.contentType, "content-length": String(size) }, body: await readFile(out) });

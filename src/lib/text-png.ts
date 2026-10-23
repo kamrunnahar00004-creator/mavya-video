@@ -53,7 +53,8 @@ async function fontFor(font: string, text: string): Promise<{ family: string; fa
   return { family: `"${name}", sans-serif`, face: await fontFace(name, text) };
 }
 
-export async function textPng(x: TextLayer): Promise<string> {
+/** The drawn text cropped to what it covers, with where it sits on the 1080x1920 frame (null: nothing drawn). */
+export async function textPng(x: TextLayer): Promise<{ png: string; x: number; y: number } | null> {
   const { family, face } = await fontFor(x.font, x.text);
   const look = textLook(x.style, x.color, x.second);
   const base: CSSProperties = { fontFamily: family, fontSize: `${(x.size / 100) * H}px`, fontWeight: 800, lineHeight: 1.12, textAlign: "center", whiteSpace: "pre-wrap", overflowWrap: "break-word", display: "block" };
@@ -72,6 +73,24 @@ export async function textPng(x: TextLayer): Promise<string> {
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
-  canvas.getContext("2d")!.drawImage(img, 0, 0);
-  return canvas.toDataURL("image/png");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(img, 0, 0);
+  // Crop to the drawn pixels: the render server overlays a small image, not a full frame.
+  const alpha = ctx.getImageData(0, 0, W, H).data;
+  let [left, top, right, bottom] = [W, H, -1, -1];
+  for (let py = 0; py < H; py++) {
+    for (let px = 0; px < W; px++) {
+      if (!alpha[(py * W + px) * 4 + 3]) continue;
+      if (px < left) left = px;
+      if (px > right) right = px;
+      if (py < top) top = py;
+      bottom = py;
+    }
+  }
+  if (right < 0) return null;
+  const out = document.createElement("canvas");
+  out.width = right - left + 1;
+  out.height = bottom - top + 1;
+  out.getContext("2d")!.drawImage(canvas, left, top, out.width, out.height, 0, 0, out.width, out.height);
+  return { png: out.toDataURL("image/png"), x: left, y: top };
 }

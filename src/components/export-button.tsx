@@ -48,9 +48,13 @@ export function ExportButton({ run, texts, ready, onToast, onDone }: { run: Run;
     try {
       await saved(run.id);
       const shown = texts.filter((t) => t.text.trim() && t.end > t.start);
-      let pngs: { png: string; start: number; end: number }[];
+      let pngs: { png: string; x: number; y: number; start: number; end: number }[];
       try {
-        pngs = await Promise.all(shown.map(async (t) => ({ png: await textPng(t), start: t.start, end: t.end })));
+        const drawn = await Promise.all(shown.map(async (t) => {
+          const d = await textPng(t);
+          return d ? { ...d, start: t.start, end: t.end } : null;
+        }));
+        pngs = drawn.filter((d) => d !== null);
       } catch {
         return fail("This browser can't draw the texts. Export in Chrome, Edge or Firefox.");
       }
