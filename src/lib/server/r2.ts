@@ -51,9 +51,10 @@ export async function deleteObject(key: string): Promise<void> {
   await r2().send(new DeleteObjectCommand({ Bucket: Bucket(), Key: key })).catch(() => undefined);
 }
 
-/** A link the browser can read the object from, for `seconds`. */
-export function signedGet(key: string, seconds = 3600): Promise<string> {
-  return getSignedUrl(r2(), new GetObjectCommand({ Bucket: Bucket(), Key: key }), { expiresIn: seconds });
+/** A link the browser can read the object from, for `seconds`; with `download`, it saves as that file name. */
+export function signedGet(key: string, seconds = 3600, download?: string): Promise<string> {
+  const disposition = download ? `attachment; filename="${download.replace(/[^\w .-]/g, "_")}"` : undefined;
+  return getSignedUrl(r2(), new GetObjectCommand({ Bucket: Bucket(), Key: key, ResponseContentDisposition: disposition }), { expiresIn: seconds });
 }
 
 /** A link the browser can upload one object to (PUT with this exact content type), for `seconds`. */

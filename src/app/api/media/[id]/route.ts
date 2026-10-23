@@ -15,8 +15,10 @@ export async function GET(request: Request, ctx: RouteContext<"/api/media/[id]">
   if (!info) return new Response("Not found", { status: 404 });
   const file = localMediaPath(id);
   if (file) return fileResponse(request, file, info.size, info.mime);
-  const res = NextResponse.redirect(await mediaLink(id), 302);
+  // ?download=<name>: the link saves the file (the export's Download button).
+  const download = new URL(request.url).searchParams.get("download");
+  const res = NextResponse.redirect(await mediaLink(id, undefined, download ? `${download.slice(0, 80)}.${id.split(".").pop()}` : undefined), 302);
   // The link is good for an hour; let the browser reuse the redirect for a while.
-  res.headers.set("Cache-Control", "private, max-age=1800");
+  res.headers.set("Cache-Control", download ? "no-store" : "private, max-age=1800");
   return res;
 }

@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { r2Enabled, deleteObject, downloadTo, objectSize, putObject, signedGet } from "@/lib/server/r2";
+import { r2Enabled, deleteObject, downloadTo, objectSize, putObject, signedGet, signedPut } from "@/lib/server/r2";
 import { authEnabled, createSupabaseAdminClient } from "@/lib/supabase/server";
 import type { Asset, Reference, Run } from "@/lib/types";
 
@@ -320,7 +320,10 @@ export function localMediaPath(mediaId: string): string | null {
 }
 
 /** Cloud: a short-lived link the browser reads the file from (after mediaAccess said yes). */
-export const mediaLink = (mediaId: string) => signedGet(mediaKey(mediaId));
+export const mediaLink = (mediaId: string, seconds?: number, download?: string) => signedGet(mediaKey(mediaId), seconds, download);
+
+/** Cloud: a signed link to upload one new file, for the render server (the export). */
+export const mediaUploadLink = (mediaId: string, mime: string, seconds: number) => signedPut(mediaKey(mediaId), mime, seconds);
 
 /** A readable local copy of a media file in `dir` (for ffmpeg and the AI models), after an access check. */
 export async function mediaToFile(mediaId: string, who: string, dir: string): Promise<{ file: string; mime: string } | null> {
@@ -353,7 +356,7 @@ export async function libraryFile(kind: LibraryKind, code: string, dir: string):
 }
 
 /** Cloud: a short-lived link to a library file (the hook's sound for the player). */
-export const libraryLink = (kind: LibraryKind, code: string) => signedGet(libraryKey(kind, code));
+export const libraryLink = (kind: LibraryKind, code: string, seconds?: number) => signedGet(libraryKey(kind, code), seconds);
 
 async function deleteMediaFile(mediaId: string, who: string): Promise<void> {
   if (!isMediaId(mediaId)) return;

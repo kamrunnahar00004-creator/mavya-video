@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, ClipboardPaste, Copy, Diamond, Download, Eye, Film, FolderOpen, GripVertical, Heart, Link as LinkIcon, ListOrdered, Loader2, Magnet, Music, Pause, PenLine, Play, Plus, Redo2, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, ClipboardPaste, Copy, Diamond, Eye, Film, FolderOpen, GripVertical, Heart, Link as LinkIcon, ListOrdered, Loader2, Magnet, Music, Pause, PenLine, Play, Plus, Redo2, RefreshCw, Scissors, SlidersHorizontal, Smartphone, Smile, Undo2, Volume1, Volume2, VolumeX, Sparkles, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
 import { frameAt } from "@/lib/filmstrip";
 import { waveform } from "@/lib/waveform";
 import { analyzeVideo } from "@/lib/analyze";
@@ -17,6 +17,7 @@ import { STYLE_GROUPS, STYLE_PRESETS, autoSecond, stylePreset } from "@/lib/text
 import { AVATAR_TONES, TEXT_Y, clipFromFile, saveStateOf, subscribeSaves, flushRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { PLATFORM_LABEL, commentCta, fmtTime, fmtViews, isLikelyBoosted, type DemoClip, type Frame, type Part, type Reference, type SoundPiece, type Run, type TextLayer, type TextPos } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
+import { ExportButton } from "@/components/export-button";
 import { HistoryPanel } from "@/components/history-panel";
 import { ProductStep, ScriptCard } from "@/components/product-step";
 import { RunPreview, SyncedAudio, SyncedVideo, TextOverlay, WarmthFilter, claimPlayback, soundAt, usePlaybackClaims } from "@/components/run-preview";
@@ -465,16 +466,14 @@ export function RunView() {
         >
           <Trash2 className="h-4 w-4" />
         </button>
-        <button
-          type="button"
-          disabled={!ready}
-          title={ready ? undefined : "Generate the hook and add a demo first"}
-          onClick={() => setToast("Rendering is not connected yet.")}
-          className="btn-primary ml-1 px-4 py-2 text-[14px]"
-        >
-          <Download className="h-4 w-4" />
-          Export
-        </button>
+        <ExportButton
+          run={run}
+          texts={texts}
+          ready={ready}
+          onToast={setToast}
+          // Saved on the server already; only the page's copy needs it (My files).
+          onDone={(x) => setRun((r) => (r?.id === run.id ? { ...r, exports: [...(r.exports ?? []), x] } : r))}
+        />
       </header>
 
       {pickerOpen && (
