@@ -78,6 +78,7 @@ async function falSubmit(model: string, input: Record<string, unknown>): Promise
   }
   if (res.status >= 500) throw new HookStartUncertain("Provider task acceptance is unknown");
   const body = (await res.json().catch(() => null)) as { request_id?: string; detail?: unknown } | null;
+  if (res.ok && (!body?.request_id || !/^[\w-]+$/.test(body.request_id))) throw new HookStartUncertain("Provider task identity is unknown");
   if (!res.ok || !body?.request_id) throw new Error(`fal ${res.status}: ${JSON.stringify(body?.detail ?? body).slice(0, 300)}`);
   return `${model}|${body.request_id}`;
 }
@@ -223,6 +224,7 @@ export function mp4Seconds(buf: Buffer): number | null {
   const at = buf.indexOf("mvhd");
   if (at < 4 || at + 32 > buf.length) return null;
   const version = buf[at + 4];
+  if (version > 1 || (version === 1 && at + 36 > buf.length)) return null;
   const scale = version === 1 ? buf.readUInt32BE(at + 24) : buf.readUInt32BE(at + 16);
   const duration = version === 1 ? Number(buf.readBigUInt64BE(at + 28)) : buf.readUInt32BE(at + 20);
   return scale ? Math.round((duration / scale) * 100) / 100 : null;
@@ -238,9 +240,10 @@ export async function checkHook(taskId: string): Promise<HookTask> {
   if (!status.ok) throw new Error(`fal status ${status.status}`);
   const s = (await status.json()) as { status?: string };
   if (s.status === "IN_QUEUE" || s.status === "IN_PROGRESS") return { state: "running", progress: s.status === "IN_PROGRESS" ? 0.5 : 0 };
-  if (s.status !== "COMPLETED") return { state: "failed", error: "The generation failed. Try again." };
+  if (s.status !== "COMPLETED") throw new Error("Unknown provider status");
   const result = await fetch(`${FAL}/${app}/requests/${id}`, { headers: falHeaders(), cache: "no-store", signal: AbortSignal.timeout(30_000) });
   const body = (await result.json().catch(() => null)) as { video?: { url?: string }; detail?: unknown } | null;
+  if (!result.ok && ![400, 422].includes(result.status)) throw new Error(`fal result unavailable ${result.status}`);
   // A completed request without a video is a refusal or an error (e.g. the safety checker).
   if (!result.ok || !body?.video?.url) {
     console.error("fal result", taskId, result.status, JSON.stringify(body?.detail ?? body).slice(0, 300));
