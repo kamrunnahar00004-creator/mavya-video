@@ -13,7 +13,7 @@ function load(file, stubs, env = {}) {
 }
 async function main() {
   let calls = [], locked = false, pending = null, createError = false, dbError = false, leaseBusy = false;
-  let row = null;
+  let row = null, closed = false, deletionAdvanced = 0;
   const session = {id:'cs_fixture',status:'open',url:'https://checkout.fixture.invalid',subscription:'sub_fixture'};
   const rpc = async (name,args) => {
     calls.push([name,args]);
@@ -26,10 +26,11 @@ async function main() {
     if(name==='mavya_checkout_record'){pending.session_id=args.p_session;return {data:null};}
     if(name==='mavya_billing_action')return {data:false};
     if(name==='mavya_billing_event')return dbError?{error:new Error('DB failure')}:{data:'applied'};
+    if(name==='mavya_deletion_event')return {data:'closed'};
     throw new Error(name);
   };
   const db = {rpc,from(table){
-    return {select(){return this;},eq(){return this;},async maybeSingle(){return dbError?{error:new Error('lookup failed')}:{data:table==='billing_subscription_ids'?{user_id:'owner'}:row,error:null};}};
+    return {select(){return this;},eq(){return this;},async maybeSingle(){return dbError?{error:new Error('lookup failed')}:{data:table==='account_deletions'?(closed?{user_id:'owner'}:null):table==='billing_subscription_ids'?{user_id:'owner'}:row,error:null};}};
   }};
   let current = {id:'sub_fixture',status:'canceled',metadata:{user_id:'owner'}};
   const stripeClient = {
@@ -56,7 +57,7 @@ async function main() {
   await assert.rejects(state.applyBillingAction('owner','token',{stripe_subscription_id:'sub_fixture',billing_revision:1,last_event_created:200},current),/changed/);
 
   let event = {id:'evt_fixture',type:'customer.subscription.updated',created:100,data:{object:{id:'sub_fixture',status:'active',metadata:{user_id:'owner'}}}};
-  const webhook = load('src/app/api/stripe/webhook/route.ts',{'@/lib/server/stripe':stripeStub,'@/lib/server/billing-state':state,'@/lib/supabase/server':supabase},{STRIPE_WEBHOOK_SECRET:'fixture-only'});
+  const webhook = load('src/app/api/stripe/webhook/route.ts',{'@/lib/server/stripe':stripeStub,'@/lib/server/billing-state':state,'@/lib/supabase/server':supabase,'@/lib/server/account-deletion':{advanceDeletion:async()=>deletionAdvanced++}},{STRIPE_WEBHOOK_SECRET:'fixture-only'});
   const request=()=>new Request('https://app.fixture.invalid/webhook',{method:'POST',headers:{'stripe-signature':'fixture'},body:'fixture'});
   calls=[]; assert.equal((await webhook.POST(request())).status,200);
   assert.equal(calls.find(c=>c[0]==='retrieve')[2],true);
@@ -69,6 +70,10 @@ async function main() {
   calls=[]; assert.equal((await webhook.POST(request())).status,500);
   assert.equal(calls.some(c=>c[0]==='mavya_billing_event'),false);
   assert.equal((await webhook.POST(new Request('https://app.fixture.invalid/webhook',{method:'POST',body:'fixture'}))).status,400);
+  closed=true;event={...event,data:{object:{...event.data.object,metadata:{user_id:'owner'}}}};calls=[];
+  assert.equal((await webhook.POST(request())).status,200);
+  assert.equal(calls.some(c=>c[0]==='mavya_billing_lock'),false);
+  current={...current,status:'active'};assert.equal((await webhook.POST(request())).status,200);assert.equal(deletionAdvanced,1);closed=false;
 
   const route=load('src/app/api/billing/route.ts',{'next/server':{connection:async()=>{}},'@/lib/plans':{PLANS:[{id:'starter'}]},'@/lib/server/stripe':stripeStub,'@/lib/supabase/server':supabase,'@/lib/server/billing-state':state,'@/lib/server/billing-change':{changeSubscription(){throw Error('unexpected');},clearPendingChange(){throw Error('unexpected');}}});
   dbError=true; calls=[];

@@ -26,7 +26,7 @@ async function main() {
   docker('run', '--detach', '--pull=never', '--network', 'none', '--name', name, '-e', 'POSTGRES_PASSWORD=fixture-only', 'postgres:16');
   try {
     for (let i = 0; ; i++) {
-      try { docker('exec', name, 'pg_isready', '-U', 'postgres'); break; }
+      try { docker('exec', name, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres'); break; }
       catch (e) { if (i === 100) throw e; await new Promise(r => setTimeout(r, 100)); }
     }
     sql(`create role anon; create role authenticated; create role service_role;

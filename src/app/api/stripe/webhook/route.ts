@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import { stripe, subscriptionRow } from "@/lib/server/stripe";
 import { billingRpc, withBillingLock } from "@/lib/server/billing-state";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { advanceDeletion } from "@/lib/server/account-deletion";
 
 export const maxDuration = 120;
 const idOf = (value: string | { id?: string } | null | undefined) => typeof value === "string" ? value : value?.id;
@@ -37,16 +38,36 @@ export async function POST(request: Request) {
       userId = binding.data.user_id;
     }
     if (!userId) {
+      const deletedBinding = await db.from("account_deletions").select("user_id").contains("known_subscription_ids", [subId]).maybeSingle<{user_id:string}>();
+      if (deletedBinding.error) throw deletedBinding.error;
+      userId = deletedBinding.data?.user_id ?? null;
+    }
+    if (!userId) {
       const sub = await stripe().subscriptions.retrieve(subId);
       userId = sub.metadata?.user_id || null;
       if (!userId) {
         const lookup = await db.from("subscriptions").select("user_id").eq("stripe_customer_id", idOf(sub.customer)).maybeSingle<{ user_id: string }>();
         if (lookup.error) throw lookup.error;
         userId = lookup.data?.user_id ?? null;
+        if (!userId) {
+          const deletedCustomer = await db.from("account_deletions").select("user_id").eq("stripe_customer_id", idOf(sub.customer)).maybeSingle<{user_id:string}>();
+          if (deletedCustomer.error) throw deletedCustomer.error;
+          userId = deletedCustomer.data?.user_id ?? null;
+        }
       }
     }
     if (!userId) throw new Error(`Unresolved subscription owner: ${subId}`);
     const owner = userId;
+    const closed = await db.from("account_deletions").select("user_id").eq("user_id", owner).maybeSingle();
+    if (closed.error) throw closed.error;
+    if (closed.data) {
+      const current = await stripe().subscriptions.retrieve(subId);
+      if (current.metadata?.user_id && current.metadata.user_id !== owner) throw new Error("Deleted subscription owner mismatch");
+      const live = !["canceled", "incomplete_expired"].includes(current.status);
+      const result = await billingRpc<string>("mavya_deletion_event", { p_user: owner, p_event: event.id, p_type: event.type, p_subscription: subId, p_live: live });
+      if (live) await advanceDeletion(owner);
+      return Response.json({ received: true, result });
+    }
     const result = await withBillingLock(owner, async (token) => {
       // Even equal-second deliveries reconcile serially against Stripe, not their old payloads.
       const current = await stripe().subscriptions.retrieve(subId!);

@@ -25,7 +25,7 @@ const record = (key, id, status) => sql(`select mavya_checkout_record('${user}',
 async function main() {
   docker('run', '--detach', '--pull=never', '--network', 'none', '--name', name, '-e', 'POSTGRES_PASSWORD=fixture-only', 'postgres:16');
   try {
-    for (let i = 0; ; i++) { try { docker('exec', name, 'pg_isready', '-U', 'postgres'); break; } catch (e) { if (i === 100) throw e; await new Promise(r => setTimeout(r, 100)); } }
+    for (let i = 0; ; i++) { try { docker('exec', name, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres'); break; } catch (e) { if (i === 100) throw e; await new Promise(r => setTimeout(r, 100)); } }
     sql(`create role anon; create role authenticated; create role service_role; create schema auth;
       create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb default '{}');
       create function auth.uid() returns uuid language sql stable as $$select null::uuid$$;`);
@@ -140,6 +140,13 @@ async function main() {
     sql(`select mavya_begin_deletion('${other}','${deletionLease}')`);
     assert.equal(sql(`select '${generation}.mp4'=any(media_ids) and 'output.mp4'=any(media_ids) and 'tmp/gen/fixture.jpg'=any(extra_keys) from account_deletions where user_id='${other}'`),'t');
     assert.throws(()=>sql(`insert into temporary_objects(key,user_id) values('blocked','${other}')`));
+    for(let i=0;i<2;i++)sql(fs.readFileSync(path.join(root,'supabase/migrations/0013_deletion_billing_events.sql'),'utf8'));
+    assert.throws(()=>sql(`select mavya_deletion_event('${user}','evt_deleted_busy','fixture','late_sub',true)`));
+    assert.equal(sql("select count(*) from billing_events where id='evt_deleted_busy'"),'0');
+    sql(`update account_deletions set state='done',lease_until=null,lease_token=null where user_id='${user}'`);
+    assert.equal(sql(`select mavya_deletion_event('${user}','evt_deleted_cancel','fixture','late_sub',false)`),'closed');
+    assert.equal(sql(`select mavya_deletion_event('${user}','evt_deleted_live','fixture','late_sub',true)`),'cancel');
+    assert.equal(sql(`select 'late_sub'=any(subscription_ids) from account_deletions where user_id='${user}'`),'t');
     assert.equal(sql("select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'mavya_%' and has_function_privilege('authenticated',p.oid,'execute')"),'0');
     console.log('PASS: billing/deletion/upload/run/AI/export/contact migrations replay, leases/order/CAS, ownership, atomic merge/append, entitlement/rate limits, source changes, cleanup snapshots and service grants');
   } finally { docker('rm', '--force', name); }
