@@ -1,11 +1,12 @@
 import "server-only";
+import { assertProductionConfig } from "@/lib/production-config";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 /** Accounts are on once the Supabase keys are set; without them the app runs locally as before (no sign-in). */
-export const authEnabled = () => Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+export const authEnabled = () => { assertProductionConfig(); return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY); };
 
 /** Server Supabase client bound to the request cookies: reads the signed-in user, queries under RLS. */
 export async function createSupabaseServerClient() {
@@ -39,7 +40,7 @@ export const getSessionUser = cache(async () => {
   return user;
 });
 
-/** Service-role client. SERVER ONLY, bypasses RLS: used only for deleting an account. */
+/** Service-role client. SERVER ONLY, bypasses RLS for owned records and service-only transactional RPCs. */
 let admin: SupabaseClient | null = null;
 export function createSupabaseAdminClient(): SupabaseClient {
   if (admin) return admin;

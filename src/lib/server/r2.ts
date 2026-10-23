@@ -1,4 +1,5 @@
 import "server-only";
+import { assertProductionConfig } from "@/lib/production-config";
 import { createWriteStream } from "node:fs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -10,7 +11,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
  * Keys: media/<mediaId> for anything served at /api/media/<mediaId>; library/{sources,hooks,demos,audio}/<code>.*
  * for the curated library. The browser never sees the keys: it gets short-lived signed links.
  */
-export const r2Enabled = () => Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_BUCKET);
+export const r2Enabled = () => { assertProductionConfig(); return Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_BUCKET); };
 
 let client: S3Client | null = null;
 function r2(): S3Client {
