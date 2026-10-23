@@ -75,6 +75,7 @@ async function main() {
 
   let scheduled = 0, reserved = 0;
   const route = load('src/app/api/runs/[id]/generate/route.ts', {
+    '@/lib/server/temp-cleanup': { expireTemporaryObjects: async () => 0 },
     'next/server': { after: () => scheduled++ },
     '@/lib/server/generation-jobs': { advanceGeneration() {}, generationJob: async () => null, generationReply: async j => ({ job: j.id }), reserveGeneration: async () => { reserved++; throw new Error('DB unavailable'); } },
     '@/lib/server/store': { cloud: () => true, getRun: async () => run },
@@ -95,6 +96,7 @@ async function main() {
     '@/lib/server/account-deletion': { advanceDeletion: async () => {throw Error('unexpected deletion');} },
     '@/lib/server/uploads': { expireUploads: async () => 0 },
     '@/lib/server/export-jobs': { advanceExport: async () => { throw Error('unexpected export'); } },
+    '@/lib/server/temp-cleanup': { expireTemporaryObjects: async () => 0 },
     '@/lib/server/generation-jobs': { advanceGeneration: async (who, id) => { assert.equal(who, 'owner'); assert.equal(id, 'job'); recovered++; } },
   }, { CRON_SECRET: secret });
   assert.equal((await cron.GET(new Request('https://fixture.invalid/cron'))).status, 401);

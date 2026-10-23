@@ -36,7 +36,7 @@ export async function advanceDeletion(user: string) {
     d.subscription_ids.shift();
    }
    await save({ subscription_ids: d.subscription_ids, checkout: null, state: d.subscription_ids.length ? "cancel" : "storage", error: null });
-   if (d.subscription_ids.length) return;
+   if (d.subscription_ids.length) throw new Error("More subscriptions need cancellation. Retry deletion.");
    d.state = "storage";
   }
   // Existing signed export PUTs last six hours. Keep the ownership index until those grants expire.

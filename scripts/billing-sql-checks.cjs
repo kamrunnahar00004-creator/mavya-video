@@ -133,6 +133,13 @@ async function main() {
     const scriptToken=JSON.parse(sql(`select mavya_begin_ai('${other}','${project}','script',(select data->>'updatedAt' from runs where id='${project}'),${literal({source})},true)`)).token;
     sql(`update library set data='{"title":"after"}' where id='${reference}'`);
     assert.equal(sql(`select mavya_finish_ai('${other}','${project}','script','${scriptToken}','{"script":{}}')`),'');
+    for(let i=0;i<2;i++)sql(fs.readFileSync(path.join(root,'supabase/migrations/0012_generation_temp_ownership.sql'),'utf8'));
+    sql(`insert into temporary_objects(key,user_id) values('tmp/gen/fixture.jpg','${other}')`);
+    const generation=sql(`insert into generations(user_id) values('${other}') returning id` ).split('\n')[0];
+    const deletionLease=sql(`select mavya_billing_lock('${other}')`);
+    sql(`select mavya_begin_deletion('${other}','${deletionLease}')`);
+    assert.equal(sql(`select '${generation}.mp4'=any(media_ids) and 'output.mp4'=any(media_ids) and 'tmp/gen/fixture.jpg'=any(extra_keys) from account_deletions where user_id='${other}'`),'t');
+    assert.throws(()=>sql(`insert into temporary_objects(key,user_id) values('blocked','${other}')`));
     assert.equal(sql("select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'mavya_%' and has_function_privilege('authenticated',p.oid,'execute')"),'0');
     console.log('PASS: billing/deletion/upload/run/AI/export/contact migrations replay, leases/order/CAS, ownership, atomic merge/append, entitlement/rate limits, source changes, cleanup snapshots and service grants');
   } finally { docker('rm', '--force', name); }

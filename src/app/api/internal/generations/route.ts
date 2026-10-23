@@ -4,6 +4,7 @@ import { advanceGeneration } from "@/lib/server/generation-jobs";
 import { advanceDeletion } from "@/lib/server/account-deletion";
 import { expireUploads } from "@/lib/server/uploads";
 import { advanceExport } from "@/lib/server/export-jobs";
+import { expireTemporaryObjects } from "@/lib/server/temp-cleanup";
 
 // Hobby plan maximum (founder 2026-10-23: stay on Hobby for now); one Kling start or check fits well inside it.
 export const maxDuration = 300;
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
     return Response.json({ ok: true });
   }
   if (await expireUploads()) return Response.json({ ok: true });
+  if (await expireTemporaryObjects()) return Response.json({ ok: true });
   const exports = await createSupabaseAdminClient().from("export_jobs").select("id,user_id")
     .or("state.in.(pending,running),cleaned.eq.false").or(`lease_until.is.null,lease_until.lt.${new Date().toISOString()}`)
     .order("updated_at").limit(1);

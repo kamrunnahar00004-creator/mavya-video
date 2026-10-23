@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { advanceGeneration, generationJob, generationReply, reserveGeneration } from "@/lib/server/generation-jobs";
 import { cloud, getRun } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
+import { expireTemporaryObjects } from "@/lib/server/temp-cleanup";
 
 // Hobby plan maximum (founder 2026-10-23: stay on Hobby for now); one Kling start or check fits well inside it.
 export const maxDuration = 300;
@@ -44,6 +45,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/runs/[id]/ge
     const job = await generationJob(who, id, jobId ?? undefined);
     if (!job) return jobId ? Response.json({ error: "Not found" }, { status: 404 }) : Response.json({ state: "idle" });
     if (["reserved", "starting", "running"].includes(job.state)) continueJob(who, job.id);
+    else after(async () => { try { await expireTemporaryObjects(); } catch (error) { console.error("generation cleanup", error); } });
     return Response.json(await generationReply(job));
   } catch (error) {
     console.error("generation read", error);

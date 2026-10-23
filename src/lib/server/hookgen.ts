@@ -1,5 +1,6 @@
 import "server-only";
 import { checkBudget, withWorkBudget, workSignal } from "@/lib/server/work-budget";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
@@ -84,9 +85,11 @@ async function falSubmit(model: string, input: Record<string, unknown>): Promise
 }
 
 /** Temporary file for the provider to read (R2 tmp/, a signed link). */
-async function share(bytes: Buffer, ext: "jpg" | "mp4"): Promise<string> {
+async function share(bytes: Buffer, ext: "jpg" | "mp4", user: string): Promise<string> {
   checkBudget();
   const key = `tmp/gen/${randomUUID()}.${ext}`;
+  const { error } = await createSupabaseAdminClient().from("temporary_objects").insert({ key, user_id: user });
+  if (error) throw error;
   await putObject(key, bytes, ext === "jpg" ? "image/jpeg" : "video/mp4");
   checkBudget();
   return signedGet(key, LINK_SECONDS);
@@ -194,7 +197,7 @@ async function startHookInner(run: Run, source: Reference | null, who: string, n
       const first = path.join(dir, "first.jpg");
       await ff("-ss", "0.05", "-i", clip, "-frames:v", "1", "-q:v", "2", first);
       const frame = await swapFirstFrame(await readFile(first), character, outfit);
-      const [imageUrl, videoUrl] = await Promise.all([share(frame, "jpg"), share(reference, "mp4")]);
+      const [imageUrl, videoUrl] = await Promise.all([share(frame, "jpg", who), share(reference, "mp4", who)]);
       return falSubmit(simple ? MOTION_FALLBACK : MOTION, {
         image_url: imageUrl,
         video_url: videoUrl,
@@ -208,7 +211,7 @@ async function startHookInner(run: Run, source: Reference | null, who: string, n
     const doing = run.hook.describe?.trim() || "they look at their laptop screen, shocked, then cover their mouth and smile";
     const prompt = `${doing.slice(0, 600)}. ${LOOK}${fix}`;
     if (character.image) {
-      const imageUrl = await share(Buffer.from(character.image.data, "base64"), "jpg");
+      const imageUrl = await share(Buffer.from(character.image.data, "base64"), "jpg", who);
       return falSubmit(IMAGE_TO_VIDEO, { start_image_url: imageUrl, prompt: `The person in the image, in the same place. ${prompt}`, duration: String(DESCRIBED_SECONDS), generate_audio: false, negative_prompt: NEGATIVE });
     }
     return falSubmit(TEXT_TO_VIDEO, { prompt: `Vertical 9:16 phone selfie of ${character.words}. ${prompt}`, duration: String(DESCRIBED_SECONDS), aspect_ratio: "9:16", generate_audio: false, negative_prompt: NEGATIVE });
