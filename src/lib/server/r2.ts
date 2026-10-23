@@ -2,7 +2,7 @@ import "server-only";
 import { createWriteStream } from "node:fs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 /**
@@ -16,6 +16,7 @@ let client: S3Client | null = null;
 function r2(): S3Client {
   return (client ??= new S3Client({
     region: "auto",
+    requestHandler: { connectionTimeout: 5_000, requestTimeout: 20_000 },
     endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId: process.env.R2_ACCESS_KEY_ID!, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY! },
   }));
@@ -61,6 +62,18 @@ export function signedGet(key: string, seconds = 3600, download?: string): Promi
 }
 
 /** A link the browser can upload one object to (PUT with this exact content type), for `seconds`. */
-export function signedPut(key: string, contentType: string, seconds = 900): Promise<string> {
-  return getSignedUrl(r2(), new PutObjectCommand({ Bucket: Bucket(), Key: key, ContentType: contentType }), { expiresIn: seconds });
+export function signedPut(key: string, contentType: string, seconds = 900, size?: number): Promise<string> {
+  return getSignedUrl(r2(), new PutObjectCommand({ Bucket: Bucket(), Key: key, ContentType: contentType, ...(size === undefined ? {} : { ContentLength: size }) }), { expiresIn: seconds });
+}
+export async function objectInfo(key: string): Promise<{size: number; mime: string; etag: string} | null> {
+ try {
+  const h = await r2().send(new HeadObjectCommand({ Bucket: Bucket(), Key: key }));
+  return { size: h.ContentLength ?? 0, mime: h.ContentType ?? "", etag: h.ETag ?? "" };
+ } catch (error) {
+  if ((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404) return null;
+  throw error;
+ }
+}
+export async function copyObject(from: string, to: string, etag: string) {
+ await r2().send(new CopyObjectCommand({ Bucket: Bucket(), Key: to, CopySource: `${Bucket()}/${from}`, CopySourceIfMatch: etag }));
 }

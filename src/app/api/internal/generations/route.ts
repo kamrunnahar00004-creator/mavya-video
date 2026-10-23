@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { advanceGeneration } from "@/lib/server/generation-jobs";
 import { advanceDeletion } from "@/lib/server/account-deletion";
+import { expireUploads } from "@/lib/server/uploads";
 
 // Hobby plan maximum (founder 2026-10-23: stay on Hobby for now); one Kling start or check fits well inside it.
 export const maxDuration = 300;
@@ -19,6 +20,7 @@ export async function GET(request: Request) {
     await advanceDeletion(deletion.data[0].user_id);
     return Response.json({ ok: true });
   }
+  if (await expireUploads()) return Response.json({ ok: true });
   const { data, error } = await createSupabaseAdminClient().from("generations").select("id, user_id")
     .in("state", ["reserved", "starting", "running"]).or(`lease_until.is.null,lease_until.lt.${new Date().toISOString()}`)
     .order("updated_at").limit(1);

@@ -93,6 +93,7 @@ async function main() {
     'node:crypto': require('node:crypto'),
     '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from(table) { queries++; return table === 'account_deletions' ? {...chain, async limit(){return {data:[],error:null};}} : chain; } }) },
     '@/lib/server/account-deletion': { advanceDeletion: async () => {throw Error('unexpected deletion');} },
+    '@/lib/server/uploads': { expireUploads: async () => 0 },
     '@/lib/server/generation-jobs': { advanceGeneration: async (who, id) => { assert.equal(who, 'owner'); assert.equal(id, 'job'); recovered++; } },
   }, { CRON_SECRET: secret });
   assert.equal((await cron.GET(new Request('https://fixture.invalid/cron'))).status, 401);

@@ -89,6 +89,15 @@ async function main() {
     assert.equal(sql(`select mavya_claim_deletion('${user}')`),'');
     sql(`delete from auth.users where id='${user}'`);
     assert.equal(sql(`select count(*) from account_deletions where user_id='${user}'`),'1');
+    for(let i=0;i<2;i++)sql(fs.readFileSync(path.join(root,'supabase/migrations/0007_upload_reservations.sql'),'utf8'));
+    sql(`insert into upload_reservations(media_id,user_id,mime,declared_size,staging_key) values('upload.png','${other}','image/png',10,'tmp/upload.png')`);
+    assert.equal(sql(`select mavya_claim_upload('${user}','upload.png')`),'');
+    const upload=JSON.parse(sql(`select mavya_claim_upload('${other}','upload.png')`));
+    assert.equal(sql(`select mavya_claim_upload('${other}','upload.png')`),'');
+    assert.equal(sql(`select mavya_finish_upload('${other}','upload.png','${upload.lease_token}','Picture')`),'t');
+    assert.equal(sql(`select mavya_finish_upload('${other}','upload.png','${upload.lease_token}','Picture')`),'t');
+    assert.equal(sql("select count(*) from media where id='upload.png'"),'1');
+    assert.equal(sql("select count(*) from assets where media_id='upload.png'"),'1');
     console.log('PASS: billing migration replay, parallel account lease, transactional event replay/rollback/order, equal-second apply, action CAS/watermark, expired leases, duplicate subscription audit, retired identity isolation, persisted Checkout identity/params, expiry/resubscribe, RPC grants');
   } finally { docker('rm', '--force', name); }
 }

@@ -5,7 +5,7 @@ import { accountClosing } from "@/lib/server/account-state";
 import { stripe } from "@/lib/server/stripe";
 import { deleteObjectStrict } from "@/lib/server/r2";
 import type Stripe from "stripe";
-type Deletion = { user_id: string; state: string; subscription_ids: string[]; checkout: { session_id?: string; params: Stripe.Checkout.SessionCreateParams; request_key: string; created_at: string } | null; media_ids: string[]; cursor: number; cleanup_after: string; lease_token: string };
+type Deletion = { user_id: string; state: string; subscription_ids: string[]; checkout: { session_id?: string; params: Stripe.Checkout.SessionCreateParams; request_key: string; created_at: string } | null; media_ids: string[]; extra_keys?: string[]; cursor: number; cleanup_after: string; lease_token: string };
 export async function beginDeletion(user: string) {
  if (await accountClosing(user)) return;
  await withBillingLock(user, token => billingRpc("mavya_begin_deletion", { p_user: user, p_token: token }));
@@ -42,11 +42,12 @@ export async function advanceDeletion(user: string) {
   // Existing signed export PUTs last six hours. Keep the ownership index until those grants expire.
   if (Date.now() < Date.parse(d.cleanup_after)) return;
   if (d.state === "storage") {
-   const batch = d.media_ids.slice(d.cursor, d.cursor + 40);
-   for (let i = 0; i < batch.length; i += 5) await Promise.all(batch.slice(i, i + 5).map(id => deleteObjectStrict(`media/${id}`)));
+   const keys = [...d.media_ids.map(id => `media/${id}`), ...(d.extra_keys ?? [])];
+   const batch = keys.slice(d.cursor, d.cursor + 40);
+   for (let i = 0; i < batch.length; i += 5) await Promise.all(batch.slice(i, i + 5).map(key => deleteObjectStrict(key)));
    d.cursor += batch.length;
-   await save({ cursor: d.cursor, state: d.cursor < d.media_ids.length ? "storage" : "auth", error: null });
-   if (d.cursor < d.media_ids.length) return;
+   await save({ cursor: d.cursor, state: d.cursor < keys.length ? "storage" : "auth", error: null });
+   if (d.cursor < keys.length) return;
   }
   const { error } = await db.auth.admin.deleteUser(user);
   if (error && error.code !== "user_not_found" && error.status !== 404) throw error;
