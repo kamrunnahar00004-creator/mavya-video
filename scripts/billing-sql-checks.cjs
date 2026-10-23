@@ -1,0 +1,84 @@
+// Real transactions in a disposable, network-disabled PostgreSQL fixture. No app env or paid services.
+const assert = require('node:assert/strict');
+const { execFileSync, spawn } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const name = `mavya-billing-check-${process.pid}`;
+const root = path.resolve(__dirname, '..');
+const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+const sql = input => execFileSync('docker', ['exec', '-i', name, 'psql', '-U', 'postgres', '-XAt', '-v', 'ON_ERROR_STOP=1'], { input, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+const parallel = input => new Promise((resolve, reject) => {
+  const child = spawn('docker', ['exec', '-i', name, 'psql', '-U', 'postgres', '-XAt', '-v', 'ON_ERROR_STOP=1']);
+  let out = '', err = ''; child.stdout.on('data', x => out += x); child.stderr.on('data', x => err += x);
+  child.on('error', reject); child.on('close', code => code ? reject(new Error(err)) : resolve(out.trim())); child.stdin.end(input);
+});
+const user = '10000000-0000-4000-8000-000000000001';
+const other = '10000000-0000-4000-8000-000000000002';
+const literal = x => `'${JSON.stringify(x).replaceAll("'", "''")}'::jsonb`;
+const state = (id = 'sub_A', status = 'active', overrides = {}) => ({ user_id: user, plan: 'starter', cycle: 'monthly', status, price_id: 'price_fixture', current_period_start: '2026-10-01T00:00:00Z', current_period_end: '2026-11-01T00:00:00Z', cancel_at_period_end: false, stripe_customer_id: 'cus_fixture', stripe_subscription_id: id, ...overrides });
+const lock = () => sql(`select mavya_billing_lock('${user}')`);
+let token;
+const event = (id, time, value, checkout = null) => sql(`select mavya_billing_event('${user}','${token}','${id}','fixture',${time},${literal(value)},${checkout ? `'${checkout}'` : 'null'})`);
+const row = () => JSON.parse(sql(`select row_to_json(s) from subscriptions s where user_id='${user}'`));
+const prepare = params => JSON.parse(sql(`select mavya_checkout_prepare('${user}','${token}',${literal(params)})`));
+const record = (key, id, status) => sql(`select mavya_checkout_record('${user}','${token}','${key}','${id}','${status}')`);
+async function main() {
+  docker('run', '--detach', '--pull=never', '--network', 'none', '--name', name, '-e', 'POSTGRES_PASSWORD=fixture-only', 'postgres:16');
+  try {
+    for (let i = 0; ; i++) { try { docker('exec', name, 'pg_isready', '-U', 'postgres'); break; } catch (e) { if (i === 100) throw e; await new Promise(r => setTimeout(r, 100)); } }
+    sql(`create role anon; create role authenticated; create role service_role; create schema auth;
+      create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb default '{}');
+      create function auth.uid() returns uuid language sql stable as $$select null::uuid$$;`);
+    for (const file of ['0001_profiles.sql', '0002_storage.sql', '0003_generation_jobs.sql', '0004_billing_state.sql', '0004_billing_state.sql']) sql(fs.readFileSync(path.join(root, 'supabase/migrations', file), 'utf8'));
+    sql(`insert into auth.users(id,email) values('${user}','one@fixture.invalid'),('${other}','two@fixture.invalid')`);
+    const locks = await Promise.all(Array.from({length: 12}, () => parallel(`select mavya_billing_lock('${user}')`)));
+    assert.equal(locks.filter(Boolean).length, 1); token = locks.find(Boolean);
+    assert.equal(event('evt_100', 100, state()), 'applied');
+    assert.equal(event('evt_100', 100, state()), 'duplicate');
+    assert.equal(row().billing_revision, 1);
+    assert.equal(event('evt_200', 200, state('sub_A', 'canceled')), 'applied');
+    assert.equal(event('evt_old', 100, state()), 'older');
+    assert.equal(row().last_event_created, 200); assert.equal(row().status, 'canceled');
+    assert.equal(event('evt_equal', 200, state()), 'applied'); // Serialized current Stripe snapshot.
+    const before = row();
+    assert.equal(event('evt_201', 201, state('sub_A', 'canceled')), 'applied');
+    assert.equal(sql(`select mavya_billing_action('${user}','${token}','sub_A',${before.billing_revision},${before.last_event_created},${literal(state())})`), 'f');
+    assert.equal(row().last_event_created, 201); assert.equal(row().status, 'canceled');
+    const current = row();
+    assert.equal(sql(`select mavya_billing_action('${user}','${token}','sub_A',${current.billing_revision},201,${literal(state('sub_A', 'canceled', {cancel_at_period_end:true}))})`), 't');
+    assert.equal(row().last_event_created, 201); assert.equal(row().billing_revision, current.billing_revision + 1);
+    assert.throws(() => event('evt_rollback', 202, state('sub_A', 'active', {plan:'invalid'})));
+    assert.equal(sql("select count(*) from billing_events where id='evt_rollback'"), '0');
+    sql(`update billing_locks set expires_at=now()-interval '1 second' where user_id='${user}'`);
+    assert.throws(() => event('evt_expired', 202, state()));
+    assert.equal(sql("select count(*) from billing_events where id='evt_expired'"), '0');
+    const oldToken = token; token = lock(); assert.ok(token); assert.notEqual(token, oldToken);
+    assert.equal(event('evt_duplicate_sub', 202, state('sub_B')), 'conflict');
+    assert.equal(row().stripe_subscription_id, 'sub_A');
+    assert.equal(sql("select count(*) from billing_conflicts where event_id='evt_duplicate_sub'"), '1');
+    const pending = prepare({line_items:[{price:'price_first'}]});
+    assert.equal(prepare({line_items:[{price:'price_other'}]}).request_key, pending.request_key);
+    assert.equal(prepare({changed:true}).params.line_items[0].price, 'price_first');
+    record(pending.request_key, 'cs_B', 'complete');
+    assert.equal(event('evt_new_checkout', 203, state('sub_B'), 'cs_B'), 'applied');
+    assert.equal(row().stripe_subscription_id, 'sub_B');
+    assert.equal(event('evt_retired', 204, state('sub_A', 'canceled')), 'unrelated');
+    assert.equal(row().stripe_subscription_id, 'sub_B'); assert.equal(row().last_event_created, 203);
+    assert.throws(() => prepare({}));
+    assert.throws(() => event('evt_wrong_owner', 204, state('sub_B', 'active', {user_id:other})));
+    assert.equal(sql("select count(*) from billing_events where id='evt_wrong_owner'"), '0');
+    event('evt_cancel_B', 205, state('sub_B', 'canceled'));
+    sql(`select mavya_checkout_clear('${user}','${token}','${pending.request_key}','sub_B')`);
+    const next = prepare({line_items:[{price:'price_next'}]});
+    assert.notEqual(next.request_key, pending.request_key);
+    record(next.request_key, 'cs_expired', 'expired');
+    sql(`select mavya_checkout_clear('${user}','${token}','${next.request_key}')`);
+    assert.notEqual(prepare({}).request_key, next.request_key);
+    sql(`select mavya_billing_unlock('${user}','${oldToken}')`);
+    assert.equal(lock(), ''); // Stale unlock cannot release a newer lease.
+    assert.equal(sql("select has_function_privilege('authenticated','mavya_billing_event(uuid,uuid,text,text,bigint,jsonb,text)','execute')"), 'f');
+    assert.equal(sql("select has_function_privilege('service_role','mavya_billing_event(uuid,uuid,text,text,bigint,jsonb,text)','execute')"), 't');
+    console.log('PASS: billing migration replay, parallel account lease, transactional event replay/rollback/order, equal-second apply, action CAS/watermark, expired leases, duplicate subscription audit, retired identity isolation, persisted Checkout identity/params, expiry/resubscribe, RPC grants');
+  } finally { docker('rm', '--force', name); }
+}
+main().catch(e => { console.error(e); process.exitCode = 1; });

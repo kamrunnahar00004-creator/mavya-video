@@ -1,8 +1,11 @@
 import { connection } from "next/server";
 import type Stripe from "stripe";
-import { PLANS, type BillingCycle, type PlanId } from "@/lib/plans";
-import { priceFor, stripe, stripeEnabled, subscriptionRow } from "@/lib/server/stripe";
-import { createSupabaseAdminClient, getSessionUser } from "@/lib/supabase/server";
+import { PLANS, type BillingCycle } from "@/lib/plans";
+import { priceFor, stripe, stripeEnabled } from "@/lib/server/stripe";
+import { getSessionUser } from "@/lib/supabase/server";
+import { applyBillingAction, BillingBusy, billingRow, pendingCheckout, withBillingLock, type BillingRow } from "@/lib/server/billing-state";
+
+export const maxDuration = 120;
 
 /**
  * Settings > Billing and Plans.
@@ -13,22 +16,20 @@ import { createSupabaseAdminClient, getSessionUser } from "@/lib/supabase/server
  *   "cancel"                  -> {ok}   ends at the period end; access stays until then
  *   "resume"                  -> {ok}   undo a cancel before it ends
  *   "card"                    -> {url}  Stripe's page to update the card
- * The plan itself only changes through the webhook, so the page reloads it a moment after.
+ * Webhooks reconcile current Stripe state. Action writes compare subscription, revision and watermark.
  */
-type Row = { plan: PlanId | null; cycle: BillingCycle | null; status: string | null; current_period_end: string | null; cancel_at_period_end: boolean; stripe_customer_id: string | null; stripe_subscription_id: string | null; last_event_created: number };
-
 async function context() {
   const user = await getSessionUser();
   if (!user) return null;
-  const { data } = await createSupabaseAdminClient().from("subscriptions").select("plan, cycle, status, current_period_end, cancel_at_period_end, stripe_customer_id, stripe_subscription_id, last_event_created").eq("user_id", user.id).maybeSingle<Row>();
-  return { user, row: data };
+  return { user, row: await billingRow(user.id) };
 }
-const live = (row: Row | null) => Boolean(row?.plan && row.stripe_subscription_id && ["active", "trialing", "past_due"].includes(row.status ?? ""));
+const live = (row: BillingRow | null) => Boolean(row?.plan && row.stripe_subscription_id && ["active", "trialing", "past_due"].includes(row.status ?? ""));
 
 export async function GET() {
   await connection();
   if (!stripeEnabled()) return Response.json({ enabled: false, subscription: null, card: null, invoices: [] });
-  const ctx = await context();
+  const ctx = await context().catch(() => undefined);
+  if (ctx === undefined) return Response.json({ error: "Billing is unavailable. Try again." }, { status: 503 });
   if (!ctx) return Response.json({ error: "Sign in first." }, { status: 401 });
   const { row } = ctx;
   let card: { brand: string; last4: string; expMonth: number; expYear: number } | null = null;
@@ -67,48 +68,39 @@ export async function GET() {
 
 export async function POST(request: Request) {
   if (!stripeEnabled()) return Response.json({ error: "Checkout is not connected yet." }, { status: 503 });
-  const ctx = await context();
-  if (!ctx) return Response.json({ error: "Sign in first." }, { status: 401 });
-  const { user, row } = ctx;
+  const user = await getSessionUser();
+  if (!user) return Response.json({ error: "Sign in first." }, { status: 401 });
   const body = (await request.json().catch(() => null)) as { action?: unknown; plan?: unknown; cycle?: unknown } | null;
   const origin = new URL(request.url).origin;
   const plan = PLANS.find((p) => p.id === body?.plan)?.id;
   const cycle: BillingCycle = body?.cycle === "annual" ? "annual" : "monthly";
 
   try {
-    switch (body?.action) {
-      case "checkout": {
-        if (!plan) return Response.json({ error: "Pick a plan." }, { status: 400 });
-        if (live(row)) return Response.json({ error: "You already have a plan. Change it instead." }, { status: 409 });
-        const session = await stripe().checkout.sessions.create({
-          mode: "subscription",
-          line_items: [{ price: priceFor(plan, cycle), quantity: 1 }],
-          client_reference_id: user.id,
-          subscription_data: { metadata: { user_id: user.id } },
-          ...(row?.stripe_customer_id ? { customer: row.stripe_customer_id } : { customer_email: user.email }),
-          allow_promotion_codes: true,
-          success_url: `${origin}/settings/billing?paid=1`,
-          cancel_url: `${origin}/settings/plans`,
+    return await withBillingLock(user.id, async (token) => {
+      const row = await billingRow(user.id);
+      switch (body?.action) {
+        case "checkout": {
+          if (!plan) return Response.json({ error: "Pick a plan." }, { status: 400 });
+          if (live(row)) return Response.json({ error: "You already have a plan. Change it instead." }, { status: 409 });
+          return Response.json({ url: await pendingCheckout(user, token, row, plan, cycle, origin) });
+        }
+        case "change": {
+          if (!plan || !live(row)) return Response.json({ error: "Pick a plan." }, { status: 400 });
+          const sub = await stripe().subscriptions.retrieve(row!.stripe_subscription_id!);
+          const updated = await stripe().subscriptions.update(sub.id, {
+            items: [{ id: sub.items.data[0].id, price: priceFor(plan, cycle) }],
+            proration_behavior: "create_prorations",
+            cancel_at_period_end: false,
+            metadata: { user_id: user.id },
         });
-        return Response.json({ url: session.url });
-      }
-      case "change": {
-        if (!plan || !live(row)) return Response.json({ error: "Pick a plan." }, { status: 400 });
-        const sub = await stripe().subscriptions.retrieve(row!.stripe_subscription_id!);
-        const updated = await stripe().subscriptions.update(sub.id, {
-          items: [{ id: sub.items.data[0].id, price: priceFor(plan, cycle) }],
-          proration_behavior: "create_prorations",
-          cancel_at_period_end: false,
-          metadata: { user_id: user.id },
-        });
-        await save(user.id, updated, row!.last_event_created);
+        await applyBillingAction(user.id, token, row!, updated);
         return Response.json({ ok: true });
       }
       case "cancel":
       case "resume": {
         if (!live(row)) return Response.json({ error: "No plan to change." }, { status: 400 });
         const updated = await stripe().subscriptions.update(row!.stripe_subscription_id!, body.action === "cancel" ? { cancel_at_period_end: true } : { cancel_at_period_end: false, cancel_at: "" });
-        await save(user.id, updated, row!.last_event_created);
+        await applyBillingAction(user.id, token, row!, updated);
         return Response.json({ ok: true });
       }
       case "card": {
@@ -119,13 +111,10 @@ export async function POST(request: Request) {
       default:
         return Response.json({ error: "Bad request" }, { status: 400 });
     }
+    });
   } catch (e) {
     console.error("billing", body?.action, e);
+    if (e instanceof BillingBusy) return Response.json({ error: e.message }, { status: 409 });
     return Response.json({ error: "Billing is not available right now. Try again." }, { status: 502 });
   }
-}
-
-/** Show the change at once; the webhook confirms it (same event time, so it still applies). */
-async function save(userId: string, sub: Stripe.Subscription, eventCreated: number) {
-  await createSupabaseAdminClient().from("subscriptions").upsert(subscriptionRow(userId, sub, eventCreated), { onConflict: "user_id" });
 }

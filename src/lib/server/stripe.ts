@@ -11,7 +11,7 @@ export const stripeEnabled = () => Boolean(process.env.STRIPE_SECRET_KEY);
 let client: Stripe | null = null;
 export function stripe(): Stripe {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error("STRIPE_SECRET_KEY is not set");
-  return (client ??= new Stripe(process.env.STRIPE_SECRET_KEY));
+  return (client ??= new Stripe(process.env.STRIPE_SECRET_KEY, { timeout: 20_000, maxNetworkRetries: 0 }));
 }
 
 const ENV_NAME: Record<PlanId, string> = { starter: "STARTER", pro: "SHOP", studio: "POWER" };
