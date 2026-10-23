@@ -35,7 +35,6 @@ export function AuthModalHost() {
 }
 
 function AuthModal({ initialMode, next, error: initialError, onClose }: { initialMode: Mode; next: string; error: string | null; onClose: () => void }) {
-  const router = useRouter();
   const [mode, setMode] = useState<Mode>(initialMode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -114,8 +113,8 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
         const { error: e } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (e) throw e;
       }
-      router.push(next);
-      router.refresh();
+      // A full page load: the router may hold a prefetched "signed out, go to sign-up" answer for `next`.
+      window.location.assign(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
       setLoading(false);
