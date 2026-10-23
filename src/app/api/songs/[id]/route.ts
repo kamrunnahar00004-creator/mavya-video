@@ -1,3 +1,4 @@
+import { boundedFetch } from "@/lib/server/bounded-fetch";
 import { saveMedia } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 
@@ -8,13 +9,13 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/songs/[id]
   const who = await currentUser();
   if (!who) return signInFirst();
   try {
-    const track = (await (await fetch(`https://api.deezer.com/track/${id}`, { headers: { "Accept-Language": "en" }, cache: "no-store" })).json()) as {
+    const track = (await (await boundedFetch(`https://api.deezer.com/track/${id}`, { headers: { "Accept-Language": "en" }, cache: "no-store" })).json()) as {
       title?: string;
       preview?: string;
       artist?: { name: string };
     };
     if (!track.preview || !track.preview.startsWith("https://")) return Response.json({ error: "This song has no clip" }, { status: 404 });
-    const audio = await fetch(track.preview);
+    const audio = await boundedFetch(track.preview, {}, 10 * 1024 * 1024, 15_000);
     if (!audio.ok) throw new Error("download failed");
     const name = `${track.title ?? "Song"} · ${track.artist?.name ?? ""}`.slice(0, 120);
     const file = new File([await audio.arrayBuffer()], `${name}.mp3`, { type: "audio/mpeg" });

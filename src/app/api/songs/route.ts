@@ -1,3 +1,4 @@
+import { boundedFetch } from "@/lib/server/bounded-fetch";
 /** Real songs for step 5: Deezer's public catalog (trending, top chart, or a search), each with a 30-second clip of the song. */
 export type Song = { id: number; title: string; artist: string; cover: string; preview: string; duration: number };
 
@@ -16,7 +17,8 @@ const TRENDING_PLAYLISTS = [
 const headers = { "Accept-Language": "en" };
 
 async function tracks(url: string): Promise<DeezerTrack[]> {
-  const res = await fetch(url, { headers, next: { revalidate: 3600 } });
+  const res = await boundedFetch(url, { headers, next: { revalidate: 3600 } });
+  if (!res.ok) throw Error("Catalog unavailable");
   const data = (await res.json()) as { data?: DeezerTrack[] };
   return data.data ?? [];
 }

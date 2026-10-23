@@ -123,6 +123,9 @@ async function main() {
     assert.equal(sql(`select mavya_claim_export('${user}','${exportId}')`),'');
     assert.ok(JSON.parse(sql(`select mavya_claim_export('${other}','${exportId}')`)).lease_token);
     assert.equal(sql(`select mavya_claim_export('${other}','${exportId}')`),'');
+    for(let i=0;i<2;i++)sql(fs.readFileSync(path.join(root,'supabase/migrations/0010_contact_inquiries.sql'),'utf8'));
+    const inquiries=await Promise.all(Array.from({length:12},()=>parallel("select mavya_contact_inquiry('fixture-hash','user@example.test','Test inquiry')")));
+    assert.equal(inquiries.filter(Boolean).length,5);
     console.log('PASS: billing migration replay, parallel account lease, transactional event replay/rollback/order, equal-second apply, action CAS/watermark, expired leases, duplicate subscription audit, retired identity isolation, persisted Checkout identity/params, expiry/resubscribe, RPC grants');
   } finally { docker('rm', '--force', name); }
 }

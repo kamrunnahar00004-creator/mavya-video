@@ -1,3 +1,8 @@
+import { createHmac } from "node:crypto";
+import { cloud } from "@/lib/server/store";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { billingRpc } from "@/lib/server/billing-state";
+import { boundedFetch } from "@/lib/server/bounded-fetch";
 import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -26,14 +31,25 @@ export async function POST(request: Request) {
   const times = (recent.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
   if (times.length >= PER_WINDOW) return Response.json({ error: "Too many messages. Try again later." }, { status: 429 });
   recent.set(ip, [...times, now]);
+  if(recent.size>10_000)for(const [key,seen] of recent)if(!seen.some(t=>now-t<WINDOW_MS))recent.delete(key);
 
   const entry = { at: new Date(now).toISOString(), email, message };
+  let inquiry: string | null=null;
+  if(cloud()){
+    try{
+      const bucket=createHmac("sha256",process.env.SUPABASE_SERVICE_ROLE_KEY!).update(ip).digest("hex");
+      inquiry=await billingRpc<string|null>("mavya_contact_inquiry",{p_bucket:bucket,p_email:email,p_message:message});
+      if(!inquiry)return Response.json({error:"Too many messages. Try again later."},{status:429});
+    }catch(error){console.error("contact storage",error);return Response.json({error:"Couldn't send. Email hello@mavya.app instead."},{status:503});}
+  }
   // The local copy works on a normal server; on Vercel the disk is read-only, so email is the delivery there.
-  let kept = false;
+  let kept = Boolean(inquiry);
   try {
+    if (!inquiry) {
     await mkdir(DATA_DIR, { recursive: true });
     await appendFile(path.join(DATA_DIR, "inquiries.jsonl"), JSON.stringify(entry) + "\n");
     kept = true;
+    }
   } catch (error) {
     console.error("contact: could not keep a local copy", error);
   }
@@ -43,7 +59,7 @@ export async function POST(request: Request) {
   let sent = false;
   if (key && to) {
     try {
-      const res = await fetch("https://api.resend.com/emails", {
+      const res = await boundedFetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
         body: JSON.stringify({
@@ -60,6 +76,10 @@ export async function POST(request: Request) {
     } catch (error) {
       console.error("contact: email failed", error);
     }
+  }
+  if(inquiry&&sent){
+    const updated=await createSupabaseAdminClient().from("contact_inquiries").update({status:"sent"}).eq("id",inquiry);
+    if(updated.error)console.error("contact status",updated.error);
   }
   if (!kept && !sent) return Response.json({ error: "Couldn't send. Email hello@mavya.app instead." }, { status: 500 });
   return Response.json({ ok: true });
