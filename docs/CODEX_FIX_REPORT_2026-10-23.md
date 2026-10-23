@@ -120,3 +120,122 @@ For a future reviewed rollout: block generation traffic first, let old in-flight
 7. Studio full-usage margin concerns in the review remain unchanged. Fixing quota leakage does not make the published plan profitable at the reviewed vendor-cost assumptions.
 
 Implementation commit `6eb0c0f` and this separately committed report are for Claude's review. Nothing has been pushed or merged into main.
+
+## Part 2: billing state and Kling job compatibility
+
+Continued on `codex/launch-fixes-2026-10-23` from `2e2e54a`, after the founder's Kling commit `1b5d5e1`. Implementation commits:
+
+- `711e8a2`: H3/H4/H6, serialized billing reconciliation and persistent Checkout identity.
+- `9b1ebdc`: C1/H8, accept fal task identities in the durable generation transition.
+
+This is another bounded delivery, not completion of the full request. I stopped at the next item, H5, under Part 2's explicit safe-stopping instruction. Immediate collection must be coordinated with durable payment-operation retries, renewal schedules, discounts, monthly/annual transitions and cancel/resume of an already scheduled change. Simply changing two subscription-update flags would leave the downgrade/credit path and schedule recovery inconsistent. I left H5 unchanged instead of shipping that half-fix. Later items remain open in the requested order. These commits are not launch clearance.
+
+### Part 2 status per finding
+
+| ID | Current status | Part 2 changes, verification and commit |
+| --- | --- | --- |
+| C1 | fixed | Found and corrected the new Kling integration's task-ID mismatch: 0003's UUID-only transition would reject `model\|request-id` after a paid submission. New migration 0005 accepts bounded fal identities and strict legacy UUIDs while preserving lease/owner/CAS checks. SQL regression uses an actual-format fal task for the fallback, verifies it is stored, and rejects URLs/multiple separators. PASS. Commit `9b1ebdc`. No hookgen.ts changes. |
+| H1 | fixed | Part 1 atomic reservation design retained. Required generation regression and SQL suites PASS after all new migrations. No Part 2 accounting-policy change. |
+| H2 | fixed | Part 1 shared monthly anniversary window retained. Annual/clamping SQL checks PASS. No Part 2 allowance/price/limit change. |
+| H3 | fixed | `src/app/api/stripe/webhook/route.ts`, `src/lib/server/billing-state.ts`, 0004: obtain a per-account database lease before the authoritative Stripe retrieve. Event insertion and ordered state application happen together in `mavya_billing_event`; exceptions roll back the event claim. Strictly older events cannot lower the watermark. Equal-second deliveries are serialized and reconcile current Stripe state rather than their payload snapshots. Owner/DB/provider failures return 500 without acknowledging an applied event. SQL checks cover concurrent leases, replay, older/equal timestamps, rollback and expired tokens. Stub checks prove retrieve occurs under the lease, uses fresh canceled state despite an active event payload, and fails closed on lookup/owner/lease errors. PASS. Commit `711e8a2`. |
+| H4 | fixed | Billing POST actions read current account state inside the same lease. Immediate writes use `mavya_billing_action` with subscription ID, billing_revision and last_event_created as conditions; the RPC never changes the watermark. Expired/stale leases and revisions cannot apply. `src/app/api/billing/route.ts` no longer unconditionally upserts subscription rows. SQL test applies a newer webhook before a stale action and confirms rejection with watermark/status preserved; successful actions increase revision only. Stub test rejects a failed CAS. PASS. Commit `711e8a2`. |
+| H5 | not fixed | Upgrade updates still use create_prorations and downgrades remain immediate. Immediate collected upgrades, durable payment retry identity, renewal schedules and matching cancel/resume handling are not implemented. This is the stopping point described above. No H5 fix commit. |
+| H6 | fixed | 0004 adds per-user persistent billing_checkouts with exact creation parameters and a stable UUID key saved before Stripe create. Under the account lease, retries reuse the open session or the same Stripe idempotency key. Different plan selection cannot create a second concurrent checkout. A confirmed expired session can be replaced; a completed one blocks another purchase until reconciled. Subscription IDs are bound to owners; retired IDs cannot overwrite the current subscription. A different live subscription produces a durable billing_conflicts row and a support log, never an automatic refund. SQL tests cover Checkout identity, unchanged saved parameters, expiry/resubscribe, retired-event isolation and duplicate auditing. Stub tests reproduce a lost create response, reuse the identical key/parameters despite changed email/origin, reuse known sessions and block unsafe old-key replay. PASS. Commit `711e8a2`. Legacy pre-migration open Checkout sessions require separate cutover handling. |
+| H7 | not fixed | Durable deletion, immediate Stripe cancellation, write blocking, R2 cleanup and auth deletion remain open. No Part 2 changes or fix verification. |
+| H8 | partly | Migration 0005 prevents fal task IDs being lost solely because the old UUID validator rejected them. Existing durable-job recovery tests PASS. Preexisting uncertain jobs, general stale writers, deployed scheduler behavior and actual browser reload tests remain unresolved as described in Part 1. Commit `9b1ebdc`. |
+| H9 | not fixed | Upload reservations/ownership/size/expiry/immutable finalization remain open. No Part 2 changes or fix verification. |
+| H10 | not fixed | General atomic run section merging, export append identity and AI input CAS remain open. No Part 2 changes or fix verification. |
+| H11 | not fixed | Text PNG outline/hollow serialization remains open. No Part 2 changes or fix verification. |
+| H12 | not fixed | Worker queue/input/user/time limits remain open. No Part 2 changes or fix verification. |
+| M1 | not fixed | Product/script entitlement and per-user rate limits remain open. No Part 2 changes or fix verification. |
+| M2 | not fixed | Export save barrier and saved-run snapshot remain open. No Part 2 changes or fix verification. |
+| M3 | not fixed | Export PNG upload/batching and silent layer loss remain open. No Part 2 changes or fix verification. |
+| M4 | not fixed | Client login control-character redirects remain open. No Part 2 changes or fix verification. |
+| M5 | not fixed | Independent export finalization and temp cleanup remain open. No Part 2 changes or fix verification. |
+| M6 | not fixed | Glass/font/filter parity remains open. No Part 2 changes or fix verification. |
+| M7 | partly | Billing row lookup failures now block billing actions instead of being treated as no subscription; billing GET returns unavailable on its initial DB lookup failure. Stub tests PASS. Production-wide configuration validation remains open. Commit `711e8a2`. |
+| M8 | partly | Billing/webhook routes declare 120-second budgets; Stripe SDK requests have a 20-second timeout and automatic network retries disabled. A 3-minute database lease covers reconciliation, and stale workers cannot commit afterward. Deployed budgets/runtime, generation stage limits and export dispatch remain unverified/open. Type/lint and lease tests PASS. Commit `711e8a2`. |
+| M9 | not fixed | Profile-aware reference checks, inventory limits and garbage collection remain open. No Part 2 changes or fix verification. |
+| L1 | not fixed | Server billing DB errors now return unavailable, but client settings still lack distinct transport-failure states and bounded monotonic polling. No client settings fix or verification. |
+| L2 | not fixed | Contact delivery/shared limiting and catalog fetch bounds remain open. No Part 2 changes or fix verification. |
+| L3 | partly | Billing comments now describe conditional action writes rather than claiming the webhook is the sole writer. Stripe timeout/retry assumptions are explicit. Other stale comments and Node runtime work remain open. Commit `711e8a2`. |
+
+### Part 2 checks and output
+
+All external service dependencies in the new JS tests are explicit stubs; unexpected imports throw. No Stripe API client, fal.ai, Gemini or other paid service was called. The SQL checks use independent psql connections to a disposable PostgreSQL 16 Docker container with no network or host ports. Test-owned containers are removed afterward. No browser was opened or audio played.
+
+```text
+$ npx tsc --noEmit -p .
+[no output; exit 0]
+
+$ npx eslint src render
+[no output; exit 0]
+
+$ node scripts/review-checks.cjs
+[Supabase SDK Node 20 deprecation warning]
+PASS: sound migration, piece/gap timing, malformed sections, storage recovery/concurrency, byte ranges, coalesced saves, bounded filmstrip cleanup
+[exit 0]
+
+$ node scripts/generation-checks.cjs
+PASS: preserved edits/history, stale-input guard, no unreserved spend, server fallback/refund decisions, uncertain start, deterministic output, finalization retry, job-only API, authenticated recovery cron
+[exit 0]
+
+$ node scripts/generation-sql-checks.cjs
+[expected migration replay notices]
+[two expected Invalid provider task exceptions caught by negative assertions]
+PASS: migration replay, ownership, request replay, parallel quota, shared monthly window, leases, bound legacy/fal task IDs, one fallback/refund, completion CAS/replay, uncertain recovery, RPC grants
+[exit 0]
+
+$ node scripts/billing-checks.cjs
+PASS: lost Checkout response reuses persisted parameters/key, existing session reuse, old unknown-create recovery, busy lease, lookup fail closed, action CAS failure, webhook fresh state under lease, owner mismatch/signature guards, no paid imports
+[exit 0]
+
+$ node scripts/billing-sql-checks.cjs
+PASS: billing migration replay, parallel account lease, transactional event replay/rollback/order, equal-second apply, action CAS/watermark, expired leases, duplicate subscription audit, retired identity isolation, persisted Checkout identity/params, expiry/resubscribe, RPC grants
+[exit 0]
+
+$ git diff --check
+[no output; exit 0]
+
+$ git diff 1b5d5e1 -- src/lib/server/hookgen.ts src/lib/plans.ts
+[no output]
+```
+
+New tests: `scripts/billing-checks.cjs`, `scripts/billing-sql-checks.cjs`. Updated: `scripts/generation-sql-checks.cjs` now applies 0004/0005 and repeats 0005. The separate billing fixture repeats 0004. No working build directory was replaced. Passing these tests establishes the listed control flow and local transaction properties, not live Stripe behavior or dashboard configuration.
+
+### Part 2 migrations, in order
+
+After the existing 0001-0003, apply:
+
+1. `supabase/migrations/0004_billing_state.sql`: adds subscriptions.billing_revision; service-only billing leases, pending Checkouts, subscription-ID bindings and conflict audit tables with RLS; backfills current subscription identities. Adds service-role-only lock/unlock, Checkout prepare/record/clear, transactional webhook claim/apply and action CAS RPCs. Fresh PostgreSQL 16 application and replay both pass. No run or media data is deleted.
+2. `supabase/migrations/0005_generation_provider_ids.sql`: replaces only the existing transition function to validate fal `model|request-id` or strict legacy UUIDs, retaining the state machine and restrictive grants. Fresh application and replay pass. No job is restarted, refunded, deleted or rewritten by this migration.
+
+Do not edit or reapply 0001-0003 to deliver these fixes. Apply the new migrations before enabling the new route code in a future reviewed rollout. Neither has been applied to production here.
+
+### Part 2 environment and Stripe settings
+
+- No new environment variables. Existing STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, six configured price IDs, Supabase settings and Part 1 CRON_SECRET remain required. Kling uses FAL_KEY as introduced by the founder; RUNWAYML_API_SECRET is not reintroduced. No model or prompt choices changed.
+- The restricted Stripe key now needs Checkout Sessions **read** as well as create, because retries retrieve known sessions. Subscriptions read/update, existing customer/invoice reads and card-portal permissions remain necessary. Verify sandbox-equivalent permissions without exposing the key. No Schedule, Refund, Event retrieval or invoice-pay API is used by this implementation.
+- Continue subscribing to checkout.session.completed, customer.subscription.created/updated/deleted and invoice.paid. Unknown/unresolvable subscription owners now cause 500 for retry and an error log, rather than an acknowledged discarded change. Monitor and repair those errors.
+- Verify that the configured 120-second billing/webhook budgets and existing 800-second generation budgets are supported by the actual Vercel Pro/Fluid Compute setup. No hosting setting or upgrade was performed here.
+- Deployment must address already-open legacy Checkout sessions. New persistent idempotency cannot invalidate previously issued Stripe links. Confirm/expire those sessions through an authorized operational procedure before reopening purchasing; no live sessions were modified here.
+
+Reference checks used official Stripe documentation: [webhook ordering and retries](https://docs.stripe.com/webhooks), [Checkout sessions](https://docs.stripe.com/api/checkout/sessions/create), [subscription update and immediate collection](https://docs.stripe.com/api/subscriptions/update), [renewal schedules](https://docs.stripe.com/api/subscription_schedules/create). Documentation reads do not verify the live account's API version or permissions.
+
+### Part 2 user-visible behavior
+
+- Concurrent billing mutations can return "Billing is updating. Try again." rather than racing. A stale action cannot restore an older subscription state or lower event time.
+- Retrying Checkout reopens the existing open session. Choosing a different plan while one is open asks the user to finish that checkout first; a second session is not created. Completed payments wait for reconciliation instead of offering another purchase.
+- Initial billing database outages return an error, not an empty subscription that permits Checkout. Client error-state presentation still needs L1.
+- Retired subscription updates/deletions leave the current subscription intact. A second live subscription is logged for support review, not automatically canceled or refunded.
+- New Kling jobs can persist their provider identity. Prompts, model choices, prices, limits, styling and generated-hook processing are unchanged.
+
+### Part 2 risks and recovery
+
+1. **H5 remains a money risk:** the old upgrade/downgrade proration policy is still present. H7, H9-H12, M1 and the remaining export/auth/operational findings remain open. Do not describe this branch as fully launch-safe.
+2. A lost Checkout response uses the saved exact parameters and Stripe idempotency key. Stripe can prune keys after 24 hours, so an unknown session without a recorded ID is deliberately blocked after 23 hours and asks for support. Do not delete that row or rotate the key just to unblock purchasing. Support must first establish whether the original session/subscription exists. Confirmed expired sessions may be cleared safely. A completed session can be cleared for resubscription only after its matching current subscription is terminal, verified through Stripe and the database.
+3. Review billing_conflicts and duplicate-subscription logs. The transaction preserves the current subscription and records incoming paid identities; it does not resolve existing double billing, cancel a second subscription or issue refunds. Retired identity events are ignored; a legitimate replacement after cancellation is accepted through the matching persisted Checkout session. Externally created replacements without that identity require support reconciliation rather than silently taking over the account.
+4. Webhook state retrieval is serialized locally, but Stripe can change after retrieval. A subsequent event reconciles that newer state. Database leases expire after three minutes; an expired worker cannot apply. A crashed worker delays retries until lease expiry. During a lease conflict webhooks return 500 so Stripe retries. The implementation does not claim to prevent changes made directly in Stripe or to replace operational reconciliation.
+5. A Stripe action can succeed while the following database commit fails. The route returns an error; a webhook must reconcile the remote state. Do not infer a failed remote mutation solely from the HTTP error. Durable payment-operation identity is part of the next H5 work before immediate collection is introduced.
+6. Fal submissions made before 0005 may already have lost their returned ID when 0003 rejected it. Applying 0005 does not repair those jobs or establish whether they were charged. Correlate the provider's request/spend history with the job's owner/input/time before binding a verified task or issuing a credit. Never automatically resubmit an uncertain job.
+7. Production migrations, RLS, actual Stripe API/restricted-key behavior, webhook delivery/retries, sandbox payment failures, UI polling and closed-tab cloud recovery were not exercised. No live paid calls, production writes, pushes, merges or deployment occurred. The local identity remains kamrunnahar00004-creator.
