@@ -11,7 +11,8 @@ import { currentUser, signInFirst } from "@/lib/server/who";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 
 export const maxDuration = 300;
-const W = 1080, H = 1920, FPS = 30, LINK_SECONDS = 6 * 3600;
+// 720p: every source is 720p (Kling, library hooks); 1080p only added render time (founder 2026-10-24: as fast as possible).
+const W = 720, H = 1280, FPS = 30, LINK_SECONDS = 6 * 3600;
 const renderer = () => (process.env.RENDER_URL && process.env.RENDER_SECRET ? { url: process.env.RENDER_URL.replace(/\/+$/, ""), secret: process.env.RENDER_SECRET } : null);
 
 /** A link the render server can download a run's file from (null when it is not this user's). */

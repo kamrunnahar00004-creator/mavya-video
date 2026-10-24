@@ -26,7 +26,7 @@ export type FontKey = keyof typeof FONTS;
 
 /** Extra fonts from Google Fonts, loaded on demand (only when shown in the picker or used). */
 export const GOOGLE_FONTS = [
-  "Inter", "Roboto", "Open Sans", "Lato", "Oswald", "Raleway", "Nunito", "Rubik", "Work Sans", "DM Sans",
+  "TikTok Sans", "Inter", "Roboto", "Open Sans", "Lato", "Oswald", "Raleway", "Nunito", "Rubik", "Work Sans", "DM Sans",
   "Manrope", "Archivo Black", "Barlow", "Barlow Condensed", "Bangers", "Bungee", "Fredoka", "Lobster", "Pacifico", "Dancing Script",
   "Caveat", "Shadows Into Light", "Indie Flower", "Kalam", "Satisfy", "Righteous", "Russo One", "Teko", "Titan One", "Luckiest Guy",
   "Chewy", "Comfortaa", "Quicksand", "Josefin Sans", "Space Grotesk", "Sora", "Outfit", "Plus Jakarta Sans", "Lexend", "Syne",
@@ -34,15 +34,19 @@ export const GOOGLE_FONTS = [
   "Exo 2", "Saira Condensed", "Fjalla One", "Press Start 2P",
 ] as const;
 
-/** Fonts every device already has: never fetched from Google. Arial (bold) is the default hook font. */
+/** Fonts every device already has: never fetched from Google. */
 export const SYSTEM_FONTS = ["Arial", "Helvetica", "Impact", "Verdana", "Georgia"] as const;
 
-/** Every font the text picker offers: Arial first, the built-in ones, system ones, then Google. A text's `font` is a key or a family name. */
+/** The font every new text starts with: TikTok's own caption font (founder 2026-10-24; free on Google Fonts). */
+export const DEFAULT_FONT = "TikTok Sans";
+
+/** Every font the text picker offers: TikTok Sans first, Arial, the built-in ones, system ones, then Google. A text's `font` is a key or a family name. */
 export const FONT_CHOICES: { id: string; label: string }[] = [
+  { id: DEFAULT_FONT, label: DEFAULT_FONT },
   { id: "Arial", label: "Arial Bold" },
   ...(Object.keys(FONTS) as FontKey[]).map((k) => ({ id: k, label: FONTS[k].label })),
   ...SYSTEM_FONTS.filter((f) => f !== "Arial").map((f) => ({ id: f, label: f })),
-  ...GOOGLE_FONTS.map((f) => ({ id: f, label: f })),
+  ...GOOGLE_FONTS.filter((f) => f !== DEFAULT_FONT).map((f) => ({ id: f, label: f })),
 ];
 
 export const fontLabel = (font: string) => (font in FONTS ? FONTS[font as FontKey].label : font === "Arial" ? "Arial Bold" : font);

@@ -12,7 +12,7 @@ const number = (x, lo, hi) => typeof x === 'number' && Number.isFinite(x) && x >
 const link = x => typeof x === 'string' && x.length <= 8192 && /^https:\/\//.test(x);
 export function validJob(b) {
  const s=b?.spec;
- if (!s || s.width!==1080 || s.height!==1920 || s.fps!==30 || !number(s.total,0.05,180) || !link(b.output?.url) || b.output.contentType!=='video/mp4') return false;
+ if (!s || s.width!==720 || s.height!==1280 || s.fps!==30 || !number(s.total,0.05,180) || !link(b.output?.url) || b.output.contentType!=='video/mp4') return false;
  if (!/^[0-9a-f-]{36}$/i.test(b.meta?.who??'') || JSON.stringify(b.meta).length>2048) return false;
  if (!Array.isArray(s.segments)||s.segments.length<1||s.segments.length>40||!Array.isArray(s.sounds)||s.sounds.length>20||!Array.isArray(s.overlays)||s.overlays.length>200) return false;
  let pieces=0,len=0;
@@ -24,7 +24,7 @@ export function validJob(b) {
  }
  if(pieces>200||len>181||Math.abs(len-s.total)>1)return false;
  for(const a of s.sounds)if(!link(a.url)||!number(a.at,0,s.total)||!number(a.start,0,3600)||!number(a.dur,0.01,s.total)||!number(a.volume,0,1))return false;
- for(const o of s.overlays)if(!link(o.url)||!number(o.start,0,s.total)||!number(o.end,0,s.total)||o.end<=o.start||!number(o.x,0,1080)||!number(o.y,0,1920))return false;
+ for(const o of s.overlays)if(!link(o.url)||!number(o.start,0,s.total)||!number(o.end,0,s.total)||o.end<=o.start||!number(o.x,0,720)||!number(o.y,0,1280))return false;
  return true;
 }
 export function validProbe(width,height,duration) {

@@ -4,12 +4,12 @@ import { textLook } from "@/lib/text-styles";
 import type { TextLayer } from "@/lib/types";
 
 /**
- * Draws one on-screen text as a full-frame transparent PNG (1080x1920) for the export, with the exact CSS the
+ * Draws one on-screen text as a full-frame transparent PNG (720x1280, the export size) for the export, with the exact CSS the
  * preview uses (TextRender in run-preview.tsx): same size (percent of the frame height), position, box width and
  * style. The font is embedded (only the glyphs this text uses) so the drawing never falls back to another font.
  */
-const W = 1080;
-const H = 1920;
+const W = 720;
+const H = 1280;
 
 /** The built-in fonts are next/font copies of these Google families. */
 const GOOGLE_NAME: Record<keyof typeof FONTS, string> = { anton: "Anton", montserrat: "Montserrat", poppins: "Poppins", bebas: "Bebas Neue", marker: "Permanent Marker", geist: "Geist" };
@@ -56,7 +56,7 @@ async function fontFor(font: string, text: string): Promise<{ family: string; fa
   return { family: `"${name}", sans-serif`, face: await fontFace(name, text) };
 }
 
-/** The drawn text cropped to what it covers, with where it sits on the 1080x1920 frame (null: nothing drawn). */
+/** The drawn text cropped to what it covers, with where it sits on the 720x1280 frame (null: nothing drawn). */
 export async function textPng(x: TextLayer): Promise<{ png: string; x: number; y: number } | null> {
   if (!x.text.trim()) return null;
   const look = textLook(x.style, x.color, x.second);

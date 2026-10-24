@@ -110,7 +110,9 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
         if (e) throw e;
       }
       // A full page load: the router may hold a prefetched "signed out, go to sign-up" answer for `next`.
-      window.location.assign(next);
+      // /auth/continue is a route handler (no plan: Plans; else `next`), so this must be a real page load.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign(`/auth/continue?next=${encodeURIComponent(next)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
       setLoading(false);

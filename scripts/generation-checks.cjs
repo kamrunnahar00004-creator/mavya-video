@@ -16,10 +16,10 @@ function load(file, stubs = {}, env = {}) {
   }, Buffer, Response, Request, URL, AbortSignal, process: { env }, console: { error() {} } }, { filename: file });
   return module.exports;
 }
-const client = load('src/lib/client.ts');
+const client = load('src/lib/client.ts', { '@/lib/studio-data': { DEFAULT_FONT: 'TikTok Sans' } });
 const adjust = load('src/lib/adjust.ts');
 const edit = load('src/lib/edit.ts', { '@/lib/adjust': adjust });
-const { generationPatch } = load('src/lib/generation-edit.ts', { '@/lib/client': client, '@/lib/adjust': adjust, '@/lib/edit': edit });
+const { generationPatch } = load('src/lib/generation-edit.ts', { '@/lib/client': client, '@/lib/adjust': adjust, '@/lib/edit': edit, '@/lib/studio-data': { DEFAULT_FONT: 'TikTok Sans' } });
 const run = { id: 'run', sourceRefId: 'ref', updatedAt: 'now', hook: { mode: 'generate', source: 'library', face: { kind: 'ai', index: 1 }, text: '', generated: { src: '/old.mp4', seconds: 6, at: 'old' } }, demo: { clip: null, frame: 'none' }, texts: [{ id: 'hook', text: 'My edited text', start: 0, end: 6, x: 50, y: 22, size: 4.6, font: 'Arial', color: '#fff', style: 'outline' }] };
 const generated = { src: '/new.mp4', seconds: 6, at: 'new' };
 const patch = generationPatch(run, run, generated, 'Suggested');

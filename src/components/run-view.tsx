@@ -8,7 +8,7 @@ import { frameAt } from "@/lib/filmstrip";
 import { waveform } from "@/lib/waveform";
 import { analyzeVideo } from "@/lib/analyze";
 import { CHARACTERS, characterById } from "@/lib/characters";
-import { FONT_CHOICES, fontCss, fontLabel, loadFonts } from "@/lib/studio-data";
+import { DEFAULT_FONT, FONT_CHOICES, fontCss, fontLabel, loadFonts } from "@/lib/studio-data";
 import { ADJUST_ROWS, type Adjust, type AdjustRow, type Motion, NO_ADJUST, fullAdjust, isAdjusted, keyAt, motionAt, moveKey, panBy, setMotion, speedOf, toggleKey, videoStyle } from "@/lib/adjust";
 import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundPieces, soundRows } from "@/lib/sound";
 import type { Song } from "@/app/api/songs/route";
@@ -254,7 +254,7 @@ export function RunView() {
       const overlaps = base && base.start < we - 0.01 && base.end > ws + 0.01;
       const item: TextLayer = base
         ? { ...base, id: uid(), text, start: ws, end: we, y: overlaps && !template ? Math.min(90, base.y + 12) : base.y }
-        : { id: uid(), text, start: ws, end: we, x: 50, y: TEXT_Y.top, size: 4.6, font: "Arial", color: "#ffffff", style: "outline" };
+        : { id: uid(), text, start: ws, end: we, x: 50, y: TEXT_Y.top, size: 4.6, font: DEFAULT_FONT, color: "#ffffff", style: "outline" };
       return i >= 0 ? [...t.slice(0, i + 1), item, ...t.slice(i + 1)] : [...t, item];
     });
     commitTexts();
@@ -306,7 +306,7 @@ export function RunView() {
     const end = round1(generated.seconds / nextSpeed);
     const item: TextLayer = base
       ? { ...base, text: blankText ? "" : base.text && base.text !== DEFAULT_HOOK_TEXT ? base.text : text }
-      : { id: "hook", text: blankText ? "" : text, start: 0, end, x: 50, y: TEXT_Y.top, size: 4.6, font: "Arial", color: "#ffffff", style: "outline" };
+      : { id: "hook", text: blankText ? "" : text, start: 0, end, x: 50, y: TEXT_Y.top, size: 4.6, font: DEFAULT_FONT, color: "#ffffff", style: "outline" };
     const versions = hook.generated && (hook.generated.src !== generated.src || hook.generated.at !== generated.at) ? [...(hook.versions ?? []), hook.generated].slice(-50) : hook.versions;
     save({
       ...(sourceRefId !== undefined ? { sourceRefId } : {}),
@@ -333,7 +333,7 @@ export function RunView() {
   const textOver = (all: TextLayer[], text: string, at: number, len: number): TextLayer => {
     const look = lookBefore(all, at);
     const span = { start: round1(at), end: round1(at + len) };
-    return look ? { ...look, id: uid(), text, ...span } : { id: uid(), text, ...span, x: 50, y: TEXT_Y.top, size: 4.6, font: "Arial", color: "#ffffff", style: "outline" };
+    return look ? { ...look, id: uid(), text, ...span } : { id: uid(), text, ...span, x: 50, y: TEXT_Y.top, size: 4.6, font: DEFAULT_FONT, color: "#ffffff", style: "outline" };
   };
   /** Puts an uploaded video into a demo clip. Texts after it move later by its length (or by the change, when replacing). */
   const fillClip = async (clipId: string, file: File, startClips?: DemoClip[], mode?: "single" | "clips") => {

@@ -1,4 +1,5 @@
 import type { Clip, Project, Reference, Run, Slot, TextLayer } from "@/lib/types";
+import { DEFAULT_FONT } from "@/lib/studio-data";
 
 /** Hook remixes until the text model is connected: same energy, aimed at the product. */
 export function remixHook(original: string, product: string, audience: string): string[] {
@@ -212,7 +213,7 @@ export function buildProject(run: Run, ref: Reference | null): Project {
     refTitle: ref?.title ?? "",
     slots,
     texts: [
-      { id: uid(), text: run.hook.text || "How is this tool even legal?", start: 0, end: hookEnd, x: 50, y: TEXT_Y[run.hook.textPos ?? "top"], size: 5.2, font: "Arial", color: "#ffffff", style: "outline" },
+      { id: uid(), text: run.hook.text || "How is this tool even legal?", start: 0, end: hookEnd, x: 50, y: TEXT_Y[run.hook.textPos ?? "top"], size: 5.2, font: DEFAULT_FONT, color: "#ffffff", style: "outline" },
       ...(ctaStart !== null ? [{ id: uid(), text: "Link in bio", start: round1(ctaStart), end: round1(total), x: 50, y: 50, size: 4.6, font: "montserrat" as const, color: "#6c47ff", style: "box" as const }] : []),
     ],
   };
