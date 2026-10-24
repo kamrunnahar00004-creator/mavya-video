@@ -249,7 +249,8 @@ export function mp4Seconds(buf: Buffer): number | null {
   if (version > 1 || (version === 1 && at + 36 > buf.length)) return null;
   const scale = version === 1 ? buf.readUInt32BE(at + 24) : buf.readUInt32BE(at + 16);
   const duration = version === 1 ? Number(buf.readBigUInt64BE(at + 28)) : buf.readUInt32BE(at + 20);
-  return scale ? Math.round((duration / scale) * 100) / 100 : null;
+  const seconds = scale ? Math.round((duration / scale) * 100) / 100 : 0;
+  return seconds > 0 && Number.isFinite(seconds) ? seconds : null;
 }
 
 /** Where a generation is; when it is done, the video itself (fal's link expires). */
@@ -278,7 +279,9 @@ export async function checkHook(taskId: string): Promise<HookTask> {
   const res = await fetch(body!.video!.url!, { signal: AbortSignal.timeout(60_000) });
   if (!res.ok) throw new Error("Couldn't download the result");
   const video = Buffer.from(await res.arrayBuffer());
-  return { state: "done", video, seconds: mp4Seconds(video) ?? (await probeSeconds(video)) ?? DESCRIBED_SECONDS };
+  const seconds = mp4Seconds(video) ?? await probeSeconds(video);
+  if (seconds === null) throw new Error("Generated video duration is unavailable");
+  return { state: "done", video, seconds };
 }
 
 /** Length read by ffmpeg when the MP4 header could not be read directly (Codex V10: never guess a motion hook's length). */
@@ -292,7 +295,7 @@ async function probeSeconds(video: Buffer): Promise<number | null> {
     const d = /Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/.exec(stderr);
     const seconds = d ? +d[1] * 3600 + +d[2] * 60 + +d[3] : 0;
     if (seconds > 0) return Math.round(seconds * 100) / 100;
-    console.error("hook duration unreadable; using the default length");
+    console.error("hook duration unreadable; retaining the task for recovery");
     return null;
   } finally {
     await rm(dir, { recursive: true, force: true });
