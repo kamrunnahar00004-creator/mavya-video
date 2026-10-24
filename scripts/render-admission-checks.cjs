@@ -18,7 +18,7 @@ async function main(){
   const duplicate=job(10);duplicate.meta.who=job(1).meta.who;assert.equal((await post(duplicate)).status,429);
   for(let n=2;n<=9;n++)assert.equal((await post(job(n))).status,200);
   assert.equal((await post(job(10))).status,429);
-  const health=await (await fetch(`${base}/health`)).json();assert.equal(health.queued,8);assert.equal(health.busy,true);assert.equal(health.protocol,2);
+  const health=await (await fetch(`${base}/health`)).json();assert.equal(health.queued,8);assert.equal(health.busy,true);assert.equal(health.protocol,3);assert.equal(health.size,"720x1280");
   assert.equal((await fetch(`${base}/jobs/${job(1).id}`)).status,401);
   console.log('PASS: real worker HTTP auth, idempotent dispatch, changed-payload conflict, one active export per user and queue cap; all external fetches blocked');
  }finally{

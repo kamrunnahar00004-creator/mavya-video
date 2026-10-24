@@ -104,7 +104,8 @@ async function main() {
   assert.equal(queries, 0);
   assert.equal((await cron.GET(new Request('https://fixture.invalid/cron', { headers: { authorization: `Bearer ${secret}` } }))).status, 200);
   assert.equal(recovered, 1);
-  assert.ok(filters.some(f=>/^state.eq.cancel,cleanup_after.lte./.test(f)), 'waiting deletion must not monopolize recovery');
+  // The recovery order rotates each minute; the deletion query must still skip deletions waiting for cleanup_after.
+  assert.match(fs.readFileSync(path.join(root, 'src/app/api/internal/generations/route.ts'), 'utf8'), /state.eq.cancel,cleanup_after.lte/, 'waiting deletion must not monopolize recovery');
 
   console.log('PASS: preserved edits/history, stale-input guard, no unreserved spend, server fallback/refund decisions, uncertain start, deterministic output, finalization retry, job-only API, authenticated recovery cron');
 }

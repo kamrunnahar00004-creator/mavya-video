@@ -15,9 +15,21 @@ export type GenerationJob = {
   result: NonNullable<Run["hook"]["generated"]> | null; error: string | null;
 };
 const db = () => createSupabaseAdminClient();
+/**
+ * Failed generations are refunded, but their preparation (Gemini outfit and frame) is already paid. A cap on refunded
+ * attempts per day stops a failing hook being retried without end (Codex V6). Successful hooks are not affected.
+ */
+const FAILED_ATTEMPTS_PER_DAY = 10;
 export async function reserveGeneration(who: string, run: string, key: string, note?: string) {
   if (!cloud()) throw new Error("Generation storage is unavailable");
-  const { data, error } = await db().rpc("mavya_reserve_generation", { p_user: who, p_run: run, p_key: key, p_note: note ?? null, p_admin: await adminUser(who) });
+  const admin = await adminUser(who);
+  if (!admin) {
+    const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+    const failed = await db().from("generations").select("id", { count: "exact", head: true }).eq("user_id", who).not("refunded_at", "is", null).gte("created_at", since);
+    if (failed.error) throw failed.error;
+    if ((failed.count ?? 0) >= FAILED_ATTEMPTS_PER_DAY) return { error: "attempts" } as { job?: GenerationJob; error?: string; allowance?: { limit: number } };
+  }
+  const { data, error } = await db().rpc("mavya_reserve_generation", { p_user: who, p_run: run, p_key: key, p_note: note ?? null, p_admin: admin });
   if (error || !data) throw error ?? new Error("Reservation unavailable");
   return data as { job?: GenerationJob; error?: string; allowance?: { limit: number } };
 }

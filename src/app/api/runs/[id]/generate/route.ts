@@ -4,7 +4,7 @@ import { cloud, getRun } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { expireTemporaryObjects } from "@/lib/server/temp-cleanup";
 
-// Hobby plan maximum (founder 2026-10-23: stay on Hobby for now); one Kling start or check fits well inside it.
+// One Kling start or check fits well inside 300 s.
 export const maxDuration = 300;
 const uuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const continueJob = (who: string, job: string) => after(async () => {
@@ -22,6 +22,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/g
   try {
     const reserved = await reserveGeneration(who, id, body.key, typeof body.note === "string" ? body.note.slice(0, 300) : undefined);
     if (reserved.error === "quota") return Response.json({ error: reserved.allowance?.limit === 0 ? "Choose a plan to make AI hooks." : "You've used this month's AI hooks. Upgrade for more.", needsPlan: true }, { status: 402 });
+    if (reserved.error === "attempts") return Response.json({ error: "Too many failed tries today. Try again tomorrow or contact us." }, { status: 429 });
     if (!reserved.job) return Response.json({ error: "Not found" }, { status: reserved.error === "conflict" ? 409 : 404 });
     continueJob(who, reserved.job.id);
     return Response.json(await generationReply(reserved.job));

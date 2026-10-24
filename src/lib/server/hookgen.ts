@@ -3,7 +3,7 @@ import { checkBudget, withWorkBudget, workSignal } from "@/lib/server/work-budge
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -267,7 +267,8 @@ export async function checkHook(taskId: string): Promise<HookTask> {
   if (!result.ok && ![400, 422].includes(result.status)) throw new Error(`fal result unavailable ${result.status}`);
   // An interrupted or malformed result response does not establish provider failure.
   // Leave the paid task recoverable instead of starting another paid attempt.
-  const body = (await result.json()) as { video?: { url?: string }; detail?: unknown } | null;
+  // An explicit 400/422 is a provider failure even when its body is not JSON.
+  const body = (result.ok ? await result.json() : await result.json().catch(() => null)) as { video?: { url?: string }; detail?: unknown } | null;
   if (result.ok && !body?.video?.url) throw new Error("Provider result is incomplete");
   // Explicit provider errors can trigger the job's single fallback.
   if (!result.ok) {
@@ -277,5 +278,23 @@ export async function checkHook(taskId: string): Promise<HookTask> {
   const res = await fetch(body!.video!.url!, { signal: AbortSignal.timeout(60_000) });
   if (!res.ok) throw new Error("Couldn't download the result");
   const video = Buffer.from(await res.arrayBuffer());
-  return { state: "done", video, seconds: mp4Seconds(video) ?? DESCRIBED_SECONDS };
+  return { state: "done", video, seconds: mp4Seconds(video) ?? (await probeSeconds(video)) ?? DESCRIBED_SECONDS };
+}
+
+/** Length read by ffmpeg when the MP4 header could not be read directly (Codex V10: never guess a motion hook's length). */
+async function probeSeconds(video: Buffer): Promise<number | null> {
+  const dir = await mkdtemp(path.join(tmpdir(), "mavya-probe-"));
+  try {
+    const file = path.join(dir, "result.mp4");
+    await writeFile(file, video);
+    // ffmpeg -i with no output exits non-zero; the duration is in its stderr either way.
+    const stderr = await exec(ffmpegPath(), ["-hide_banner", "-i", file], { timeout: 20_000 }).then((r) => r.stderr, (e: { stderr?: string }) => e.stderr ?? "");
+    const d = /Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/.exec(stderr);
+    const seconds = d ? +d[1] * 3600 + +d[2] * 60 + +d[3] : 0;
+    if (seconds > 0) return Math.round(seconds * 100) / 100;
+    console.error("hook duration unreadable; using the default length");
+    return null;
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }

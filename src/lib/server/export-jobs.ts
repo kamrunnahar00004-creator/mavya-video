@@ -42,7 +42,8 @@ export async function advanceExport(who: string, id: string) {
     if (read.status === 404) {
      const health = await fetch(`${base}/health`, { signal: AbortSignal.timeout(10_000), cache: "no-store" });
      const capability = await health.json().catch(() => null) as { protocol?: number } | null;
-     if (!health.ok || capability?.protocol !== 2) throw new Error("Render worker update required");
+     // Protocol 3 = durable job ids + 720x1280 exports (Codex V9: protocol 2 covered both 1080 and 720 workers).
+     if (!health.ok || capability?.protocol !== 3) throw new Error("Render worker update required");
      const sent = await fetch(`${base}/jobs`, { method: "POST", headers, body: JSON.stringify(j.payload), signal: AbortSignal.timeout(55_000) });
      const dispatched = await sent.json().catch(() => null) as { id?: string } | null;
      if (!sent.ok || dispatched?.id !== j.id) throw new Error(`Render dispatch identity ${sent.status}`);

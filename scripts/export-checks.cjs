@@ -16,7 +16,7 @@ async function main(){
  await api.advanceExport('owner','job');assert.equal(append,1);
  record={...record,state:'pending',cleaned:false,overlay_ids:[],cleanup_cursor:0};head=null;
  await assert.rejects(api.advanceExport('owner','job'),/worker update required/);assert.equal(network.some(c=>c[1]==='POST'),false);
- protocol=2;await api.advanceExport('owner','job');assert.equal(record.state,'running');assert.equal(network.filter(c=>c[1]==='POST').length,1);
+ protocol=3;await api.advanceExport('owner','job');assert.equal(record.state,'running');assert.equal(network.filter(c=>c[1]==='POST').length,1);
  console.log('PASS: durable export recovers from output without worker/browser, owned registration, single append, bounded resumable PNG cleanup and terminal replay');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
