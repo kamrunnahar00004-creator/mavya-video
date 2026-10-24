@@ -114,8 +114,10 @@ export function finalArgs(spec, list, local, out) {
   let n = 1;
   let v = "0:v";
   spec.overlays.forEach((o, oi) => {
-    args.push("-i", local.overlays[oi]);
-    graph.push(`[${v}][${n++}:v]overlay=${Math.round(o.x)}:${Math.round(o.y)}:enable='between(t,${r(o.start)},${r(o.end - 0.001)})'[o${oi}]`);
+    // A text image is one frame. As a plain input, overlay dropped later-starting texts on real clips (2026-10-24:
+    // the second text never appeared); looped at the video's frame rate it is a steady stream that ends with it.
+    args.push("-loop", "1", "-framerate", String(fps), "-t", String(r(total)), "-i", local.overlays[oi]);
+    graph.push(`[${v}][${n++}:v]overlay=${Math.round(o.x)}:${Math.round(o.y)}:shortest=1:enable='between(t,${r(o.start)},${r(o.end - 0.001)})'[o${oi}]`);
     v = `o${oi}`;
   });
   graph.push(`[${v}]format=yuv420p[vout]`);
