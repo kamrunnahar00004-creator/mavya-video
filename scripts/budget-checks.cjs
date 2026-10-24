@@ -12,7 +12,7 @@ async function main(){
  assert.deepEqual(prompts(fs.readFileSync('src/lib/server/hookgen.ts','utf8')),prompts(execFileSync('git',['show','0b013a7:src/lib/server/hookgen.ts'],{encoding:'utf8'})));
  const glob=fs.readdirSync('src/app/api',{recursive:true}).filter(x=>String(x).endsWith('route.ts'));
  for(const f of glob){const source=fs.readFileSync(`src/app/api/${f}`,'utf8');for(const m of source.matchAll(/maxDuration\s*=\s*(\d+)/g))assert.ok(Number(m[1])<=300,f);}
- assert.equal(JSON.parse(fs.readFileSync('vercel.json')).crons[0].schedule,'0 4 * * *');
- console.log('PASS: isolated work deadline abort, unchanged Kling models/prompts, all function budgets <=300s and daily Hobby cron');
+ assert.equal(JSON.parse(fs.readFileSync('vercel.json')).crons[0].schedule,'* * * * *');
+ console.log('PASS: isolated work deadline abort, unchanged Kling models/prompts, all function budgets <=300s and per-minute Pro recovery cron');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
