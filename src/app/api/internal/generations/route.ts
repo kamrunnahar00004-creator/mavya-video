@@ -51,7 +51,12 @@ export async function GET(request: Request) {
   ];
   const first = Math.floor(Date.now() / 60_000) % steps.length;
   let failed = false;
+  // A step can take up to ~240 s (a generation's setup plus settlement). Start one only while the tick is young, so
+  // slow failures earlier in the loop can never push the whole invocation past the 300 s limit (Codex P2V3).
+  const started = Date.now();
+  const START_WINDOW_MS = 30_000;
   for (let i = 0; i < steps.length; i++) {
+    if (i > 0 && Date.now() - started > START_WINDOW_MS) break;
     try {
       if (await steps[(first + i) % steps.length]()) return Response.json({ ok: true });
     } catch (error) {

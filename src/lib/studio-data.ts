@@ -83,8 +83,16 @@ export function loadFonts(fonts: readonly string[], previewText?: string) {
   for (const f of families) {
     const key = `${f}|`;
     loaded.add(key);
-    // Google answers 400 for a weight the family does not have; then the default face.
-    add(`https://fonts.googleapis.com/css2?family=${familyParam(f)}:wght@800&display=swap`, [key], () => add(`https://fonts.googleapis.com/css2?family=${familyParam(f)}&display=swap`, [key]));
+    const bold = `https://fonts.googleapis.com/css2?family=${familyParam(f)}:wght@800&display=swap`;
+    // Ask Google first: a 400 means the family has no 800 face (then its default face, as the export does); a network
+    // error is temporary, so nothing is cached and the next call tries 800 again (Codex P2V4).
+    fetch(bold, { method: "GET", cache: "force-cache" })
+      .then((r) => {
+        if (r.ok) add(bold, [key]);
+        else if (r.status === 400) add(`https://fonts.googleapis.com/css2?family=${familyParam(f)}&display=swap`, [key]);
+        else loaded.delete(key);
+      })
+      .catch(() => loaded.delete(key));
   }
 }
 

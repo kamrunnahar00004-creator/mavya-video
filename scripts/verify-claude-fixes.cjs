@@ -16,16 +16,21 @@ async function attempts(){
  assert.ok(filters.some(args=>args[0]==='refunded_at'),'24h window follows refunds, not old job creation');
 }
 async function fonts(){
- const links=[];
+ // Claude P2V4 fix: Google is asked first; 400 = no 800 face (default face), a network error caches nothing.
+ const links=[],calls=[];let answer=200;
  const document={createElement:()=>({remove(){this.removed=true;}}),head:{appendChild:link=>links.push(link)}};
- const api=load('src/lib/studio-data.ts',{}, {},{document});
- api.loadFonts(['anton','Arial','Helvetica','geist']);assert.equal(links.length,0);
- api.loadFonts(['TikTok Sans']);assert.match(links[0].href,/TikTok\+Sans:wght@800/);
- api.loadFonts(['TikTok Sans']);assert.equal(links.length,1);
- links[0].onerror();assert.equal(links[0].removed,true);assert.ok(!links[1].href.includes('wght'));
- links[1].onerror();api.loadFonts(['TikTok Sans']);assert.equal(links.length,3);
- api.loadFonts(['TikTok Sans','Anton Test'],'abc');assert.match(links[3].href,/text=abc/);assert.ok(!links[3].href.includes('wght'));
- links[3].onerror();api.loadFonts(['TikTok Sans','Anton Test'],'abc');assert.equal(links.length,5);
+ const fetch=async url=>{calls.push(url);if(answer==='offline')throw Error('offline');return {ok:answer===200,status:answer};};
+ const tick=()=>new Promise(r=>setTimeout(r,0));
+ const api=load('src/lib/studio-data.ts',{}, {},{document,fetch});
+ api.loadFonts(['anton','Arial','Helvetica','geist']);await tick();assert.equal(links.length+calls.length,0);
+ api.loadFonts(['TikTok Sans']);await tick();assert.match(links[0].href,/TikTok\+Sans:wght@800/);
+ api.loadFonts(['TikTok Sans']);await tick();assert.equal(links.length,1);assert.equal(calls.length,1);
+ answer=400;api.loadFonts(['No Bold']);await tick();assert.ok(!links[1].href.includes('wght'),'no 800 face: default face');
+ answer='offline';api.loadFonts(['Flaky']);await tick();assert.equal(links.length,2,'nothing loaded while offline');
+ answer=200;api.loadFonts(['Flaky']);await tick();assert.match(links[2].href,/Flaky:wght@800/,'800 retried after a network error');
+ links[2].onerror();api.loadFonts(['Flaky']);await tick();assert.equal(calls.filter(c=>c.includes('Flaky')).length,3,'failed stylesheet retries');
+ api.loadFonts(['TikTok Sans','Anton Test'],'abc');assert.match(links.at(-1).href,/text=abc/);assert.ok(!links.at(-1).href.includes('wght'));
+ const n=links.length;links.at(-1).onerror();api.loadFonts(['TikTok Sans','Anton Test'],'abc');assert.equal(links.length,n+1);
 }
 async function cron(){
  let time=0,events=[],fail=new Set(),present=true;
