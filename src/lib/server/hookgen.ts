@@ -71,9 +71,10 @@ const falHeaders = () => ({ Authorization: `Key ${falKey()}`, "content-type": "a
 /** Queue one fal request; the task id carries the model so it can be polled later ("<model>|<request id>"). */
 async function falSubmit(model: string, input: Record<string, unknown>): Promise<string> {
   checkBudget();
+  const headers = falHeaders();
   let res: Response;
   try {
-    res = await fetch(`${FAL}/${model}`, { method: "POST", headers: falHeaders(), body: JSON.stringify(input), signal: workSignal(60_000) });
+    res = await fetch(`${FAL}/${model}`, { method: "POST", headers, body: JSON.stringify(input), signal: workSignal(60_000) });
   } catch {
     throw new HookStartUncertain("Provider task acceptance is unknown");
   }

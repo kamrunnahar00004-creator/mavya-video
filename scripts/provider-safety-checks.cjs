@@ -1,12 +1,17 @@
 const assert=require('node:assert/strict'),{load}=require('./check-module.cjs');
 async function main(){
  let replies=[];
- const api=load('src/lib/server/hookgen.ts',{
+ const stubs={
   '@/lib/server/work-budget':{checkBudget(){},withWorkBudget:f=>f(),workSignal:()=>AbortSignal.timeout(1000)},
   'node:child_process':{execFile(){}},'node:crypto':require('node:crypto'),'node:fs/promises':{mkdtemp:async()=>'/fixture',rm:async()=>{}},'node:module':require('node:module'),'node:os':require('node:os'),'node:path':require('node:path'),'node:util':require('node:util'),
   '@/lib/server/gemini':{},'@/lib/server/r2':{},'@/lib/server/store':{}
   ,'@/lib/supabase/server':{}
- },{FAL_KEY:'fixture-only'},{fetch:async()=>replies.shift()});
+ };
+ const api=load('src/lib/server/hookgen.ts',stubs,{FAL_KEY:'fixture-only'},{fetch:async()=>replies.shift()});
+ let sent=0;
+ const noKey=load('src/lib/server/hookgen.ts',stubs,{}, {fetch:async()=>{sent++;throw Error('unexpected network');}});
+ await assert.rejects(noKey.startHook({hook:{face:{kind:'described',text:'fixture person'}}},null,'owner'),error=>!(error instanceof noKey.HookStartUncertain)&&/FAL_KEY/.test(error.message));
+ assert.equal(sent,0);
  const short=Buffer.alloc(36);short.write('mvhd',4);short[8]=1;assert.equal(api.mp4Seconds(short),null);
  const box=(type,data)=>{const b=Buffer.alloc(8+data.length);b.writeUInt32BE(b.length);b.write(type,4);data.copy(b,8);return b;};
  const header=Buffer.alloc(100);header.writeUInt32BE(1000,12);header.writeUInt32BE(3250,16);
