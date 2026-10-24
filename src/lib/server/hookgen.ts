@@ -224,7 +224,25 @@ export type HookTask = { state: "running"; progress: number } | { state: "done";
 
 /** Length of an MP4 from its movie header (mvhd), without ffmpeg. */
 export function mp4Seconds(buf: Buffer): number | null {
-  const at = buf.indexOf("mvhd");
+  // Walk box boundaries: compressed media can contain the bytes "mvhd" too.
+  function find(start: number, end: number, movie = false): number {
+    for (let pos = start; pos + 8 <= end;) {
+      const size32 = buf.readUInt32BE(pos);
+      const type = buf.toString("ascii", pos + 4, pos + 8);
+      const header = size32 === 1 ? 16 : 8;
+      if (pos + header > end) return -1;
+      const size = size32 === 1 ? Number(buf.readBigUInt64BE(pos + 8)) : size32 || end - pos;
+      if (!Number.isSafeInteger(size) || size < header || size > end - pos) return -1;
+      if (type === "moov" && !movie) return find(pos + header, pos + size, true);
+      if (type === "mvhd" && movie) {
+        const at = pos + header - 4;
+        return at + (buf[at + 4] === 1 ? 36 : 32) <= pos + size ? at : -1;
+      }
+      pos += size;
+    }
+    return -1;
+  }
+  const at = find(0, buf.length);
   if (at < 4 || at + 32 > buf.length) return null;
   const version = buf[at + 4];
   if (version > 1 || (version === 1 && at + 36 > buf.length)) return null;
