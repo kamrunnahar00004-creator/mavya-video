@@ -6,9 +6,9 @@ import { expireUploads } from "@/lib/server/uploads";
 import { advanceExport } from "@/lib/server/export-jobs";
 import { expireTemporaryObjects } from "@/lib/server/temp-cleanup";
 
-// Hobby plan maximum (founder 2026-10-23: stay on Hobby for now); one Kling start or check fits well inside it.
+// Keep each invocation within the configured Pro function budget.
 export const maxDuration = 300;
-/** Daily Hobby recovery advances existing deletion/cleanup/export/generation work, never new spend requests. */
+/** Per-minute recovery advances durable deletion/cleanup/export/generation work. */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   const got = Buffer.from(request.headers.get("authorization") ?? "");
@@ -16,6 +16,7 @@ export async function GET(request: Request) {
   if (!secret || secret.length < 32 || got.length !== want.length || !timingSafeEqual(got, want)) return new Response(null, { status: 401 });
   const deletion = await createSupabaseAdminClient().from("account_deletions").select("user_id")
     .neq("state", "done").or(`lease_until.is.null,lease_until.lt.${new Date().toISOString()}`)
+    .or(`state.eq.cancel,cleanup_after.lte.${new Date().toISOString()}`)
     .order("updated_at").limit(1);
   if (deletion.error) return new Response(null, { status: 503 });
   if (deletion.data?.[0]) {

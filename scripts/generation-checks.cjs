@@ -88,7 +88,8 @@ async function main() {
   assert.equal(reserved, 1); assert.equal(scheduled, 0);
 
   let queries = 0, recovered = 0;
-  const chain = { select() { return this; }, neq() { return this; }, in() { return this; }, or() { return this; }, order() { return this; }, async limit() { return { data: [{ id: 'job', user_id: 'owner' }], error: null }; } };
+  const filters=[];
+  const chain = { select() { return this; }, neq() { return this; }, in() { return this; }, or(value) { filters.push(value); return this; }, order() { return this; }, async limit() { return { data: [{ id: 'job', user_id: 'owner' }], error: null }; } };
   const secret = 'fixture-only-cron-secret-32-characters';
   const cron = load('src/app/api/internal/generations/route.ts', {
     'node:crypto': require('node:crypto'),
@@ -103,6 +104,7 @@ async function main() {
   assert.equal(queries, 0);
   assert.equal((await cron.GET(new Request('https://fixture.invalid/cron', { headers: { authorization: `Bearer ${secret}` } }))).status, 200);
   assert.equal(recovered, 1);
+  assert.ok(filters.some(f=>/^state.eq.cancel,cleanup_after.lte./.test(f)), 'waiting deletion must not monopolize recovery');
 
   console.log('PASS: preserved edits/history, stale-input guard, no unreserved spend, server fallback/refund decisions, uncertain start, deterministic output, finalization retry, job-only API, authenticated recovery cron');
 }
