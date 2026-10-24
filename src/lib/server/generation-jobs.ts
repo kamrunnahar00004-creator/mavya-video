@@ -25,9 +25,16 @@ export async function reserveGeneration(who: string, run: string, key: string, n
   const admin = await adminUser(who);
   if (!admin) {
     const since = new Date(Date.now() - 24 * 3600_000).toISOString();
-    const failed = await db().from("generations").select("id", { count: "exact", head: true }).eq("user_id", who).not("refunded_at", "is", null).gte("created_at", since);
+    const failed = await db().from("generations").select("id", { count: "exact", head: true }).eq("user_id", who).not("refunded_at", "is", null).gte("refunded_at", since);
     if (failed.error) throw failed.error;
-    if ((failed.count ?? 0) >= FAILED_ATTEMPTS_PER_DAY) return { error: "attempts" } as { job?: GenerationJob; error?: string; allowance?: { limit: number } };
+    if ((failed.count ?? 0) >= FAILED_ATTEMPTS_PER_DAY) {
+      // Admission limits new work, not a replay of work already reserved for this owner/run.
+      const replay = await db().from("generations").select("*").eq("user_id", who).eq("run_id", run).eq("request_key", key).maybeSingle<GenerationJob>();
+      if (replay.error) throw replay.error;
+      const existing = replay.data ?? await generationJob(who, run);
+      if (existing) return { job: existing };
+      return { error: "attempts" } as { job?: GenerationJob; error?: string; allowance?: { limit: number } };
+    }
   }
   const { data, error } = await db().rpc("mavya_reserve_generation", { p_user: who, p_run: run, p_key: key, p_note: note ?? null, p_admin: admin });
   if (error || !data) throw error ?? new Error("Reservation unavailable");
