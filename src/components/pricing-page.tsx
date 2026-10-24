@@ -90,7 +90,73 @@ function FeatureList({ lead, items, strong }: { lead?: string; items: string[]; 
   );
 }
 
-function PlanCard({ plan, cycle }: { plan: Plan; cycle: BillingCycle }) {
+/**
+ * Who is looking at the pricing page (founder 2026-10-24: signed-in people without a plan land here to choose one).
+ * Signed out: the buttons lead to sign-up. Signed in without a plan: straight to Stripe Checkout. With a plan:
+ * Settings > Plans, where plan changes live.
+ */
+type Viewer = { kind: "loading" | "out" | "none" } | { kind: "plan"; plan: string };
+function useViewer(): Viewer {
+  const [viewer, setViewer] = useState<Viewer>({ kind: "loading" });
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/usage", { cache: "no-store" })
+      .then(async (r) => {
+        if (!alive) return;
+        if (!r.ok) return setViewer({ kind: "out" });
+        const u = (await r.json()) as { plan?: string | null; limit?: number | null };
+        setViewer(u.plan ? { kind: "plan", plan: u.plan } : u.limit === null ? { kind: "plan", plan: "admin" } : { kind: "none" });
+      })
+      .catch(() => alive && setViewer({ kind: "out" }));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return viewer;
+}
+
+function PlanButton({ plan, cycle, viewer }: { plan: Plan; cycle: BillingCycle; viewer: Viewer }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const cls = `${cardBtn} mt-5 ${plan.popular ? "bg-accent text-white hover:bg-accent-hover" : "bg-text text-white hover:opacity-90"}`;
+  if (viewer.kind === "plan") {
+    return (
+      <Link href="/settings/plans" className={cls}>
+        {viewer.plan === plan.id ? "Your plan" : `Switch to ${plan.name}`}
+      </Link>
+    );
+  }
+  if (viewer.kind !== "none") {
+    return (
+      <Link href="/?auth=signup&next=%2Fpricing" scroll={false} className={cls}>
+        Choose {plan.name}
+      </Link>
+    );
+  }
+  async function checkout() {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/billing", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "checkout", plan: plan.id, cycle }) });
+      const j = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (r.ok && j.url) return window.location.assign(j.url);
+      setError(j.error ?? "Something went wrong. Try again.");
+    } catch {
+      setError("Something went wrong. Try again.");
+    }
+    setBusy(false);
+  }
+  return (
+    <>
+      <button type="button" disabled={busy} onClick={() => void checkout()} className={`${cls} cursor-pointer disabled:opacity-60`}>
+        {busy ? "Opening checkout..." : `Choose ${plan.name}`}
+      </button>
+      {error && <p role="alert" className="mt-2 text-[12.5px] font-semibold text-red-700">{error}</p>}
+    </>
+  );
+}
+
+function PlanCard({ plan, cycle, viewer }: { plan: Plan; cycle: BillingCycle; viewer: Viewer }) {
   const price = priceOf(plan, cycle);
   return (
     <div className={`flex flex-col rounded-2xl bg-panel p-6 ${plan.popular ? "border-2 border-accent shadow-[0_1px_2px_rgba(21,18,31,0.04),0_16px_40px_-16px_rgba(123,76,250,0.35)]" : "border border-line"}`}>
@@ -102,9 +168,7 @@ function PlanCard({ plan, cycle }: { plan: Plan; cycle: BillingCycle }) {
         <span className="text-[14px] text-muted">/ month</span>
       </p>
       <p className="mt-1.5 text-[12.5px] text-soft">{cycle === "annual" ? `$${plan.yearly} billed yearly, save $${plan.price * 12 - plan.yearly}` : "Billed monthly"}</p>
-      <Link href="/studio" className={`${cardBtn} mt-5 ${plan.popular ? "bg-accent text-white hover:bg-accent-hover" : "bg-text text-white hover:opacity-90"}`}>
-        Choose {plan.name}
-      </Link>
+      <PlanButton plan={plan} cycle={cycle} viewer={viewer} />
       <FeatureList lead={plan.plus ? `Everything in ${plan.plus}, plus:` : "Includes:"} items={plan.features} strong={plan.popular} />
     </div>
   );
@@ -143,6 +207,7 @@ function BusinessCard() {
 
 export function PricingPage() {
   const [cycle, setCycle] = useState<BillingCycle>("monthly");
+  const viewer = useViewer();
   return (
     <div className="landing-theme min-h-full bg-bg">
       <MarketingHeader active="pricing" />
@@ -165,7 +230,7 @@ export function PricingPage() {
 
         {/* The four cards */}
         <div className="mt-9 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:items-stretch">
-          {PLANS.map((plan) => <PlanCard key={plan.id} plan={plan} cycle={cycle} />)}
+          {PLANS.map((plan) => <PlanCard key={plan.id} plan={plan} cycle={cycle} viewer={viewer} />)}
           <BusinessCard />
         </div>
         <p className="mt-5 text-center text-[12.5px] text-soft">Plans renew automatically; cancel anytime in Billing.</p>

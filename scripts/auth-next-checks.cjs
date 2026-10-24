@@ -13,7 +13,7 @@ async function routes(){
   '@/lib/server/usage':{allowance:async()=>{if(fail)throw Error('fixture unavailable');return a;}}
  });
  const dest=async next=>(await route.GET(new Request('https://fixture.invalid/auth/continue?next='+encodeURIComponent(next)))).headers.get('location');
- assert.equal(await dest('/studio/run'),'https://fixture.invalid/settings/plans');
+ assert.equal(await dest('/studio/run'),'https://fixture.invalid/pricing');
  a={plan:'pro',limit:60};assert.equal(await dest('/studio/run'),'https://fixture.invalid/studio/run');
  a={plan:null,limit:null};assert.equal(await dest('/studio/run'),'https://fixture.invalid/studio/run');
  assert.equal(await dest('//evil.invalid'),'https://fixture.invalid/studio');
