@@ -20,6 +20,9 @@ async function main(){
  replies=[Response.json({})];await assert.rejects(api.startHook({hook:{face:{kind:'described',text:'fixture person'},describe:'fixture action'}},null,'owner'),error=>error instanceof api.HookStartUncertain);
  replies=[Response.json({status:'UNKNOWN'})];await assert.rejects(api.checkHook('fal-ai/model|fixture'),/Unknown provider status/);
  replies=[Response.json({status:'COMPLETED'}),new Response('temporary',{status:503})];await assert.rejects(api.checkHook('fal-ai/model|fixture'),/unavailable/);
+ replies=[Response.json({status:'COMPLETED'}),new Response('{"video":')];await assert.rejects(api.checkHook('fal-ai/model|fixture'),SyntaxError);
+ replies=[Response.json({status:'COMPLETED'}),Response.json({})];await assert.rejects(api.checkHook('fal-ai/model|fixture'),/incomplete/);
+ replies=[Response.json({status:'COMPLETED'}),Response.json({detail:'safety refusal'},{status:422})];assert.equal((await api.checkHook('fal-ai/model|fixture')).state,'failed');
  console.log('PASS: truncated MP4 v1 header is safe, unknown provider status and transient result failure never become paid fallbacks');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

@@ -263,14 +263,17 @@ export async function checkHook(taskId: string): Promise<HookTask> {
   if (s.status === "IN_QUEUE" || s.status === "IN_PROGRESS") return { state: "running", progress: s.status === "IN_PROGRESS" ? 0.5 : 0 };
   if (s.status !== "COMPLETED") throw new Error("Unknown provider status");
   const result = await fetch(`${FAL}/${app}/requests/${id}`, { headers: falHeaders(), cache: "no-store", signal: AbortSignal.timeout(30_000) });
-  const body = (await result.json().catch(() => null)) as { video?: { url?: string }; detail?: unknown } | null;
   if (!result.ok && ![400, 422].includes(result.status)) throw new Error(`fal result unavailable ${result.status}`);
-  // A completed request without a video is a refusal or an error (e.g. the safety checker).
-  if (!result.ok || !body?.video?.url) {
+  // An interrupted or malformed result response does not establish provider failure.
+  // Leave the paid task recoverable instead of starting another paid attempt.
+  const body = (await result.json()) as { video?: { url?: string }; detail?: unknown } | null;
+  if (result.ok && !body?.video?.url) throw new Error("Provider result is incomplete");
+  // Explicit provider errors can trigger the job's single fallback.
+  if (!result.ok) {
     console.error("fal result", taskId, result.status, JSON.stringify(body?.detail ?? body).slice(0, 300));
     return { state: "failed", error: /safety|nsfw|moderation/i.test(JSON.stringify(body)) ? "The video model refused this one. Try another character or hook." : "The generation failed. Try again." };
   }
-  const res = await fetch(body.video.url, { signal: AbortSignal.timeout(60_000) });
+  const res = await fetch(body!.video!.url!, { signal: AbortSignal.timeout(60_000) });
   if (!res.ok) throw new Error("Couldn't download the result");
   const video = Buffer.from(await res.arrayBuffer());
   return { state: "done", video, seconds: mp4Seconds(video) ?? DESCRIBED_SECONDS };
