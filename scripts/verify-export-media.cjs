@@ -24,6 +24,17 @@ async function main(){
   assert.equal(frames.length/12,60,'two seconds at 30fps');
   spec.overlays=Array.from({length:12},(_,i)=>({x:i*40,y:0,start:i/10,end:2}));
   run(finalArgs(spec,list,{sounds:[],overlays:spec.overlays.map(()=>png)},path.join(dir,'many.mp4')));
+  // Exercise the actual fallback duration probe on generated media, with all HTTP stubbed.
+  const {load}=require('./check-module.cjs');
+  const movie=fs.readFileSync(out),at=movie.indexOf('mvhd');assert.ok(at>0);movie.writeUInt32BE(0,at+20);
+  const replies=[Response.json({status:'COMPLETED'}),Response.json({video:{url:'https://fixture.invalid/out'}}),new Response(movie)];
+  const hook=load('src/lib/server/hookgen.ts',{
+   '@/lib/server/work-budget':{checkBudget(){},withWorkBudget:f=>f(),workSignal:()=>AbortSignal.timeout(1000)},
+   '@/lib/supabase/server':{},'@/lib/server/gemini':{},'@/lib/server/r2':{},'@/lib/server/store':{},
+   ...Object.fromEntries(['child_process','crypto','fs/promises','module','os','path','util'].map(name=>['node:'+name,require('node:'+name)]))
+  },{FAL_KEY:'fixture-only'},{fetch:async()=>replies.shift()});
+  assert.equal(hook.mp4Seconds(movie),null);
+  const measured=await hook.checkHook('fal-ai/model|fixture');assert.equal(measured.state,'done');assert.ok(Math.abs(measured.seconds-2)<0.05);
   console.log('PASS: real silent offline 720p ffmpeg export, 30.30fps piece boundary, start/end overlays, inactive intervals and two-second audio');
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 }

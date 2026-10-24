@@ -28,6 +28,21 @@ async function main(){
  replies=[Response.json({status:'COMPLETED'}),new Response('{"video":')];await assert.rejects(api.checkHook('fal-ai/model|fixture'),SyntaxError);
  replies=[Response.json({status:'COMPLETED'}),Response.json({})];await assert.rejects(api.checkHook('fal-ai/model|fixture'),/incomplete/);
  replies=[Response.json({status:'COMPLETED'}),Response.json({detail:'safety refusal'},{status:422})];assert.equal((await api.checkHook('fal-ai/model|fixture')).state,'failed');
+ for(const code of [400,422]){
+  replies=[Response.json({status:'COMPLETED'}),new Response('provider refusal',{status:code})];assert.equal((await api.checkHook('fal-ai/model|fixture')).state,'failed');
+ }
+ let probeText='Duration: 00:00:07.25',probes=0,cleaned=0;
+ const probeApi=load('src/lib/server/hookgen.ts',{
+  ...stubs,'node:module':{createRequire:()=>()=>'/fixture/ffmpeg'},
+  'node:child_process':{execFile(_bin,_args,options,cb){probes++;assert.equal(options.timeout,20000);cb(Object.assign(Error('probe exits without output'),{stderr:probeText}));}},
+  'node:fs/promises':{mkdtemp:async()=>'/fixture/probe',writeFile:async()=>{},rm:async()=>{cleaned++;}}
+ },{FAL_KEY:'fixture-only'},{fetch:async()=>replies.shift()});
+ async function result(video){replies=[Response.json({status:'COMPLETED'}),Response.json({video:{url:'https://fixture.invalid/result'}}),new Response(video)];return probeApi.checkHook('fal-ai/model|fixture');}
+ assert.equal((await result(real)).seconds,3.25);assert.equal(probes,0);
+ const zero=Buffer.from(real);zero.writeUInt32BE(0,32);assert.equal(probeApi.mp4Seconds(zero),null);
+ assert.equal((await result(zero)).seconds,7.25);assert.equal(probes,1);assert.equal(cleaned,1);
+ probeText='Duration: N/A';await assert.rejects(result(Buffer.from('unknown')),/duration is unavailable/);assert.equal(cleaned,2);
+ probeText='';await assert.rejects(result(Buffer.from('timeout')),/duration is unavailable/);assert.equal(cleaned,3);
  console.log('PASS: truncated MP4 v1 header is safe, unknown provider status and transient result failure never become paid fallbacks');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
