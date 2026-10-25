@@ -29,6 +29,12 @@ export function BillingView() {
   useEffect(() => {
     if (!waiting) return;
     if (sub) {
+      // Paid and confirmed: straight into the app, like other SaaS (a full load so the app gate sees the new plan).
+      if (paid && ["active", "trialing"].includes(sub.status)) {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.assign("/studio");
+        return;
+      }
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setWaiting(false);
       return;
@@ -43,7 +49,7 @@ export function BillingView() {
       }
     }, 2000);
     return () => clearInterval(t);
-  }, [waiting, sub, reload]);
+  }, [waiting, sub, reload, paid]);
 
   const run = async (action: string) => {
     setBusy(action);
