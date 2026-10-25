@@ -95,7 +95,7 @@ function FeatureList({ lead, items, strong }: { lead?: string; items: string[]; 
  * Signed out: the buttons lead to sign-up. Signed in without a plan: straight to Stripe Checkout. With a plan:
  * Settings > Plans, where plan changes live.
  */
-type Viewer = { kind: "loading" | "out" | "none" } | { kind: "plan"; plan: string };
+type Viewer = { kind: "loading" | "out" | "none" | "billing" } | { kind: "plan"; plan: string };
 function useViewer(): Viewer {
   const [viewer, setViewer] = useState<Viewer>({ kind: "loading" });
   useEffect(() => {
@@ -104,8 +104,8 @@ function useViewer(): Viewer {
       .then(async (r) => {
         if (!alive) return;
         if (!r.ok) return setViewer({ kind: "out" });
-        const u = (await r.json()) as { plan?: string | null; limit?: number | null };
-        setViewer(u.plan ? { kind: "plan", plan: u.plan } : u.limit === null ? { kind: "plan", plan: "admin" } : { kind: "none" });
+        const u = (await r.json()) as { plan?: string | null; limit?: number | null; billingStatus?: string | null };
+        setViewer(u.plan ? { kind: "plan", plan: u.plan } : u.limit === null ? { kind: "plan", plan: "admin" } : u.billingStatus === "past_due" ? { kind: "billing" } : { kind: "none" });
       })
       .catch(() => alive && setViewer({ kind: "out" }));
     return () => {
@@ -119,6 +119,7 @@ function PlanButton({ plan, cycle, viewer }: { plan: Plan; cycle: BillingCycle; 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cls = `${cardBtn} mt-5 ${plan.popular ? "bg-accent text-white hover:bg-accent-hover" : "bg-text text-white hover:opacity-90"}`;
+  if (viewer.kind === "billing") return <Link href="/settings/billing" className={cls}>Manage billing</Link>;
   if (viewer.kind === "plan") {
     return (
       <Link href="/settings/plans" className={cls}>

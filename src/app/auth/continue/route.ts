@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { safeNext } from "@/lib/auth-next";
 import { allowance } from "@/lib/server/usage";
 import { getSessionUser } from "@/lib/supabase/server";
+import { billingRow } from "@/lib/server/billing-state";
 
 /**
  * Where people land after signing in or signing up (password, Google or the email link).
@@ -15,7 +16,10 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.redirect(`${origin}/?auth=login`);
   try {
     const a = await allowance(user.id);
-    if (!a.plan && a.limit !== null) return NextResponse.redirect(`${origin}/pricing`);
+    if (!a.plan && a.limit !== null) {
+      const billing = await billingRow(user.id);
+      return NextResponse.redirect(`${origin}${billing?.status === "past_due" ? "/settings/billing" : "/pricing"}`);
+    }
   } catch (error) {
     // Billing unavailable: do not block sign-in; the app asks for a plan when an AI step needs one.
     console.error("auth continue", error);

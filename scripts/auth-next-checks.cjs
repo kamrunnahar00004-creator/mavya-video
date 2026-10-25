@@ -5,15 +5,17 @@ assert.equal(safeNext('/settings/plans?paid=1'),'/settings/plans?paid=1');
 assert.equal(safeNext('/studio/../settings'),'/settings');
 console.log('PASS: shared same-origin auth destination rejects control characters and browser-normalized external paths');
 async function routes(){
- let user={id:'owner'}, a={plan:null,limit:0}, fail=false;
+ let user={id:'owner'}, a={plan:null,limit:0}, fail=false, billing=null;
  const redirect=url=>new Response(null,{status:307,headers:{location:url}});
  const route=load('src/app/auth/continue/route.ts',{
   'next/server':{NextResponse:{redirect}}, '@/lib/auth-next':{safeNext},
   '@/lib/supabase/server':{getSessionUser:async()=>user},
+  '@/lib/server/billing-state':{billingRow:async()=>billing},
   '@/lib/server/usage':{allowance:async()=>{if(fail)throw Error('fixture unavailable');return a;}}
  });
  const dest=async next=>(await route.GET(new Request('https://fixture.invalid/auth/continue?next='+encodeURIComponent(next)))).headers.get('location');
  assert.equal(await dest('/studio/run'),'https://fixture.invalid/pricing');
+ billing={status:'past_due'};assert.equal(await dest('/studio/run'),'https://fixture.invalid/settings/billing');billing=null;
  a={plan:'pro',limit:60};assert.equal(await dest('/studio/run'),'https://fixture.invalid/studio/run');
  a={plan:null,limit:null};assert.equal(await dest('/studio/run'),'https://fixture.invalid/studio/run');
  assert.equal(await dest('//evil.invalid'),'https://fixture.invalid/studio');
