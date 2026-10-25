@@ -37,6 +37,8 @@ async function gate(){
  const pages=['/studio','/studio/run','/studio/run/edit','/library','/library/item','/login'];
  for(const path of pages){claims=null;let r=await run(path);assert.equal(r.status,307);assert.ok(r.location.includes('auth=signup'));assert.ok(r.location.includes('next='));claims={sub:'owner',email:'user@fixture.invalid'};plan=null;r=await run(path);assert.equal(r.location,'https://app.invalid/pricing');plan='pro';r=await run(path,{rsc:'1','next-router-prefetch':'1'});assert.equal(r.status,path==='/login'?307:200);}
  const paid=['/api/uploads','/api/media','/api/runs/run/export'];
+ for(const path of ['/settings','/settings/plans','/settings/billing','/settings/usage']){claims=null;assert.ok((await run(path)).location.includes('auth=signup'));}
+ for(const path of ['/api/runs/run/generate','/api/runs/run/product','/api/runs/run/script']){claims=null;assert.equal((await run(path)).status,401);}
  for(const path of paid){claims=null;assert.equal((await run(path)).status,401);claims={sub:'owner'};plan=null;const r=await run(path);assert.equal(r.status,402);assert.equal(r.body.needsPlan,true);assert.equal(r.cookies.getAll()[0].value,'refreshed');plan='starter';assert.equal((await run(path)).status,200);}
  claims={sub:'owner'};plan=null;
  for(const path of ['/settings','/settings/billing','/settings/plans','/settings/usage','/billing','/api/media/owned.mp4','/api/runs/run/generate','/api/runs/run/product','/api/runs/run/script'])assert.equal((await run(path)).status,200,path);
@@ -68,9 +70,11 @@ async function pricing(){
  }
 }
 async function billing(){
- const nav=[],intervals=[];let paid='1',account={usage:{plan:null,admin:false},billing:{subscription:{status:'active',plan:'pro'}},plan:null,loaded:true,error:false,reload:async()=>{}};
- const h=harness('src/components/billing-view.tsx',{'next/link':{},'next/navigation':{useSearchParams:()=>new URLSearchParams({paid})},'lucide-react':{},'@/lib/plans':{},'@/components/settings-shell':{useAccount:()=>account,useToast:()=>[null,()=>{}]}},{window:{location:{assign:url=>nav.push(url)}},setInterval:callback=>{intervals.push(callback);return 1;},clearInterval(){}});
+ const nav=[],intervals=[];let time=0;class Clock extends Date{static now(){return time;}}
+ let paid='1',account={usage:{plan:null,admin:false},billing:{subscription:{status:'active',plan:'pro'}},plan:null,loaded:true,error:false,reload:async()=>{}};
+ const h=harness('src/components/billing-view.tsx',{'next/link':{},'next/navigation':{useSearchParams:()=>new URLSearchParams({paid})},'lucide-react':{},'@/lib/plans':{},'@/components/settings-shell':{useAccount:()=>account,useToast:()=>[null,()=>{}]}},{Date:Clock,window:{location:{assign:url=>nav.push(url)}},setInterval:callback=>{intervals.push(callback);return 1;},clearInterval(){}});
  h.render(h.api.BillingView);for(const effect of h.effects())effect();assert.equal(nav.length,0,'active status alone is not usable entitlement');assert.equal(intervals.length,1,'keep polling while webhook entitlement is absent');
+ time=31000;intervals[0]();
  account={...account,usage:{plan:'pro',admin:false}};h.render(h.api.BillingView);h.effects()[0]();assert.equal(nav.at(-1),'/studio');
  nav.length=0;paid='0';h.render(h.api.BillingView);h.effects()[0]();assert.equal(nav.length,0,'ordinary billing visit does not redirect');
  paid='1';account={...account,error:true};h.render(h.api.BillingView);h.effects()[0]();assert.equal(nav.length,0,'failed reload does not use stale entitlement');

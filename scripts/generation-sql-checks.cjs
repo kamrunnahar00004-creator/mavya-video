@@ -39,6 +39,13 @@ async function main() {
       insert into subscriptions(user_id,plan,status,cycle,current_period_start,current_period_end)
       values('${user}','starter','active','annual',date_trunc('year',now()),date_trunc('year',now())+interval '1 year');
       insert into runs(id,user_id,data) values('${run}','${user}','{"updatedAt":"original","hook":{},"demo":{"keep":true}}');`);
+    for (const status of ['active','trialing','past_due','unpaid','canceled']) {
+      sql(`update subscriptions set status='${status}' where user_id='${user}'`);
+      assert.equal(JSON.parse(sql(`select mavya_allowance('${user}')`)).plan, ['active','trialing'].includes(status)?'starter':null);
+    }
+    sql(`update subscriptions set status='active',cancel_at_period_end=true where user_id='${user}'`);
+    assert.equal(JSON.parse(sql(`select mavya_allowance('${user}')`)).plan,'starter','cancelling stays usable until paid period end');
+    sql(`update subscriptions set cancel_at_period_end=false where user_id='${user}'`);
     assert.equal(JSON.parse(sql(reserve(run, key, other))).error, 'not_found');
     const j = JSON.parse(sql(reserve())).job;
     assert.equal(JSON.parse(sql(reserve())).job.id, j.id);
