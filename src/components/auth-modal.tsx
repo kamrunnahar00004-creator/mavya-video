@@ -114,7 +114,13 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign(`/auth/continue?next=${encodeURIComponent(next)}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
+      const message = err instanceof Error ? err.message : "";
+      // Supabase's own wording, made plain: an email that already has an account, or a wrong email/password.
+      if (/already registered|already exists/i.test(message)) {
+        setMode("login");
+        setError("You already have an account. Log in instead.");
+      } else if (/invalid login credentials/i.test(message)) setError("Wrong email or password.");
+      else setError(message || "Something went wrong. Try again.");
       setLoading(false);
     }
   }
