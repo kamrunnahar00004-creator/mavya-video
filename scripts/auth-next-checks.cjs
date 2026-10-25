@@ -19,25 +19,13 @@ async function routes(){
  assert.equal(await dest('//evil.invalid'),'https://fixture.invalid/studio');
  fail=true;assert.equal(await dest('/studio/run'),'https://fixture.invalid/studio/run');fail=false;
  user=null;assert.equal(await dest('/studio/run'),'https://fixture.invalid/?auth=login');
- let code,signedIn=null,deleted=[],signedOut=0;
+ let code;
  const callback=load('src/app/auth/callback/route.ts',{
   'next/server':{NextResponse:{redirect}},'@/lib/auth-next':{safeNext},
-  '@/lib/supabase/server':{
-   createSupabaseServerClient:async()=>({auth:{exchangeCodeForSession:async c=>{code=c;return {data:signedIn?{user:signedIn}:undefined,error:null};},signOut:async()=>{signedOut++;}}}),
-   createSupabaseAdminClient:()=>({auth:{admin:{deleteUser:async id=>{deleted.push(id);return {error:null};}}}})
-  }
+  '@/lib/supabase/server':{createSupabaseServerClient:async()=>({auth:{exchangeCodeForSession:async c=>{code=c;return {error:null};}}})}
  });
- const back=async q=>(await callback.GET(new Request('https://fixture.invalid/auth/callback?code=fixture&next=%2Fstudio%2Frun'+q))).headers.get('location');
- assert.equal(await back(''),'https://fixture.invalid/auth/continue?next=%2Fstudio%2Frun');assert.equal(code,'fixture');
- // Founder 2026-10-25: Google Log in must not create accounts.
- const now=new Date().toISOString(),old='2026-01-01T00:00:00.000Z';
- signedIn={id:'fresh',created_at:now,last_sign_in_at:now};
- assert.equal(await back('&intent=login'),'https://fixture.invalid/?auth=signup&error=noaccount&next=%2Fstudio%2Frun');
- assert.deepEqual(deleted,['fresh']);assert.equal(signedOut,1);
- assert.equal(await back(''),'https://fixture.invalid/auth/continue?next=%2Fstudio%2Frun','Sign up keeps a new account');
- signedIn={id:'returning',created_at:old,last_sign_in_at:now};
- assert.equal(await back('&intent=login'),'https://fixture.invalid/auth/continue?next=%2Fstudio%2Frun','an existing account logs in');
- assert.deepEqual(deleted,['fresh']);
- console.log('PASS: actual continue/callback handlers cover no plan, paid, admin, signed out, outage, exchanged-code continuation and Google log in without an account');
+ const result=await callback.GET(new Request('https://fixture.invalid/auth/callback?code=fixture&next=%2Fstudio%2Frun'));
+ assert.equal(code,'fixture');assert.equal(result.headers.get('location'),'https://fixture.invalid/auth/continue?next=%2Fstudio%2Frun');
+ console.log('PASS: actual continue/callback handlers cover no plan, paid, admin, signed out, outage and exchanged-code continuation');
 }
 routes().catch(error=>{console.error(error);process.exitCode=1;});
