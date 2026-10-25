@@ -39,14 +39,17 @@ export async function updateSession(request: NextRequest) {
     return r;
   };
 
-  // /login is the popup on the landing page.
-  if (pathname === "/login") return redirect(new URL(signedIn ? "/studio" : "/?auth=login", request.url));
+  const denied = (body: object, status: number) => {
+    const r = NextResponse.json(body, { status });
+    response.cookies.getAll().forEach((c) => r.cookies.set(c));
+    return r;
+  };
   if (pathname.startsWith("/api/")) {
     if (PUBLIC_API.includes(pathname)) return response;
-    if (!signedIn) return Response.json({ error: "Sign in first." }, { status: 401 });
+    if (!signedIn) return denied({ error: "Sign in first." }, 401);
     // Uploads and exports cost storage and render time: paid plans only (AI routes check their own allowance).
     if (PAID_API.some((p) => p.test(pathname)) && !(await paid(data!.claims.sub as string, data!.claims.email))) {
-      return Response.json({ error: "Choose a plan to continue.", needsPlan: true }, { status: 402 });
+      return denied({ error: "Choose a plan to continue.", needsPlan: true }, 402);
     }
     return response;
   }
@@ -58,9 +61,10 @@ export async function updateSession(request: NextRequest) {
   }
   // Founder rule 2026-10-25: nothing leads into the app without a paid plan. Unpaid accounts only see Pricing (and
   // Settings, to manage billing and their profile). Admins (ADMIN_EMAILS) are always in.
-  if (APP_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`)) && !(await paid(data!.claims.sub as string, data!.claims.email))) {
+  if ((pathname === "/login" || APP_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) && !(await paid(data!.claims.sub as string, data!.claims.email))) {
     return redirect(new URL("/pricing", request.url));
   }
+  if (pathname === "/login") return redirect(new URL("/studio", request.url));
   return response;
 }
 
