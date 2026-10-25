@@ -5,10 +5,13 @@ import type { BillingCycle, PlanId } from "@/lib/plans";
 
 export type Allowance = { plan: PlanId | null; admin: boolean; used: number; limit: number | null; resetsAt: string | null };
 
+/**
+ * Unlimited use for the accounts in ADMIN_USER_IDS (the founder). By user id, never by email: email sign-up is not
+ * confirmed, so anyone could register an unused admin address (Codex A0).
+ */
 export async function adminUser(who: string): Promise<boolean> {
   const user = await getSessionUser();
-  return user?.id === who && Boolean(user.email) && (process.env.ADMIN_EMAILS ?? "").split(",")
-    .map((email) => email.trim().toLowerCase()).filter(Boolean).includes(user.email!.toLowerCase());
+  return user?.id === who && (process.env.ADMIN_USER_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean).includes(who);
 }
 
 type Sub = { plan: PlanId | null; cycle: BillingCycle | null; status: string | null; current_period_start: string | null; current_period_end: string | null; cancel_at_period_end: boolean };

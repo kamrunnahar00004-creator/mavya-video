@@ -48,7 +48,7 @@ export async function updateSession(request: NextRequest) {
     if (PUBLIC_API.includes(pathname)) return response;
     if (!signedIn) return denied({ error: "Sign in first." }, 401);
     // Uploads and exports cost storage and render time: paid plans only (AI routes check their own allowance).
-    if (PAID_API.some((p) => p.test(pathname)) && !(await paid(data!.claims.sub as string, data!.claims.email))) {
+    if (PAID_API.some((p) => p.test(pathname)) && !(await paid(data!.claims.sub as string))) {
       return denied({ error: "Choose a plan to continue.", needsPlan: true }, 402);
     }
     return response;
@@ -60,8 +60,8 @@ export async function updateSession(request: NextRequest) {
     return redirect(to);
   }
   // Founder rule 2026-10-25: nothing leads into the app without a paid plan. Unpaid accounts only see Pricing (and
-  // Settings, to manage billing and their profile). Admins (ADMIN_EMAILS) are always in.
-  if ((pathname === "/login" || APP_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) && !(await paid(data!.claims.sub as string, data!.claims.email))) {
+  // Settings, to manage billing and their profile). Admins (ADMIN_USER_IDS) are always in.
+  if ((pathname === "/login" || APP_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) && !(await paid(data!.claims.sub as string))) {
     return redirect(new URL("/pricing", request.url));
   }
   if (pathname === "/login") return redirect(new URL("/studio", request.url));
@@ -72,9 +72,9 @@ const APP_PAGES = ["/studio", "/library"];
 const PAID_API = [/^\/api\/uploads(\/|$)/, /^\/api\/media\/?$/, /^\/api\/runs\/[^/]+\/export(\/|$)/];
 
 /** Has a usable plan (the same allowance the AI routes use), or is an admin. Fails closed: unknown means unpaid. */
-async function paid(user: string, email: unknown): Promise<boolean> {
-  const admins = (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
-  if (typeof email === "string" && admins.includes(email.toLowerCase())) return true;
+async function paid(user: string): Promise<boolean> {
+  // Admins by account id, never by email: email sign-up is unconfirmed, so an email proves nothing (Codex A0).
+  if (isAdminId(user)) return true;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !service) return false;
@@ -92,4 +92,9 @@ async function paid(user: string, email: unknown): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** ADMIN_USER_IDS: comma-separated Supabase user ids with unlimited use (the founder). Ids, not emails (Codex A0). */
+function isAdminId(id: string): boolean {
+  return (process.env.ADMIN_USER_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean).includes(id);
 }

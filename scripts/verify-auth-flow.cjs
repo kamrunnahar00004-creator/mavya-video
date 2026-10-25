@@ -32,7 +32,7 @@ async function gate(){
  let claims=null,plan=null,fail=false,calls=[];
  function cookies(){const jar=new Map();return {getAll:()=>[...jar.values()],set:(name,value,options)=>{const c=typeof name==='object'?name:{name,value,...options};jar.set(c.name,c);}};}
  const next={next:()=>({status:200,cookies:cookies()}),redirect:to=>({status:307,location:String(to),cookies:cookies()}),json:(body,{status})=>({status,body,cookies:cookies()})};
- const api=load('src/lib/supabase/session.ts',{'next/server':{NextResponse:next},'@supabase/ssr':{createServerClient:(_url,_key,options)=>({auth:{getClaims:async()=>{options.cookies.setAll([{name:'session',value:'refreshed',options:{httpOnly:true}}]);return {data:{claims}};}}})}},{NEXT_PUBLIC_SUPABASE_URL:'https://fixture.invalid',NEXT_PUBLIC_SUPABASE_ANON_KEY:'anon-fixture',SUPABASE_SERVICE_ROLE_KEY:'service-fixture',ADMIN_EMAILS:' Admin@fixture.invalid '},{fetch:async(url,options)=>{calls.push([url,options]);if(fail)throw Error('DB unavailable');return Response.json({plan});}});
+ const api=load('src/lib/supabase/session.ts',{'next/server':{NextResponse:next},'@supabase/ssr':{createServerClient:(_url,_key,options)=>({auth:{getClaims:async()=>{options.cookies.setAll([{name:'session',value:'refreshed',options:{httpOnly:true}}]);return {data:{claims}};}}})}},{NEXT_PUBLIC_SUPABASE_URL:'https://fixture.invalid',NEXT_PUBLIC_SUPABASE_ANON_KEY:'anon-fixture',SUPABASE_SERVICE_ROLE_KEY:'service-fixture',ADMIN_USER_IDS:' admin-id '},{fetch:async(url,options)=>{calls.push([url,options]);if(fail)throw Error('DB unavailable');return Response.json({plan});}});
  const run=async(path,headers={})=>{const url=new URL('https://app.invalid'+path);return api.updateSession({url:url.href,nextUrl:url,cookies:cookies(),headers:new Headers(headers)});};
  const pages=['/studio','/studio/run','/studio/run/edit','/library','/library/item','/login'];
  for(const path of pages){claims=null;let r=await run(path);assert.equal(r.status,307);assert.ok(r.location.includes('auth=signup'));assert.ok(r.location.includes('next='));claims={sub:'owner',email:'user@fixture.invalid'};plan=null;r=await run(path);assert.equal(r.location,'https://app.invalid/pricing');plan='pro';r=await run(path,{rsc:'1','next-router-prefetch':'1'});assert.equal(r.status,path==='/login'?307:200);}
@@ -44,11 +44,12 @@ async function gate(){
  for(const path of ['/settings','/settings/billing','/settings/plans','/settings/usage','/billing','/api/media/owned.mp4','/api/runs/run/generate','/api/runs/run/product','/api/runs/run/script'])assert.equal((await run(path)).status,200,path);
  for(const path of ['/api/contact','/api/stripe/webhook','/api/internal/generations']){claims=null;assert.equal((await run(path)).status,200);}
  claims={sub:'owner'};fail=true;assert.equal((await run('/studio')).location,'https://app.invalid/pricing');assert.equal((await run('/api/uploads')).status,402);
- claims={sub:'owner',email:'ADMIN@fixture.invalid'};calls=[];assert.equal((await run('/studio')).status,200);assert.equal(calls.length,0);
+ claims={sub:'admin-id',email:'anyone@fixture.invalid'};calls=[];assert.equal((await run('/studio')).status,200);assert.equal(calls.length,0);
+ claims={sub:'owner',email:'Admin@fixture.invalid'};plan=null;assert.equal((await run('/studio')).location,'https://app.invalid/pricing','an admin email alone is not admin (A0 fixed)');
  claims={sub:'owner',email:'user@fixture.invalid'};fail=false;await run('/studio');assert.equal(calls.at(-1)[1].headers.apikey,'service-fixture');assert.equal(JSON.parse(calls.at(-1)[1].body).p_user,'owner');
- // This demonstrates the open admin-email trust issue: no verified identity check is requested.
- const usage=load('src/lib/server/usage.ts',{'@/lib/server/store':{cloud:()=>true},'@/lib/supabase/server':{getSessionUser:async()=>({id:'new-signup',email:'admin@fixture.invalid',email_confirmed_at:null}),createSupabaseAdminClient(){throw Error('unexpected DB');}}},{ADMIN_EMAILS:'admin@fixture.invalid'});
- assert.equal(await usage.adminUser('new-signup'),true);
+ // A0 fixed: admin by user id; a new sign-up using an admin email is not admin.
+ const usage=load('src/lib/server/usage.ts',{'@/lib/server/store':{cloud:()=>true},'@/lib/supabase/server':{getSessionUser:async()=>({id:'new-signup',email:'admin@fixture.invalid',email_confirmed_at:null}),createSupabaseAdminClient(){throw Error('unexpected DB');}}},{ADMIN_USER_IDS:'admin-id'});
+ assert.equal(await usage.adminUser('new-signup'),false);
  const fs=require('fs');
  const proxy=fs.readFileSync('src/proxy.ts','utf8');for(const root of ['/studio/:path*','/library/:path*','/settings/:path*','/billing/:path*','/api/:path*','/login'])assert.ok(proxy.includes('"'+root+'"'));
  for(const file of fs.readdirSync('src/app/(app)',{recursive:true}).filter(f=>f.endsWith('page.tsx')))assert.ok(/^(studio|library|settings|billing)\//.test(file),file);
