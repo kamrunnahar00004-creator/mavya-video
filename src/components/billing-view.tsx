@@ -16,7 +16,7 @@ const money = (amount: number, currency: string) => (currency === "USD" ? `$${am
 const brandName = (b: string) => ({ visa: "Visa", mastercard: "Mastercard", amex: "Amex", discover: "Discover", jcb: "JCB", diners: "Diners", unionpay: "UnionPay" })[b] ?? b.charAt(0).toUpperCase() + b.slice(1);
 
 export function BillingView() {
-  const { billing, plan, loaded, error, reload } = useAccount({ billing: true });
+  const { billing, usage, plan, loaded, error, reload } = useAccount({ billing: true });
   const paid = useSearchParams().get("paid") === "1";
   const [toast, setToast] = useToast();
   const [cancel, setCancel] = useState(false);
@@ -25,16 +25,18 @@ export function BillingView() {
   const sub = billing?.subscription ?? null;
   const confirmUntil=useRef<number|null>(null);
 
+  // Use the same usable entitlement as the proxy, including after a delayed manual refresh.
+  useEffect(() => {
+    if (paid && !error && (usage?.plan || usage?.admin)) {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign("/studio");
+    }
+  }, [paid, error, usage]);
+
   // The webhook usually lands within a few seconds of Checkout.
   useEffect(() => {
     if (!waiting) return;
-    if (sub) {
-      // Paid and confirmed: straight into the app, like other SaaS (a full load so the app gate sees the new plan).
-      if (paid && ["active", "trialing"].includes(sub.status)) {
-        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-        window.location.assign("/studio");
-        return;
-      }
+    if (!paid && sub) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setWaiting(false);
       return;

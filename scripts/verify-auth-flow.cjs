@@ -66,5 +66,13 @@ async function pricing(){
   else {for(const cycle of ['monthly','annual']){h.reset();const b=h.render(button.type,{...button.props,cycle});b.props.children.find(n=>n?.type==='button').props.onClick();await new Promise(r=>setImmediate(r));assert.equal(JSON.parse(calls.at(-1)[1].body).cycle,cycle);assert.equal(JSON.parse(calls.at(-1)[1].body).plan,'starter');assert.equal(nav.at(-1),'https://checkout.fixture.invalid');}}
  }
 }
-async function main(){await modal();await gate();await pricing();console.log('PASS: auth modal, app/API gate matrix, admin trust reproduction, matcher inventory and pricing viewer/checkout matrix');}
+async function billing(){
+ const nav=[],intervals=[];let paid='1',account={usage:{plan:null,admin:false},billing:{subscription:{status:'active',plan:'pro'}},plan:null,loaded:true,error:false,reload:async()=>{}};
+ const h=harness('src/components/billing-view.tsx',{'next/link':{},'next/navigation':{useSearchParams:()=>new URLSearchParams({paid})},'lucide-react':{},'@/lib/plans':{},'@/components/settings-shell':{useAccount:()=>account,useToast:()=>[null,()=>{}]}},{window:{location:{assign:url=>nav.push(url)}},setInterval:callback=>{intervals.push(callback);return 1;},clearInterval(){}});
+ h.render(h.api.BillingView);for(const effect of h.effects())effect();assert.equal(nav.length,0,'active status alone is not usable entitlement');assert.equal(intervals.length,1,'keep polling while webhook entitlement is absent');
+ account={...account,usage:{plan:'pro',admin:false}};h.render(h.api.BillingView);h.effects()[0]();assert.equal(nav.at(-1),'/studio');
+ nav.length=0;paid='0';h.render(h.api.BillingView);h.effects()[0]();assert.equal(nav.length,0,'ordinary billing visit does not redirect');
+ paid='1';account={...account,error:true};h.render(h.api.BillingView);h.effects()[0]();assert.equal(nav.length,0,'failed reload does not use stale entitlement');
+}
+async function main(){await modal();await gate();await pricing();await billing();console.log('PASS: actual auth modal, app/API gate, pricing checkout and billing entitlement-return matrix');}
 main().catch(e=>{console.error(e);process.exitCode=1;});
