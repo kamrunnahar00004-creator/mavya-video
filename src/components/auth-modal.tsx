@@ -1,5 +1,6 @@
 "use client";
 import { safeNext } from "@/lib/auth-next";
+import { authError } from "@/lib/auth-error";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -26,7 +27,19 @@ export function AuthModalHost() {
   const close = useCallback(() => router.replace(pathname, { scroll: false }), [router, pathname]);
   // The popup portals into <body>, so it renders in the browser only.
   const inBrowser = useSyncExternalStore(noop, () => true, () => false);
-  if (!inBrowser || (auth !== "login" && auth !== "signup")) return null;
+  const [signedOut, setSignedOut] = useState(false);
+  const next = safeNext(params.get("next"));
+  useEffect(() => {
+    if (auth !== "login" && auth !== "signup") return;
+    let active = true;
+    void createSupabaseBrowserClient().auth.getUser().then(({ data }) => {
+      if (!active) return;
+      if (data.user) window.location.assign(`/auth/continue?next=${encodeURIComponent(next)}`);
+      else setSignedOut(true);
+    }).catch(() => { if (active) setSignedOut(true); });
+    return () => { active = false; };
+  }, [auth, next]);
+  if (!inBrowser || !signedOut || (auth !== "login" && auth !== "signup")) return null;
   return <AuthModal key={auth} initialMode={auth} next={safeNext(params.get("next"))} error={params.get("error") ? "Sign-in didn't finish. Try again." : null} onClose={close} />;
 }
 
@@ -39,7 +52,6 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
-  const [notice, setNotice] = useState<string | null>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const isSignup = mode === "signup";
   const callback = (to: string) => `${window.location.origin}/auth/callback?next=${encodeURIComponent(to)}`;
@@ -63,7 +75,6 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
   function switchMode(to: Mode) {
     setMode(to);
     setError(null);
-    setNotice(null);
   }
 
   async function handleGoogle() {
@@ -83,7 +94,6 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
     e.preventDefault();
     if (loading) return;
     setError(null);
-    setNotice(null);
     if (!email.trim() || !password) return setError("Enter your email and password.");
     if (isSignup) {
       if (password.length < 8) return setError("Password must be at least 8 characters.");
@@ -96,15 +106,10 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
         const { data, error: e } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { emailRedirectTo: callback(next), data: name.trim() ? { full_name: name.trim() } : undefined },
+          options: { data: name.trim() ? { full_name: name.trim() } : undefined },
         });
         if (e) throw e;
-        // With email confirmation on there is no session yet.
-        if (!data.session) {
-          setNotice("Check your email to confirm your account, then log in.");
-          setLoading(false);
-          return;
-        }
+        if (!data.session) throw new Error("Sign-up could not sign you in. Try again or contact us.");
       } else {
         const { error: e } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (e) throw e;
@@ -114,13 +119,9 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign(`/auth/continue?next=${encodeURIComponent(next)}`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "";
-      // Supabase's own wording, made plain: an email that already has an account, or a wrong email/password.
-      if (/already registered|already exists/i.test(message)) {
-        setMode("login");
-        setError("You already have an account. Log in instead.");
-      } else if (/invalid login credentials/i.test(message)) setError("Wrong email or password.");
-      else setError(message || "Something went wrong. Try again.");
+      const result = authError(err, isSignup);
+      if (result.login) setMode("login");
+      setError(result.message);
       setLoading(false);
     }
   }
@@ -200,7 +201,6 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
           )}
 
           {error && <p role="alert" className="text-[13px] font-medium text-red-600">{error}</p>}
-          {notice && <p role="status" className="text-[13px] font-medium">{notice}</p>}
 
           <button
             type="submit"
