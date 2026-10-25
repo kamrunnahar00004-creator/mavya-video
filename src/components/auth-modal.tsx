@@ -34,6 +34,8 @@ export function AuthModalHost() {
     let active = true;
     void createSupabaseBrowserClient().auth.getUser().then(({ data }) => {
       if (!active) return;
+      // A full load discards any prefetched signed-out app response.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       if (data.user) window.location.assign(`/auth/continue?next=${encodeURIComponent(next)}`);
       else setSignedOut(true);
     }).catch(() => { if (active) setSignedOut(true); });

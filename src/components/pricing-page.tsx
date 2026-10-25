@@ -95,19 +95,20 @@ function FeatureList({ lead, items, strong }: { lead?: string; items: string[]; 
  * Signed out: the buttons lead to sign-up. Signed in without a plan: straight to Stripe Checkout. With a plan:
  * Settings > Plans, where plan changes live.
  */
-type Viewer = { kind: "loading" | "out" | "none" | "billing" } | { kind: "plan"; plan: string };
+type Viewer = { kind: "loading" | "error" | "out" | "none" | "billing" } | { kind: "plan"; plan: string };
 function useViewer(): Viewer {
   const [viewer, setViewer] = useState<Viewer>({ kind: "loading" });
   useEffect(() => {
     let alive = true;
-    fetch("/api/usage", { cache: "no-store" })
+    fetch("/api/usage", { cache: "no-store", signal: AbortSignal.timeout(15_000) })
       .then(async (r) => {
         if (!alive) return;
-        if (!r.ok) return setViewer({ kind: "out" });
+        if (r.status === 401) return setViewer({ kind: "out" });
+        if (!r.ok) throw new Error("Usage unavailable");
         const u = (await r.json()) as { plan?: string | null; limit?: number | null; billingStatus?: string | null };
         setViewer(u.plan ? { kind: "plan", plan: u.plan } : u.limit === null ? { kind: "plan", plan: "admin" } : u.billingStatus === "past_due" ? { kind: "billing" } : { kind: "none" });
       })
-      .catch(() => alive && setViewer({ kind: "out" }));
+      .catch(() => alive && setViewer({ kind: "error" }));
     return () => {
       alive = false;
     };
@@ -119,6 +120,8 @@ function PlanButton({ plan, cycle, viewer }: { plan: Plan; cycle: BillingCycle; 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cls = `${cardBtn} mt-5 ${plan.popular ? "bg-accent text-white hover:bg-accent-hover" : "bg-text text-white hover:opacity-90"}`;
+  if (viewer.kind === "loading") return <button type="button" disabled className={cls}>Choose {plan.name}</button>;
+  if (viewer.kind === "error") return <button type="button" onClick={() => window.location.reload()} className={cls}>Try again</button>;
   if (viewer.kind === "billing") return <Link href="/settings/billing" className={cls}>Manage billing</Link>;
   if (viewer.kind === "plan") {
     return (

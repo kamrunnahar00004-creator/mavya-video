@@ -54,13 +54,14 @@ async function gate(){
 }
 async function pricing(){
  const plans=load('src/lib/plans.ts');
- for(const scenario of [{status:401},{usage:{plan:null,limit:0}},{usage:{plan:'pro',limit:60}},{usage:{plan:null,limit:null}},{usage:{plan:null,limit:0,billingStatus:'past_due'}}]){
+ for(const scenario of [{status:401},{status:503},{usage:{plan:null,limit:0}},{usage:{plan:'pro',limit:60}},{usage:{plan:null,limit:null}},{usage:{plan:null,limit:0,billingStatus:'past_due'}}]){
   const calls=[],nav=[];
   const h=harness('src/components/pricing-page.tsx',{'next/link':{default:'Link'},'lucide-react':{},'@/components/contact-dialog':{},'@/components/marketing-chrome':{},'@/lib/plans':plans},{window:{location:{assign:url=>nav.push(url)}},fetch:async(url,opts)=>{calls.push([url,opts]);return url==='/api/usage'?Response.json(scenario.usage??{},{status:scenario.status??200}):Response.json({url:'https://checkout.fixture.invalid'});}});
   h.render(h.api.PricingPage);h.effects()[0]();await new Promise(r=>setImmediate(r));
   const tree=h.render(h.api.PricingPage),card=nodes(tree).find(n=>n.props.plan?.id==='starter');assert.ok(card);
   const button=nodes(h.render(card.type,card.props)).find(n=>n.props.viewer);h.reset();const output=h.render(button.type,button.props);
   if(scenario.status===401)assert.equal(output.props.href,'/?auth=signup&next=%2Fpricing');
+  else if(scenario.status===503){assert.equal(output.type,'button');assert.equal(output.props.children,'Try again');}
   else if(scenario.usage.billingStatus==='past_due')assert.equal(output.props.href,'/settings/billing');
   else if(scenario.usage.plan||scenario.usage.limit===null)assert.equal(output.props.href,'/settings/plans');
   else {for(const cycle of ['monthly','annual']){h.reset();const b=h.render(button.type,{...button.props,cycle});b.props.children.find(n=>n?.type==='button').props.onClick();await new Promise(r=>setImmediate(r));assert.equal(JSON.parse(calls.at(-1)[1].body).cycle,cycle);assert.equal(JSON.parse(calls.at(-1)[1].body).plan,'starter');assert.equal(nav.at(-1),'https://checkout.fixture.invalid');}}
