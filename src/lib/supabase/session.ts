@@ -42,8 +42,13 @@ export async function updateSession(request: NextRequest) {
   // /login is the popup on the landing page.
   if (pathname === "/login") return redirect(new URL(signedIn ? "/studio" : "/?auth=login", request.url));
   if (pathname.startsWith("/api/")) {
-    if (signedIn || PUBLIC_API.includes(pathname)) return response;
-    return Response.json({ error: "Sign in first." }, { status: 401 });
+    if (PUBLIC_API.includes(pathname)) return response;
+    if (!signedIn) return Response.json({ error: "Sign in first." }, { status: 401 });
+    // Uploads and exports cost storage and render time: paid plans only (AI routes check their own allowance).
+    if (PAID_API.some((p) => p.test(pathname)) && !(await paid(data!.claims.sub as string, data!.claims.email))) {
+      return Response.json({ error: "Choose a plan to continue.", needsPlan: true }, { status: 402 });
+    }
+    return response;
   }
   if (!signedIn) {
     const to = new URL("/", request.url);
@@ -51,5 +56,36 @@ export async function updateSession(request: NextRequest) {
     to.searchParams.set("next", pathname + search);
     return redirect(to);
   }
+  // Founder rule 2026-10-25: nothing leads into the app without a paid plan. Unpaid accounts only see Pricing (and
+  // Settings, to manage billing and their profile). Admins (ADMIN_EMAILS) are always in.
+  if (APP_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`)) && !(await paid(data!.claims.sub as string, data!.claims.email))) {
+    return redirect(new URL("/pricing", request.url));
+  }
   return response;
+}
+
+const APP_PAGES = ["/studio", "/library"];
+const PAID_API = [/^\/api\/uploads(\/|$)/, /^\/api\/media\/?$/, /^\/api\/runs\/[^/]+\/export(\/|$)/];
+
+/** Has a usable plan (the same allowance the AI routes use), or is an admin. Fails closed: unknown means unpaid. */
+async function paid(user: string, email: unknown): Promise<boolean> {
+  const admins = (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  if (typeof email === "string" && admins.includes(email.toLowerCase())) return true;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !service) return false;
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/mavya_allowance`, {
+      method: "POST",
+      headers: { apikey: service, authorization: `Bearer ${service}`, "content-type": "application/json" },
+      body: JSON.stringify({ p_user: user, p_admin: false }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) return false;
+    const a = (await res.json()) as { plan?: string | null };
+    return Boolean(a?.plan);
+  } catch {
+    return false;
+  }
 }
