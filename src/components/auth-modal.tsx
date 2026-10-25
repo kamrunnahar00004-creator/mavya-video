@@ -27,7 +27,7 @@ export function AuthModalHost() {
   // The popup portals into <body>, so it renders in the browser only.
   const inBrowser = useSyncExternalStore(noop, () => true, () => false);
   if (!inBrowser || (auth !== "login" && auth !== "signup")) return null;
-  return <AuthModal key={auth} initialMode={auth} next={safeNext(params.get("next"))} error={params.get("error") ? "Sign-in didn't finish. Try again." : null} onClose={close} />;
+  return <AuthModal key={auth} initialMode={auth} next={safeNext(params.get("next"))} error={params.get("error") === "noaccount" ? "No account found. Sign up first." : params.get("error") ? "Sign-in didn't finish. Try again." : null} onClose={close} />;
 }
 
 function AuthModal({ initialMode, next, error: initialError, onClose }: { initialMode: Mode; next: string; error: string | null; onClose: () => void }) {
@@ -42,7 +42,8 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
   const [notice, setNotice] = useState<string | null>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const isSignup = mode === "signup";
-  const callback = (to: string) => `${window.location.origin}/auth/callback?next=${encodeURIComponent(to)}`;
+  // `intent=login`: the callback refuses to keep an account that a Log in created (founder 2026-10-25).
+  const callback = (to: string, intent?: Mode) => `${window.location.origin}/auth/callback?next=${encodeURIComponent(to)}${intent === "login" ? "&intent=login" : ""}`;
 
   useEffect(() => {
     emailRef.current?.focus();
@@ -70,7 +71,7 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
     setError(null);
     setLoading(true);
     try {
-      const { error: e } = await createSupabaseBrowserClient().auth.signInWithOAuth({ provider: "google", options: { redirectTo: callback(next) } });
+      const { error: e } = await createSupabaseBrowserClient().auth.signInWithOAuth({ provider: "google", options: { redirectTo: callback(next, mode) } });
       if (e) throw e;
       // The browser goes to Google from here.
     } catch (err) {
