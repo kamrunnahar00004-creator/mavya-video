@@ -9,7 +9,7 @@ function load(file, stubs={}) {
 }
 const styles=load('src/lib/text-styles.ts');
 const png=load('src/lib/text-png.ts',{'@/lib/studio-data':{FONTS:{},SYSTEM_FONTS:['Arial']},'@/lib/text-styles':styles});
-assert.equal(styles.STYLE_PRESETS.length,50);
+assert.equal(styles.STYLE_PRESETS.length,48);
 for(const preset of styles.STYLE_PRESETS){
   const look=preset.look('#ffffff','#111111');
   for(const [key,value] of Object.entries({...look.text,...look.box})){
@@ -25,4 +25,4 @@ assert.equal(png.cssProperty('WebkitBackgroundClip'),'-webkit-background-clip');
 const {ffmpegAdjust}=load('src/lib/adjust.ts');
 const filters=ffmpegAdjust({brightness:10,contrast:20,saturation:10,warmth:20},1080,1920);
 assert.ok(filters[0].startsWith('colorchannelmixer'));assert.ok(filters[1].startsWith('eq='));assert.ok(filters[2].startsWith('colorchannelmixer'));
-console.log('PASS: valid CSS property names across all 50 styles and Webkit stroke/fill/clip');
+console.log('PASS: valid CSS property names across all 48 styles and Webkit stroke/fill/clip');

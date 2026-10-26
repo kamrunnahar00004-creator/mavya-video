@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 
 /**
- * On-screen text styles (50). Each is drawn from the text color (fg) and, when `second` is set, a second color
+ * On-screen text styles (48). Each is drawn from the text color (fg) and, when `second` is set, a second color
  * (the outline / box / glow / shadow color) the user can pick. Old runs used "outline" | "box" | "shadow" | "plain",
  * which are kept as ids here.
  */
@@ -32,7 +32,7 @@ export const STYLE_PRESETS: StylePreset[] = [
   { id: "outline-soft", label: "Soft", group: "Outline", second: "Outline color", look: (fg, ac) => ({ text: { color: fg, ...o(0.08, ac), textShadow: glow(ac, 0.15) } }) },
   { id: "outline-retro", label: "Retro", group: "Outline", second: "Retro color", look: (fg, ac) => ({ text: { color: fg, ...o(0.06, "#111"), textShadow: `0.06em 0.06em 0 ${ac}, 0.12em 0.12em 0 #111` } }) },
   { id: "outline-pop", label: "Pop", group: "Outline", second: "Outline color", look: (fg, ac) => ({ text: { color: fg, ...o(0.12, ac), textShadow: `0 0.1em 0 ${ac}` } }) },
-  // Box (14)
+  // Box (12)
   { id: "box", label: "Box", group: "Box", second: "Box color", look: (fg, ac) => ({ text: { color: fg }, box: box(ac) }) },
   { id: "box-square", label: "Square", group: "Box", second: "Box color", look: (fg, ac) => ({ text: { color: fg }, box: box(ac, { borderRadius: 0 }) }) },
   { id: "box-pill", label: "Pill", group: "Box", second: "Box color", look: (fg, ac) => ({ text: { color: fg }, box: box(ac, { borderRadius: "999px", padding: "0.1em 0.55em" }) }) },
@@ -40,8 +40,6 @@ export const STYLE_PRESETS: StylePreset[] = [
   { id: "box-highlight", label: "Highlighter", group: "Box", second: "Marker color", look: (fg, ac) => ({ text: { color: fg }, box: box(`linear-gradient(transparent 45%, ${ac} 45%)`, { padding: "0 0.1em", borderRadius: 0 }) }) },
   { id: "box-outlined", label: "Framed", group: "Box", second: "Frame color", look: (fg, ac) => ({ text: { color: fg }, box: box("transparent", { boxShadow: `inset 0 0 0 0.07em ${ac}` }) }) },
   { id: "box-hard", label: "Hard shadow", group: "Box", second: "Box color", look: (fg, ac) => ({ text: { color: fg }, box: box(ac, { boxShadow: "0.1em 0.1em 0 #111" }) }) },
-  { id: "box-glass", label: "Glass", group: "Box", look: (fg) => ({ text: { color: fg }, box: box("rgba(255,255,255,0.28)", { backdropFilter: "blur(6px)" }) }) },
-  { id: "box-dark", label: "Dark glass", group: "Box", look: (fg) => ({ text: { color: fg }, box: box("rgba(0,0,0,0.5)", { backdropFilter: "blur(6px)" }) }) },
   { id: "box-tiktok", label: "Classic", group: "Box", second: "Box color", look: (fg, ac) => ({ text: { color: fg }, box: box(ac, { borderRadius: "0.28em", padding: "0.12em 0.4em" }) }) },
   { id: "box-half", label: "Half fill", group: "Box", second: "Fill color", look: (fg, ac) => ({ text: { color: fg }, box: box(`linear-gradient(transparent 60%, ${ac} 60%)`, { borderRadius: 0, padding: "0 0.06em" }) }) },
   { id: "box-dashed", label: "Stamp", group: "Box", second: "Stamp color", look: (fg, ac) => ({ text: { color: fg }, box: box("transparent", { outline: `0.06em dashed ${ac}`, outlineOffset: "-0.06em" }) }) },
@@ -76,7 +74,9 @@ export const STYLE_PRESETS: StylePreset[] = [
 ];
 
 export const STYLE_GROUPS: StyleGroup[] = ["Outline", "Box", "Shadow", "Glow", "Gradient", "Plain"];
-export const stylePreset = (id: string) => STYLE_PRESETS.find((p) => p.id === id) ?? STYLE_PRESETS[0];
+/** Glass and Dark glass were removed (founder 2026-10-26: the export could not blur the video behind them); texts saved with them show as a plain box. */
+const RETIRED: Record<string, string> = { "box-glass": "box", "box-dark": "box" };
+export const stylePreset = (id: string) => STYLE_PRESETS.find((p) => p.id === (RETIRED[id] ?? id)) ?? STYLE_PRESETS[0];
 
 /** Readable default for the second color: black behind light text, white behind dark text. */
 export function autoSecond(fg: string): string {
