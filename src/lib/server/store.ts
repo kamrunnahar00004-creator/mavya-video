@@ -397,3 +397,11 @@ export async function appendExport(id: string, mediaId: string, result: {src: st
   });
   return done;
 }
+
+/** One bounded thumbnail read for a page, rather than one database query per card. */
+export async function referenceThumbnails(ids: string[], segment: number, who: string): Promise<{id: string; thumb: string | null}[]> {
+  if (!cloud()) return (await readDb()).references.filter(ref => ids.includes(ref.id)).map(ref => ({ id: ref.id, thumb: ref.analysis?.segments[segment]?.thumb ?? (segment === 0 ? ref.thumbUrl ?? null : null) }));
+  const { data, error } = await db().from("library").select(`id,thumb:data->analysis->segments->${segment}->>thumb,fallback:data->>thumbUrl`).in("id", ids).or(`owner.eq.curated,user_id.eq.${who}`);
+  if (error) throw error;
+  return (data as unknown as {id: string; thumb: string | null; fallback: string | null}[]).map(row => ({ id: row.id, thumb: row.thumb ?? (segment === 0 ? row.fallback : null) }));
+}

@@ -12,11 +12,30 @@ async function all(kind, values, key) {
  do {const page=await api.listPage(kind,'owner',new Request('http://fixture/api/'+kind+(cursor?'?cursor='+encodeURIComponent(cursor):'')));assert.ok(page.items.length<=24);seen.push(...page.items.map(v=>v[key]));cursor=page.next;}while(cursor);
  assert.equal(seen.length,values.length);assert.equal(new Set(seen).size,values.length);assert.deepEqual([...seen].sort(),values.map(v=>v[key]).sort());
 }
+
+async function thumbnails(){
+ let reads=0,who='owner';
+ const route=load('src/app/api/references/thumbnails/route.ts',{
+  '@/lib/server/who':{currentUser:async()=>who,signInFirst:()=>new Response(null,{status:401})},
+  '@/lib/server/store':{referenceThumbnails:async ids=>{reads++;return ids.map(id=>({id,thumb:thumbnail}));}}
+ });
+ const url='http://fixture/api/references/thumbnails?ids='+refs.slice(0,24).map(r=>r.id).join(',');
+ const response=await route.GET(new Request(url));assert.equal(response.status,200);assert.equal(reads,1);
+ assert.equal((await response.text()).match(/<image /g).length,24);assert.match(response.headers.get('Cache-Control'),/private/);assert.equal(response.headers.get('Vary'),'Cookie');
+ assert.equal((await route.GET(new Request(url+'&segment=0);drop'))).status,400);
+ assert.equal((await route.GET(new Request(url+','+id(9000)))).status,400);
+ who=null;assert.equal((await route.GET(new Request(url))).status,401);
+ const queryCalls=[];
+ const store=load('src/lib/server/store.ts',{'node:crypto':require('node:crypto'),'node:fs/promises':{},'node:path':require('node:path'),'@/lib/server/r2':{r2Enabled:()=>true},'@/lib/supabase/server':{authEnabled:()=>true,createSupabaseAdminClient:()=>({from:table=>{queryCalls.push(['from',table]);return {select(v){queryCalls.push(['select',v]);return this;},in(k,v){assert.equal(v.length,24);return this;},or(v){queryCalls.push(['or',v]);return Promise.resolve({data:[],error:null});}};}})}});
+ await store.referenceThumbnails(refs.slice(0,24).map(r=>r.id),0,'owner');
+ assert.equal(queryCalls.filter(c=>c[0]==='from').length,1);assert.match(queryCalls.find(c=>c[0]==='or')[1],/owner.eq.curated,user_id.eq.owner/);
+}
 async function main(){
+ await thumbnails();
  await all('references',refs,'id');await all('runs',runs,'id');await all('assets',assets,'mediaId');
  await assert.rejects(api.listPage('runs','owner',new Request('http://fixture?cursor=bad')),/Invalid cursor/);
  const library=await api.listPage('references','owner',new Request('http://fixture'));
- assert.ok(!JSON.stringify(library.items).includes('data:image'));assert.match(library.items[0].analysis.segments[0].thumb,/^\/api\/references\/.+\/thumbnail/);
+ assert.ok(!JSON.stringify(library.items).includes('data:image'));assert.match(library.items[0].analysis.segments[0].thumb,/^\/api\/references\/thumbnails\?ids=/);
  const summary=await api.listPage('runs','owner',new Request('http://fixture?view=summary'));
  assert.equal(summary.items[0].project,undefined);assert.equal(summary.items[0].hook.versions,undefined);
  const metrics={library:{beforeBytes:Buffer.byteLength(JSON.stringify(refs.slice(0,5000))),afterBytes:Buffer.byteLength(JSON.stringify(library.items))},studio:{beforeBytes:Buffer.byteLength(JSON.stringify(runs.slice(0,1000))),afterBytes:Buffer.byteLength(JSON.stringify(summary.items))}};

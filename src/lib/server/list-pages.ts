@@ -52,25 +52,29 @@ export async function listPage(kind: Kind, who: string, request: Request) {
   if (summary) {
     const ids = [...new Set(items.map(v => (v as Run).sourceRefId).filter((v): v is string => Boolean(v)))];
     const covers = new Map<string, string>();
+    const imageURL = "/api/references/thumbnails?ids=" + ids.join(",");
     if (ids.length && cloud()) {
       const { data, error } = await createSupabaseAdminClient().from("library").select("id,thumb:data->analysis->segments->0->>thumb,fallback:data->>thumbUrl").in("id", ids).or(`owner.eq.curated,user_id.eq.${who}`);
       if (error) throw error;
       for (const row of (data ?? []) as unknown as {id:string;thumb:string|null;fallback:string|null}[]) {
         const thumb = row.thumb ?? row.fallback;
-        if (thumb) covers.set(row.id, thumb.startsWith("data:") ? `/api/references/${row.id}/thumbnail` : thumb);
+        if (thumb) covers.set(row.id, thumb.startsWith("data:") ? `${imageURL}#svgView(viewBox(0,${ids.indexOf(row.id) * 320},180,320))` : thumb);
       }
     } else if (ids.length) {
       for (const ref of await listReferences(who)) {
         const thumb = ref.analysis?.segments[0]?.thumb ?? ref.thumbUrl;
-        if (thumb && ids.includes(ref.id)) covers.set(ref.id, thumb.startsWith("data:") ? `/api/references/${ref.id}/thumbnail` : thumb);
+        if (thumb && ids.includes(ref.id)) covers.set(ref.id, thumb.startsWith("data:") ? `${imageURL}#svgView(viewBox(0,${ids.indexOf(ref.id) * 320},180,320))` : thumb);
       }
     }
     items = items.map(value => ({ ...value, cover: covers.get((value as Run).sourceRefId ?? "") }));
   }
-  if (kind === "references") items = items.map(value => {
+  if (kind === "references") {
+  const imageURL = "/api/references/thumbnails?ids=" + items.map(value => (value as Reference).id).join(",");
+  items = items.map((value, tile) => {
     const ref = value as Reference;
-    return { ...ref, analysis: ref.analysis ? { ...ref.analysis, segments: ref.analysis.segments.map((seg, index) => ({ ...seg, thumb: seg.thumb?.startsWith("data:") ? `/api/references/${ref.id}/thumbnail?segment=${index}` : seg.thumb })) } : ref.analysis };
+    return { ...ref, thumbUrl: ref.thumbUrl?.startsWith("data:") ? `${imageURL}&segment=0#svgView(viewBox(0,${tile * 320},180,320))` : ref.thumbUrl, analysis: ref.analysis ? { ...ref.analysis, segments: ref.analysis.segments.map((seg, index) => ({ ...seg, thumb: seg.thumb?.startsWith("data:") ? `${imageURL}&segment=${index}#svgView(viewBox(0,${tile * 320},180,320))` : seg.thumb })) } : ref.analysis };
   });
+  }
   return { items, next };
 }
 export function pageResponse(items: unknown[], next: string | null) {
