@@ -113,6 +113,29 @@ async function main() {
     assert.equal(sql(`select state from generations where id='${uncertain.id}'`), 'uncertain');
     assert.equal(sql(`select has_function_privilege('authenticated','mavya_reserve_generation(uuid,uuid,uuid,text,boolean)','execute')`), 'f');
     assert.equal(sql(`select has_function_privilege('service_role','mavya_reserve_generation(uuid,uuid,uuid,text,boolean)','execute')`), 't');
+
+    // New admission migration is exercised only in this disposable, network-disabled database.
+    for(let i=0;i<2;i++) sql(fs.readFileSync(path.join(root,'supabase/migrations/0015_atomic_refund_admission.sql'),'utf8'));
+    const capRun='20000000-0000-4000-8000-000000000900', freshRun='20000000-0000-4000-8000-000000000901';
+    const capJob='40000000-0000-4000-8000-000000000900', capToken='50000000-0000-4000-8000-000000000900';
+    sql(`insert into runs(id,user_id,data) values('${capRun}','${other}','{"hook":{},"demo":{}}'),('${freshRun}','${other}','{"hook":{},"demo":{}}');
+      insert into subscriptions(user_id,plan,status,cycle,current_period_start,current_period_end) values('${other}','starter','active','monthly',now(),now()+interval '1 month') on conflict(user_id) do update set plan='starter',status='active',current_period_start=now(),current_period_end=now()+interval '1 month';
+      insert into generations(id,user_id,run_id,request_key,state,input,refunded_at)
+      select gen_random_uuid(),'${other}','${capRun}',gen_random_uuid(),'failed','{}',now() from generate_series(1,9);
+      insert into generations(id,user_id,run_id,request_key,state,input,lease_token,lease_until) values('${capJob}','${other}','${capRun}',gen_random_uuid(),'running','{}','${capToken}',now()+interval '1 minute');`);
+    const refunding=asyncSql(`begin;select mavya_generation_transition('${other}','${capJob}','${capToken}','failed');select pg_sleep(0.7) /* part2_refund_hold */;commit;`);
+    let holding=false;
+    for(let i=0;i<50;i++){
+      holding=sql("select exists(select 1 from pg_stat_activity where pid<>pg_backend_pid() and query like '%part2_refund_hold%' and wait_event='PgSleep')")==='t';
+      if(holding) break;
+      await new Promise(r=>setTimeout(r,10));
+    }
+    assert.ok(holding,'refund transaction holds the shared user lock');
+    const blocked = await Promise.all(Array.from({length:6},()=>asyncSql(reserve(freshRun, require('node:crypto').randomUUID(), other))));
+    await refunding;
+    assert.ok(blocked.every(x=>JSON.parse(x).error==='attempts'),'parallel admission cannot pass a committing tenth refund');
+    const replayKey=sql(`select request_key from generations where id='${capJob}'`);
+    assert.equal(JSON.parse(sql(reserve(capRun,replayKey,other))).job.id,capJob,'existing request replay survives the cap');
     console.log('PASS: migration replay, ownership, request replay, parallel quota, shared monthly window, leases, bound legacy/fal task IDs, one fallback/refund, completion CAS/replay, uncertain recovery, RPC grants');
   } finally { docker('rm', '--force', name); }
 }
