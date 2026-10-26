@@ -17,6 +17,9 @@ function cursor(raw: string | null): Cursor | null {
 const token = (at: string, id: string) => Buffer.from(JSON.stringify({ at, id })).toString("base64url");
 /** Keyset continuation, including equal timestamps; each response and database read is bounded. */
 export async function listPage(kind: Kind, who: string, request: Request) {
+  const curatedOnly = kind === "references" && new URL(request.url).searchParams.get("scope") === "curated";
+  const refSummary = kind === "references" && new URL(request.url).searchParams.get("view") === "studio";
+  const refKeys = ["title", "platform", "sourceUrl", "views", "mediaId", "mime", "analysis", "niche", "hookStyle", "thumbUrl", "author", "likes", "comments", "caption", "summary", "recipe", "postedAt", "pending", "review", "followers"];
   const summary = kind === "runs" && new URL(request.url).searchParams.get("view") === "summary";
   const after = cursor(new URL(request.url).searchParams.get("cursor"));
   const table = kind === "references" ? "library" : kind;
@@ -24,18 +27,18 @@ export async function listPage(kind: Kind, who: string, request: Request) {
   let items: (Run | Reference | Asset)[];
   let next: string | null = null;
   if (cloud()) {
-    let query = createSupabaseAdminClient().from(table).select(kind === "assets" ? "media_id,name,kind,created_at" : kind === "references" ? "id,owner,data,created_at" : summary ? "id,created_at,title:data->>title,updatedAt:data->>updatedAt,sourceRefId:data->>sourceRefId,hook:data->hook,demo:data->demo,product:data->product,sounds:data->sounds,sound:data->sound" : "id,data,created_at");
-    query = kind === "references" ? query.or(`owner.eq.curated,user_id.eq.${who}`) : query.eq("user_id", who);
+    let query = createSupabaseAdminClient().from(table).select(kind === "assets" ? "media_id,name,kind,created_at" : kind === "references" ? (refSummary ? "id,owner,created_at,refStyle:data->ai->style," + refKeys.map(k => k + ":data->" + k).join(",") : "id,owner,data,created_at") : summary ? "id,created_at,title:data->>title,updatedAt:data->>updatedAt,sourceRefId:data->>sourceRefId,hook:data->hook,demo:data->demo,product:data->product,sounds:data->sounds,sound:data->sound" : "id,data,created_at");
+    query = kind === "references" ? curatedOnly ? query.eq("owner", "curated") : query.or(`owner.eq.curated,user_id.eq.${who}`) : query.eq("user_id", who);
     if (after) query = query.or(`created_at.lt.${after.at},and(created_at.eq.${after.at},${idKey}.lt.${after.id})`);
     const { data, error } = await query.order("created_at", { ascending: false }).order(idKey, { ascending: false }).limit(PAGE_SIZE);
     if (error) throw error;
     const rows = (data ?? []) as unknown as {id: string; owner: Reference["owner"]; data: Run | Reference; media_id: string; name: string; kind: Asset["kind"]; created_at: string}[];
-    items = rows.map(r => kind === "assets" ? { mediaId: r.media_id, name: r.name, kind: r.kind, createdAt: r.created_at } : kind === "references" ? { ...r.data, id: r.id, owner: r.owner } as Reference : summary ? { ...(r as unknown as Run), createdAt: r.created_at } : r.data);
+    items = rows.map(r => kind === "assets" ? { mediaId: r.media_id, name: r.name, kind: r.kind, createdAt: r.created_at } : kind === "references" ? refSummary ? { ...r, id: r.id, owner: r.owner, createdAt: r.created_at, ai: (r as unknown as {refStyle?: string}).refStyle ? {style: (r as unknown as {refStyle: string}).refStyle} : undefined } as unknown as Reference : { ...r.data, id: r.id, owner: r.owner } as Reference : summary ? { ...(r as unknown as Run), createdAt: r.created_at } : r.data);
     if (rows.length === PAGE_SIZE) { const last = rows.at(-1)!; next = token(last.created_at, kind === "assets" ? last.media_id : last.id); }
   } else {
     const values = kind === "assets" ? await listAssets(who) : kind === "references" ? await listReferences(who) : await listRuns(who);
     const idOf = (v: Run | Reference | Asset) => "mediaId" in v && !("id" in v) ? v.mediaId : (v as Run | Reference).id;
-    items = [...values].sort((a,b) => b.createdAt.localeCompare(a.createdAt) || idOf(b).localeCompare(idOf(a))).filter(v => !after || v.createdAt < after.at || v.createdAt === after.at && idOf(v) < after.id).slice(0,PAGE_SIZE);
+    items = [...values].filter(v => !curatedOnly || (v as Reference).owner === "curated").sort((a,b) => b.createdAt.localeCompare(a.createdAt) || idOf(b).localeCompare(idOf(a))).filter(v => !after || v.createdAt < after.at || v.createdAt === after.at && idOf(v) < after.id).slice(0,PAGE_SIZE);
     if (items.length === PAGE_SIZE) { const last = items.at(-1)!; next = token(last.createdAt,idOf(last)); }
   }
   if (summary) items = items.map(value => {

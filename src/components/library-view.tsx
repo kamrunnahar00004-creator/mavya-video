@@ -17,7 +17,7 @@ export function LibraryView() {
 
   useEffect(() => {
     let alive = true;
-    fetchPage<Reference>("/api/references?view=studio")
+    fetchPage<Reference>("/api/references?view=studio&scope=curated")
       .then((page) => { if (alive) { setRefs(page.items); setCursor(page.next); } })
       .catch(() => alive && setRefs([]));
     return () => {
@@ -50,7 +50,7 @@ export function LibraryView() {
             <Loader2 className="h-5 w-5 animate-spin" />
           </div>
         ) : (
-          <SourcePicker onLoadMore={cursor ? async () => { const page = await fetchPage<Reference>("/api/references?view=studio", cursor); setRefs(old => [...(old ?? []), ...page.items]); setCursor(page.next); } : undefined} refs={refs} source={null} onRefsChange={setRefs} onPick={(r) => void startWithHook(r)} onClear={() => undefined} />
+          <SourcePicker onLoadMore={cursor ? async () => { const page = await fetchPage<Reference>("/api/references?view=studio&scope=curated", cursor); setRefs(old => [...(old ?? []), ...page.items]); setCursor(page.next); } : undefined} refs={refs} source={null} onRefsChange={setRefs} onPick={(r) => void startWithHook(r)} onClear={() => undefined} />
         )}
         {error && <p className="mt-3 text-[13px] text-red-500">{error}</p>}
       </div>

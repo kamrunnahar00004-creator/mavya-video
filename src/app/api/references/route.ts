@@ -16,13 +16,22 @@ export async function GET(request: Request) {
   const page = await listPage("references", who, request);
   const refs = page.items as import("@/lib/types").Reference[];
   const view = new URL(request.url).searchParams.get("view");
-  if (view === "covers") return pageResponse(refs.map((r) => ({ id: r.id, thumbUrl: r.analysis?.segments[0]?.thumb ?? r.thumbUrl })), page.next);
+  const respond = (items: unknown[]) => {
+    const response = pageResponse(items, page.next);
+    if (new URL(request.url).searchParams.get("scope") === "curated") {
+      // Session-bound browser cache, never put owned data into a shared CDN cache.
+      response.headers.set("Cache-Control", "private, max-age=60, must-revalidate");
+      response.headers.set("Vary", "Cookie");
+    }
+    return response;
+  };
+  if (view === "covers") return respond(refs.map((r) => ({ id: r.id, thumbUrl: r.analysis?.segments[0]?.thumb ?? r.thumbUrl })));
   if (view === "studio") {
     // Curation history and model explanations never appear in the studio.
     const keys = ["id", "title", "platform", "sourceUrl", "views", "mediaId", "mime", "createdAt", "analysis", "owner", "niche", "hookStyle", "thumbUrl", "author", "likes", "comments", "caption", "summary", "recipe", "postedAt", "pending", "review", "followers"] as const;
-    return pageResponse(refs.map((r) => ({ ...Object.fromEntries(keys.map((k) => [k, r[k]])), ai: r.ai ? { style: r.ai.style } : undefined })), page.next);
+    return respond(refs.map((r) => ({ ...Object.fromEntries(keys.map((k) => [k, r[k]])), ai: r.ai ? { style: r.ai.style } : undefined })));
   }
-  return pageResponse(refs, page.next);
+  return respond(refs);
   } catch (error) { return listError(error); }
 }
 
