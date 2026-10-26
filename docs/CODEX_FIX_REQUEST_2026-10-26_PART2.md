@@ -38,6 +38,27 @@ evidence, fix commit and the checks you ran.
   - Make the 10-refunds-per-day cap hold under concurrency, if that is possible without changing the
     policy itself.
 
+## Make the app as fast as possible (founder request)
+
+Measure first, then fix, then measure again. Report before/after numbers for each change.
+- **Landing and Pricing:** first load JS, LCP, CLS. Lazy-load below-the-fold videos, right-size and
+  modern-format posters/images, preload only the hero media, avoid layout shift. Keep the other
+  creators' videos and the hero as they are, only load them smarter.
+- **Studio, editor and library:** time to usable. Stop fetching the full library and full run when a
+  summary is enough (ties into M6). Split heavy client code by route (editor, text styles, fonts,
+  music) with dynamic imports. Avoid re-render storms in the editor timeline; memoize hot components.
+  Thumbnails as small images, not base64 in JSON.
+- **API:** add `Cache-Control` where data is public or slow-changing (songs catalog, curated library,
+  sounds). Parallelize independent server queries. No N+1 queries. Indexes as in the item above.
+- **Media:** R2 signed URLs reused within their lifetime, range requests for video, posters for
+  every video element, `preload="metadata"` unless the video is visible.
+- **Export and generation:** cut waiting the user sees (polling interval and backoff, progress
+  updates) without raising server or provider cost. The render worker stays on its current plan.
+- **Fonts:** only the weights in use; `font-display: swap`; preload TikTok Sans 800 only where
+  the editor needs it.
+- Do not remove features, change the look, change copy or add paid services to gain speed. Vercel
+  Speed Insights is already installed; mention which pages to watch there.
+
 ## Do not change (founder decisions pending; report only)
 
 - **M3** privacy retention wording vs runtime retention.
