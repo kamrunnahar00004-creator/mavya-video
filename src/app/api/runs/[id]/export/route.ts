@@ -44,7 +44,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   const existing = await exportJob(who, id);
   if (existing) return Response.json({job:existing.id});
   const body = await request.json().catch(()=>null) as {snapshot?:unknown;texts?:{id?:unknown;mediaId?:unknown;x?:unknown;y?:unknown}[]} | null;
-  if(body?.snapshot!==run.updatedAt || !Array.isArray(body.texts) || body.texts.length>200) return Response.json({error:"Your run changed. Save and try again."},{status:409});
+  if(body?.snapshot!==run.updatedAt || !Array.isArray(body.texts) || body.texts.length>RENDER_LIMITS.overlays) return Response.json({error:"Your run changed. Save and try again."},{status:409});
   const texts=body.texts;
   const expected=exportLayers(run);
   if(texts.length!==expected.length || new Set(texts.map(t=>t?.id)).size!==texts.length || expected.some(t=>!texts.some(p=>p?.id===t.id)))return Response.json({error:"Text images are incomplete. Try again."},{status:400});
@@ -63,7 +63,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   const segs = timeline(run, null).filter((s) => s.src);
   const total = videoLength(segs);
   if (!segs.length || total <= 0) return Response.json({ error: "Nothing to export yet." }, { status: 400 });
-  if (total > 180) return Response.json({ error: "Videos can be up to 3 minutes." }, { status: 400 });
+  if (total > RENDER_LIMITS.seconds) return Response.json({ error: "Videos can be up to 3 minutes." }, { status: 400 });
 
   const segments = [];
   for (const s of segs) {

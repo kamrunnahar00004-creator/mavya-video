@@ -3,7 +3,7 @@ import type { Run } from "@/lib/types";
 import { validRunPatch } from "@/lib/server/run-validation";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { renderLimitError } from "@/lib/render-limits";
-import { timeline } from "@/lib/edit";
+import { timeline, videoLength } from "@/lib/edit";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/runs/[id]">) {
   const { id } = await ctx.params;
@@ -29,7 +29,8 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/runs/[id]"
     const current = await getRun(id, who);
     if (!current) return Response.json({ error: "Not found" }, { status: 404 });
     const merged = { ...current, ...body };
-    const bounds = renderLimitError(timeline(merged, null), merged.texts?.length, merged.sounds?.length);
+    const segments = timeline(merged, null);
+    const bounds = renderLimitError(segments, merged.texts?.length, merged.sounds?.length, videoLength(segments.filter(s => s.src)));
     if (bounds) return Response.json({ error: bounds }, { status: 400 });
   }
   if (!body) return Response.json({ error: "Bad request" }, { status: 400 });
