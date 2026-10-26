@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import localFont from "next/font/local";
 import { Anton, Bebas_Neue, Geist, Geist_Mono, Montserrat, Permanent_Marker, Poppins } from "next/font/google";
 import "./globals.css";
@@ -33,6 +34,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${fonts} h-full antialiased`}>
       <body className="h-full">
         {children}
+        {/* Vercel Speed Insights (real-user page speed, Vercel Pro). */}
+        <SpeedInsights />
       </body>
     </html>
   );
