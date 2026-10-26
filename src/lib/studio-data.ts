@@ -50,7 +50,7 @@ export const FONT_CHOICES: { id: string; label: string }[] = [
 ];
 
 export const fontLabel = (font: string) => (font in FONTS ? FONTS[font as FontKey].label : font === "Arial" ? "Arial Bold" : font);
-export const fontCss = (font: string) => (font in FONTS ? FONTS[font as FontKey].css : `"${font}", sans-serif`);
+export const fontCss = (font: string) => (font in FONTS ? FONTS[font as FontKey].css : font === DEFAULT_FONT ? `var(--font-tiktok-sans, "TikTok Sans"), sans-serif` : `"${font}", sans-serif`);
 
 const loaded = new Set<string>();
 const familyParam = (f: string) => encodeURIComponent(f).replace(/%20/g, "+");
@@ -61,7 +61,7 @@ const familyParam = (f: string) => encodeURIComponent(f).replace(/%20/g, "+");
  */
 export function loadFonts(fonts: readonly string[], previewText?: string) {
   if (typeof document === "undefined") return;
-  const families = fonts.filter((f) => !(f in FONTS) && !(SYSTEM_FONTS as readonly string[]).includes(f) && !loaded.has(`${f}|${previewText ?? ""}`));
+  const families = fonts.filter((f) => !(f === DEFAULT_FONT && document.querySelector?.("[data-editor-fonts]")) && !(f in FONTS) && !(SYSTEM_FONTS as readonly string[]).includes(f) && !loaded.has(`${f}|${previewText ?? ""}`));
   if (!families.length) return;
   const add = (href: string, keys: string[], onError?: () => void) => {
     const link = document.createElement("link");
