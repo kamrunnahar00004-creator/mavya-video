@@ -9,7 +9,7 @@ import path from "node:path";
 /**
  * Business inquiries: cloud records persist in contact_inquiries; local records use .data/inquiries.jsonl.
  * With RESEND_API_KEY and CONTACT_TO they are also emailed (reply goes to the sender). CONTACT_FROM is a sender on a
- * domain verified in Resend; without one, Resend's test sender only delivers to the account owner's address.
+ * domain verified in Resend; the verified Mavya domain is the default.
  */
 const DATA_DIR = path.join(process.cwd(), ".data");
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,253}\.[^\s@]{2,}$/;
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
         method: "POST",
         headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
         body: JSON.stringify({
-          from: process.env.CONTACT_FROM || "Mavya <onboarding@resend.dev>",
+          from: process.env.CONTACT_FROM || "Mavya <no-reply@mavya.app>",
           to: [to],
           reply_to: email,
           subject: `Mavya Business: ${email}`,
