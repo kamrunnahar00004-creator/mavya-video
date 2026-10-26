@@ -56,7 +56,8 @@ export async function pendingCheckout(user: { id: string; email?: string }, toke
       subscription_data: { metadata: { user_id: user.id } },
       ...(row?.stripe_customer_id ? { customer: row.stripe_customer_id } : { customer_email: user.email }),
       allow_promotion_codes: true, expires_at: Math.floor(Date.now() / 1000) + 3600,
-      success_url: `${origin}/settings/billing?paid=1`, cancel_url: `${origin}/settings/plans`,
+      // The return page confirms the payment with Stripe itself and opens the app at once (no waiting for the webhook).
+      success_url: `${origin}/checkout/return?session_id={CHECKOUT_SESSION_ID}`, cancel_url: `${origin}/pricing`,
     } });
     let session: Stripe.Checkout.Session;
     if (pending.session_id) session = await stripe().checkout.sessions.retrieve(pending.session_id);
