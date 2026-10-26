@@ -1,0 +1,971 @@
+{
+  "baselineRevision": "a47a04e",
+  "codeRevision": "2d9032d",
+  "publicBefore": {
+    "setup": "local production, cold browser cache, 375x900, 2x CPU, 3.5s observation, external requests blocked",
+    "rows": [
+      {
+        "round": 0,
+        "lcp": 408,
+        "cls": 0.03762660976080247,
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "jsBytes": 236793,
+        "imageBytes": 199799,
+        "fontBytes": 257132,
+        "fontRequests": 12,
+        "mediaBytes": 1967265,
+        "mediaRequests": 4,
+        "dom": 789.6999999880791
+      },
+      {
+        "round": 0,
+        "lcp": 484,
+        "cls": 0,
+        "path": "/pricing",
+        "clientWidth": 360,
+        "scrollWidth": 380,
+        "jsBytes": 236793,
+        "imageBytes": 11662,
+        "fontBytes": 257132,
+        "fontRequests": 12,
+        "mediaBytes": 0,
+        "mediaRequests": 0,
+        "dom": 510.9000000357628
+      },
+      {
+        "round": 1,
+        "lcp": 344,
+        "cls": 0,
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "jsBytes": 236793,
+        "imageBytes": 199799,
+        "fontBytes": 257132,
+        "fontRequests": 12,
+        "mediaBytes": 1967265,
+        "mediaRequests": 4,
+        "dom": 598.8000000119209
+      },
+      {
+        "round": 1,
+        "lcp": 476,
+        "cls": 0,
+        "path": "/pricing",
+        "clientWidth": 360,
+        "scrollWidth": 380,
+        "jsBytes": 236793,
+        "imageBytes": 11662,
+        "fontBytes": 257132,
+        "fontRequests": 12,
+        "mediaBytes": 0,
+        "mediaRequests": 0,
+        "dom": 484.69999998807907
+      },
+      {
+        "round": 2,
+        "lcp": 516,
+        "cls": 0,
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "jsBytes": 236793,
+        "imageBytes": 199799,
+        "fontBytes": 257132,
+        "fontRequests": 12,
+        "mediaBytes": 1967265,
+        "mediaRequests": 4,
+        "dom": 998.4000000357628
+      },
+      {
+        "round": 2,
+        "lcp": 568,
+        "cls": 0,
+        "path": "/pricing",
+        "clientWidth": 360,
+        "scrollWidth": 380,
+        "jsBytes": 236793,
+        "imageBytes": 11662,
+        "fontBytes": 257132,
+        "fontRequests": 12,
+        "mediaBytes": 0,
+        "mediaRequests": 0,
+        "dom": 592.2000000476837
+      }
+    ],
+    "summary": {
+      "/": {
+        "lcp": 408,
+        "cls": 0,
+        "jsBytes": 236793,
+        "mediaBytes": 1967265,
+        "mediaRequests": 4,
+        "imageBytes": 199799,
+        "fontBytes": 257132,
+        "fontRequests": 12,
+        "dom": 789.6999999880791
+      },
+      "/pricing": {
+        "lcp": 484,
+        "cls": 0,
+        "jsBytes": 236793,
+        "mediaBytes": 0,
+        "mediaRequests": 0,
+        "imageBytes": 11662,
+        "fontBytes": 257132,
+        "fontRequests": 12,
+        "dom": 510.9000000357628
+      }
+    }
+  },
+  "publicAfter": {
+    "setup": "local production, cold browser cache, 375x900, 2x CPU, 3.5s observation, external requests blocked",
+    "rows": [
+      {
+        "round": 0,
+        "lcp": 416,
+        "cls": 0,
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "jsBytes": 235404,
+        "imageBytes": 146396,
+        "fontBytes": 154120,
+        "fontRequests": 6,
+        "mediaBytes": 1966965,
+        "mediaRequests": 3,
+        "dom": 464
+      },
+      {
+        "round": 0,
+        "lcp": 432,
+        "cls": 0,
+        "path": "/pricing",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "jsBytes": 218766,
+        "imageBytes": 11662,
+        "fontBytes": 154120,
+        "fontRequests": 6,
+        "mediaBytes": 0,
+        "mediaRequests": 0,
+        "dom": 506.10000002384186
+      },
+      {
+        "round": 1,
+        "lcp": 444,
+        "cls": 0,
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "jsBytes": 235404,
+        "imageBytes": 146396,
+        "fontBytes": 154120,
+        "fontRequests": 6,
+        "mediaBytes": 1966965,
+        "mediaRequests": 3,
+        "dom": 561.9000000357628
+      },
+      {
+        "round": 1,
+        "lcp": 416,
+        "cls": 0,
+        "path": "/pricing",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "jsBytes": 218766,
+        "imageBytes": 11662,
+        "fontBytes": 154120,
+        "fontRequests": 6,
+        "mediaBytes": 0,
+        "mediaRequests": 0,
+        "dom": 534.5999999642372
+      },
+      {
+        "round": 2,
+        "lcp": 308,
+        "cls": 0,
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "jsBytes": 235404,
+        "imageBytes": 146396,
+        "fontBytes": 154120,
+        "fontRequests": 6,
+        "mediaBytes": 1966965,
+        "mediaRequests": 3,
+        "dom": 583.8999999761581
+      },
+      {
+        "round": 2,
+        "lcp": 372,
+        "cls": 0,
+        "path": "/pricing",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "jsBytes": 218766,
+        "imageBytes": 11662,
+        "fontBytes": 154120,
+        "fontRequests": 6,
+        "mediaBytes": 0,
+        "mediaRequests": 0,
+        "dom": 498.5
+      }
+    ],
+    "summary": {
+      "/": {
+        "lcp": 416,
+        "cls": 0,
+        "jsBytes": 235404,
+        "mediaBytes": 1966965,
+        "mediaRequests": 3,
+        "imageBytes": 146396,
+        "fontBytes": 154120,
+        "fontRequests": 6,
+        "dom": 561.9000000357628
+      },
+      "/pricing": {
+        "lcp": 416,
+        "cls": 0,
+        "jsBytes": 218766,
+        "mediaBytes": 0,
+        "mediaRequests": 0,
+        "imageBytes": 11662,
+        "fontBytes": 154120,
+        "fontRequests": 6,
+        "dom": 506.10000002384186
+      }
+    }
+  },
+  "initialBaseline": {
+    "setup": "local production, cold browser cache, 375x900, 2x CPU, 3.5s observation, external requests blocked",
+    "rows": [
+      {
+        "round": 0,
+        "lcp": 1192,
+        "cls": 0,
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "jsBytes": 236793,
+        "mediaBytes": 1967265,
+        "mediaRequests": 4,
+        "dom": 998.6999999880791
+      },
+      {
+        "round": 0,
+        "lcp": 620,
+        "cls": 0,
+        "path": "/pricing",
+        "clientWidth": 360,
+        "scrollWidth": 380,
+        "jsBytes": 236793,
+        "mediaBytes": 0,
+        "mediaRequests": 0,
+        "dom": 185.19999998807907
+      },
+      {
+        "round": 1,
+        "lcp": 352,
+        "cls": 0.03762660976080247,
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "jsBytes": 236793,
+        "mediaBytes": 1967265,
+        "mediaRequests": 4,
+        "dom": 982.7000000476837
+      },
+      {
+        "round": 1,
+        "lcp": 548,
+        "cls": 0,
+        "path": "/pricing",
+        "clientWidth": 360,
+        "scrollWidth": 380,
+        "jsBytes": 236793,
+        "mediaBytes": 0,
+        "mediaRequests": 0,
+        "dom": 528.9000000357628
+      },
+      {
+        "round": 2,
+        "lcp": 504,
+        "cls": 0,
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "jsBytes": 236793,
+        "mediaBytes": 1967265,
+        "mediaRequests": 4,
+        "dom": 814
+      },
+      {
+        "round": 2,
+        "lcp": 476,
+        "cls": 0,
+        "path": "/pricing",
+        "clientWidth": 360,
+        "scrollWidth": 380,
+        "jsBytes": 236793,
+        "mediaBytes": 0,
+        "mediaRequests": 0,
+        "dom": 211
+      }
+    ],
+    "summary": {
+      "/": {
+        "lcp": 504,
+        "cls": 0,
+        "jsBytes": 236793,
+        "mediaBytes": 1967265,
+        "mediaRequests": 4,
+        "dom": 982.7000000476837
+      },
+      "/pricing": {
+        "lcp": 548,
+        "cls": 0,
+        "jsBytes": 236793,
+        "mediaBytes": 0,
+        "mediaRequests": 0,
+        "dom": 211
+      }
+    }
+  },
+  "app": {
+    "setup": "Client fixtures only, proxy disabled in separate artifact copies, API replies stubbed at 120ms, 1440x1000, CPU 2x, cold cache, three rounds. No auth/backend latency certification.",
+    "rows": [
+      {
+        "round": 0,
+        "editOpenMs": null,
+        "phase": "before",
+        "path": "/studio",
+        "usable": 1586.800000011921,
+        "jsBytes": 298104,
+        "fontBytes": 257132,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 123
+      },
+      {
+        "round": 0,
+        "editOpenMs": null,
+        "phase": "before",
+        "path": "/library",
+        "usable": 882.1000000238419,
+        "jsBytes": 291704,
+        "fontBytes": 257132,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 64
+      },
+      {
+        "round": 0,
+        "editOpenMs": 49.10000002384186,
+        "phase": "before",
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "usable": 810.5,
+        "jsBytes": 298104,
+        "fontBytes": 257132,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 12
+      },
+      {
+        "round": 0,
+        "editOpenMs": null,
+        "phase": "after",
+        "path": "/studio",
+        "usable": 1150.699999988079,
+        "jsBytes": 238462,
+        "fontBytes": 154120,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 51
+      },
+      {
+        "round": 0,
+        "editOpenMs": null,
+        "phase": "after",
+        "path": "/library",
+        "usable": 596.3000000119209,
+        "jsBytes": 238462,
+        "fontBytes": 154120,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 28
+      },
+      {
+        "round": 0,
+        "editOpenMs": 94.30000001192093,
+        "phase": "after",
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "usable": 832.5,
+        "jsBytes": 274301,
+        "fontBytes": 279248,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 12
+      },
+      {
+        "round": 1,
+        "editOpenMs": null,
+        "phase": "before",
+        "path": "/studio",
+        "usable": 1082.300000011921,
+        "jsBytes": 298104,
+        "fontBytes": 257132,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 123
+      },
+      {
+        "round": 1,
+        "editOpenMs": null,
+        "phase": "before",
+        "path": "/library",
+        "usable": 734.1000000238419,
+        "jsBytes": 291704,
+        "fontBytes": 257132,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 64
+      },
+      {
+        "round": 1,
+        "editOpenMs": 37.59999996423721,
+        "phase": "before",
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "usable": 841.3000000119209,
+        "jsBytes": 298104,
+        "fontBytes": 257132,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 12
+      },
+      {
+        "round": 1,
+        "editOpenMs": null,
+        "phase": "after",
+        "path": "/studio",
+        "usable": 708.7000000476837,
+        "jsBytes": 238462,
+        "fontBytes": 154120,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 51
+      },
+      {
+        "round": 1,
+        "editOpenMs": null,
+        "phase": "after",
+        "path": "/library",
+        "usable": 686.1999999880791,
+        "jsBytes": 238462,
+        "fontBytes": 154120,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 28
+      },
+      {
+        "round": 1,
+        "editOpenMs": 149.60000002384186,
+        "phase": "after",
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "usable": 1053.800000011921,
+        "jsBytes": 274301,
+        "fontBytes": 279248,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 12
+      },
+      {
+        "round": 2,
+        "editOpenMs": null,
+        "phase": "before",
+        "path": "/studio",
+        "usable": 1355,
+        "jsBytes": 298104,
+        "fontBytes": 257132,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 123
+      },
+      {
+        "round": 2,
+        "editOpenMs": null,
+        "phase": "before",
+        "path": "/library",
+        "usable": 744.8000000119209,
+        "jsBytes": 291704,
+        "fontBytes": 257132,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 64
+      },
+      {
+        "round": 2,
+        "editOpenMs": 38.80000001192093,
+        "phase": "before",
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "usable": 700.8999999761581,
+        "jsBytes": 298104,
+        "fontBytes": 257132,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 12
+      },
+      {
+        "round": 2,
+        "editOpenMs": null,
+        "phase": "after",
+        "path": "/studio",
+        "usable": 745.9000000357628,
+        "jsBytes": 238462,
+        "fontBytes": 154120,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 51
+      },
+      {
+        "round": 2,
+        "editOpenMs": null,
+        "phase": "after",
+        "path": "/library",
+        "usable": 599,
+        "jsBytes": 238462,
+        "fontBytes": 154120,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 28
+      },
+      {
+        "round": 2,
+        "editOpenMs": 72.30000001192093,
+        "phase": "after",
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "usable": 666.3999999761581,
+        "jsBytes": 274301,
+        "fontBytes": 279248,
+        "title": "Mavya: viral hook + demo videos",
+        "buttons": 12
+      }
+    ],
+    "summary": {
+      "before:/studio": {
+        "usable": 1355,
+        "jsBytes": 298104,
+        "fontBytes": 257132,
+        "editOpenMs": null
+      },
+      "before:/library": {
+        "usable": 744.8000000119209,
+        "jsBytes": 291704,
+        "fontBytes": 257132,
+        "editOpenMs": null
+      },
+      "before:/studio/10000000-0000-4000-8000-000000000000": {
+        "usable": 810.5,
+        "jsBytes": 298104,
+        "fontBytes": 257132,
+        "editOpenMs": 38.80000001192093
+      },
+      "after:/studio": {
+        "usable": 745.9000000357628,
+        "jsBytes": 238462,
+        "fontBytes": 154120,
+        "editOpenMs": null
+      },
+      "after:/library": {
+        "usable": 599,
+        "jsBytes": 238462,
+        "fontBytes": 154120,
+        "editOpenMs": null
+      },
+      "after:/studio/10000000-0000-4000-8000-000000000000": {
+        "usable": 832.5,
+        "jsBytes": 274301,
+        "fontBytes": 279248,
+        "editOpenMs": 94.30000001192093
+      }
+    },
+    "errors": []
+  },
+  "editor": {
+    "setup": "Production React, 2x CPU, 200 stable overlays + 40 filmstrips, initial mount + 60 parent updates, three rounds; no media decoded or fetched",
+    "rows": [
+      {
+        "phase": "before",
+        "round": 0,
+        "ms": 343,
+        "overlay": 12200,
+        "film": 2440
+      },
+      {
+        "phase": "after",
+        "round": 0,
+        "ms": 29.100000023841858,
+        "overlay": 200,
+        "film": 40
+      },
+      {
+        "phase": "before",
+        "round": 1,
+        "ms": 260.9000000357628,
+        "overlay": 12200,
+        "film": 2440
+      },
+      {
+        "phase": "after",
+        "round": 1,
+        "ms": 17.600000023841858,
+        "overlay": 200,
+        "film": 40
+      },
+      {
+        "phase": "before",
+        "round": 2,
+        "ms": 160,
+        "overlay": 12200,
+        "film": 2440
+      },
+      {
+        "phase": "after",
+        "round": 2,
+        "ms": 19.900000035762787,
+        "overlay": 200,
+        "film": 40
+      }
+    ],
+    "summary": {
+      "before": {
+        "ms": 260.9000000357628,
+        "overlay": 12200,
+        "film": 2440
+      },
+      "after": {
+        "ms": 19.900000035762787,
+        "overlay": 200,
+        "film": 40
+      }
+    }
+  },
+  "server": {
+    "setup": "Node 22; actual AWS signing middleware, dummy credentials, HTTP forbidden; 1,000 concurrent identical reads, 3 rounds",
+    "rows": [
+      {
+        "phase": "before",
+        "round": 0,
+        "signs": 1000,
+        "ms": 214.75781899999998
+      },
+      {
+        "phase": "after",
+        "round": 0,
+        "signs": 1,
+        "ms": 1.77916799999997
+      },
+      {
+        "phase": "before",
+        "round": 1,
+        "signs": 1000,
+        "ms": 136.73170699999997
+      },
+      {
+        "phase": "after",
+        "round": 1,
+        "signs": 1,
+        "ms": 1.8826140000001033
+      },
+      {
+        "phase": "before",
+        "round": 2,
+        "signs": 1000,
+        "ms": 128.77505399999995
+      },
+      {
+        "phase": "after",
+        "round": 2,
+        "signs": 1,
+        "ms": 2.752495000000067
+      }
+    ],
+    "summary": {
+      "before": {
+        "ms": 136.73170699999997,
+        "signs": 1000
+      },
+      "after": {
+        "ms": 1.8826140000001033,
+        "signs": 1
+      }
+    },
+    "polling": {
+      "exportForegroundMs": 2500,
+      "generationForegroundMs": 4000,
+      "hiddenMs": 30000,
+      "outageCeilingMs": 30000
+    }
+  },
+  "lists": {
+    "library": {
+      "beforeBytes": 141125001,
+      "afterBytes": 123907,
+      "parseBeforeMs": 92.95386899999994,
+      "parseAfterMs": 0.06236699999999473
+    },
+    "studio": {
+      "beforeBytes": 25829001,
+      "afterBytes": 8329,
+      "parseBeforeMs": 12.663976999999704,
+      "parseAfterMs": 0.03478300000006129
+    }
+  },
+  "images": {
+    "before": 742255,
+    "after": 548012,
+    "items": [
+      {
+        "f": "explain-strip.jpg",
+        "before": 13152,
+        "after": 8280
+      },
+      {
+        "f": "lib-DWp_8nwCPSF.jpg",
+        "before": 20190,
+        "after": 13862
+      },
+      {
+        "f": "lib-DZAiMMTP2YQ.jpg",
+        "before": 25203,
+        "after": 19204
+      },
+      {
+        "f": "lib-DZQq5b8y5-X.jpg",
+        "before": 18036,
+        "after": 12382
+      },
+      {
+        "f": "lib-DZzQN_uKt5o.jpg",
+        "before": 23204,
+        "after": 17648
+      },
+      {
+        "f": "lib-Da3jXHJvp0K.jpg",
+        "before": 29754,
+        "after": 24250
+      },
+      {
+        "f": "lib-Da8y1bfqG4V.jpg",
+        "before": 32305,
+        "after": 28462
+      },
+      {
+        "f": "lib-Da9dDfqC3a2.jpg",
+        "before": 26061,
+        "after": 19324
+      },
+      {
+        "f": "lib-DaFCnEnNxTM.jpg",
+        "before": 18706,
+        "after": 13302
+      },
+      {
+        "f": "lib-DajwiOOtvDL.jpg",
+        "before": 19351,
+        "after": 14620
+      },
+      {
+        "f": "lib-Db6BVR0T_-L.jpg",
+        "before": 28162,
+        "after": 19804
+      },
+      {
+        "f": "lib-DbHo7QFIvD4.jpg",
+        "before": 25166,
+        "after": 19774
+      },
+      {
+        "f": "lib-DbtW-sFSSlP.jpg",
+        "before": 19358,
+        "after": 14052
+      },
+      {
+        "f": "lib-DcOiTp0xxTK.jpg",
+        "before": 27931,
+        "after": 22672
+      },
+      {
+        "f": "lib-Dd--YQOqo16.jpg",
+        "before": 24567,
+        "after": 18040
+      },
+      {
+        "f": "lib-Dd-LI6_qeUp.jpg",
+        "before": 19833,
+        "after": 14150
+      },
+      {
+        "f": "lib-Dd2QhtfoiVH.jpg",
+        "before": 25829,
+        "after": 20358
+      },
+      {
+        "f": "lib-Dd5IUdKphv8.jpg",
+        "before": 20823,
+        "after": 14936
+      },
+      {
+        "f": "lib-DdCZhNzvbK2.jpg",
+        "before": 24103,
+        "after": 17508
+      },
+      {
+        "f": "lib-DdCqlaoP67w.jpg",
+        "before": 23710,
+        "after": 18054
+      },
+      {
+        "f": "lib-DdLjyNctVi9.jpg",
+        "before": 22978,
+        "after": 16614
+      },
+      {
+        "f": "lib-DdXIV6tuGTu.jpg",
+        "before": 28114,
+        "after": 19874
+      },
+      {
+        "f": "lib-Ddlnj3gBl6l.jpg",
+        "before": 22224,
+        "after": 16390
+      },
+      {
+        "f": "lib-DduKGOJTDgx.jpg",
+        "before": 26345,
+        "after": 19074
+      },
+      {
+        "f": "lib-DdzIAhgg63u.jpg",
+        "before": 23113,
+        "after": 16644
+      },
+      {
+        "f": "lib-DeAdRbPgOTb.jpg",
+        "before": 30142,
+        "after": 23252
+      },
+      {
+        "f": "lib-DeCh8DbAxDt.jpg",
+        "before": 23614,
+        "after": 18116
+      },
+      {
+        "f": "lib-DeDo3iHKIKh.jpg",
+        "before": 24048,
+        "after": 17402
+      },
+      {
+        "f": "mx-demo-0.jpg",
+        "before": 10180,
+        "after": 6822
+      },
+      {
+        "f": "mx-demo-1.jpg",
+        "before": 11581,
+        "after": 7238
+      },
+      {
+        "f": "mx-demo-2.jpg",
+        "before": 9160,
+        "after": 5406
+      },
+      {
+        "f": "mx-demo-3.jpg",
+        "before": 6869,
+        "after": 4082
+      },
+      {
+        "f": "mx-hook-0.jpg",
+        "before": 9928,
+        "after": 7166
+      },
+      {
+        "f": "mx-hook-1.jpg",
+        "before": 10229,
+        "after": 7322
+      },
+      {
+        "f": "mx-hook-2.jpg",
+        "before": 8378,
+        "after": 5196
+      },
+      {
+        "f": "mx-hook-3.jpg",
+        "before": 9908,
+        "after": 6732
+      }
+    ]
+  },
+  "pricingWidths": {
+    "rows": [
+      {
+        "phase": "before",
+        "width": 320,
+        "clientWidth": 305,
+        "scrollWidth": 325,
+        "tableClient": 263,
+        "tableScroll": 760
+      },
+      {
+        "phase": "before",
+        "width": 375,
+        "clientWidth": 360,
+        "scrollWidth": 380,
+        "tableClient": 318,
+        "tableScroll": 760
+      },
+      {
+        "phase": "before",
+        "width": 390,
+        "clientWidth": 375,
+        "scrollWidth": 395,
+        "tableClient": 333,
+        "tableScroll": 760
+      },
+      {
+        "phase": "after",
+        "width": 320,
+        "clientWidth": 305,
+        "scrollWidth": 305,
+        "tableClient": 263,
+        "tableScroll": 760
+      },
+      {
+        "phase": "after",
+        "width": 375,
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "tableClient": 318,
+        "tableScroll": 760
+      },
+      {
+        "phase": "after",
+        "width": 390,
+        "clientWidth": 375,
+        "scrollWidth": 375,
+        "tableClient": 333,
+        "tableScroll": 760
+      }
+    ],
+    "sameCopy": true
+  },
+  "thumbnailFixture": {
+    "browser": "muted Chrome",
+    "correctPixels": [
+      [
+        255,
+        0,
+        0,
+        255
+      ],
+      [
+        0,
+        255,
+        0,
+        255
+      ]
+    ],
+    "sharedHTTPRequests": 1,
+    "databaseQueryAssertions": {
+      "cards": 24,
+      "queries": 1
+    },
+    "scope": "actual thumbnail route with fixture rows, never a real account/database"
+  }
+}
