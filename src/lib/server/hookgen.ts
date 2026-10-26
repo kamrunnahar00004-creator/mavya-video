@@ -192,6 +192,9 @@ async function startHookInner(run: Run, source: Reference | null, who: string, n
   try {
     const character = await characterOf(run, who, dir);
     const clip = await hookVideo(run, source, who, dir);
+    if (!clip && (source || run.hook.source === "library" || run.hook.source === "upload")) {
+      throw new Error("The reference video is unavailable. Try again or choose another hook.");
+    }
 
     if (clip) {
       const [outfit, reference] = await Promise.all([outfitFor(clip, character), motionReference(clip, dir)]);
