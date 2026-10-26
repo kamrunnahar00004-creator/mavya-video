@@ -27,5 +27,24 @@ async function bounds(){
  const {validJob}=await import('../render/limits.mjs');const fixture={meta:{who:'10000000-0000-4000-8000-000000000001'},output:{url:'https://fixture.invalid/out',contentType:'video/mp4'},spec:{width:RENDER_LIMITS.width,height:RENDER_LIMITS.height,fps:RENDER_LIMITS.fps,total:3,segments:[{url:'https://fixture.invalid/in',gap:0,speed:1,volume:1,pieces:[{start:0,end:3}],look:{keys:keys(200)}}],sounds:[],overlays:[]}};
  assert.equal(validJob(fixture),true);fixture.spec.segments[0].look.keys=keys(201);assert.equal(validJob(fixture),false);
 }
-async function main(){await profile();await deletes();await bounds();console.log('PASS: profile last-good state, truthful cloud deletes, shared save/export/worker limits at the boundary');}
+
+async function admission(){
+ let segments=Array(41).fill({src:'/fixture.mp4'}),seconds=3,reserved=0;
+ const route=load('src/app/api/runs/[id]/export/route.ts',{
+  'next/server':{after:()=>assert.fail('render must not be scheduled')},'@/lib/export-layers':{exportLayers:()=>[]},
+  '@/lib/server/billing-state':{billingRpc:()=>{reserved++;return true;}},
+  '@/lib/supabase/server':{},'@/lib/server/export-jobs':{},'node:crypto':require('node:crypto'),'@/lib/adjust':{},
+  '@/lib/edit':{timeline:()=>segments,videoLength:()=>seconds},
+  '@/lib/server/store':{cloud:()=>true,getRun:async()=>({hook:{generated:{src:'/fixture.mp4'}}})},
+  '@/lib/server/who':{currentUser:async()=> 'owner'},'@/lib/sound':{soundPieces:()=>[]}
+ },{RENDER_URL:'https://fixture.invalid',RENDER_SECRET:'fixture-only'});
+ const invoke=()=>route.POST(new Request('http://fixture/api/export',{method:'POST',body:'{}'}),{params:Promise.resolve({id:'fixture'})});
+ let response=await invoke();assert.equal(response.status,400);assert.match((await response.json()).error,/40 clips/);
+ segments=[{src:'/fixture.mp4',adjust:{keys:Array(201).fill({})}}];
+ response=await invoke();assert.equal(response.status,400);assert.match((await response.json()).error,/200 keyframes/);
+ segments=[{src:'/fixture.mp4'}];seconds=181;
+ response=await invoke();assert.equal(response.status,400);assert.match((await response.json()).error,/3 minutes/);
+ assert.equal(reserved,0,'invalid snapshots are refused before signing, reserving or dispatching');
+}
+async function main(){await profile();await deletes();await bounds();await admission();console.log('PASS: profile last-good state, truthful cloud deletes, shared save/export/worker limits at the boundary');}
 main().catch(e=>{console.error(e);process.exitCode=1;});
