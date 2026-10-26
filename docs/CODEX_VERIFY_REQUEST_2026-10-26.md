@@ -100,6 +100,47 @@ Commits to review: `09f2d96` (checkout return), `f4ee339` (forgot password). Con
   generation jobs and export. Report each finding with file:line and a concrete failure
   scenario; fix only what you can show is broken.
 
+### B7. Whole-app audit (every feature, not only today's changes)
+The app is live and about to get marketing traffic. Walk every route and feature end to end in
+code (and locally where possible, with stubs for paid services) and report what is broken,
+unsafe or inconsistent. Cover at least:
+- **Marketing pages:** landing (`/`), `/pricing`, `/terms`, `/privacy`, header/footer links,
+  auth popup open/close from every entry point, mobile widths (no horizontal scroll).
+- **Auth:** sign up, log in, Google, forgot password, log out, `next` handling, signed-in user
+  hitting the popup, deleted account then signing up again with the same email.
+- **Paid gate:** every page under `src/app/(app)` and every API route in `src/app/api`. List
+  each route with: signed out, signed in unpaid, paid, past_due, admin, and what it returns.
+  Anything that costs money (AI, uploads, storage, render) must be unreachable unpaid.
+- **Studio and editor:** pick hook, Generate (job create, cron advance, fal poll, refund on
+  failure, the 10/day refunded cap, allowance count), clip list, trim/split, text (all 48 styles,
+  TikTok Sans default, retired `box-glass`/`box-dark` ids), music (Deezer), My files history,
+  save/reload of a project.
+- **Library:** browsing, categories, search, video playback, R2 signed URLs and their expiry.
+- **Uploads and media:** size/type limits, upload reservations, R2 writes, media retention and
+  cleanup jobs, temporary objects, what happens on a failed or abandoned upload.
+- **Export:** request, Render worker protocol 3, 720x1280 output, text overlay timing at piece
+  boundaries, one-job-at-a-time admission, timeout and retry, the download link, what the user
+  sees when Render is down or slow.
+- **Billing:** checkout for all 3 plans x monthly/annual, promotion codes, upgrade, downgrade,
+  cancel at period end, resume, past_due, the Stripe portal, `/settings/billing` and
+  `/settings/plans` states, usage page numbers matching `mavya_allowance`.
+- **Settings and account:** profile edit, usage, account deletion (Stripe subscription cancel,
+  data removal, R2 objects, `account_deletions`), re-signup after deletion.
+- **Cron and internal routes:** `/api/internal/generations` auth (`CRON_SECRET`), the minute
+  rotation, the 30-second start window, behavior when a step throws.
+- **Contact form:** validation, rate limiting, spam, `contact_inquiries` rows, email delivery.
+- **Config and failure modes:** each missing or wrong env var (Stripe, fal, R2, Render, Resend,
+  Supabase), what the user sees, and that nothing leaks secrets or stack traces to the browser.
+- **Security:** RLS on every table (RLS on, no policies: confirm the browser never queries
+  tables directly), service-role key never in client bundles, open redirects (`safeNext`),
+  input validation on every API body, IDOR (can user A read or change user B's runs, media,
+  assets, exports, generations?).
+- **Performance:** Studio and landing load time, oversized client bundles, unbounded queries,
+  missing indexes on hot lookups.
+
+For each finding: severity (blocker / high / medium / low), file:line, concrete failure scenario,
+fix commit or "not fixed, needs founder decision". Fix blockers and highs; list the rest.
+
 ## Rules (founder decisions, do not change)
 
 - Prices fixed: $29 / $59 / $99, 20 / 60 / 150 hooks. Never change.
