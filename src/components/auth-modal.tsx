@@ -10,11 +10,11 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 /*
  * Sign in / sign up, the same popup as the Etsy Mavya app: Google, or email and password, login and signup in one
- * overlay (no forgot password until email sending is set up). It opens over the marketing pages from `?auth=login` or `?auth=signup` (the header buttons, and the
+ * overlay, plus Forgot password (a reset link by email, then /reset-password). It opens over the marketing pages from `?auth=login` or `?auth=signup` (the header buttons, and the
  * proxy sends signed-out visitors here with `next` = where they were going). Access control is server-side; this
  * is only the UI.
  */
-type Mode = "login" | "signup";
+type Mode = "login" | "signup" | "forgot";
 const noop = () => () => undefined;
 
 
@@ -55,7 +55,9 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
   const emailRef = useRef<HTMLInputElement>(null);
+  const [sent, setSent] = useState(false);
   const isSignup = mode === "signup";
+  const isForgot = mode === "forgot";
   const callback = (to: string) => `${window.location.origin}/auth/callback?next=${encodeURIComponent(to)}`;
 
   useEffect(() => {
@@ -77,6 +79,7 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
   function switchMode(to: Mode) {
     setMode(to);
     setError(null);
+    setSent(false);
   }
 
   async function handleGoogle() {
@@ -96,6 +99,7 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
     e.preventDefault();
     if (loading) return;
     setError(null);
+    if (isForgot) return void sendReset();
     if (!email.trim() || !password) return setError("Enter your email and password.");
     if (isSignup) {
       if (password.length < 8) return setError("Password must be at least 8 characters.");
@@ -128,12 +132,22 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
     }
   }
 
+  /** Always the same answer, so the form never reveals which emails have an account. */
+  async function sendReset() {
+    if (!email.trim()) return setError("Enter your email.");
+    setLoading(true);
+    const { error: e } = await createSupabaseBrowserClient().auth.resetPasswordForEmail(email.trim(), { redirectTo: callback("/reset-password") });
+    setLoading(false);
+    if (e?.status === 429) return setError("Too many tries. Wait a minute and try again.");
+    setSent(true);
+  }
+
   // Portal to <body>: the sticky header's backdrop blur would otherwise contain the fixed overlay.
   return createPortal(
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={isSignup ? "Create your account" : "Log in"}
+      aria-label={isSignup ? "Create your account" : isForgot ? "Reset your password" : "Log in"}
       className="landing-theme fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,13,11,0.55)] px-4 py-8 backdrop-blur-sm"
       onClick={() => !loading && onClose()}
     >
@@ -147,8 +161,32 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
           <X className="h-5 w-5" aria-hidden="true" />
         </button>
 
-        <h2 className="text-[24px] font-semibold tracking-[-0.02em]">{isSignup ? "Create your account" : "Welcome back"}</h2>
-        <p className="mt-1 text-[14px] text-muted">{isSignup ? "Make your first hook + demo video." : "Log in to continue."}</p>
+        <h2 className="text-[24px] font-semibold tracking-[-0.02em]">{isSignup ? "Create your account" : isForgot ? "Reset your password" : "Welcome back"}</h2>
+        <p className="mt-1 text-[14px] text-muted">{isSignup ? "Make your first hook + demo video." : isForgot ? "We'll email you a reset link." : "Log in to continue."}</p>
+
+        {isForgot ? (
+          sent ? (
+            <p role="status" className="mt-6 rounded-lg bg-raised px-4 py-3 text-[14px] leading-relaxed text-text">
+              If <b>{email.trim()}</b> has an account, a reset link is on its way. Check your inbox.
+            </p>
+          ) : (
+            <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-3.5">
+              <Field label="Email">
+                <input ref={emailRef} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required className={inputClass} placeholder="you@example.com" />
+              </Field>
+              {error && <p role="alert" className="text-[13px] font-medium text-red-600">{error}</p>}
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-1 inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-3 text-[15px] font-semibold text-white transition-all hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                Send reset link
+              </button>
+            </form>
+          )
+        ) : (
+        <>
 
         <button
           type="button"
@@ -195,6 +233,11 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
                 {showPassword ? <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" /> : <Eye className="h-[18px] w-[18px]" aria-hidden="true" />}
               </button>
             </div>
+            {!isSignup && (
+              <button type="button" onClick={() => switchMode("forgot")} className="mt-1.5 block text-[12.5px] font-semibold text-accent hover:underline">
+                Forgot password?
+              </button>
+            )}
           </Field>
           {isSignup && (
             <Field label="Confirm password">
@@ -213,11 +256,13 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
             {isSignup ? "Create account" : "Log in"}
           </button>
         </form>
+        </>
+        )}
 
         <p className="mt-5 text-center text-[13.5px] text-muted">
-          {isSignup ? "Already have an account? " : "Don't have an account? "}
-          <button type="button" onClick={() => switchMode(isSignup ? "login" : "signup")} className="font-semibold text-accent hover:underline">
-            {isSignup ? "Log in" : "Sign up"}
+          {isForgot ? "Remembered it? " : isSignup ? "Already have an account? " : "Don't have an account? "}
+          <button type="button" onClick={() => switchMode(isSignup || isForgot ? "login" : "signup")} className="font-semibold text-accent hover:underline">
+            {isSignup || isForgot ? "Log in" : "Sign up"}
           </button>
         </p>
         <p className="mt-4 text-center text-[12.5px] leading-relaxed text-soft">
