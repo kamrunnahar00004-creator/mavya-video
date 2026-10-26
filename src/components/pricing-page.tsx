@@ -213,7 +213,7 @@ export function PricingPage() {
   const [cycle, setCycle] = useState<BillingCycle>("monthly");
   const viewer = useViewer();
   return (
-    <div className="landing-theme min-h-full bg-bg">
+    <div className="landing-theme min-h-full overflow-x-clip bg-bg">
       <MarketingHeader active="pricing" />
 
       <main className="mx-auto max-w-[1240px] px-5 pb-24 pt-14 sm:pt-20">
