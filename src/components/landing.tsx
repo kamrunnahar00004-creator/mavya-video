@@ -24,7 +24,7 @@ function Phone({ lib, views, className = "" }: { lib: string; views: string; cla
   return (
     <div className={`relative w-[180px] shrink-0 rounded-[32px] xl:w-[190px] bg-ink p-[6px] shadow-[0_30px_60px_-24px_rgba(21,18,31,0.55)] ${className}`}>
       <div className="relative aspect-[9/19.5] overflow-hidden rounded-[28px] bg-[#14121f]">
-        <LoopVideo src={`/landing/lib-${lib}.mp4`} poster={`/landing/lib-${lib}.jpg`} className="absolute inset-0 h-full w-full object-cover" />
+        <LoopVideo src={`/landing/lib-${lib}.mp4`} poster={`/landing/lib-${lib}.webp`} className="absolute inset-0 h-full w-full object-cover" />
         <span className="absolute left-1/2 top-2.5 h-4 w-16 -translate-x-1/2 rounded-full bg-black" />
         <span className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10.5px] font-bold text-white">
           <Play className="h-2.5 w-2.5" fill="currentColor" />
@@ -85,7 +85,7 @@ export function Landing() {
 
       {/* What a hook + demo video is, shown with a real one */}
       <section className="mx-auto max-w-[1160px] px-5 pb-20">
-        <HookDemoExplainer src={`/landing/lib-${EXPLAIN.code}-full.mp4`} poster={`/landing/lib-${EXPLAIN.code}.jpg`} strip="/landing/explain-strip.jpg" hookEnd={EXPLAIN.hookEnd} length={EXPLAIN.length} />
+        <HookDemoExplainer src={`/landing/lib-${EXPLAIN.code}-full.mp4`} poster={`/landing/lib-${EXPLAIN.code}.webp`} strip="/landing/explain-strip.webp" hookEnd={EXPLAIN.hookEnd} length={EXPLAIN.length} />
       </section>
 
       <HowItWorks />

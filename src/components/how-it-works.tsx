@@ -156,6 +156,7 @@ const HOOKS = [
 ];
 const HOOK_MS = 3500;
 function LibraryPanel() {
+  const live = useContext(Live);
   const [sel, pick] = useCycle(HOOKS.length, HOOK_MS);
   const video = useLivePlay();
   const h = HOOKS[sel];
@@ -174,7 +175,7 @@ function LibraryPanel() {
 
       <div className={BODY}>
         <div key={h.code} className={`${MEDIA} ${FADE_IN}`}>
-          <video ref={video} src={`/landing/lib-${h.code}.mp4`} poster={`/landing/lib-${h.code}.jpg`} muted loop playsInline aria-label={h.line} className="absolute inset-0 h-full w-full object-cover" />
+          <video ref={video} src={live ? `/landing/lib-${h.code}.mp4` : undefined} preload="none" poster={`/landing/lib-${h.code}.webp`} muted loop playsInline aria-label={h.line} className="absolute inset-0 h-full w-full object-cover" />
         </div>
         <div className="flex min-w-0 flex-col">
           <div key={h.code} className={`flex flex-col pb-6 ${FADE_IN}`}>
@@ -206,7 +207,7 @@ function LibraryPanel() {
             className={`grid w-full cursor-pointer grid-cols-[1fr_64px_56px] items-center gap-3 rounded-lg px-2.5 py-1.5 text-left transition-colors ${i === sel ? "bg-accent-tint" : "hover:bg-raised"}`}
           >
             <span className="flex min-w-0 items-center gap-2.5">
-              <span className="h-[30px] w-[17px] shrink-0 rounded-[4px] bg-cover bg-center" style={{ backgroundImage: `url(/landing/lib-${x.code}.jpg)` }} />
+              <span className="h-[30px] w-[17px] shrink-0 rounded-[4px] bg-cover bg-center" style={{ backgroundImage: `url(/landing/lib-${x.code}.webp)` }} />
               <span className={`truncate text-[13px] ${i === sel ? "font-semibold text-text" : "text-muted"}`}>{x.line}</span>
             </span>
             <span className="text-right text-[13px] font-semibold tabular-nums">{x.views}</span>
@@ -276,7 +277,7 @@ function CharacterPanel() {
       <div className={BODY}>
         <div key={id} className={`${MEDIA} ${FADE_IN}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/characters/${id}.jpg`} alt={name} className="absolute inset-0 h-full w-full object-cover" />
+          <img src={`/characters/${id}.webp`} alt={name} className="absolute inset-0 h-full w-full object-cover" />
           <span className="absolute inset-x-2 bottom-2 rounded-md bg-black/55 px-2 py-1.5 backdrop-blur">
             <span className="block text-[10.5px] font-semibold text-white">Generating hook</span>
             <span className="mt-1 block h-1 overflow-hidden rounded-full bg-white/25">
@@ -312,7 +313,7 @@ function CharacterPanel() {
             onClick={() => pick(i)}
             aria-label={c}
             className={`aspect-square cursor-pointer rounded-lg bg-raised bg-cover bg-center transition-[box-shadow,opacity] ${i === sel ? "ring-[3px] ring-accent" : "opacity-85 hover:opacity-100"}`}
-            style={{ backgroundImage: `url(/characters/thumbs/${c}.jpg)` }}
+            style={{ backgroundImage: `url(/characters/thumbs/${c}.webp)` }}
           />
         ))}
       </div>
@@ -326,7 +327,7 @@ function CharacterPanel() {
  * Step 3: the demo playing with the current shot's brief (what to film, camera, length); the shot list below,
  * the shot on screen highlighted (times are this video's own scenes).
  */
-const DEMO = { src: "/landing/lib-DbHo7QFIvD4.mp4", poster: "/landing/lib-DbHo7QFIvD4.jpg" };
+const DEMO = { src: "/landing/lib-DbHo7QFIvD4.mp4", poster: "/landing/lib-DbHo7QFIvD4.webp" };
 const SHOTS = [
   { from: 0, to: 3, title: "The hook", text: "Your character reacts to the hook. Mavya makes this part.", camera: "Selfie", onScreen: "pov: you’ve been flirting with the guy at your cafe for weeks now and today he airdrops you THIS" },
   { from: 3, to: 6, title: "The AirDrop arrives", text: "Film your laptop over your shoulder as the link pops up in the corner.", camera: "Over the shoulder", onScreen: "pov: you’ve been flirting with the guy at your cafe for weeks now and today he airdrops you THIS" },
@@ -366,7 +367,7 @@ function DemoPanel() {
 
       <div className={BODY}>
         <div className={MEDIA}>
-          <video ref={ref} src={DEMO.src} poster={DEMO.poster} muted loop playsInline aria-label="A demo" className="absolute inset-0 h-full w-full object-cover" />
+          <video ref={ref} src={live ? DEMO.src : undefined} preload="none" poster={DEMO.poster} muted loop playsInline aria-label="A demo" className="absolute inset-0 h-full w-full object-cover" />
         </div>
         <div className="flex min-w-0 flex-col">
         <div key={at} className={`flex flex-col pb-6 ${FADE_IN}`}>
