@@ -48,7 +48,8 @@ export async function updateSession(request: NextRequest) {
     if (PUBLIC_API.includes(pathname)) return response;
     if (!signedIn) return denied({ error: "Sign in first." }, 401);
     // Uploads and exports cost storage and render time: paid plans only (AI routes check their own allowance).
-    if (PAID_API.some((p) => p.test(pathname)) && !(await paid(data!.claims.sub as string))) {
+    const writesContent = ["POST", "PATCH"].includes(request.method) && PAID_CONTENT_WRITES.some((p) => p.test(pathname));
+    if ((writesContent || PAID_API.some((p) => p.test(pathname))) && !(await paid(data!.claims.sub as string))) {
       return denied({ error: "Choose a plan to continue.", needsPlan: true }, 402);
     }
     return response;
@@ -70,6 +71,7 @@ export async function updateSession(request: NextRequest) {
 
 const APP_PAGES = ["/studio", "/library"];
 const PAID_API = [/^\/api\/uploads(\/|$)/, /^\/api\/media\/?$/, /^\/api\/runs\/[^/]+\/export(\/|$)/];
+const PAID_CONTENT_WRITES = [/^\/api\/songs\/[^/]+\/?$/, /^\/api\/(runs|references)(\/[^/]+)?\/?$/];
 
 /** Has a usable plan (the same allowance the AI routes use), or is an admin. Fails closed: unknown means unpaid. */
 async function paid(user: string): Promise<boolean> {

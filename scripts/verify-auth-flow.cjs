@@ -43,10 +43,13 @@ async function gate(){
  function cookies(){const jar=new Map();return {getAll:()=>[...jar.values()],set:(name,value,options)=>{const c=typeof name==='object'?name:{name,value,...options};jar.set(c.name,c);}};}
  const next={next:()=>({status:200,cookies:cookies()}),redirect:to=>({status:307,location:String(to),cookies:cookies()}),json:(body,{status})=>({status,body,cookies:cookies()})};
  const api=load('src/lib/supabase/session.ts',{'next/server':{NextResponse:next},'@supabase/ssr':{createServerClient:(_url,_key,options)=>({auth:{getClaims:async()=>{options.cookies.setAll([{name:'session',value:'refreshed',options:{httpOnly:true}}]);return {data:{claims}};}}})}},{NEXT_PUBLIC_SUPABASE_URL:'https://fixture.invalid',NEXT_PUBLIC_SUPABASE_ANON_KEY:'anon-fixture',SUPABASE_SERVICE_ROLE_KEY:'service-fixture',ADMIN_USER_IDS:' admin-id '},{fetch:async(url,options)=>{calls.push([url,options]);if(fail)throw Error('DB unavailable');return Response.json({plan});}});
- const run=async(path,headers={})=>{const url=new URL('https://app.invalid'+path);return api.updateSession({url:url.href,nextUrl:url,cookies:cookies(),headers:new Headers(headers)});};
+ const run=async(path,headers={},method='GET')=>{const url=new URL('https://app.invalid'+path);return api.updateSession({url:url.href,nextUrl:url,method,cookies:cookies(),headers:new Headers(headers)});};
  const pages=['/studio','/studio/run','/studio/run/edit','/library','/library/item','/login'];
  for(const path of pages){claims=null;let r=await run(path);assert.equal(r.status,307);assert.ok(r.location.includes('auth=signup'));assert.ok(r.location.includes('next='));claims={sub:'owner',email:'user@fixture.invalid'};plan=null;r=await run(path);assert.equal(r.location,'https://app.invalid/pricing');plan='pro';r=await run(path,{rsc:'1','next-router-prefetch':'1'});assert.equal(r.status,path==='/login'?307:200);}
  const paid=['/api/uploads','/api/media','/api/runs/run/export'];
+ for(const path of ['/api/songs/123','/api/runs','/api/runs/run','/api/references','/api/references/ref']){
+  claims={sub:'owner'};plan=null;assert.equal((await run(path,{},'POST')).status,402,path);plan='pro';assert.equal((await run(path,{},'POST')).status,200,path);
+ }
  for(const path of ['/settings','/settings/plans','/settings/billing','/settings/usage']){claims=null;assert.ok((await run(path)).location.includes('auth=signup'));}
  for(const path of ['/api/runs/run/generate','/api/runs/run/product','/api/runs/run/script']){claims=null;assert.equal((await run(path)).status,401);}
  for(const path of paid){claims=null;assert.equal((await run(path)).status,401);claims={sub:'owner'};plan=null;const r=await run(path);assert.equal(r.status,402);assert.equal(r.body.needsPlan,true);assert.equal(r.cookies.getAll()[0].value,'refreshed');plan='starter';assert.equal((await run(path)).status,200);}
