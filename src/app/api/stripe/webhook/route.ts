@@ -3,18 +3,26 @@ import { stripe, subscriptionRow } from "@/lib/server/stripe";
 import { billingRpc, withBillingLock } from "@/lib/server/billing-state";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { advanceDeletion } from "@/lib/server/account-deletion";
+import { stripeWebhookSecret } from "@/lib/production-config";
 
 export const maxDuration = 120;
 const idOf = (value: string | { id?: string } | null | undefined) => typeof value === "string" ? value : value?.id;
 /** Signature first. Fetch current Stripe state under a per-account lease, then atomically claim/apply. */
 export async function POST(request: Request) {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!secret) return Response.json({ error: "not configured" }, { status: 503 });
+  const secret = stripeWebhookSecret();
+  if (!secret) {
+    console.error("stripe_webhook_config_invalid");
+    return Response.json({ error: "not configured" }, { status: 503 });
+  }
   const signature = request.headers.get("stripe-signature");
   if (!signature) return Response.json({ error: "missing signature" }, { status: 400 });
   let event: Stripe.Event;
   try { event = await stripe().webhooks.constructEventAsync(await request.text(), signature, secret); }
-  catch { return Response.json({ error: "invalid signature" }, { status: 400 }); }
+  catch {
+    // Distinct alertable marker. Never log the secret, signature or untrusted request body.
+    console.error("stripe_webhook_signature_invalid");
+    return Response.json({ error: "invalid signature" }, { status: 400 });
+  }
   try {
     let subId: string | undefined, userId: string | null = null, checkout: string | null = null;
     if (event.type === "checkout.session.completed") {

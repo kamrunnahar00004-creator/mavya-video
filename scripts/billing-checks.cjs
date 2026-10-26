@@ -57,7 +57,7 @@ async function main() {
   await assert.rejects(state.applyBillingAction('owner','token',{stripe_subscription_id:'sub_fixture',billing_revision:1,last_event_created:200},current),/changed/);
 
   let event = {id:'evt_fixture',type:'customer.subscription.updated',created:100,data:{object:{id:'sub_fixture',status:'active',metadata:{user_id:'owner'}}}};
-  const webhook = load('src/app/api/stripe/webhook/route.ts',{'@/lib/server/stripe':stripeStub,'@/lib/server/billing-state':state,'@/lib/supabase/server':supabase,'@/lib/server/account-deletion':{advanceDeletion:async()=>deletionAdvanced++}},{STRIPE_WEBHOOK_SECRET:'fixture-only'});
+  const webhook = load('src/app/api/stripe/webhook/route.ts',{'@/lib/production-config':{stripeWebhookSecret:()=> 'whsec_fixture'},'@/lib/server/stripe':stripeStub,'@/lib/server/billing-state':state,'@/lib/supabase/server':supabase,'@/lib/server/account-deletion':{advanceDeletion:async()=>deletionAdvanced++}},{STRIPE_WEBHOOK_SECRET:'whsec_fixture'});
   const request=()=>new Request('https://app.fixture.invalid/webhook',{method:'POST',headers:{'stripe-signature':'fixture'},body:'fixture'});
   calls=[]; assert.equal((await webhook.POST(request())).status,200);
   assert.equal(calls.find(c=>c[0]==='retrieve')[2],true);

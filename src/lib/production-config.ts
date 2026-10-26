@@ -5,3 +5,9 @@ export function productionReady(): boolean {
 export function assertProductionConfig() {
  if (!productionReady()) throw new Error("Production account storage is unavailable");
 }
+
+/** Billing-specific validation must not take unrelated app routes offline. */
+export function stripeWebhookSecret(): string | null {
+ const secret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
+ return secret && /^whsec_\S+$/.test(secret) ? secret : null;
+}
