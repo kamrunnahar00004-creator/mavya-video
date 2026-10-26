@@ -14,7 +14,7 @@ import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundP
 import type { Song } from "@/app/api/songs/route";
 import { type Seg, clipSrc, demoClips, fileAt, moveClipPiece, removeDemoClip, segAt, videoLength, pieceSpans, relAt, remapTexts, retimeTexts, runSteps, shotList, storeParts, timeline } from "@/lib/edit";
 import { STYLE_GROUPS, STYLE_PRESETS, autoSecond, stylePreset } from "@/lib/text-styles";
-import { AVATAR_TONES, TEXT_Y, clipFromFile, saveStateOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
+import { AVATAR_TONES, TEXT_Y, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { PLATFORM_LABEL, commentCta, fmtTime, fmtViews, isLikelyBoosted, type DemoClip, type Frame, type Part, type Reference, type SoundPiece, type Run, type TextLayer, type TextPos } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
 import { ExportButton } from "@/components/export-button";
@@ -827,8 +827,9 @@ export function RunView() {
 /** "Saving..." / "Saved" next to the title; red while a save failed (it is retried). */
 function SaveStatus({ id }: { id: string }) {
   const state = useSyncExternalStore(subscribeSaves, () => saveStateOf(id), () => "idle" as const);
+  const error = useSyncExternalStore(subscribeSaves, () => saveErrorOf(id), () => null);
   if (state === "idle") return null;
-  if (state === "error") return <span className="text-[12.5px] font-semibold text-red-600">Couldn&apos;t save, retrying</span>;
+  if (state === "error") return <span role="alert" className="text-[12.5px] font-semibold text-red-600">{error ?? "Couldn't save, retrying"}</span>;
   return (
     <span className="flex items-center gap-1 text-[12.5px] font-semibold text-soft">
       {state === "saved" && <Check className="h-3.5 w-3.5" />}

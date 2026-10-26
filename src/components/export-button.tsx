@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, Loader2, X } from "lucide-react";
 import { uploadFile, waitRunSaves } from "@/lib/client";
-import { textPng } from "@/lib/text-png";
 import { exportLayers } from "@/lib/export-layers";
+import { renderLimitError } from "@/lib/render-limits";
+import { timeline, videoLength } from "@/lib/edit";
+import { soundPieces } from "@/lib/sound";
 import type { Run } from "@/lib/types";
 
 type Done = { src: string; seconds: number; at: string };
@@ -64,6 +66,10 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
       const response=await fetch(`/api/runs/${run.id}`,{cache:"no-store",signal:AbortSignal.timeout(30_000)});
       if(!response.ok)throw Error("Couldn't load the saved run.");
       const snapshot=await response.json() as Run;
+      const segments=timeline(snapshot,null).filter(s=>s.src),total=videoLength(segments);
+      const bounds=renderLimitError(segments,exportLayers(snapshot).length,soundPieces(snapshot,total).length,total);
+      if(bounds)throw Error(bounds);
+      const {textPng}=await import("@/lib/text-png");
       const manifest=[];
       // Draw/upload one at a time, avoiding 200 simultaneous full-resolution canvases.
       for(const t of exportLayers(snapshot)){

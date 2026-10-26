@@ -1,0 +1,11 @@
+{
+  "width": 720,
+  "height": 1280,
+  "fps": 30,
+  "segments": 40,
+  "pieces": 200,
+  "keyframes": 200,
+  "sounds": 20,
+  "overlays": 200,
+  "seconds": 180
+}

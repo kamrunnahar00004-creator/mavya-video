@@ -2,6 +2,8 @@ import { deleteRun, getRun, updateRun } from "@/lib/server/store";
 import type { Run } from "@/lib/types";
 import { validRunPatch } from "@/lib/server/run-validation";
 import { currentUser, signInFirst } from "@/lib/server/who";
+import { renderLimitError } from "@/lib/render-limits";
+import { timeline } from "@/lib/edit";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/runs/[id]">) {
   const { id } = await ctx.params;
@@ -17,7 +19,19 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/runs/[id]"
   const who = await currentUser();
   if (!who) return signInFirst();
   const body = (await request.json().catch(() => null)) as Partial<Run> | null;
+  if (body) {
+    const candidates = [body.hook, ...(Array.isArray(body.demo?.clips) ? body.demo.clips : [])].filter(Boolean);
+    const bounds = renderLimitError(candidates as Parameters<typeof renderLimitError>[0], body.texts?.length, body.sounds?.length);
+    if (bounds) return Response.json({ error: bounds }, { status: 400 });
+  }
   if (!validRunPatch(body)) return Response.json({ error: "Invalid run sections" }, { status: 400 });
+  if (body?.hook || body?.demo) {
+    const current = await getRun(id, who);
+    if (!current) return Response.json({ error: "Not found" }, { status: 404 });
+    const merged = { ...current, ...body };
+    const bounds = renderLimitError(timeline(merged, null), merged.texts?.length, merged.sounds?.length);
+    if (bounds) return Response.json({ error: bounds }, { status: 400 });
+  }
   if (!body) return Response.json({ error: "Bad request" }, { status: 400 });
   const patch: Partial<Omit<Run, "id" | "createdAt">> = {};
   if (typeof body.title === "string") patch.title = body.title.trim().slice(0, 140) || "Untitled run";

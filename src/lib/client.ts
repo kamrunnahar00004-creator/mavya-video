@@ -78,9 +78,11 @@ const saveChains = new Map<string, Promise<Run | null>>();
 /** Save status per run, for the "Saved" label: saving, saved, or error (a server or network failure is retried). */
 export type SaveState = "idle" | "saving" | "saved" | "error";
 const saveStates = new Map<string, SaveState>();
+const saveErrors = new Map<string, string>();
 const saveListeners = new Set<() => void>();
-function setSaveState(id: string, state: SaveState) {
-  if (saveStates.get(id) === state) return;
+function setSaveState(id: string, state: SaveState, error?: string) {
+  if (saveStates.get(id) === state && saveErrors.get(id) === error) return;
+  if (error) saveErrors.set(id, error); else saveErrors.delete(id);
   saveStates.set(id, state);
   saveListeners.forEach((l) => l());
 }
@@ -91,6 +93,7 @@ export function subscribeSaves(listener: () => void) {
   };
 }
 export const saveStateOf = (id: string): SaveState => saveStates.get(id) ?? "idle";
+export const saveErrorOf = (id: string): string | null => saveErrors.get(id) ?? null;
 
 /** Patches sent or queued per run, by send order: a failed patch is retried only for sections nothing newer has written. */
 let saveSeq = 0;
@@ -115,6 +118,8 @@ function flushRun(id: string) {
       const res = await fetch(`/api/runs/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body, keepalive });
       if (res.ok) return (await res.json()) as Run;
       retry = res.status >= 500;
+      const failure = await res.json().catch(() => null) as { error?: unknown } | null;
+      if (typeof failure?.error === "string") setSaveState(id, "error", failure.error.slice(0, 200));
       return null;
     } catch {
       retry = true;
@@ -134,7 +139,7 @@ function flushRun(id: string) {
       if (!pendingSaves.has(id) && !saveChains.has(id)) setSaveState(id, "saved");
       return;
     }
-    setSaveState(id, "error");
+    setSaveState(id, "error", saveErrors.get(id));
     if (!retry) return;
     const stale = Object.fromEntries(Object.entries(pending.patch).filter(([k]) => !superseded.has(k))) as Partial<Run>;
     if (!Object.keys(stale).length) return;

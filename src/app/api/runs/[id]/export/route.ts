@@ -9,10 +9,12 @@ import { segSpeed, timeline, videoLength } from "@/lib/edit";
 import { cloud, getRun, libraryLink, mediaAccess, mediaLink, mediaUploadLink, newUpload } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { pieceEnd, soundPieces } from "@/lib/sound";
+import { RENDER_LIMITS, renderLimitError } from "@/lib/render-limits";
 
 export const maxDuration = 300;
 // 720p: every source is 720p (Kling, library hooks); 1080p only added render time (founder 2026-10-24: as fast as possible).
-const W = 720, H = 1280, FPS = 30, LINK_SECONDS = 6 * 3600;
+const { width: W, height: H, fps: FPS } = RENDER_LIMITS;
+const LINK_SECONDS = 6 * 3600;
 const renderer = () => (process.env.RENDER_URL && process.env.RENDER_SECRET ? { url: process.env.RENDER_URL.replace(/\/+$/, ""), secret: process.env.RENDER_SECRET } : null);
 
 /** A link the render server can download a run's file from (null when it is not this user's). */
@@ -35,6 +37,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   const run = await getRun(id, who);
   if (!run) return Response.json({ error: "Not found" }, { status: 404 });
   if (!run.hook.generated) return Response.json({ error: "Generate the hook first." }, { status: 400 });
+  const sourceSegments = timeline(run, null).filter(s => s.src);
+  const bounds = renderLimitError(sourceSegments, exportLayers(run).length, soundPieces(run, videoLength(sourceSegments)).length, videoLength(sourceSegments));
+  if (bounds) return Response.json({ error: bounds }, { status: 400 });
 
   const existing = await exportJob(who, id);
   if (existing) return Response.json({job:existing.id});

@@ -1,4 +1,5 @@
 import { AVATAR_TONES } from "@/lib/client";
+import limits from "../../../render/constraints.json";
 
 /** Reject broken sections before they can make a saved run impossible to open. */
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
@@ -16,7 +17,7 @@ function adjust(v: unknown): boolean {
   if (!object(v)) return false;
   const ranges: Record<string, [number, number]> = { brightness: [-50, 50], contrast: [-50, 50], saturation: [-50, 50], warmth: [-50, 50], zoom: [0, 100], panX: [-100, 100], panY: [-100, 100], speed: [0.5, 2], volume: [0, 100] };
   for (const [key, [lo, hi]] of Object.entries(ranges)) if (!optional(v[key], (n) => number(n, lo, hi))) return false;
-  return optional(v.flip, (b) => typeof b === "boolean") && optional(v.keys, (ks) => Array.isArray(ks) && ks.length <= 500 && ks.every((k) => object(k) && number(k.t) && number(k.zoom, 0, 100) && number(k.panX, -100, 100) && number(k.panY, -100, 100)));
+  return optional(v.flip, (b) => typeof b === "boolean") && optional(v.keys, (ks) => Array.isArray(ks) && ks.length <= limits.keyframes && ks.every((k) => object(k) && number(k.t) && number(k.zoom, 0, 100) && number(k.panX, -100, 100) && number(k.panY, -100, 100)));
 }
 
 function clip(v: unknown): boolean {
@@ -47,7 +48,7 @@ function hook(v: unknown): boolean {
 
 function demo(v: unknown): boolean {
   if (!object(v) || !nullable(v.clip, clip) || !["none", "laptop", "overlay"].includes(String(v.frame))) return false;
-  return optional(v.clips, (cs) => Array.isArray(cs) && cs.length <= 100 && uniqueIds(cs) && cs.every((c) => {
+  return optional(v.clips, (cs) => Array.isArray(cs) && cs.length < limits.segments && uniqueIds(cs) && cs.every((c) => {
     if (!object(c) || !id(c.id) || c.id === "hook" || !string(c.label) || !optional(c.mediaId, mediaId) || !optional(c.src, localVideo) || !optional(c.adjust, adjust) || !optional(c.parts, parts)) return false;
     for (const key of ["name", "hint", "camera", "text"]) if (!optional(c[key], string)) return false;
     for (const key of ["seconds", "start", "end", "target"]) if (!optional(c[key], number)) return false;
@@ -57,7 +58,7 @@ function demo(v: unknown): boolean {
 }
 
 function texts(v: unknown): boolean {
-  return Array.isArray(v) && v.length <= 200 && uniqueIds(v) && v.every((t) => object(t) && id(t.id) && string(t.text) && number(t.start) && number(t.end) && (t.end as number) > (t.start as number) && number(t.x, -100, 200) && number(t.y, -100, 200) && number(t.size, 0.1, 100) && string(t.font) && string(t.color) && string(t.style) && optional(t.second, string));
+  return Array.isArray(v) && v.length <= limits.overlays && uniqueIds(v) && v.every((t) => object(t) && id(t.id) && string(t.text) && number(t.start) && number(t.end) && (t.end as number) > (t.start as number) && number(t.x, -100, 200) && number(t.y, -100, 200) && number(t.size, 0.1, 100) && string(t.font) && string(t.color) && string(t.style) && optional(t.second, string));
 }
 
 export function validAnalysis(v: unknown): boolean {

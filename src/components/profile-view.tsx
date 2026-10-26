@@ -26,7 +26,7 @@ export function ProfileView() {
       setSaved(p);setFirst(p.firstName);setLast(p.lastName);setUnavailable(false);
     } catch { if (!signal?.aborted) setUnavailable(true); }
   }, []);
-  useEffect(() => { const abort = new AbortController(); void reload(abort.signal); return () => abort.abort(); }, [reload]);
+  useEffect(() => { const abort = new AbortController(); queueMicrotask(() => { if (!abort.signal.aborted) void reload(abort.signal); }); return () => abort.abort(); }, [reload]);
 
   useEffect(() => {
     if (!toast) return;
