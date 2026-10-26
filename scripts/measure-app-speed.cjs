@@ -27,7 +27,7 @@ async function main(){
   else if(url.pathname.startsWith('/api/media/')){status=404;body={};}
   else if(url.pathname==='/api/assets')body=[];
   const data=Buffer.from(JSON.stringify(body)).toString('base64');
-  setTimeout(()=>void send('Fetch.fulfillRequest',{requestId,responseCode:status,responseHeaders:headers,body:data}),120);
+  setTimeout(()=>void send('Fetch.fulfillRequest',{requestId,responseCode:status,responseHeaders:headers,body:data}).catch(()=>{}),120);
  });
  await send('Page.enable');await send('Runtime.enable');await send('Network.enable');
  await send('Network.setCacheDisabled',{cacheDisabled:true});await send('Fetch.enable',{patterns:[{urlPattern:'*'}]});
@@ -37,10 +37,15 @@ async function main(){
  for(let round=0;round<3;round++)for(const port of [3427,afterPort])for(const path of ['/studio','/library','/studio/'+id(0)]){
   await send('Network.clearBrowserCache');await send('Page.navigate',{url:`http://localhost:${port}${path}`});await new Promise(r=>setTimeout(r,2400));
   const result=await send('Runtime.evaluate',{returnByValue:true,expression:`(()=>{const r=performance.getEntriesByType('resource');return {usable:window.__usable,jsBytes:r.filter(x=>x.initiatorType==='script').reduce((n,x)=>n+x.transferSize,0),fontBytes:r.filter(x=>/woff/.test(x.name)).reduce((n,x)=>n+x.transferSize,0),title:document.title,buttons:document.querySelectorAll('button').length}})()`});
-  rows.push({round,phase:port===3427?'before':'after',path,...result.result.value});
+  let editOpenMs=null;
+  if(path.startsWith("/studio/")){
+    const opened=await send('Runtime.evaluate',{returnByValue:true,awaitPromise:true,expression:`new Promise(resolve=>{const start=performance.now(),button=Array.from(document.querySelectorAll('button')).find(x=>x.textContent.trim()==='Edit video');if(!button){resolve(0);return;}const observer=new MutationObserver(()=>{if(document.querySelector('[role="dialog"][aria-label="Edit video"]')){observer.disconnect();resolve(performance.now()-start);}});observer.observe(document.body,{subtree:true,childList:true});button.click();setTimeout(()=>{observer.disconnect();resolve(0)},3000);})`});
+    editOpenMs=opened.result.value;
+  }
+  rows.push({round,editOpenMs,phase:port===3427?'before':'after',path,...result.result.value});
  }
  const median=v=>v.sort((a,b)=>a-b)[Math.floor(v.length/2)],summary={};
- for(const phase of ['before','after'])for(const path of [...new Set(rows.map(r=>r.path))])summary[phase+':'+path]=Object.fromEntries(['usable','jsBytes','fontBytes'].map(k=>[k,median(rows.filter(r=>r.phase===phase&&r.path===path).map(r=>r[k]))]));
+ for(const phase of ['before','after'])for(const path of [...new Set(rows.map(r=>r.path))])summary[phase+':'+path]=Object.fromEntries(['usable','jsBytes','fontBytes','editOpenMs'].map(k=>[k,median(rows.filter(r=>r.phase===phase&&r.path===path).map(r=>r[k]))]));
  const data={setup:'Client fixtures only, proxy disabled in separate artifact copies, API replies stubbed at 120ms, 1440x1000, CPU 2x, cold cache, three rounds. No auth/backend latency certification.',rows,summary,errors};
  fs.writeFileSync(out,JSON.stringify(data,null,2));console.log(JSON.stringify(summary));console.log('browser errors:',errors.length);ws.close();if(rows.some(r=>!r.usable)||errors.length)process.exitCode=1;
 }
