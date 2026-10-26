@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, Loader2, X } from "lucide-react";
 import { uploadFile, waitRunSaves } from "@/lib/client";
+import { pollDelay, waitForPoll } from "@/lib/polling";
 import { exportLayers } from "@/lib/export-layers";
 import { renderLimitError } from "@/lib/render-limits";
 import { timeline, videoLength } from "@/lib/edit";
@@ -29,6 +30,8 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
   const [jobId,setJobId]=useState<string|null>(null);
   const blocked=useRef(false);
   const callback=useRef(onDone);
+  const notify=useRef(onToast);
+  useEffect(()=>{notify.current=onToast;},[onToast]);
   useEffect(()=>{callback.current=onDone;},[onDone]);
   useEffect(()=>{
     let stop=false;
@@ -40,22 +43,26 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
   useEffect(()=>{
     if(!jobId)return;
     let stop=false;
+    const abort=new AbortController();
     void(async()=>{
+      let failures=0;
       for(let i=0;i<400&&!stop;i++){
-        await new Promise(r=>setTimeout(r,2500));
+        await waitForPoll(pollDelay(2500,failures,document.hidden),abort.signal);
+        if(stop)return;
         const response=await fetch(`/api/runs/${run.id}/export?job=${jobId}`,{cache:"no-store",signal:AbortSignal.timeout(30_000)}).catch(()=>null);
         const reply=await response?.json().catch(()=>null);
         if(stop)return;
         if(reply?.state==="done"&&reply.export){
           setProgress(null);setJobId(null);blocked.current=false;setDone(reply.export);callback.current(reply.export);return;
         }
-        if(reply?.state==="failed"||response?.status===404){setProgress(null);setJobId(null);blocked.current=false;onToast(reply?.error??"The export failed. Try again.");return;}
-        if(typeof reply?.progress==="number")setProgress(Math.max(0.02,reply.progress));
+        if(reply?.state==="failed"||response?.status===404){setProgress(null);setJobId(null);blocked.current=false;notify.current(reply?.error??"The export failed. Try again.");return;}
+        failures=response?.ok?0:failures+1;
+        if(typeof reply?.progress==="number")setProgress(previous=>Math.max(previous??0,0.02,Math.min(1,reply.progress)));
       }
-      if(!stop){setProgress(null);setJobId(null);blocked.current=false;onToast("This is taking too long. Reopen this run to continue.");}
+      if(!stop){setProgress(null);setJobId(null);blocked.current=false;notify.current("This is taking too long. Reopen this run to continue.");}
     })();
-    return ()=>{stop=true;};
-  },[jobId,run.id,onToast]);
+    return ()=>{stop=true;abort.abort();};
+  },[jobId,run.id]);
 
   async function start() {
     if(blocked.current)return;

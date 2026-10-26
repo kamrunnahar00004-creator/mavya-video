@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Adjust, fullAdjust, speedOf, videoStyle, warmthId, warmthMatrix } from "@/lib/adjust";
 import { fileAt, segAt, timeline, videoLength } from "@/lib/edit";
@@ -333,7 +333,7 @@ export function usePlaybackClaims(who: string, setPlaying: (v: boolean) => void)
 export const sizeLabel = (size: number) => Math.round(size * 10);
 
 /** Text layer positioned like on the phone. With `onMove`: drag to move, corner handle to resize. The parent needs `[container-type:size]` (text sizes are in cqh). */
-export function TextOverlay({ x, onMove }: { x: TextLayer; onMove?: (p: { x?: number; y?: number; size?: number }) => void }) {
+export const TextOverlay = memo(function TextOverlay({ x, onMove }: { x: TextLayer; onMove?: (p: { x?: number; y?: number; size?: number }) => void }) {
   // While resizing: the size, shown next to the cursor.
   const [badge, setBadge] = useState<{ left: number; top: number; size: number } | null>(null);
   function drag(e: React.PointerEvent<HTMLElement>, mode: "move" | "resize") {
@@ -389,7 +389,7 @@ export function TextOverlay({ x, onMove }: { x: TextLayer; onMove?: (p: { x?: nu
         )}
     </div>
   );
-}
+});
 
 function TextRender({ x, editing, onDone }: { x: TextLayer; editing: boolean; onDone: (t: string) => void }) {
   useEffect(() => loadFonts([x.font]), [x.font]);
