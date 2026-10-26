@@ -1,5 +1,5 @@
 import { TikTok_Sans, Anton, Bebas_Neue, Montserrat, Permanent_Marker, Poppins } from "next/font/google";
-const tiktok = TikTok_Sans({ variable: "--font-tiktok-sans", subsets: ["latin"], weight: "800", display: "swap" });
+const tiktok = TikTok_Sans({ variable: "--font-tiktok-sans", subsets: ["latin"], weight: "800", display: "swap", adjustFontFallback: false });
 // Caption fonts for text overlays.
 const anton = Anton({ variable: "--font-anton", subsets: ["latin"], weight: "400" });
 const bebas = Bebas_Neue({ variable: "--font-bebas", subsets: ["latin"], weight: "400" });

@@ -15,7 +15,7 @@ async function all(kind, values, key) {
 
 async function thumbnails(){
  let reads=0,who='owner';
- const route=load('src/app/api/references/thumbnails/route.ts',{
+ const route=load('src/app/api/references/thumbnails/route.ts',{'next/server':{connection:async()=>{}},
   '@/lib/server/who':{currentUser:async()=>who,signInFirst:()=>new Response(null,{status:401})},
   '@/lib/server/store':{referenceThumbnails:async ids=>{reads++;return ids.map(id=>({id,thumb:thumbnail}));}}
  });

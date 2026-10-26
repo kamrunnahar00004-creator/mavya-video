@@ -1,7 +1,9 @@
+import { connection } from "next/server";
 import { referenceThumbnails } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 /** Each image fragment selects a small tile; the whole page shares one cached response/query. */
 export async function GET(request: Request) {
+  await connection();
   const who = await currentUser();
   if (!who) return signInFirst();
   const params = new URL(request.url).searchParams;
