@@ -38,7 +38,7 @@ export function MavyaMark({ className = "h-8 w-8", inverted = false }: { classNa
 /** The marketing pages' logo, floating header and footer (landing and pricing). */
 export function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-2.5">
+    <Link prefetch={false} href="/" className="flex items-center gap-2.5">
       <MavyaMark />
       <span className="text-[18px] font-bold tracking-tight">Mavya</span>
     </Link>

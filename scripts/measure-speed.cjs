@@ -19,9 +19,10 @@ async function main(){
  await send('Page.addScriptToEvaluateOnNewDocument',{source:`window.__speed={lcp:0,cls:0};new PerformanceObserver(l=>{for(const e of l.getEntries())window.__speed.lcp=e.startTime}).observe({type:'largest-contentful-paint',buffered:true});new PerformanceObserver(l=>{for(const e of l.getEntries())if(!e.hadRecentInput)window.__speed.cls+=e.value}).observe({type:'layout-shift',buffered:true});`});
  const rows=[];
  for(let round=0;round<3;round++)for(const path of ['/','/pricing']){
-  await send('Network.clearBrowserCache');await send('Page.navigate',{url:`http://localhost:${port}${path}`});
+  await send('Network.clearBrowserCache');const navigation=await send('Page.navigate',{url:`http://localhost:${port}${path}`});if(navigation.errorText)throw Error(navigation.errorText);
   await new Promise(r=>setTimeout(r,3500));
   const result=await send('Runtime.evaluate',{returnByValue:true,expression:`(()=>{document.querySelectorAll('video,audio').forEach(v=>{v.muted=true;v.pause()});const resources=performance.getEntriesByType('resource');return {...window.__speed,path:location.pathname,clientWidth:document.documentElement.clientWidth,scrollWidth:document.documentElement.scrollWidth,jsBytes:resources.filter(r=>r.initiatorType==='script').reduce((n,r)=>n+r.transferSize,0),imageBytes:resources.filter(r=>r.initiatorType==='img'||/\\.(jpg|webp|png)(\\?|$)/.test(r.name)).reduce((n,r)=>n+r.transferSize,0),fontBytes:resources.filter(r=>/woff/.test(r.name)).reduce((n,r)=>n+r.transferSize,0),fontRequests:resources.filter(r=>/woff/.test(r.name)).length,mediaBytes:resources.filter(r=>/\\.(mp4|webm)(\\?|$)/.test(r.name)).reduce((n,r)=>n+r.transferSize,0),mediaRequests:resources.filter(r=>/\\.(mp4|webm)(\\?|$)/.test(r.name)).length,dom:performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd}})()`});
+  if(result.result.value?.path!==path || !(result.result.value.jsBytes>0))throw Error("Invalid benchmark navigation: "+JSON.stringify(result.result.value));
   rows.push({round,...result.result.value});
  }
  const median=values=>values.sort((a,b)=>a-b)[Math.floor(values.length/2)];
