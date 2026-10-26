@@ -33,9 +33,9 @@ async function fonts(){
  const n=links.length;links.at(-1).onerror();api.loadFonts(['TikTok Sans','Anton Test'],'abc');assert.equal(links.length,n+1);
 }
 async function cron(){
- let time=0,events=[],fail=new Set(),present=true;
+ let time=0,events=[],fail=new Set(),present=true,slow=false;
  class Clock extends Date {static now(){return time;}}
- const step=async name=>{events.push(name);if(fail.has(name))throw Error(name);return present;};
+ const step=async name=>{events.push(name);if(slow)time+=31000;if(fail.has(name))throw Error(name);return present;};
  const query=table=>({select(){return this;},neq(){return this;},or(){return this;},order(){return this;},in(){return this;},async limit(){return {data:present?[{id:'job',user_id:'owner'}]:[],error:null};}});
  const api=load('src/app/api/internal/generations/route.ts',{
   'node:crypto':require('node:crypto'),'@/lib/supabase/server':{createSupabaseAdminClient:()=>({from:query})},
@@ -48,6 +48,7 @@ async function cron(){
  events=[];fail=new Set(['deletion','upload','temp','export','generation']);assert.equal((await api.GET(request())).status,503);assert.equal(events.length,5);
  fail=new Set();present=false;assert.equal((await api.GET(request())).status,200);
  assert.equal((await api.GET(new Request('https://fixture.invalid/cron'))).status,401);
+ time=0;events=[];present=true;slow=true;fail=new Set(['deletion']);assert.equal((await api.GET(request())).status,503);assert.deepEqual(events,['deletion'],'do not start another category after the 30-second window');
 }
 async function main(){await attempts();await fonts();await cron();console.log('PASS: capped-attempt replay/window/error/admin cases, font isolation/fallback/retry and every cron rotation/error outcome');}
 main().catch(error=>{console.error(error);process.exitCode=1;});

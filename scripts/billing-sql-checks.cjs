@@ -39,6 +39,10 @@ async function main() {
     assert.equal(event('evt_200', 200, state('sub_A', 'canceled')), 'applied');
     assert.equal(event('evt_old', 100, state()), 'older');
     assert.equal(row().last_event_created, 200); assert.equal(row().status, 'canceled');
+    assert.equal(event('checkout-return:cs_fixture', 100, state()), 'older');
+    assert.equal(event('checkout-return:cs_fixture', 100, state()), 'duplicate');
+    assert.equal(row().last_event_created, 200); assert.equal(row().status, 'canceled');
+    assert.equal(sql("select user_id from billing_subscription_ids where subscription_id='sub_A'"),user);
     assert.equal(event('evt_equal', 200, state()), 'applied'); // Serialized current Stripe snapshot.
     const before = row();
     assert.equal(event('evt_201', 201, state('sub_A', 'canceled')), 'applied');
