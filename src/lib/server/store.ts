@@ -106,7 +106,8 @@ export async function listReferences(who: string): Promise<Reference[]> {
 export async function getReference(id: string, who: string): Promise<Reference | null> {
   if (!cloud()) return (await readDb()).references.find((r) => r.id === id) ?? null;
   if (!/^[0-9a-f-]{36}$/.test(id)) return null;
-  const { data } = await db().from("library").select("*").eq("id", id).maybeSingle<LibraryRow>();
+  const { data, error } = await db().from("library").select("*").eq("id", id).maybeSingle<LibraryRow>();
+  if (error) throw error;
   if (!data || (data.owner === "user" && data.user_id !== who)) return null;
   return fromRow(data);
 }
@@ -155,7 +156,8 @@ export async function deleteReference(id: string, who: string): Promise<void> {
   }
   const ref = await getReference(id, who);
   if (!ref) return;
-  await db().from("library").delete().eq("id", id);
+  const { error } = await db().from("library").delete().eq("id", id);
+  if (error) throw error;
   if (ref.mediaId) await deleteMediaFile(ref.mediaId);
 }
 
@@ -224,7 +226,8 @@ export async function deleteRun(id: string, who: string): Promise<void> {
     });
     return;
   }
-  await db().from("runs").delete().eq("id", id).eq("user_id", who);
+  const { error } = await db().from("runs").delete().eq("id", id).eq("user_id", who);
+  if (error) throw error;
 }
 
 /* ---------- Media + assets ---------- */
@@ -292,7 +295,8 @@ export async function deleteAsset(mediaId: string, who: string): Promise<void> {
     await deleteMediaFile(mediaId);
     return;
   }
-  await db().from("assets").delete().eq("media_id", mediaId).eq("user_id", who);
+  const { error } = await db().from("assets").delete().eq("media_id", mediaId).eq("user_id", who);
+  if (error) throw error;
   await deleteMediaFile(mediaId);
 }
 

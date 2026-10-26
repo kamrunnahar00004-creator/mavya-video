@@ -469,7 +469,8 @@ export function RunView() {
           type="button"
           onClick={async () => {
             if (!confirm("Delete this run?")) return;
-            await fetch(`/api/runs/${run.id}`, { method: "DELETE" });
+            const response = await fetch(`/api/runs/${run.id}`, { method: "DELETE" }).catch(() => null);
+            if (!response?.ok) return setToast("Couldn't delete the video. Try again.");
             router.push("/studio");
           }}
           className="rounded-lg p-2 text-soft hover:bg-raised hover:text-text"

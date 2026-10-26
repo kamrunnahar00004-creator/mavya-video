@@ -48,6 +48,7 @@ export async function DELETE(_request: Request, ctx: RouteContext<"/api/referenc
   const { id } = await ctx.params;
   const who = await currentUser();
   if (!who) return signInFirst();
+  try {
   const ref = await getReference(id, who);
   if (!ref) return new Response(null, { status: 204 });
   // The hook library is curated: only the curator's machine may remove from it.
@@ -56,4 +57,5 @@ export async function DELETE(_request: Request, ctx: RouteContext<"/api/referenc
   }
   await deleteReference(id, who);
   return new Response(null, { status: 204 });
+  } catch { return Response.json({ error: "Couldn't delete the hook. Try again." }, { status: 503 }); }
 }

@@ -81,7 +81,8 @@ export function ReferenceView() {
 
   async function remove() {
     if (!confirm("Delete this video from the library?")) return;
-    await fetch(`/api/references/${id}`, { method: "DELETE" });
+    const response = await fetch(`/api/references/${id}`, { method: "DELETE" }).catch(() => null);
+    if (!response?.ok) return alert("Couldn't delete the hook. Try again.");
     router.push("/library");
   }
 

@@ -67,6 +67,7 @@ export function RunsList() {
   const [creating, setCreating] = useState(false);
   const [view, setView] = useState<View>("grid");
   const [editing, setEditing] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -120,8 +121,9 @@ export function RunsList() {
 
   async function remove(r: Run) {
     if (!confirm(`Delete "${titleOf(r)}"? This can't be undone.`)) return;
-    setRuns((all) => all?.filter((x) => x.id !== r.id) ?? null);
-    await fetch(`/api/runs/${r.id}`, { method: "DELETE" });
+    const response = await fetch(`/api/runs/${r.id}`, { method: "DELETE" }).catch(() => null);
+    if (!response?.ok) return setError("Couldn't delete the video. Try again.");
+    setRuns((all) => all?.filter((x) => x.id !== r.id) ?? null);setError(null);
   }
 
   const iconBtn = "flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-raised hover:text-text";
@@ -186,6 +188,7 @@ export function RunsList() {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
+        {error && <p role="alert" className="mb-4 text-[13px] text-red-500">{error}</p>}
         {runs === null ? (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-5">
             {[0, 1, 2, 3].map((i) => (

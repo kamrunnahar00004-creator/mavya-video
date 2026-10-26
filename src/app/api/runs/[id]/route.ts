@@ -73,6 +73,7 @@ export async function DELETE(_request: Request, ctx: RouteContext<"/api/runs/[id
   const { id } = await ctx.params;
   const who = await currentUser();
   if (!who) return signInFirst();
-  await deleteRun(id, who);
+  try { await deleteRun(id, who); }
+  catch { return Response.json({ error: "Couldn't delete the video. Try again." }, { status: 503 }); }
   return new Response(null, { status: 204 });
 }

@@ -10,5 +10,11 @@ async function profile(){
  render();effects[0]();await new Promise(r=>setImmediate(r));let tree=render();assert.equal(nodes(tree).find(n=>n.props.id==='p-first').props.value,'First');
  networkFailure=true;effects[0]();await new Promise(r=>setImmediate(r));tree=render();assert.equal(nodes(tree).find(n=>n.props.id==='p-first').props.value,'First');assert.ok(nodes(tree).some(n=>n.props.role==='alert'));
 }
-async function main(){await profile();console.log('PASS: profile read outage returns 503 and the actual UI retains its last good values');}
+async function deletes(){
+ let error=null;const id='10000000-0000-4000-8000-000000000001';
+ const store=load('src/lib/server/store.ts',{'node:crypto':require('node:crypto'),'node:fs/promises':{},'node:path':require('node:path'),'@/lib/server/r2':{r2Enabled:()=>true},'@/lib/supabase/server':{authEnabled:()=>true,createSupabaseAdminClient:()=>({from:()=>({select(){return this;},delete(){return this;},eq(){return this;},async maybeSingle(){return {data:null,error};},then(ok,bad){return Promise.resolve({error}).then(ok,bad);}})})}});
+ await store.deleteRun(id,'owner');await store.deleteAsset(id+'.png','owner');await store.deleteReference(id,'owner');
+ error=Error('delete unavailable');await assert.rejects(store.deleteRun(id,'owner'),/unavailable/);await assert.rejects(store.deleteAsset(id+'.png','owner'),/unavailable/);await assert.rejects(store.deleteReference(id,'owner'),/unavailable/);
+}
+async function main(){await profile();await deletes();console.log('PASS: profile outage preserves last-good data; cloud deletes distinguish absence from storage failure');}
 main().catch(e=>{console.error(e);process.exitCode=1;});
