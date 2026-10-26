@@ -44,7 +44,7 @@ export async function listPage(kind: Kind, who: string, request: Request) {
   if (summary) items = items.map(value => {
     const run = value as Run;
     return { id: run.id, title: run.title, createdAt: run.createdAt, updatedAt: run.updatedAt, sourceRefId: run.sourceRefId,
-      hook: { source: run.hook.source, describeReady: run.hook.describeReady, describe: run.hook.describe ? "yes" : "", face: run.hook.face ? {} : null, generated: run.hook.generated ? {src: run.hook.generated.src} : undefined },
+      hook: { source: run.hook.source, describeReady: run.hook.describeReady, describe: run.hook.describe?.trim() ? "yes" : "", face: run.hook.face ? {} : null, generated: run.hook.generated ? {src: run.hook.generated.src} : undefined },
       demo: { clip: run.demo.clip, clips: run.demo.clips?.map(c => ({ id: c.id, mediaId: c.mediaId, src: c.src })) },
       product: run.product?.brief ? {brief: {}} : null, sounds: run.sounds?.length ? [{}] : run.sounds, sound: run.sound ? {} : null
     } as Run;
