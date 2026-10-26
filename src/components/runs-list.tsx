@@ -208,7 +208,7 @@ export function RunsList() {
             {runs.map((r) => {
               const p = progress(r);
               return (
-                <Link key={r.id} href={`/studio/${r.id}`} className="group block" onClick={(e) => editing === r.id && e.preventDefault()}>
+                <Link prefetch={false} key={r.id} href={`/studio/${r.id}`} className="group block" onClick={(e) => editing === r.id && e.preventDefault()}>
                   <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-[#1d1a2b] transition-transform group-hover:-translate-y-0.5">
                     <Cover run={r} />
                     <span className={`absolute left-2 top-2 rounded-md px-2 py-0.5 text-[12px] font-bold ${p.ready ? "bg-accent text-white" : "bg-white/90 text-text"}`}>{p.label}</span>
@@ -233,6 +233,7 @@ export function RunsList() {
               const p = progress(r);
               return (
                 <Link
+                  prefetch={false}
                   key={r.id}
                   href={`/studio/${r.id}`}
                   onClick={(e) => editing === r.id && e.preventDefault()}
