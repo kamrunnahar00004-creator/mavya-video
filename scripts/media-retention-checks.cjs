@@ -12,12 +12,13 @@ async function main(){
  const upload=load('src/lib/server/store.ts',{
   'node:crypto':require('node:crypto'),'node:fs/promises':{},'node:path':require('node:path'),
   '@/lib/server/r2':{r2Enabled:()=>true,putObject:async()=>{order.push('put');if(putFail)throw Error('unknown PUT result');}},
-  '@/lib/supabase/server':{authEnabled:()=>true,createSupabaseAdminClient:()=>({from:table=>({insert:async()=>{order.push(table);return {error:fail?Error('Account deletion in progress'):null};}})})}
+  '@/lib/supabase/server':{authEnabled:()=>true,createSupabaseAdminClient:()=>({from:table=>({insert:async()=>{order.push(table);return {error:fail?Error('Account deletion in progress'):null};},delete(){order.push('remove-'+table);return this;},eq(){return this;},then(resolve){resolve({error:null});}})})}
  });
  const file={type:'audio/mpeg',name:'fixture.mp3',arrayBuffer:async()=>new Uint8Array([1,2,3]).buffer};
  await upload.saveMedia(file,false,'owner');assert.deepEqual(order,['media','put']);
  order.length=0;fail=true;await assert.rejects(upload.saveMedia(file,false,'owner'),/deletion/);assert.deepEqual(order,['media']);
  order.length=0;fail=false;putFail=true;await assert.rejects(upload.saveMedia(file,false,'owner'),/unknown PUT/);assert.deepEqual(order,['media','put']);
+ order.length=0;await assert.rejects(upload.saveMedia(file,true,'owner'),/unknown PUT/);assert.deepEqual(order,['media','assets','put','remove-assets']);
  console.log('PASS: cloud asset removal only unlists assets; no capped reference scans or destructive media/R2 deletion');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
