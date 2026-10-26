@@ -14,13 +14,17 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const next = safeNext(searchParams.get("next"), origin);
-  const reset = next === RESET || searchParams.get("type") === "recovery";
+  const reset = Boolean(tokenHash) || next === RESET || searchParams.get("type") === "recovery";
   if (code || tokenHash) {
+    try {
     const supabase = await createSupabaseServerClient();
     const { error } = tokenHash
       ? await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" })
       : await supabase.auth.exchangeCodeForSession(code!);
     if (!error) return NextResponse.redirect(reset ? `${origin}${RESET}` : `${origin}/auth/continue?next=${encodeURIComponent(next)}`);
+    } catch {
+      console.error("auth_callback_failed");
+    }
   }
   return NextResponse.redirect(reset ? `${origin}${RESET}?expired=1` : `${origin}/?auth=login&error=1`);
 }

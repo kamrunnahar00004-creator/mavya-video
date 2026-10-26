@@ -27,14 +27,20 @@ export function ResetPasswordForm() {
     if (password.length < 8) return setError("Password must be at least 8 characters.");
     if (password !== confirm) return setError("Passwords do not match.");
     setLoading(true);
-    const { error: err } = await createSupabaseBrowserClient().auth.updateUser({ password });
-    if (err) {
+    try {
+      const { error: err } = await createSupabaseBrowserClient().auth.updateUser({ password });
+      if (err) {
+        if (err.status === 401 || err.code === "session_not_found") return setState("expired");
+        return setError(err.code === "same_password" ? "Use a different password from your old one." : err.message || "Something went wrong. Try again.");
+      }
+      // A full load: /auth/continue sends accounts without a plan to Pricing, others into the app.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign("/auth/continue?next=%2Fstudio");
+    } catch {
+      setError("Something went wrong. Try again.");
+    } finally {
       setLoading(false);
-      return setError(err.code === "same_password" ? "Use a different password from your old one." : err.message || "Something went wrong. Try again.");
     }
-    // A full load: /auth/continue sends accounts without a plan to Pricing, others into the app.
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-    window.location.assign("/auth/continue?next=%2Fstudio");
   }
 
   if (state === "checking") return <Loader2 className="mx-auto h-6 w-6 animate-spin text-soft" aria-label="Loading" />;

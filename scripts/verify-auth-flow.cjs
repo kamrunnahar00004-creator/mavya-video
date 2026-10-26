@@ -9,8 +9,8 @@ function harness(file,stubs,globals={}){
 }
 const nodes=(tree)=>!tree||typeof tree!=='object'?[]:[tree,...[tree.props?.children].flat(Infinity).flatMap(nodes)];
 async function modal(){
- let auth='signup',user=null,result={data:{session:{},user:{}},error:null},calls=[],navigations=[];
- const client={auth:{getUser:async()=>({data:{user}}),signUp:async input=>{calls.push(['signup',input]);return result;},signInWithPassword:async input=>{calls.push(['password',input]);return result;},signInWithOAuth:async input=>{calls.push(['google',input]);return {error:null};}}};
+ let auth='signup',user=null,result={data:{session:{},user:{}},error:null},calls=[],navigations=[],resetError=null,resetThrow=false;
+ const client={auth:{getUser:async()=>({data:{user}}),resetPasswordForEmail:async(email,options)=>{calls.push(['reset',email,options]);if(resetThrow)throw Error('network');return {error:resetError};},signUp:async input=>{calls.push(['signup',input]);return result;},signInWithPassword:async input=>{calls.push(['password',input]);return result;},signInWithOAuth:async input=>{calls.push(['google',input]);return {error:null};}}};
  const safeNext=load('src/lib/auth-next.ts').safeNext,authError=load('src/lib/auth-error.ts').authError;
  const h=harness('src/components/auth-modal.tsx',{'@/lib/auth-next':{safeNext},'@/lib/auth-error':{authError},'react-dom':{createPortal:x=>x},'next/navigation':{useSearchParams:()=>new URLSearchParams({auth,next:'/library'}),useRouter:()=>({replace(){}}),usePathname:()=>'/'} ,'lucide-react':{Eye:'Eye',EyeOff:'EyeOff',Loader2:'Loader2',X:'X'},'@/lib/supabase/client':{createSupabaseBrowserClient:()=>client}},{window:{location:{origin:'https://fixture.invalid',assign:url=>navigations.push(url)}},document:{body:{}}});
  async function open(mode){auth=mode;h.reset();assert.equal(h.render(h.api.AuthModalHost),null);await h.effects()[0]();await new Promise(r=>setImmediate(r));const host=h.render(h.api.AuthModalHost);assert.ok(host);h.reset();return host;}
@@ -26,6 +26,16 @@ async function modal(){
  tree=await submit('login',{code:'over_request_rate_limit',message:'Try later'});assert.ok(nodes(tree).some(n=>n.props.children==='Try later'));
  tree=await submit('signup',null,null);assert.ok(nodes(tree).some(n=>n.props.children==='Sign-up could not sign you in. Try again or contact us.'));
  for(const mode of ['login','signup']){const host=await open(mode),tree=h.render(host.type,host.props);await nodes(tree).find(n=>n.type==='button'&&n.props.children?.includes?.('Continue with Google')).props.onClick();await new Promise(r=>setImmediate(r));assert.equal(calls.at(-1)[0],'google');assert.equal(calls.at(-1)[1].provider,'google');assert.ok(!JSON.stringify(calls.at(-1)[1]).includes('shouldCreateUser'));}
+ for(const scenario of [null,{status:400,message:'Unknown address'},{status:429,message:'rate limited'},'throw']){
+  resetError=typeof scenario==='object'?scenario:null;resetThrow=scenario==='throw';const host=await open('login');let tree=h.render(host.type,host.props);
+  nodes(tree).find(n=>n.type==='button'&&n.props.children==='Forgot password?').props.onClick();tree=h.render(host.type,host.props);
+  nodes(tree).find(n=>n.type==='input'&&n.props.type==='email').props.onChange({target:{value:'fixture@example.invalid'}});tree=h.render(host.type,host.props);
+  await nodes(tree).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});await new Promise(r=>setImmediate(r));tree=h.render(host.type,host.props);
+  assert.equal(calls.at(-1)[0],'reset');assert.ok(calls.at(-1)[2].redirectTo.endsWith('next=%2Freset-password'));
+  if(scenario?.status===429)assert.ok(nodes(tree).some(n=>n.props.children==='Too many tries. Wait a minute and try again.'));
+  else assert.ok(nodes(tree).some(n=>n.props.role==='status'));
+  nodes(tree).find(n=>n.type==='button'&&n.props.children==='Log in').props.onClick();assert.ok(nodes(h.render(host.type,host.props)).some(n=>n.props.children==='Welcome back'));
+ }
  user={id:'known'};h.reset();h.render(h.api.AuthModalHost);h.effects()[0]();await new Promise(r=>setImmediate(r));assert.equal(navigations.at(-1),'/auth/continue?next=%2Flibrary');assert.equal(h.render(h.api.AuthModalHost),null);
 }
 async function gate(){
@@ -80,5 +90,16 @@ async function billing(){
  nav.length=0;paid='0';h.render(h.api.BillingView);h.effects()[0]();assert.equal(nav.length,0,'ordinary billing visit does not redirect');
  paid='1';account={...account,error:true};h.render(h.api.BillingView);h.effects()[0]();assert.equal(nav.length,0,'failed reload does not use stale entitlement');
 }
-async function main(){await modal();await gate();await pricing();await billing();console.log('PASS: actual auth modal, app/API gate, pricing checkout and billing entitlement-return matrix');}
+async function resetForm(){
+ let expired=false,user={id:'owner'},answer=null,throws=false,nav=[];
+ const h=harness('src/components/reset-password-form.tsx',{'next/link':{},'next/navigation':{useSearchParams:()=>new URLSearchParams(expired?{expired:'1'}:{})},'lucide-react':{},'@/lib/supabase/client':{createSupabaseBrowserClient:()=>({auth:{getUser:async()=>({data:{user}}),updateUser:async()=>{if(throws)throw Error('network');return {error:answer};}}})}},{window:{location:{assign:url=>nav.push(url)}}});
+ for(const [password,confirm,error,message] of [['short','short',null,'Password must be at least 8 characters.'],['password123','different',null,'Passwords do not match.'],['password123','password123',{code:'same_password'},'Use a different password from your old one.'],['password123','password123','throw','Something went wrong. Try again.'],['password123','password123',null,null]]){
+  h.reset();answer=error;throws=error==='throw';h.render(h.api.ResetPasswordForm);h.effects()[0]();await new Promise(r=>setImmediate(r));let tree=h.render(h.api.ResetPasswordForm);
+  const inputs=nodes(tree).filter(n=>n.type==='input');inputs[0].props.onChange({target:{value:password}});inputs[1].props.onChange({target:{value:confirm}});tree=h.render(h.api.ResetPasswordForm);await tree.props.onSubmit({preventDefault(){}});tree=h.render(h.api.ResetPasswordForm);
+  if(message)assert.ok(nodes(tree).some(n=>n.props.children===message));else assert.equal(nav.at(-1),'/auth/continue?next=%2Fstudio');
+ }
+ expired=true;h.reset();assert.ok(nodes(h.render(h.api.ResetPasswordForm)).some(n=>n.props.children==='This link has expired'));
+ expired=false;user=null;h.reset();h.render(h.api.ResetPasswordForm);h.effects()[0]();await new Promise(r=>setImmediate(r));assert.ok(nodes(h.render(h.api.ResetPasswordForm)).some(n=>n.props.children==='This link has expired'));
+}
+async function main(){await modal();await gate();await pricing();await billing();await resetForm();console.log('PASS: auth/gate/pricing/billing matrix plus forgot send/429/transport/sent/back and reset validation/session/save/navigation');}
 main().catch(e=>{console.error(e);process.exitCode=1;});

@@ -62,7 +62,7 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
 
   useEffect(() => {
     emailRef.current?.focus();
-  }, []);
+  }, [mode]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !loading) onClose();
@@ -136,10 +136,16 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
   async function sendReset() {
     if (!email.trim()) return setError("Enter your email.");
     setLoading(true);
-    const { error: e } = await createSupabaseBrowserClient().auth.resetPasswordForEmail(email.trim(), { redirectTo: callback("/reset-password") });
-    setLoading(false);
-    if (e?.status === 429) return setError("Too many tries. Wait a minute and try again.");
-    setSent(true);
+    try {
+      const { error: e } = await createSupabaseBrowserClient().auth.resetPasswordForEmail(email.trim(), { redirectTo: callback("/reset-password") });
+      if (e?.status === 429) return setError("Too many tries. Wait a minute and try again.");
+      setSent(true);
+    } catch {
+      // Keep the same non-enumerating response for transport failures too.
+      setSent(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   // Portal to <body>: the sticky header's backdrop blur would otherwise contain the fixed overlay.

@@ -21,13 +21,20 @@ async function routes(){
  assert.equal(await dest('//evil.invalid'),'https://fixture.invalid/studio');
  fail=true;assert.equal(await dest('/studio/run'),'https://fixture.invalid/studio/run');fail=false;
  user=null;assert.equal(await dest('/studio/run'),'https://fixture.invalid/?auth=login');
- let code;
+ let code, otp, callbackError=null, callbackThrow=false;
  const callback=load('src/app/auth/callback/route.ts',{
   'next/server':{NextResponse:{redirect}},'@/lib/auth-next':{safeNext},
-  '@/lib/supabase/server':{createSupabaseServerClient:async()=>({auth:{exchangeCodeForSession:async c=>{code=c;return {error:null};}}})}
+  '@/lib/supabase/server':{createSupabaseServerClient:async()=>({auth:{exchangeCodeForSession:async c=>{code=c;if(callbackThrow)throw Error('unavailable');return {error:callbackError};},verifyOtp:async value=>{otp=value;if(callbackThrow)throw Error('unavailable');return {error:callbackError};}}})}
  });
  const result=await callback.GET(new Request('https://fixture.invalid/auth/callback?code=fixture&next=%2Fstudio%2Frun'));
  assert.equal(code,'fixture');assert.equal(result.headers.get('location'),'https://fixture.invalid/auth/continue?next=%2Fstudio%2Frun');
+ const cb=async query=>(await callback.GET(new Request('https://fixture.invalid/auth/callback?'+query))).headers.get('location');
+ assert.equal(await cb('token_hash=fixture&type=recovery'),'https://fixture.invalid/reset-password');assert.equal(otp.type,'recovery');assert.equal(otp.token_hash,'fixture');
+ assert.equal(await cb('token_hash=fixture'),'https://fixture.invalid/reset-password');
+ assert.equal(await cb('code=fixture&next=%2Freset-password'),'https://fixture.invalid/reset-password');
+ callbackError=Error('bad token');assert.equal(await cb('token_hash=bad&type=recovery'),'https://fixture.invalid/reset-password?expired=1');
+ assert.equal(await cb('code=bad&next=%2Freset-password'),'https://fixture.invalid/reset-password?expired=1');callbackError=null;
+ callbackThrow=true;assert.equal(await cb('token_hash=bad'),'https://fixture.invalid/reset-password?expired=1');callbackThrow=false;
  console.log('PASS: actual continue/callback handlers cover no plan, paid, admin, signed out, outage and exchanged-code continuation');
 }
 routes().catch(error=>{console.error(error);process.exitCode=1;});
