@@ -3,21 +3,22 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { fetchPage } from "@/lib/list-client";
 import { patchRun } from "@/lib/client";
 import type { Reference, Run } from "@/lib/types";
-import { SourcePicker } from "@/components/run-view";
+import { SourcePicker } from "@/components/source-picker";
 
 /** Viral library: the same hook grid as step 1, browsable without starting a video. */
 export function LibraryView() {
   const router = useRouter();
+  const [cursor, setCursor] = useState<string | null>(null);
   const [refs, setRefs] = useState<Reference[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
-    fetch("/api/references")
-      .then((r) => r.json())
-      .then((data: Reference[]) => alive && setRefs(data))
+    fetchPage<Reference>("/api/references?view=studio")
+      .then((page) => { if (alive) { setRefs(page.items); setCursor(page.next); } })
       .catch(() => alive && setRefs([]));
     return () => {
       alive = false;
@@ -49,7 +50,7 @@ export function LibraryView() {
             <Loader2 className="h-5 w-5 animate-spin" />
           </div>
         ) : (
-          <SourcePicker refs={refs} source={null} onRefsChange={setRefs} onPick={(r) => void startWithHook(r)} onClear={() => undefined} />
+          <SourcePicker onLoadMore={cursor ? async () => { const page = await fetchPage<Reference>("/api/references?view=studio", cursor); setRefs(old => [...(old ?? []), ...page.items]); setCursor(page.next); } : undefined} refs={refs} source={null} onRefsChange={setRefs} onPick={(r) => void startWithHook(r)} onClear={() => undefined} />
         )}
         {error && <p className="mt-3 text-[13px] text-red-500">{error}</p>}
       </div>

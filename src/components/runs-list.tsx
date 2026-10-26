@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LayoutGrid, List, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { fetchPage } from "@/lib/list-client";
 import { runSteps } from "@/lib/edit";
 import { fmtDate, type Reference, type Run } from "@/lib/types";
 
@@ -13,7 +14,7 @@ type View = "grid" | "list";
 
 /** A video's picture: the generated hook's first frame, else the stolen hook's cover. */
 function Cover({ run, source }: { run: Run; source?: Reference }) {
-  const thumb = source?.analysis?.segments[0]?.thumb ?? source?.thumbUrl;
+  const thumb = (run as Run & {cover?: string}).cover ?? source?.analysis?.segments[0]?.thumb ?? source?.thumbUrl;
   if (run.hook.generated) return <video src={`${run.hook.generated.src}#t=0.5`} muted preload="metadata" className="absolute inset-0 h-full w-full object-cover" />;
   if (thumb)
     // eslint-disable-next-line @next/next/no-img-element
@@ -62,8 +63,9 @@ function Title({ run, editing, onEdit, onRename, className }: { run: Run; editin
 
 export function RunsList() {
   const router = useRouter();
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [runs, setRuns] = useState<Run[] | null>(null);
-  const [refs, setRefs] = useState<Record<string, Reference>>({});
   const [creating, setCreating] = useState(false);
   const [view, setView] = useState<View>("grid");
   const [editing, setEditing] = useState<string | null>(null);
@@ -77,14 +79,9 @@ export function RunsList() {
     } catch {
       // No storage: grid by default.
     }
-    fetch("/api/runs")
-      .then((r) => r.json())
-      .then((data: Run[]) => alive && setRuns(data))
+    fetchPage<Run>("/api/runs?view=summary")
+      .then((page) => { if (alive) { setRuns(page.items); setCursor(page.next); } })
       .catch(() => alive && setRuns([]));
-    fetch("/api/references?view=covers")
-      .then((r) => r.json())
-      .then((data: Reference[]) => alive && setRefs(Object.fromEntries(data.map((x) => [x.id, x]))))
-      .catch(() => undefined);
     return () => {
       alive = false;
     };
@@ -188,7 +185,8 @@ export function RunsList() {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
-        {error && <p role="alert" className="mb-4 text-[13px] text-red-500">{error}</p>}
+        {cursor && <button type="button" disabled={loadingMore} className="btn-secondary m-4 px-4 py-2" onClick={async () => { setLoadingMore(true); try { const page = await fetchPage<Run>("/api/runs?view=summary", cursor); setRuns(old => [...(old ?? []), ...page.items]); setCursor(page.next); } catch { setError("List is unavailable. Try again."); } finally { setLoadingMore(false); } }}>Load more</button>}
+      {error && <p role="alert" className="mb-4 text-[13px] text-red-500">{error}</p>}
         {runs === null ? (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-5">
             {[0, 1, 2, 3].map((i) => (
@@ -211,7 +209,7 @@ export function RunsList() {
               return (
                 <Link key={r.id} href={`/studio/${r.id}`} className="group block" onClick={(e) => editing === r.id && e.preventDefault()}>
                   <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-[#1d1a2b] transition-transform group-hover:-translate-y-0.5">
-                    <Cover run={r} source={r.sourceRefId ? refs[r.sourceRefId] : undefined} />
+                    <Cover run={r} />
                     <span className={`absolute left-2 top-2 rounded-md px-2 py-0.5 text-[12px] font-bold ${p.ready ? "bg-accent text-white" : "bg-white/90 text-text"}`}>{p.label}</span>
                     <div className="absolute right-2 top-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">{actions(r, true)}</div>
                   </div>
@@ -240,7 +238,7 @@ export function RunsList() {
                   className="group grid grid-cols-[56px_minmax(0,1fr)_160px_110px_80px] items-center gap-4 border-b border-line px-4 py-2.5 last:border-b-0 hover:bg-raised"
                 >
                   <div className="relative h-[72px] w-[40px] overflow-hidden rounded-md bg-[#1d1a2b]">
-                    <Cover run={r} source={r.sourceRefId ? refs[r.sourceRefId] : undefined} />
+                    <Cover run={r} />
                   </div>
                   <Title run={r} editing={editing === r.id} onEdit={(on) => setEditing(on ? r.id : null)} onRename={(t) => void rename(r, t)} className="text-[14.5px] font-semibold" />
                   <div className="flex items-center gap-2.5">

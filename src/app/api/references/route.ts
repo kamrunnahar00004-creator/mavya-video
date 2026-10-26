@@ -1,5 +1,6 @@
+import { listPage, pageResponse, listError } from "@/lib/server/list-pages";
 import { connection } from "next/server";
-import { createReference, listReferences, mediaAccess } from "@/lib/server/store";
+import { createReference, mediaAccess } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { HOOK_STYLES, NICHES } from "@/lib/taxonomy";
 import type { Platform } from "@/lib/types";
@@ -11,15 +12,18 @@ export async function GET(request: Request) {
   await connection();
   const who = await currentUser();
   if (!who) return signInFirst();
-  const refs = await listReferences(who);
+  try {
+  const page = await listPage("references", who, request);
+  const refs = page.items as import("@/lib/types").Reference[];
   const view = new URL(request.url).searchParams.get("view");
-  if (view === "covers") return Response.json(refs.map((r) => ({ id: r.id, thumbUrl: r.analysis?.segments[0]?.thumb ?? r.thumbUrl })));
+  if (view === "covers") return pageResponse(refs.map((r) => ({ id: r.id, thumbUrl: r.analysis?.segments[0]?.thumb ?? r.thumbUrl })), page.next);
   if (view === "studio") {
     // Curation history and model explanations never appear in the studio.
     const keys = ["id", "title", "platform", "sourceUrl", "views", "mediaId", "mime", "createdAt", "analysis", "owner", "niche", "hookStyle", "thumbUrl", "author", "likes", "comments", "caption", "summary", "recipe", "postedAt", "pending", "review", "followers"] as const;
-    return Response.json(refs.map((r) => ({ ...Object.fromEntries(keys.map((k) => [k, r[k]])), ai: r.ai ? { style: r.ai.style } : undefined })));
+    return pageResponse(refs.map((r) => ({ ...Object.fromEntries(keys.map((k) => [k, r[k]])), ai: r.ai ? { style: r.ai.style } : undefined })), page.next);
   }
-  return Response.json(refs);
+  return pageResponse(refs, page.next);
+  } catch (error) { return listError(error); }
 }
 
 /** Add a video file as a reference. `owner: "curated"` puts it in the hook library (curator only). */

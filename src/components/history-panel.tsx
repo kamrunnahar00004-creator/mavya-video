@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { fetchPage } from "@/lib/list-client";
 import { speedOf } from "@/lib/adjust";
 import { claimPlayback, usePlaybackClaims } from "@/components/run-preview";
 import { Download, Film, FolderOpen, Loader2, Music, Pause, Play, X } from "lucide-react";
@@ -57,6 +58,10 @@ export function HistoryPanel({ run, refs, refreshKey, onClose, onUseHook, onUseF
   onUseDemo: (clips: DemoClip[], from: Run) => void;
   onUseSound: (p: SoundPiece) => void;
 }) {
+  const [cursors, setCursors] = useState<(string | null)[]>([]);
+  const [historyRefs, setHistoryRefs] = useState<Reference[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const [runs, setRuns] = useState<Run[] | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [tab, setTab] = useState<Tab>("hooks");
@@ -65,18 +70,34 @@ export function HistoryPanel({ run, refs, refreshKey, onClose, onUseHook, onUseF
 
   useEffect(() => {
     let alive = true;
-    Promise.all([fetch("/api/runs").then((r) => r.json() as Promise<Run[]>), fetch("/api/assets").then((r) => r.json() as Promise<Asset[]>)])
-      .then(([rs, as]) => {
+    Promise.all([fetchPage<Run>("/api/runs"), fetchPage<Asset>("/api/assets"), fetchPage<Reference>("/api/references?view=studio")])
+      .then(([rs, as, hs]) => {
         if (!alive) return;
-        setRuns(rs);
-        setAssets(as);
+        setRuns(rs.items); setAssets(as.items); setHistoryRefs(hs.items);
+        setCursors([rs.next, as.next, hs.next]); setListError(null);
       })
-      .catch(() => alive && setRuns([]));
+      .catch(() => { if (alive) setListError("List is unavailable. Try again."); });
     return () => {
       alive = false;
     };
   }, [refreshKey]);
 
+  async function loadMore() {
+    setLoadingMore(true);
+    try {
+      const [rs, as, hs] = await Promise.all([
+        cursors[0] ? fetchPage<Run>("/api/runs", cursors[0]) : null,
+        cursors[1] ? fetchPage<Asset>("/api/assets", cursors[1]) : null,
+        cursors[2] ? fetchPage<Reference>("/api/references?view=studio", cursors[2]) : null
+      ]);
+      if (rs) setRuns(old => [...(old ?? []), ...rs.items]);
+      if (as) setAssets(old => [...old, ...as.items]);
+      if (hs) setHistoryRefs(old => [...old, ...hs.items]);
+      setCursors([rs?.next ?? null, as?.next ?? null, hs?.next ?? null]); setListError(null);
+    } catch { setListError("List is unavailable. Try again."); }
+    finally { setLoadingMore(false); }
+  }
+  const availableRefs = [...new Map([...historyRefs, ...refs].map(r => [r.id, r])).values()];
   // The open video as it is now (its saved copy may be a moment behind).
   const all = runs ? [run, ...runs.filter((r) => r.id !== run.id)] : [run];
   const from = (r: Run) => ({ runId: r.id, runTitle: title(r) });
@@ -84,12 +105,12 @@ export function HistoryPanel({ run, refs, refreshKey, onClose, onUseHook, onUseF
   const hooks: Entry<Reference>[] = [];
   const seenHook = new Set<string>();
   for (const r of all) {
-    const ref = refs.find((x) => x.id === r.sourceRefId);
+    const ref = availableRefs.find((x) => x.id === r.sourceRefId);
     if (!ref || seenHook.has(ref.id)) continue;
     seenHook.add(ref.id);
     hooks.push({ key: ref.id, at: r.updatedAt, ...from(r), kind: ref.owner === "user" ? "upload" : "library", value: ref });
   }
-  for (const ref of refs) if (ref.owner === "user" && ref.mediaId && !seenHook.has(ref.id)) hooks.push({ key: ref.id, at: ref.createdAt, kind: "upload", value: ref });
+  for (const ref of availableRefs) if (ref.owner === "user" && ref.mediaId && !seenHook.has(ref.id)) hooks.push({ key: ref.id, at: ref.createdAt, kind: "upload", value: ref });
 
   const faces: Entry<Face>[] = [];
   const seenFace = new Set<string>();
@@ -163,6 +184,8 @@ export function HistoryPanel({ run, refs, refreshKey, onClose, onUseHook, onUseF
           const thumb = r.analysis?.segments[0]?.thumb ?? r.thumbUrl;
           return (
             <Card key={x.key} onUse={run.sourceRefId === r.id ? undefined : () => onUseHook(r)} footer={<><div className="truncate text-[12.5px] font-semibold">{r.author ? `@${r.author}` : r.title}</div>{meta(x)}</>}>
+      {listError && <p role="alert" className="px-5 py-2 text-red-500">{listError}</p>}
+      {cursors.some(Boolean) && <button type="button" className="btn-secondary m-3 px-4 py-2" disabled={loadingMore} onClick={() => void loadMore()}>Load more</button>}
               {r.mediaId ? <HoverVideo src={`/api/media/${r.mediaId}`} /> : thumb ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={thumb} alt="" className="h-full w-full object-cover" />
