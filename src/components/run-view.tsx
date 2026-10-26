@@ -1,4 +1,5 @@
 "use client";
+import { MediaVideo } from "@/components/media-video";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
@@ -576,7 +577,7 @@ export function RunView() {
                     <div className="space-y-3 border-t border-line p-4">
                       {staged ? (
                         <div className="flex items-center gap-3 rounded-xl border border-line p-2.5">
-                          <video src={`/api/media/${staged.mediaId}#t=0.5`} muted preload="metadata" className="h-[72px] w-[42px] rounded-md bg-ink object-cover" />
+                          <MediaVideo src={`/api/media/${staged.mediaId}#t=0.5`} muted preload="metadata" className="h-[72px] w-[42px] rounded-md bg-ink object-cover" />
                           <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{staged.title}</span>
                           <button type="button" onClick={() => setStaged(null)} className="rounded-lg px-3 py-1.5 text-[13px] font-bold text-accent hover:bg-accent-tint">
                             Replace

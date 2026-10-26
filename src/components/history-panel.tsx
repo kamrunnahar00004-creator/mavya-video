@@ -1,4 +1,5 @@
 "use client";
+import { MediaVideo } from "@/components/media-video";
 
 import { useEffect, useId, useRef, useState } from "react";
 import { fetchPage } from "@/lib/list-client";
@@ -184,8 +185,6 @@ export function HistoryPanel({ run, refs, refreshKey, onClose, onUseHook, onUseF
           const thumb = r.analysis?.segments[0]?.thumb ?? r.thumbUrl;
           return (
             <Card key={x.key} onUse={run.sourceRefId === r.id ? undefined : () => onUseHook(r)} footer={<><div className="truncate text-[12.5px] font-semibold">{r.author ? `@${r.author}` : r.title}</div>{meta(x)}</>}>
-      {listError && <p role="alert" className="px-5 py-2 text-red-500">{listError}</p>}
-      {cursors.some(Boolean) && <button type="button" className="btn-secondary m-3 px-4 py-2" disabled={loadingMore} onClick={() => void loadMore()}>Load more</button>}
               {r.mediaId ? <HoverVideo src={`/api/media/${r.mediaId}`} /> : thumb ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={thumb} alt="" className="h-full w-full object-cover" />
@@ -281,6 +280,8 @@ export function HistoryPanel({ run, refs, refreshKey, onClose, onUseHook, onUseF
 
   return (
     <div className="card flex h-full w-[500px] max-w-[calc(100vw-24px)] flex-col overflow-hidden">
+      {listError && <p role="alert" className="px-5 py-2 text-red-500">{listError}</p>}
+      {cursors.some(Boolean) && <button type="button" className="btn-secondary m-3 px-4 py-2" disabled={loadingMore} onClick={() => void loadMore()}>Load more</button>}
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <div className="flex items-center gap-2 text-[15px] font-bold">
           <FolderOpen className="h-[18px] w-[18px] text-muted" />
@@ -354,7 +355,7 @@ function HoverVideo({ src, at = 0.5, sound = false }: { src: string; at?: number
   usePlaybackClaims(who, setPlaying);
   useEffect(() => { if (!playing) ref.current?.pause(); }, [playing]);
   return (
-    <video
+    <MediaVideo
       ref={ref}
       src={`${src}#t=${at}`}
       muted={!sound}

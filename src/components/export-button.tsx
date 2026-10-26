@@ -1,4 +1,5 @@
 "use client";
+import { MediaVideo } from "@/components/media-video";
 
 import { useEffect, useRef, useState } from "react";
 import { Download, Loader2, X } from "lucide-react";
@@ -119,7 +120,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <video src={done.src} controls autoPlay playsInline className="mt-4 aspect-[9/16] max-h-[60vh] w-full rounded-xl bg-black object-contain" />
+            <MediaVideo src={done.src} controls autoPlay playsInline className="mt-4 aspect-[9/16] max-h-[60vh] w-full rounded-xl bg-black object-contain" />
             <a href={`${done.src}?download=${encodeURIComponent(name)}`} download className="btn-primary mt-4 w-full py-2.5 text-[14px]">
               <Download className="h-4 w-4" />
               Download

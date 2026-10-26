@@ -1,4 +1,5 @@
 "use client";
+import { MediaVideo } from "@/components/media-video";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -15,7 +16,7 @@ type View = "grid" | "list";
 /** A video's picture: the generated hook's first frame, else the stolen hook's cover. */
 function Cover({ run, source }: { run: Run; source?: Reference }) {
   const thumb = (run as Run & {cover?: string}).cover ?? source?.analysis?.segments[0]?.thumb ?? source?.thumbUrl;
-  if (run.hook.generated) return <video src={`${run.hook.generated.src}#t=0.5`} muted preload="metadata" className="absolute inset-0 h-full w-full object-cover" />;
+  if (run.hook.generated) return <MediaVideo src={`${run.hook.generated.src}#t=0.5`} muted preload="metadata" className="absolute inset-0 h-full w-full object-cover" />;
   if (thumb)
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={thumb} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />;

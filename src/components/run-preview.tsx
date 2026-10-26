@@ -1,4 +1,5 @@
 "use client";
+import { MediaVideo } from "@/components/media-video";
 
 import { memo, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -222,7 +223,7 @@ export function SyncedVideo({ src, at, piece = 0, playing, style, rate = 1, volu
     if (v && v.readyState >= 1) v.currentTime = atRef.current;
   }, [piece]);
   return (
-    <video
+    <MediaVideo
       ref={ref}
       src={src}
       muted

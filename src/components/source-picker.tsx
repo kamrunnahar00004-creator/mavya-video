@@ -1,4 +1,5 @@
 "use client";
+import { MediaVideo } from "@/components/media-video";
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Eye, Heart, Link as LinkIcon, Loader2, Upload, X } from "lucide-react";
 import { analyzeVideo } from "@/lib/analyze";
@@ -193,7 +194,7 @@ function HookCard({ r, busy, disabled, onPick }: { r: Reference; busy: boolean; 
       className="group relative aspect-[9/16] overflow-hidden rounded-xl bg-ink text-left outline-2 outline-offset-2 outline-transparent transition-[outline-color] hover:outline-accent disabled:opacity-60"
     >
       {r.mediaId && hover ? (
-        <video src={`/api/media/${r.mediaId}`} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover" />
+        <MediaVideo src={`/api/media/${r.mediaId}`} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover" />
       ) : r.mediaId || r.thumbUrl ? (
         <Thumb r={r} className="absolute inset-0 h-full w-full" />
       ) : (
@@ -418,7 +419,7 @@ export function Thumb({ r, className }: { r: Reference; className?: string }) {
       // eslint-disable-next-line @next/next/no-img-element
       <img src={thumb} alt="" loading="lazy" decoding="async" className={`object-cover ${className ?? ""}`} />
     );
-  if (r.mediaId) return <video src={`/api/media/${r.mediaId}#t=0.5`} muted preload="metadata" className={`object-cover ${className ?? ""}`} />;
+  if (r.mediaId) return <MediaVideo src={`/api/media/${r.mediaId}#t=0.5`} muted preload="metadata" className={`object-cover ${className ?? ""}`} />;
   return (
     <span className={`flex items-center justify-center bg-raised text-soft ${className ?? ""}`}>
       <LinkIcon className="h-4 w-4" />

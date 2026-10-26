@@ -1,4 +1,5 @@
 "use client";
+import { MediaVideo } from "@/components/media-video";
 import dynamic from "next/dynamic";
 
 import { memo, useCallback, useEffect, useId, useRef, useState } from "react";
@@ -233,7 +234,7 @@ export function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlace
                   className={`absolute inset-0 overflow-hidden ${zoomed ? "cursor-grab touch-none active:cursor-grabbing" : "cursor-zoom-in"}`}
                 >
                   <WarmthFilter adjust={seg.adjust} />
-                  <video ref={vref} key={`${seg.src}|${version ?? ""}`} src={seg.src} muted={!playing} playsInline onLoadedMetadata={() => seek(0)} className="absolute inset-0 h-full w-full object-cover" style={look} />
+                  <MediaVideo ref={vref} key={`${seg.src}|${version ?? ""}`} src={seg.src} muted={!playing} playsInline onLoadedMetadata={() => seek(0)} className="absolute inset-0 h-full w-full object-cover" style={look} />
                   {local.filter((x) => x.text.trim() && t >= x.start - 0.05 && t <= x.end + 0.05).map((x) => <TextOverlay key={x.id} x={x} onMove={(pos) => onPatch(x.id, pos)} />)}
                 </div>
               ) : null)}
@@ -1970,7 +1971,7 @@ export function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, 
               )}
               {clipSrc(c) ? (
                 <button type="button" onClick={() => setOpenId(open ? null : c.id)} aria-label={open ? "Close clip" : "Edit clip"} className="relative shrink-0">
-                  <video src={`${clipSrc(c)}#t=0.5`} muted preload="metadata" className="h-[56px] w-[32px] rounded-md bg-ink object-cover" />
+                  <MediaVideo src={`${clipSrc(c)}#t=0.5`} muted preload="metadata" className="h-[56px] w-[32px] rounded-md bg-ink object-cover" />
                   <span className="absolute -left-1.5 -top-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-accent text-[10.5px] font-black text-white">{i + 1}</span>
                 </button>
               ) : (
@@ -2231,7 +2232,7 @@ function TrimmedVideo({ src, parts, muted = false, adjust, rate = 1, onTime }: {
     raf = requestAnimationFrame(frame);
     return () => { cancelAnimationFrame(raf); v.pause(); };
   }, [key, rate, playing]);
-  return <video ref={ref} src={src} autoPlay={playing} muted={muted} loop playsInline className="absolute inset-0 h-full w-full object-cover" style={style} />;
+  return <MediaVideo ref={ref} src={src} autoPlay={playing} muted={muted} loop playsInline className="absolute inset-0 h-full w-full object-cover" style={style} />;
 }
 
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${(sec % 60).toFixed(1).padStart(4, "0")}`;
