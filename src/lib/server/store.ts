@@ -242,8 +242,10 @@ export async function saveMedia(file: File, asAsset: boolean, who: string): Prom
     }
     return { mediaId, mime: file.type };
   }
-  await putObject(mediaKey(mediaId), bytes, file.type);
+  // The closing-account trigger must accept ownership before any R2 write. Deletion snapshots this identity even
+  // if it starts while PUT is in flight. Keep the ledger on an ambiguous PUT failure so cleanup can still find it.
   await registerMedia(mediaId, file.type, bytes.length, who, asAsset ? file.name : null);
+  await putObject(mediaKey(mediaId), bytes, file.type);
   return { mediaId, mime: file.type };
 }
 
