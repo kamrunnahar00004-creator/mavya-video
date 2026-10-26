@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Upload } from "lucide-react";
 import { SettingsPage } from "@/components/settings-shell";
 import { uploadFile } from "@/lib/client";
@@ -9,6 +9,7 @@ import { NO_PROFILE, PROFILE_EVENT, initials, signOut, type Profile } from "@/li
 /** Settings > Profile: picture, email (from sign-in), first and last name, and deleting the account. */
 export function ProfileView() {
   const [saved, setSaved] = useState<Profile | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
   const [first, setFirst] = useState("");
   const [last, setLast] = useState("");
   const [busy, setBusy] = useState<"save" | "photo" | null>(null);
@@ -16,21 +17,16 @@ export function ProfileView() {
   const [confirm, setConfirm] = useState(false);
   const file = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/profile")
-      .then((r) => r.json() as Promise<Profile>)
-      .then((p) => {
-        if (!alive) return;
-        setSaved(p);
-        setFirst(p.firstName);
-        setLast(p.lastName);
-      })
-      .catch(() => alive && setSaved(NO_PROFILE));
-    return () => {
-      alive = false;
-    };
+  const reload = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const response = await fetch("/api/profile", { cache: "no-store", signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000) });
+      if (!response.ok) throw Error("Profile unavailable");
+      const p = await response.json() as Profile;
+      if (signal?.aborted) return;
+      setSaved(p);setFirst(p.firstName);setLast(p.lastName);setUnavailable(false);
+    } catch { if (!signal?.aborted) setUnavailable(true); }
   }, []);
+  useEffect(() => { const abort = new AbortController(); void reload(abort.signal); return () => abort.abort(); }, [reload]);
 
   useEffect(() => {
     if (!toast) return;
@@ -87,6 +83,7 @@ export function ProfileView() {
 
   return (
     <SettingsPage title="Profile" subtitle="Manage your personal details">
+        {unavailable && <p role="alert" className="mt-6 text-[14px] text-muted">Profile is unavailable. <button type="button" onClick={() => void reload()} className="font-semibold text-accent">Retry</button></p>}
         <section className="mt-6 overflow-hidden rounded-2xl border border-line bg-panel">
           <div className={row.replace("border-t ", "")}>
             <span className={label}>Profile picture</span>

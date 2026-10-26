@@ -27,15 +27,20 @@ async function readAccount(): Promise<Profile | null> {
   const user = await getSessionUser();
   if (!user) return null;
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.from("profiles").select("first_name, last_name, avatar_url").eq("id", user.id).maybeSingle<Row>();
+  const { data, error } = await supabase.from("profiles").select("first_name, last_name, avatar_url").eq("id", user.id).maybeSingle<Row>();
+  if (error) throw error;
   return { email: user.email ?? "", firstName: data?.first_name ?? "", lastName: data?.last_name ?? "", avatar: data?.avatar_url ?? "" };
 }
 
 export async function GET() {
   await connection();
   if (!authEnabled()) return Response.json(await readLocal());
-  const profile = await readAccount();
-  return profile ? Response.json(profile) : Response.json({ error: "Sign in first." }, { status: 401 });
+  try {
+    const profile = await readAccount();
+    return profile ? Response.json(profile) : Response.json({ error: "Sign in first." }, { status: 401 });
+  } catch {
+    return Response.json({ error: "Profile is unavailable. Try again." }, { status: 503 });
+  }
 }
 
 export async function PATCH(request: Request) {
@@ -62,7 +67,8 @@ export async function PATCH(request: Request) {
     if (patch.avatar !== undefined) row.avatar_url = patch.avatar;
     const { error } = await supabase.from("profiles").update(row).eq("id", user.id);
     if (error) return Response.json({ error: "Couldn't save." }, { status: 500 });
-    return Response.json(await readAccount());
+    try { return Response.json(await readAccount()); }
+    catch { return Response.json({ error: "Profile is unavailable. Try again." }, { status: 503 }); }
   }
 
   const next = { ...(await readLocal()), ...patch };
