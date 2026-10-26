@@ -13,7 +13,7 @@ async function webhook(){
  shape=false;assert.equal((await api.POST(req())).status,503);assert.ok(logs.some(x=>x[0]==='stripe_webhook_config_invalid'));shape=true;bad=false;
  lookupError=true;assert.equal((await api.POST(req())).status,500);lookupError=false;
  providerError=true;assert.equal((await api.POST(req())).status,500);providerError=false;
- // Definitive legacy-owner outcome is covered once the B3 handler is installed.
+ const legacy=await api.POST(req());assert.equal(legacy.status,200);assert.equal((await legacy.json()).result,'unowned');assert.ok(logs.some(x=>x[0]==='stripe_webhook_owner_unresolved'));
 }
 async function main(){await webhook();console.log('PASS: alertable signature/config failures without leaked payloads; transient DB/Stripe failures still retry');}
 main().catch(e=>{console.error(e);process.exitCode=1;});

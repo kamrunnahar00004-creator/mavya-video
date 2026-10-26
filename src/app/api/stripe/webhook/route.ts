@@ -64,7 +64,11 @@ export async function POST(request: Request) {
         }
       }
     }
-    if (!userId) throw new Error(`Unresolved subscription owner: ${subId}`);
+    if (!userId) {
+      // Every authoritative lookup above succeeded. Retrying an unowned legacy subscription cannot repair it.
+      console.error("stripe_webhook_owner_unresolved", { event: event.id, subscription: subId });
+      return Response.json({ received: true, result: "unowned" });
+    }
     const owner = userId;
     const closed = await db.from("account_deletions").select("user_id").eq("user_id", owner).maybeSingle();
     if (closed.error) throw closed.error;
