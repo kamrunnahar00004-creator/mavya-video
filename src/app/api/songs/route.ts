@@ -48,7 +48,7 @@ export async function GET(request: Request) {
         }
       }
     }
-    return Response.json(list.filter((t) => t.preview).map(toSong));
+    return Response.json(list.filter((t) => t.preview).map(toSong), { headers: { "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=900" } });
   } catch {
     return Response.json({ error: "Songs are not available right now" }, { status: 502 });
   }

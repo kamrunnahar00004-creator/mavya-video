@@ -60,9 +60,24 @@ export async function deleteObjectStrict(key: string): Promise<void> {
 }
 
 /** A link the browser can read the object from, for `seconds`; with `download`, it saves as that file name. */
+const readLinks = new Map<string, {until: number; value: Promise<string>}>();
 export function signedGet(key: string, seconds = 3600, download?: string): Promise<string> {
   const disposition = download ? `attachment; filename="${download.replace(/[^\w .-]/g, "_")}"` : undefined;
-  return getSignedUrl(r2(), new GetObjectCommand({ Bucket: Bucket(), Key: key, ResponseContentDisposition: disposition }), { expiresIn: seconds });
+  // Keep at least half the original lifetime for the browser's 30-minute redirect cache.
+  // Permission checks remain at every API entry; PUT grants are never reused.
+  const cacheKey = JSON.stringify([Bucket(), key, seconds, disposition]);
+  const now = Date.now();
+  const hit = readLinks.get(cacheKey);
+  if (hit && hit.until > now) return hit.value;
+  readLinks.delete(cacheKey);
+  const value = getSignedUrl(r2(), new GetObjectCommand({ Bucket: Bucket(), Key: key, ResponseContentDisposition: disposition }), { expiresIn: seconds });
+  if (seconds >= 120) {
+    if (readLinks.size >= 1000) readLinks.delete(readLinks.keys().next().value!);
+    const entry = {until: now + Math.min(seconds / 2, 1800) * 1000, value};
+    readLinks.set(cacheKey, entry);
+    void value.catch(() => { if (readLinks.get(cacheKey) === entry) readLinks.delete(cacheKey); });
+  }
+  return value;
 }
 
 /** A link the browser can upload one object to (PUT with this exact content type), for `seconds`. */
