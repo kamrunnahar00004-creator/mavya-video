@@ -110,7 +110,7 @@ function Hand({ cards, label, on }: { cards: string[]; label: string; on: boolea
               transitionDelay: `${i * 70}ms`,
             }}
           >
-            <LoopVideo src={`${src}.mp4`} poster={`${src}.jpg`} className="absolute inset-0 h-full w-full object-cover" />
+            <LoopVideo src={`${src}.mp4`} poster={`${src}.webp`} className="absolute inset-0 h-full w-full object-cover" />
           </div>
         ))}
       </div>

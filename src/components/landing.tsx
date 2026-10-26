@@ -49,6 +49,7 @@ const FAQ = [
 export function Landing() {
   return (
     <div className="landing-theme min-h-full bg-bg">
+      <link rel="preload" as="image" href="/landing/lib-DcOiTp0xxTK.webp" fetchPriority="high" />
       <MarketingHeader />
 
       {/* Hero: text left (semibold, three clean lines), the three phones fanned right, both in the first screen */}
