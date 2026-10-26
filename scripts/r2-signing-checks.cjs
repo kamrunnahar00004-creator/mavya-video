@@ -22,6 +22,10 @@ async function main(){
  assert.equal(signs-count,1,'concurrent reads share one signing operation');assert.ok(reads.every(x=>x===reads[0]));
  await api.signedGet('media/shared-fixture.mp4',3600,'download.mp4');assert.equal(signs-count,2,'download disposition has a distinct signature');
  await api.signedGet('media/shared-fixture.mp4',60);await api.signedGet('media/shared-fixture.mp4',60);assert.equal(signs-count,4,'short grants are not reused');
+ await api.signedGet('media/worker-input.mp4',21600);await api.signedGet('media/worker-input.mp4',21600);
+ assert.equal(signs-count,6,'durable six-hour input specs receive fresh full-lifetime grants');
+ await api.signedGet('temporary/provider-input.mp4',86400);await api.signedGet('temporary/provider-input.mp4',86400);
+ assert.equal(signs-count,8,'provider grants retain their full requested lifetime');
  console.log('PASS: offline upload signature binds Content-Length, avoids empty-body checksum and copies only the HEAD-verified object version');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
