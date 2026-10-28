@@ -1,6 +1,5 @@
 import { listPage, pageResponse, listError } from "@/lib/server/list-pages";
-import { after, connection } from "next/server";
-import { fillCovers } from "@/lib/server/covers";
+import { connection } from "next/server";
 import { createReference, mediaAccess } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { HOOK_STYLES, NICHES } from "@/lib/taxonomy";
@@ -15,7 +14,6 @@ export async function GET(request: Request) {
   if (!who) return signInFirst();
   try {
   const page = await listPage("references", who, request);
-  if (page.missingCovers.length) after(() => fillCovers(page.missingCovers));
   const refs = page.items as import("@/lib/types").Reference[];
   const view = new URL(request.url).searchParams.get("view");
   const respond = (items: unknown[]) => {

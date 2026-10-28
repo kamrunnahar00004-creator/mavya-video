@@ -19,7 +19,7 @@ const MEDIA_ID = /\/api\/media\/([0-9a-f-]{36}(?:\.[a-z0-9]{2,5})?)/;
 
 const rows = [];
 for (let from = 0; ; from += 500) {
-  const { data, error } = await db.from("library").select("id,data").order("id").range(from, from + 499);
+  const { data, error } = await db.from("library").select("id,data").eq("owner", "curated").order("id").range(from, from + 499);
   if (error) throw error;
   rows.push(...data);
   if (data.length < 500) break;
@@ -40,7 +40,10 @@ async function one({ id, mediaId }) {
     // Re-read just before writing so only the cover flag changes.
     const { data, error } = await db.from("library").select("data").eq("id", id).single();
     if (error) throw error;
-    const updated = await db.from("library").update({ data: { ...data.data, smallCover: true } }).eq("id", id);
+    const currentMedia = (data.data.analysis?.segments?.[0]?.thumb ?? data.data.thumbUrl ?? "").match(MEDIA_ID)?.[1];
+    if (currentMedia !== mediaId) throw new Error("Thumbnail changed during backfill");
+    const updated = await db.from("library").update({ data: { ...data.data, smallCover: true } }).eq("id", id).eq("owner", "curated").eq("data", data.data).select("id");
+    if (!updated.error && !updated.data?.length) throw new Error("Concurrent edit, retry later");
     if (updated.error) throw updated.error;
     ok++; before += original.length; after += webp.length;
   } catch (error) {

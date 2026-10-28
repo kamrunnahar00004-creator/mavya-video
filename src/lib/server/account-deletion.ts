@@ -41,8 +41,8 @@ export async function advanceDeletion(user: string) {
   }
   // Existing signed export PUTs last six hours. Keep the ownership index until those grants expire.
   if (Date.now() < Date.parse(d.cleanup_after)) return;
-  if (d.state === "storage") {
-   const keys = [...d.media_ids.map(id => `media/${id}`), ...(d.extra_keys ?? [])];
+  if (d.state === "storage" || d.state === "auth") {
+   const keys = [...d.media_ids.map(id => `media/${id}`), ...(d.extra_keys ?? []), ...d.media_ids.map(id => `covers/${id}.webp`)];
    const batch = keys.slice(d.cursor, d.cursor + 40);
    for (let i = 0; i < batch.length; i += 5) await Promise.all(batch.slice(i, i + 5).map(key => deleteObjectStrict(key)));
    d.cursor += batch.length;
