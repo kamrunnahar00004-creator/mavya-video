@@ -21,10 +21,12 @@ async function auth() {
   user = null; assert.equal(await who.currentUser(), null);
   user = { id: id(1) }; closing = true; assert.equal(await who.currentUser(), null);
   assert.equal(checks, 3);
-  const usage = load('src/lib/server/usage.ts', { '@/lib/server/store': {}, '@/lib/supabase/server': { getSessionUser: async () => user } }, { ADMIN_USER_IDS: id(1) });
+  let adminChecks=0;
+  const usage = load('src/lib/server/usage.ts', { '@/lib/server/store': {}, '@/lib/supabase/server': { getSessionUser: async () => {adminChecks++;return user;} } }, { ADMIN_USER_IDS: id(1) });
   assert.equal(await usage.adminUser(id(1)), true);
   user = { id: id(2), email: 'founder@invalid.test' }; assert.equal(await usage.adminUser(id(2)), false);
   user = null; assert.equal(await usage.adminUser(id(1)), false);
+  assert.equal(adminChecks,2,'non-admin IDs do not cause a redundant live Auth lookup');
 }
 
 async function backgroundPlayback() {

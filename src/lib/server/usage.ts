@@ -10,8 +10,9 @@ export type Allowance = { plan: PlanId | null; admin: boolean; used: number; lim
  * confirmed, so anyone could register an unused admin address (Codex A0).
  */
 export async function adminUser(who: string): Promise<boolean> {
+  if (!(process.env.ADMIN_USER_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean).includes(who)) return false;
   const user = await getSessionUser();
-  return user?.id === who && (process.env.ADMIN_USER_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean).includes(who);
+  return user?.id === who;
 }
 
 type Sub = { plan: PlanId | null; cycle: BillingCycle | null; status: string | null; current_period_start: string | null; current_period_end: string | null; cancel_at_period_end: boolean };
