@@ -32,7 +32,7 @@ export function AuthModalHost() {
   useEffect(() => {
     if (auth !== "login" && auth !== "signup") { queueMicrotask(() => setClosed(false)); return; }
     let active = true;
-    void createSupabaseBrowserClient().auth.getUser().then(({ data }) => {
+    void Promise.resolve().then(() => createSupabaseBrowserClient().auth.getUser()).then(({ data }) => {
       if (!active) return;
       // A full load discards any prefetched signed-out app response.
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
@@ -92,7 +92,10 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
   async function showPending() {
     flushSync(() => setLoading(true));
     // Let the pending button paint before auth setup or redirect work uses the main thread.
-    if (typeof requestAnimationFrame === "function") await new Promise<void>(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    if (typeof requestAnimationFrame === "function") await new Promise<void>(resolve => {
+      const fallback = setTimeout(resolve, 100);
+      requestAnimationFrame(() => setTimeout(() => { clearTimeout(fallback); resolve(); }, 0));
+    });
   }
 
   async function handleGoogle() {
