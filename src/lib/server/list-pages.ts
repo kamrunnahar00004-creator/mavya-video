@@ -95,7 +95,7 @@ export async function listPage(kind: Kind, who: string, request: Request) {
     missingCovers = refs.filter(ref => !ref.smallCover);
   }
   if (kind === "references") {
-  
+
   items = items.map((value, tile) => {
     const ref = value as Reference;
     const group = Math.floor(tile / PAGE_SIZE) * PAGE_SIZE;
