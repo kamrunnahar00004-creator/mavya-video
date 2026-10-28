@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/pending-link";
 import { usePathname } from "next/navigation";
 import { AccountChip } from "@/components/account-chip";
 import { MavyaMark } from "@/components/marketing-chrome";

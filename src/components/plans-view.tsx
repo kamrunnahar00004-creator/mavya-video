@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/pending-link";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import { ContactDialog } from "@/components/contact-dialog";

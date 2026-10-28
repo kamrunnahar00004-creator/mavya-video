@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/pending-link";
 import { BTN_OUTLINE, SettingsPage, formatDate, useAccount } from "@/components/settings-shell";
 
 /** Settings > Usage: this period's AI hooks, a bar that fills against the plan's limit. */

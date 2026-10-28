@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
-import Link from "next/link";
+import Link from "@/components/pending-link";
 import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";

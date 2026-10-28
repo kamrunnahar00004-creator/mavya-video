@@ -1,3 +1,4 @@
+import { RouteSkeleton } from "@/components/route-skeleton";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
@@ -8,5 +9,5 @@ async function RedirectToStudio({ params }: { params: Promise<{ id: string }> })
 }
 
 export default function EditPage({ params }: { params: Promise<{ id: string }> }) {
-  return <Suspense fallback={null}><RedirectToStudio params={params} /></Suspense>;
+  return <Suspense fallback={<RouteSkeleton path="/studio/loading/edit" />}><RedirectToStudio params={params} /></Suspense>;
 }

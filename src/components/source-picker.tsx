@@ -26,7 +26,7 @@ const sortValue = (r: Reference, sort: Sort): number | string =>
   sort === "views" ? (r.views ?? 0) : sort === "likes" ? (r.likes ?? 0) : sort === "comments" ? (r.comments ?? 0) : (r.postedAt ?? r.createdAt);
 
 /** The hook library grid (step 1 picker panel and the Viral library page). */
-export function SourcePicker({ refs, source, onRefsChange, onPick, onClear, onLoadMore }: { onLoadMore?: () => Promise<void>; refs: Reference[]; source: Reference | null; onRefsChange: (r: Reference[]) => void; onPick: (r: Reference) => void; onClear: () => void}) {
+export function SourcePicker({ refs, source, onRefsChange, onPick, onClear, onLoadMore }: { onLoadMore?: () => Promise<void>; refs: Reference[]; source: Reference | null; onRefsChange: (r: Reference[]) => void; onPick: (r: Reference) => void | Promise<void>; onClear: () => void}) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [sort, setSort] = useState<Sort>("views");
   const [style, setStyle] = useState<"all" | "text_music" | "talking">("all");
@@ -37,14 +37,15 @@ export function SourcePicker({ refs, source, onRefsChange, onPick, onClear, onLo
   /** `isNew`: a just-uploaded video that isn't in `refs` yet. */
   async function pick(r: Reference, isNew = false) {
     setError(null);
-    if (r.analysis || !r.mediaId) return onPick(r);
     setBusyId(r.id);
     try {
+      if (r.analysis || !r.mediaId) { await onPick(r); return; }
       const analysis = await analyzeVideo(`/api/media/${r.mediaId}`);
-      await fetch(`/api/references/${r.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ analysis }) });
+      const response = await fetch(`/api/references/${r.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ analysis }) });
+      if (!response.ok) throw Error("Could not save the hook. Try again.");
       const updated = { ...r, analysis };
       onRefsChange((isNew ? [r, ...refs] : refs).map((x) => (x.id === r.id ? updated : x)));
-      onPick(updated);
+      await onPick(updated);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not read this video");
     } finally {
@@ -193,9 +194,7 @@ function HookCard({ r, busy, disabled, onPick }: { r: Reference; busy: boolean; 
       onMouseLeave={() => setHover(false)}
       className="group relative aspect-[9/16] overflow-hidden rounded-xl bg-ink text-left outline-2 outline-offset-2 outline-transparent transition-[outline-color] hover:outline-accent disabled:opacity-60"
     >
-      {r.mediaId && hover ? (
-        <MediaVideo src={`/api/media/${r.mediaId}`} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover" />
-      ) : r.mediaId || r.thumbUrl ? (
+      {r.mediaId || r.thumbUrl ? (
         <Thumb r={r} className="absolute inset-0 h-full w-full" />
       ) : (
         <div className="absolute inset-0 flex flex-col p-3 pt-9">
@@ -203,6 +202,7 @@ function HookCard({ r, busy, disabled, onPick }: { r: Reference; busy: boolean; 
           <p className="line-clamp-6 text-[14px] font-bold leading-snug text-white">{r.title}</p>
         </div>
       )}
+      {r.mediaId && hover && <MediaVideo src={`/api/media/${r.mediaId}`} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover" />}
       {r.author && <span className="absolute left-2 top-2 max-w-[calc(100%-16px)] truncate rounded-md bg-black/55 px-1.5 py-0.5 text-[11px] font-semibold text-white group-hover:opacity-0">@{r.author}</span>}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-8">
         <div className="flex items-center gap-2.5 text-[12px] font-bold text-white">
@@ -415,12 +415,12 @@ export function UploadDrop({ onAdded }: { onAdded: (r: Reference) => void }) {
 export function Thumb({ r, className }: { r: Reference; className?: string }) {
   const original = r.analysis?.segments[0]?.thumb ?? r.thumbUrl;
   // The small cover first; if its link fails (expired, missing), fall back to the full thumbnail.
-  const [coverFailed, setCoverFailed] = useState(false);
-  const thumb = r.coverUrl && !coverFailed ? r.coverUrl : original;
+  const [failed, setFailed] = useState<string[]>([]);
+  const thumb = [r.coverUrl, original].find((url): url is string => Boolean(url && !failed.includes(url)));
   if (thumb)
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={thumb} alt="" loading="lazy" decoding="async" onError={thumb === r.coverUrl ? () => setCoverFailed(true) : undefined} className={`object-cover ${className ?? ""}`} />
+      <img src={thumb} alt="" loading="lazy" decoding="async" onError={() => setFailed(old => old.includes(thumb) ? old : [...old.slice(-3), thumb])} className={`object-cover ${className ?? ""}`} />
     );
   if (r.mediaId) return <MediaVideo src={`/api/media/${r.mediaId}#t=0.5`} muted preload="metadata" className={`object-cover ${className ?? ""}`} />;
   return (

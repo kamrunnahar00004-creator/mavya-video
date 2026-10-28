@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/pending-link";
 import { usePathname } from "next/navigation";
 import { BarChart3, ChevronLeft, CreditCard, LayoutList, LogOut, User } from "lucide-react";
 import { AUTH_ENABLED, signOut } from "@/lib/profile";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/pending-link";
 import { Avatar } from "@/components/profile-view";
 import { NO_PROFILE, PROFILE_EVENT, displayName, type Profile } from "@/lib/profile";
 import { planById, type PlanId } from "@/lib/plans";
@@ -13,7 +13,7 @@ export function AccountChip() {
   useEffect(() => {
     let alive = true;
     fetch("/api/profile")
-      .then((r) => r.json() as Promise<Profile>)
+      .then((r) => { if (!r.ok) throw Error("Profile unavailable"); return r.json() as Promise<Profile>; })
       .then((p) => alive && setProfile(p))
       .catch(() => undefined);
     fetch("/api/usage")

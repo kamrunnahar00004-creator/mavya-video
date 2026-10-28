@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/pending-link";
 import { ArrowRight, Check, Minus, Plus } from "lucide-react";
 import { ContactDialog } from "@/components/contact-dialog";
 import { MarketingFooter, MarketingHeader, MavyaMark } from "@/components/marketing-chrome";

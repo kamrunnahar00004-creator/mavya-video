@@ -61,7 +61,7 @@ async function gate(){
  claims={sub:'owner',email:'Admin@fixture.invalid'};plan=null;assert.equal((await run('/studio')).location,'https://app.invalid/pricing','an admin email alone is not admin (A0 fixed)');
  claims={sub:'owner',email:'user@fixture.invalid'};fail=false;await run('/studio');assert.equal(calls.at(-1)[1].headers.apikey,'service-fixture');assert.equal(JSON.parse(calls.at(-1)[1].body).p_user,'owner');
  // A0 fixed: admin by user id; a new sign-up using an admin email is not admin.
- const usage=load('src/lib/server/usage.ts',{'@/lib/server/store':{cloud:()=>true},'@/lib/supabase/server':{getClaimsUser:async()=>({id:'new-signup'}),getSessionUser:async()=>({id:'new-signup',email:'admin@fixture.invalid',email_confirmed_at:null}),createSupabaseAdminClient(){throw Error('unexpected DB');}}},{ADMIN_USER_IDS:'admin-id'});
+ const usage=load('src/lib/server/usage.ts',{'@/lib/server/store':{cloud:()=>true},'@/lib/supabase/server':{getSessionUser:async()=>({id:'new-signup',email:'admin@fixture.invalid',email_confirmed_at:null}),createSupabaseAdminClient(){throw Error('unexpected DB');}}},{ADMIN_USER_IDS:'admin-id'});
  assert.equal(await usage.adminUser('new-signup'),false);
  const fs=require('fs');
  const proxy=fs.readFileSync('src/proxy.ts','utf8');for(const root of ['/studio/:path*','/library/:path*','/settings/:path*','/billing/:path*','/api/:path*','/login'])assert.ok(proxy.includes('"'+root+'"'));
@@ -72,7 +72,7 @@ async function pricing(){
  const plans=load('src/lib/plans.ts');
  for(const scenario of [{status:401},{status:503},{usage:{plan:null,limit:0}},{usage:{plan:'pro',limit:60}},{usage:{plan:null,limit:null}},{usage:{plan:null,limit:0,billingStatus:'past_due'}}]){
   const calls=[],nav=[];
-  const h=harness('src/components/pricing-page.tsx',{'next/link':{default:'Link'},'lucide-react':{},'@/components/contact-dialog':{},'@/components/marketing-chrome':{},'@/lib/plans':plans},{window:{location:{assign:url=>nav.push(url)}},fetch:async(url,opts)=>{calls.push([url,opts]);return url==='/api/usage'?Response.json(scenario.usage??{},{status:scenario.status??200}):Response.json({url:'https://checkout.fixture.invalid'});}});
+  const h=harness('src/components/pricing-page.tsx',{'@/components/pending-link':{default:'Link'},'lucide-react':{},'@/components/contact-dialog':{},'@/components/marketing-chrome':{},'@/lib/plans':plans},{window:{location:{assign:url=>nav.push(url)}},fetch:async(url,opts)=>{calls.push([url,opts]);return url==='/api/usage'?Response.json(scenario.usage??{},{status:scenario.status??200}):Response.json({url:'https://checkout.fixture.invalid'});}});
   h.render(h.api.PricingPage);h.effects()[0]();await new Promise(r=>setImmediate(r));
   const tree=h.render(h.api.PricingPage),card=nodes(tree).find(n=>n.props.plan?.id==='starter');assert.ok(card);
   const button=nodes(h.render(card.type,card.props)).find(n=>n.props.viewer);h.reset();const output=h.render(button.type,button.props);
@@ -86,7 +86,7 @@ async function pricing(){
 async function billing(){
  const nav=[],intervals=[];let time=0;class Clock extends Date{static now(){return time;}}
  let paid='1',account={usage:{plan:null,admin:false},billing:{subscription:{status:'active',plan:'pro'}},plan:null,loaded:true,error:false,reload:async()=>{}};
- const h=harness('src/components/billing-view.tsx',{'next/link':{},'next/navigation':{useSearchParams:()=>new URLSearchParams({paid})},'lucide-react':{},'@/lib/plans':{},'@/components/settings-shell':{useAccount:()=>account,useToast:()=>[null,()=>{}]}},{Date:Clock,window:{location:{assign:url=>nav.push(url)}},setInterval:callback=>{intervals.push(callback);return 1;},clearInterval(){}});
+ const h=harness('src/components/billing-view.tsx',{'@/components/pending-link':{},'next/navigation':{useSearchParams:()=>new URLSearchParams({paid})},'lucide-react':{},'@/lib/plans':{},'@/components/settings-shell':{useAccount:()=>account,useToast:()=>[null,()=>{}]}},{Date:Clock,window:{location:{assign:url=>nav.push(url)}},setInterval:callback=>{intervals.push(callback);return 1;},clearInterval(){}});
  h.render(h.api.BillingView);for(const effect of h.effects())effect();assert.equal(nav.length,0,'active status alone is not usable entitlement');assert.equal(intervals.length,1,'keep polling while webhook entitlement is absent');
  time=31000;intervals[0]();
  account={...account,usage:{plan:'pro',admin:false}};h.render(h.api.BillingView);h.effects()[0]();assert.equal(nav.at(-1),'/studio');
@@ -95,7 +95,7 @@ async function billing(){
 }
 async function resetForm(){
  let expired=false,user={id:'owner'},answer=null,throws=false,nav=[];
- const h=harness('src/components/reset-password-form.tsx',{'next/link':{},'next/navigation':{useSearchParams:()=>new URLSearchParams(expired?{expired:'1'}:{})},'lucide-react':{},'@/lib/supabase/client':{createSupabaseBrowserClient:()=>({auth:{getUser:async()=>({data:{user}}),updateUser:async()=>{if(throws)throw Error('network');return {error:answer};}}})}},{window:{location:{assign:url=>nav.push(url)}}});
+ const h=harness('src/components/reset-password-form.tsx',{'@/components/pending-link':{},'next/navigation':{useSearchParams:()=>new URLSearchParams(expired?{expired:'1'}:{})},'lucide-react':{},'@/lib/supabase/client':{createSupabaseBrowserClient:()=>({auth:{getUser:async()=>({data:{user}}),updateUser:async()=>{if(throws)throw Error('network');return {error:answer};}}})}},{window:{location:{assign:url=>nav.push(url)}}});
  for(const [password,confirm,error,message] of [['short','short',null,'Password must be at least 8 characters.'],['password123','different',null,'Passwords do not match.'],['password123','password123',{code:'same_password'},'Use a different password from your old one.'],['password123','password123','throw','Something went wrong. Try again.'],['password123','password123',null,null]]){
   h.reset();answer=error;throws=error==='throw';h.render(h.api.ResetPasswordForm);h.effects()[0]();await new Promise(r=>setImmediate(r));let tree=h.render(h.api.ResetPasswordForm);
   const inputs=nodes(tree).filter(n=>n.type==='input');inputs[0].props.onChange({target:{value:password}});inputs[1].props.onChange({target:{value:confirm}});tree=h.render(h.api.ResetPasswordForm);await tree.props.onSubmit({preventDefault(){}});tree=h.render(h.api.ResetPasswordForm);

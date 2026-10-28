@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState, type RefObject } from "react";
-import Link from "next/link";
+import Link from "@/components/pending-link";
 import { ArrowRight, Film, Lock, Music, PenLine, Search, Upload } from "lucide-react";
 
 /*

@@ -11,6 +11,7 @@ export const AUTH_ENABLED = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && proc
 
 /** Sign out in the browser, then go to the landing page. */
 export async function signOut() {
+  window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/" }));
   if (AUTH_ENABLED) {
     const { createSupabaseBrowserClient } = await import("@/lib/supabase/client");
     await createSupabaseBrowserClient().auth.signOut().catch(() => undefined);

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/pending-link";
 import { ArrowRight, Play } from "lucide-react";
 import { MarketingFooter, MarketingHeader } from "@/components/marketing-chrome";
 import { LoopVideo } from "@/components/loop-video";

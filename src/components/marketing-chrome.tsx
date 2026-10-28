@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import Link from "next/link";
+import Link from "@/components/pending-link";
 import { AuthModalHost } from "@/components/auth-modal";
 import { MAINTENANCE } from "@/lib/maintenance";
 

@@ -5,7 +5,7 @@ import { coverLinks } from "@/lib/server/covers";
 import type { Asset, Reference, Run } from "@/lib/types";
 
 export const PAGE_SIZE = 24;
-const ALL_REFERENCES = 2000;
+const ALL_REFERENCES = 500;
 type Kind = "runs" | "references" | "assets";
 type Cursor = { at: string; id: string };
 function cursor(raw: string | null): Cursor | null {

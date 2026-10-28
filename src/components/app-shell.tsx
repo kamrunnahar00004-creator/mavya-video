@@ -1,3 +1,4 @@
+import { NavigationFeedback } from "@/components/navigation-feedback";
 import { Suspense } from "react";
 import { MainNav, SidebarBody } from "@/components/sidebar-body";
 
@@ -10,7 +11,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <SidebarBody />
         </Suspense>
       </aside>
-      <main className="min-w-0 flex-1">{children}</main>
+      <main className="relative min-w-0 flex-1">{children}<Suspense fallback={null}><NavigationFeedback /></Suspense></main>
     </div>
   );
 }

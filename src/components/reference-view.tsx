@@ -1,8 +1,9 @@
 "use client";
+import { RouteSkeleton } from "@/components/route-skeleton";
 import { MediaVideo } from "@/components/media-video";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/pending-link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ExternalLink, Loader2, RefreshCw, Scissors, Trash2, Wand2 } from "lucide-react";
 import { analyzeVideo } from "@/lib/analyze";
@@ -99,9 +100,7 @@ export function ReferenceView() {
   }
   if (!ref) {
     return (
-      <div className="flex h-full items-center justify-center text-soft">
-        <Loader2 className="h-5 w-5 animate-spin" />
-      </div>
+      <RouteSkeleton path="/library/loading" />
     );
   }
 

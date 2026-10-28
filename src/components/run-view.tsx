@@ -1,8 +1,9 @@
 "use client";
+import { RouteSkeleton } from "@/components/route-skeleton";
 import { MediaVideo } from "@/components/media-video";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import Link from "next/link";
+import Link from "@/components/pending-link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Check, ChevronDown, Film, FolderOpen, Loader2, PenLine, RefreshCw, SlidersHorizontal, Sparkles, Trash2, Upload, X } from "lucide-react";
 
@@ -29,7 +30,7 @@ import { RunPreview, claimPlayback } from "@/components/run-preview";
 
 const ClipEditor = dynamic(() => import("@/components/editor-tools").then(m => m.ClipEditor));
 const SoundStep = dynamic(() => import("@/components/editor-tools").then(m => m.SoundStep));
-const VideoEditor = dynamic(() => import("@/components/editor-tools").then(m => m.VideoEditor));
+const VideoEditor = dynamic(() => import("@/components/editor-tools").then(m => m.VideoEditor), { loading: () => <div role="dialog" aria-label="Opening editor" className="fixed inset-0 z-50 bg-panel p-6"><RouteSkeleton path="/studio/loading/edit" /></div> });
 const DemoStep = dynamic(() => import("@/components/editor-tools").then(m => m.DemoStep));
 const GenerateProgress = dynamic(() => import("@/components/editor-tools").then(m => m.GenerateProgress));
 const PRODUCT_KEY = "mavya-product-v1";
@@ -81,22 +82,24 @@ export function RunView() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([fetch(`/api/runs/${id}`), loadLibrary()])
-      .then(async ([r, rs]) => {
-        if (!r.ok) throw new Error("missing");
-        const runData = (await r.json()) as Run;
-        const refData = [...rs.items];
-        if (runData.sourceRefId && !refData.some(r => r.id === runData.sourceRefId)) {
-          const selected = await fetch(`/api/references/${runData.sourceRefId}`);
-          if (!selected.ok) throw Error("missing");
-          refData.push(await selected.json() as Reference);
-        }
-        if (!alive) return;
-        setRun(runData);
-        setRefs(refData);
-        setRefCursor(rs.next);
-      })
-      .catch(() => alive && setMissing(id));
+    // The video is usable independently of the full catalog. Library failures do not hide it.
+    void loadLibrary().then(page => {
+      if (!alive) return;
+      setRefs(old => [...(old ?? []).filter(r => !r.partial), ...page.items.filter(r => !(old ?? []).some(x => !x.partial && x.id === r.id))]);
+      setRefCursor(page.next);
+    }).catch(() => { if (alive) { setRefs(old => old ?? []); setToast("Library is unavailable. Try again."); } });
+    void fetch(`/api/runs/${id}`).then(async response => {
+      if (!response.ok) throw Error("missing");
+      const data = await response.json() as Run;
+      if (!alive) return;
+      setRun(data);
+      if (data.sourceRefId) {
+        const selected = await fetch(`/api/references/${data.sourceRefId}`);
+        if (!selected.ok) throw Error("source");
+        const full = await selected.json() as Reference;
+        if (alive) setRefs(old => [full, ...(old ?? []).filter(r => r.id !== full.id)]);
+      } else setRefs(old => old ?? []);
+    }).catch(() => alive && setMissing(id));
     return () => {
       alive = false;
     };
@@ -215,9 +218,7 @@ export function RunView() {
   }
   if (!run || run.id !== id || !refs) {
     return (
-      <div className="card flex h-full items-center justify-center text-soft">
-        <Loader2 className="h-5 w-5 animate-spin" />
-      </div>
+      <RouteSkeleton path={`/studio/${id}`} />
     );
   }
 
@@ -225,7 +226,14 @@ export function RunView() {
   const hook = run.hook;
   const ready = Boolean(hook.generated) && demoClips(run).some((c) => clipSrc(c));
   const texts = runTexts(run);
-  const pickHook = (ref: Reference, from: HookSource = "library") => {
+  const pickHook = async (ref: Reference, from: HookSource = "library") => {
+    if (ref.partial) {
+      const response = await fetch(`/api/references/${ref.id}`);
+      if (!response.ok) throw Error("Couldn't load the hook. Try again.");
+      const full = await response.json() as Reference;
+      ref = { ...full, coverUrl: ref.coverUrl, partial: false };
+      setRefs(old => old?.map(r => r.id === full.id ? ref : r) ?? old);
+    }
     const seg = ref.analysis?.segments.find((s) => s.role === "hook");
     // Prefill the hook text with the stolen hook's on-screen text, unless the user already wrote their own.
     const base = texts.find((x) => x.id === "hook");

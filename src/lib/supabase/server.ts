@@ -42,19 +42,6 @@ export const getSessionUser = cache(async () => {
   return user;
 });
 
-/**
- * The signed-in user's id, from the session token verified locally (ES256 via the project's JWKS, cached), the same
- * check the proxy uses. No Auth server round trip, so the hot data routes answer ~0.3 s sooner. A revoked session
- * stays valid until its token expires (at most an hour); billing, checkout, account and profile keep getSessionUser.
- */
-export const getClaimsUser = cache(async (): Promise<{ id: string } | null> => {
-  if (!authEnabled()) return null;
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.getClaims();
-  const sub = data?.claims?.sub;
-  return !error && typeof sub === "string" && sub ? { id: sub } : null;
-});
-
 /** Service-role client. SERVER ONLY, bypasses RLS for owned records and service-only transactional RPCs. */
 let admin: SupabaseClient | null = null;
 export function createSupabaseAdminClient(): SupabaseClient {
