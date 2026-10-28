@@ -1,0 +1,2666 @@
+{
+  "profile": "Offline credential-free production builds; Chrome 156, 1440x1000, CPU 2x, 250 ms network latency, 10/2 Mbps, API fixture delay 250 ms, intentionally slow library 1500 ms, cold caches and prefetch delayed 2500 ms (it may finish before click). Visual is two animation frames after the first relevant main-content/pending DOM mutation; scripts, styles, comments and hidden route probes are ignored, not a hardware display measurement. Three rounds. API network never reaches servers. No authenticated proxy RPC latency included.",
+  "rows": [
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Videos to library",
+      "visualMs": 622.3000000007451,
+      "usableMs": 1094.699999999255,
+      "path": "/library"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Library to videos",
+      "visualMs": 706.1000000014901,
+      "usableMs": 993.1000000014901,
+      "path": "/studio"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Videos to settings",
+      "visualMs": 379,
+      "usableMs": 671.0999999977648,
+      "path": "/settings"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Settings to plans",
+      "visualMs": 330.69999999925494,
+      "usableMs": 934.1999999992549,
+      "path": "/settings/plans"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Settings to billing",
+      "visualMs": 335.5,
+      "usableMs": 964.4000000022352,
+      "path": "/settings/billing"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Settings to usage",
+      "visualMs": 340.0999999977648,
+      "usableMs": 340.19999999925494,
+      "path": "/settings/usage"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Settings to videos",
+      "visualMs": 684.8000000007451,
+      "usableMs": 986.8999999985099,
+      "path": "/studio"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Open video",
+      "visualMs": 725.3999999985099,
+      "usableMs": 1409.199999999255,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Video to videos",
+      "visualMs": 34.399999998509884,
+      "usableMs": 1012.5,
+      "path": "/studio"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "New video",
+      "visualMs": 30.099999997764826,
+      "usableMs": 1559.699999999255,
+      "path": "/studio/10000000-0000-4000-8000-000000000001"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Use library hook",
+      "visualMs": 1526.5,
+      "usableMs": 2141.099999997765,
+      "path": "/studio/10000000-0000-4000-8000-000000000001"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Open editor",
+      "visualMs": 29.099999997764826,
+      "usableMs": 417.69999999925494,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Reference detail (route probe)",
+      "visualMs": 352.69999999925494,
+      "usableMs": 1055.300000000745,
+      "path": "/library/10000000-0000-4000-8000-000000000100"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Legacy edit redirect (route probe)",
+      "visualMs": 628.1000000014901,
+      "usableMs": 1657.6000000014901,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Landing to signup",
+      "visualMs": 700.8999999985099,
+      "usableMs": 701.1999999992549,
+      "path": "/"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Close signup",
+      "visualMs": 442.19999999925494,
+      "usableMs": 442.19999999925494,
+      "path": "/"
+    },
+    {
+      "round": 0,
+      "phase": "before",
+      "name": "Signup to pricing (SDK and continuation stubs)",
+      "visualMs": 84.80000000074506,
+      "usableMs": 1036,
+      "path": "/pricing"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Videos to library",
+      "visualMs": 30.699999999254942,
+      "usableMs": 2355.699999999255,
+      "path": "/library"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Library to videos",
+      "visualMs": 103.10000000149012,
+      "usableMs": 982.4000000022352,
+      "path": "/studio"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Videos to settings",
+      "visualMs": 36.600000001490116,
+      "usableMs": 690.4000000022352,
+      "path": "/settings"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Settings to plans",
+      "visualMs": 22.800000000745058,
+      "usableMs": 1007.3999999985099,
+      "path": "/settings/plans"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Settings to billing",
+      "visualMs": 45,
+      "usableMs": 935.6000000014901,
+      "path": "/settings/billing"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Settings to usage",
+      "visualMs": 44.30000000074506,
+      "usableMs": 359.69999999925494,
+      "path": "/settings/usage"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Settings to videos",
+      "visualMs": 39.5,
+      "usableMs": 945.6999999992549,
+      "path": "/studio"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Open video",
+      "visualMs": 24.5,
+      "usableMs": 1073.5999999977648,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Video to videos",
+      "visualMs": 34.399999998509884,
+      "usableMs": 976.5,
+      "path": "/studio"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "New video",
+      "visualMs": 21.600000001490116,
+      "usableMs": 1350.699999999255,
+      "path": "/studio/f30a90a2-500a-4c30-b26e-550f74c93d56"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Use library hook",
+      "visualMs": 53.5,
+      "usableMs": 1468.7000000029802,
+      "path": "/studio/ee420da0-d813-4f06-8ed0-7d447daf1295"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Open editor",
+      "visualMs": 60.5,
+      "usableMs": 569.7000000029802,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Reference detail (route probe)",
+      "visualMs": 42,
+      "usableMs": 1059.300000000745,
+      "path": "/library/10000000-0000-4000-8000-000000000100"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Legacy edit redirect (route probe)",
+      "visualMs": 41.79999999701977,
+      "usableMs": 2016.8999999985099,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Landing to signup",
+      "visualMs": 71.59999999776483,
+      "usableMs": 863.3999999985099,
+      "path": "/"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Close signup",
+      "visualMs": 51.899999998509884,
+      "usableMs": 51.899999998509884,
+      "path": "/"
+    },
+    {
+      "round": 0,
+      "phase": "after",
+      "name": "Signup to pricing (SDK and continuation stubs)",
+      "visualMs": 28.5,
+      "usableMs": 1060,
+      "path": "/pricing"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Videos to library",
+      "visualMs": 628.1000000014901,
+      "usableMs": 979.6000000014901,
+      "path": "/library"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Library to videos",
+      "visualMs": 649.1999999992549,
+      "usableMs": 954.1999999992549,
+      "path": "/studio"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Videos to settings",
+      "visualMs": 369.6000000014901,
+      "usableMs": 636.3000000007451,
+      "path": "/settings"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Settings to plans",
+      "visualMs": 359.9000000022352,
+      "usableMs": 1022.5,
+      "path": "/settings/plans"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Settings to billing",
+      "visualMs": 326.5,
+      "usableMs": 943.1999999992549,
+      "path": "/settings/billing"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Settings to usage",
+      "visualMs": 323,
+      "usableMs": 323,
+      "path": "/settings/usage"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Settings to videos",
+      "visualMs": 664,
+      "usableMs": 979.1000000014901,
+      "path": "/studio"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Open video",
+      "visualMs": 665,
+      "usableMs": 1290.800000000745,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Video to videos",
+      "visualMs": 38.600000001490116,
+      "usableMs": 991,
+      "path": "/studio"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "New video",
+      "visualMs": 23.199999999254942,
+      "usableMs": 1618.199999999255,
+      "path": "/studio/10000000-0000-4000-8000-000000000001"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Use library hook",
+      "visualMs": 1471.1000000014901,
+      "usableMs": 2079.400000002235,
+      "path": "/studio/10000000-0000-4000-8000-000000000001"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Open editor",
+      "visualMs": 25.899999998509884,
+      "usableMs": 390.30000000074506,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Reference detail (route probe)",
+      "visualMs": 338.30000000074506,
+      "usableMs": 995.6999999992549,
+      "path": "/library/10000000-0000-4000-8000-000000000100"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Legacy edit redirect (route probe)",
+      "visualMs": 655.4000000022352,
+      "usableMs": 1694.300000000745,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Landing to signup",
+      "visualMs": 659.3999999985099,
+      "usableMs": 659.5999999977648,
+      "path": "/"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Close signup",
+      "visualMs": 407.5999999977648,
+      "usableMs": 407.8999999985099,
+      "path": "/"
+    },
+    {
+      "round": 1,
+      "phase": "before",
+      "name": "Signup to pricing (SDK and continuation stubs)",
+      "visualMs": 129.30000000074506,
+      "usableMs": 1072,
+      "path": "/pricing"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Videos to library",
+      "visualMs": 15,
+      "usableMs": 2228.699999999255,
+      "path": "/library"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Library to videos",
+      "visualMs": 49.5,
+      "usableMs": 946.8999999985099,
+      "path": "/studio"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Videos to settings",
+      "visualMs": 22.199999999254942,
+      "usableMs": 681.5999999977648,
+      "path": "/settings"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Settings to plans",
+      "visualMs": 45.899999998509884,
+      "usableMs": 1035.6000000014901,
+      "path": "/settings/plans"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Settings to billing",
+      "visualMs": 44.69999999925494,
+      "usableMs": 1017.8999999985099,
+      "path": "/settings/billing"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Settings to usage",
+      "visualMs": 48,
+      "usableMs": 392.30000000074506,
+      "path": "/settings/usage"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Settings to videos",
+      "visualMs": 25.800000000745058,
+      "usableMs": 972.3000000007451,
+      "path": "/studio"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Open video",
+      "visualMs": 46.600000001490116,
+      "usableMs": 1165.5,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Video to videos",
+      "visualMs": 38.20000000298023,
+      "usableMs": 1005,
+      "path": "/studio"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "New video",
+      "visualMs": 19.300000000745058,
+      "usableMs": 1402.800000000745,
+      "path": "/studio/2f34329a-3aa8-445e-ae01-0ac8432d3c1c"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Use library hook",
+      "visualMs": 40.600000001490116,
+      "usableMs": 1341.199999999255,
+      "path": "/studio/4b6da7ec-b071-4ce4-81c5-d63f6c860b76"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Open editor",
+      "visualMs": 64.30000000074506,
+      "usableMs": 626.6999999992549,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Reference detail (route probe)",
+      "visualMs": 94.30000000074506,
+      "usableMs": 1192.6000000014901,
+      "path": "/library/10000000-0000-4000-8000-000000000100"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Legacy edit redirect (route probe)",
+      "visualMs": 44.400000002235174,
+      "usableMs": 1732.9000000022352,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Landing to signup",
+      "visualMs": 44.19999999925494,
+      "usableMs": 755.1999999992549,
+      "path": "/"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Close signup",
+      "visualMs": 100.69999999925494,
+      "usableMs": 100.69999999925494,
+      "path": "/"
+    },
+    {
+      "round": 1,
+      "phase": "after",
+      "name": "Signup to pricing (SDK and continuation stubs)",
+      "visualMs": 76.89999999850988,
+      "usableMs": 1044,
+      "path": "/pricing"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Videos to library",
+      "visualMs": 636.1000000014901,
+      "usableMs": 1152.8999999985099,
+      "path": "/library"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Library to videos",
+      "visualMs": 719.4000000022352,
+      "usableMs": 1044.800000000745,
+      "path": "/studio"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Videos to settings",
+      "visualMs": 377.5,
+      "usableMs": 657.3000000007451,
+      "path": "/settings"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Settings to plans",
+      "visualMs": 358.69999999925494,
+      "usableMs": 969.1000000014901,
+      "path": "/settings/plans"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Settings to billing",
+      "visualMs": 381.30000000074506,
+      "usableMs": 1014.5,
+      "path": "/settings/billing"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Settings to usage",
+      "visualMs": 319.1000000014901,
+      "usableMs": 319.30000000074506,
+      "path": "/settings/usage"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Settings to videos",
+      "visualMs": 666.8000000007451,
+      "usableMs": 961.8999999985099,
+      "path": "/studio"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Open video",
+      "visualMs": 644.5,
+      "usableMs": 1317.4000000022352,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Video to videos",
+      "visualMs": 37.600000001490116,
+      "usableMs": 968.8999999985099,
+      "path": "/studio"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "New video",
+      "visualMs": 28.699999999254942,
+      "usableMs": 1493.5,
+      "path": "/studio/10000000-0000-4000-8000-000000000001"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Use library hook",
+      "visualMs": 1477.0999999977648,
+      "usableMs": 2060.5,
+      "path": "/studio/10000000-0000-4000-8000-000000000001"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Open editor",
+      "visualMs": 53.400000002235174,
+      "usableMs": 537.8000000007451,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Reference detail (route probe)",
+      "visualMs": 406.1000000014901,
+      "usableMs": 1125.9000000022352,
+      "path": "/library/10000000-0000-4000-8000-000000000100"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Legacy edit redirect (route probe)",
+      "visualMs": 666,
+      "usableMs": 1678.5999999977648,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Landing to signup",
+      "visualMs": 1190.199999999255,
+      "usableMs": 1190.199999999255,
+      "path": "/"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Close signup",
+      "visualMs": 558.5999999977648,
+      "usableMs": 558.5999999977648,
+      "path": "/"
+    },
+    {
+      "round": 2,
+      "phase": "before",
+      "name": "Signup to pricing (SDK and continuation stubs)",
+      "visualMs": 96.89999999850988,
+      "usableMs": 1077,
+      "path": "/pricing"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Videos to library",
+      "visualMs": 18.800000000745058,
+      "usableMs": 2320.10000000149,
+      "path": "/library"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Library to videos",
+      "visualMs": 105.5,
+      "usableMs": 1054,
+      "path": "/studio"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Videos to settings",
+      "visualMs": 34.5,
+      "usableMs": 742.8000000007451,
+      "path": "/settings"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Settings to plans",
+      "visualMs": 47.600000001490116,
+      "usableMs": 993.6000000014901,
+      "path": "/settings/plans"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Settings to billing",
+      "visualMs": 9.899999998509884,
+      "usableMs": 893.0999999977648,
+      "path": "/settings/billing"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Settings to usage",
+      "visualMs": 52.099999997764826,
+      "usableMs": 352.5999999977648,
+      "path": "/settings/usage"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Settings to videos",
+      "visualMs": 23.199999999254942,
+      "usableMs": 1003.3000000007451,
+      "path": "/studio"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Open video",
+      "visualMs": 68.90000000223517,
+      "usableMs": 1135.9000000022352,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Video to videos",
+      "visualMs": 57.80000000074506,
+      "usableMs": 933.3999999985099,
+      "path": "/studio"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "New video",
+      "visualMs": 21.300000000745058,
+      "usableMs": 1309.699999999255,
+      "path": "/studio/65acf936-3479-4efe-b6db-38280f8e1aba"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Use library hook",
+      "visualMs": 19.100000001490116,
+      "usableMs": 1384.6000000014901,
+      "path": "/studio/2e23b78f-5871-417f-afcf-88b779ba3210"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Open editor",
+      "visualMs": 27.699999999254942,
+      "usableMs": 424.69999999925494,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Reference detail (route probe)",
+      "visualMs": 80.19999999925494,
+      "usableMs": 1038.8999999985099,
+      "path": "/library/10000000-0000-4000-8000-000000000100"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Legacy edit redirect (route probe)",
+      "visualMs": 46.100000001490116,
+      "usableMs": 1760.800000000745,
+      "path": "/studio/10000000-0000-4000-8000-000000000000"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Landing to signup",
+      "visualMs": 52.100000001490116,
+      "usableMs": 785.8000000007451,
+      "path": "/"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Close signup",
+      "visualMs": 83.90000000223517,
+      "usableMs": 84.10000000149012,
+      "path": "/"
+    },
+    {
+      "round": 2,
+      "phase": "after",
+      "name": "Signup to pricing (SDK and continuation stubs)",
+      "visualMs": 40.80000000074506,
+      "usableMs": 1086,
+      "path": "/pricing"
+    }
+  ],
+  "summary": [
+    {
+      "name": "Videos to library",
+      "before": {
+        "visualMs": 628.1000000014901,
+        "usableMs": 1094.699999999255
+      },
+      "after": {
+        "visualMs": 18.800000000745058,
+        "usableMs": 2320.10000000149
+      }
+    },
+    {
+      "name": "Library to videos",
+      "before": {
+        "visualMs": 706.1000000014901,
+        "usableMs": 993.1000000014901
+      },
+      "after": {
+        "visualMs": 103.10000000149012,
+        "usableMs": 982.4000000022352
+      }
+    },
+    {
+      "name": "Videos to settings",
+      "before": {
+        "visualMs": 377.5,
+        "usableMs": 657.3000000007451
+      },
+      "after": {
+        "visualMs": 34.5,
+        "usableMs": 690.4000000022352
+      }
+    },
+    {
+      "name": "Settings to plans",
+      "before": {
+        "visualMs": 358.69999999925494,
+        "usableMs": 969.1000000014901
+      },
+      "after": {
+        "visualMs": 45.899999998509884,
+        "usableMs": 1007.3999999985099
+      }
+    },
+    {
+      "name": "Settings to billing",
+      "before": {
+        "visualMs": 335.5,
+        "usableMs": 964.4000000022352
+      },
+      "after": {
+        "visualMs": 44.69999999925494,
+        "usableMs": 935.6000000014901
+      }
+    },
+    {
+      "name": "Settings to usage",
+      "before": {
+        "visualMs": 323,
+        "usableMs": 323
+      },
+      "after": {
+        "visualMs": 48,
+        "usableMs": 359.69999999925494
+      }
+    },
+    {
+      "name": "Settings to videos",
+      "before": {
+        "visualMs": 666.8000000007451,
+        "usableMs": 979.1000000014901
+      },
+      "after": {
+        "visualMs": 25.800000000745058,
+        "usableMs": 972.3000000007451
+      }
+    },
+    {
+      "name": "Open video",
+      "before": {
+        "visualMs": 665,
+        "usableMs": 1317.4000000022352
+      },
+      "after": {
+        "visualMs": 46.600000001490116,
+        "usableMs": 1135.9000000022352
+      }
+    },
+    {
+      "name": "Video to videos",
+      "before": {
+        "visualMs": 37.600000001490116,
+        "usableMs": 991
+      },
+      "after": {
+        "visualMs": 38.20000000298023,
+        "usableMs": 976.5
+      }
+    },
+    {
+      "name": "New video",
+      "before": {
+        "visualMs": 28.699999999254942,
+        "usableMs": 1559.699999999255
+      },
+      "after": {
+        "visualMs": 21.300000000745058,
+        "usableMs": 1350.699999999255
+      }
+    },
+    {
+      "name": "Use library hook",
+      "before": {
+        "visualMs": 1477.0999999977648,
+        "usableMs": 2079.400000002235
+      },
+      "after": {
+        "visualMs": 40.600000001490116,
+        "usableMs": 1384.6000000014901
+      }
+    },
+    {
+      "name": "Open editor",
+      "before": {
+        "visualMs": 29.099999997764826,
+        "usableMs": 417.69999999925494
+      },
+      "after": {
+        "visualMs": 60.5,
+        "usableMs": 569.7000000029802
+      }
+    },
+    {
+      "name": "Reference detail (route probe)",
+      "before": {
+        "visualMs": 352.69999999925494,
+        "usableMs": 1055.300000000745
+      },
+      "after": {
+        "visualMs": 80.19999999925494,
+        "usableMs": 1059.300000000745
+      }
+    },
+    {
+      "name": "Legacy edit redirect (route probe)",
+      "before": {
+        "visualMs": 655.4000000022352,
+        "usableMs": 1678.5999999977648
+      },
+      "after": {
+        "visualMs": 44.400000002235174,
+        "usableMs": 1760.800000000745
+      }
+    },
+    {
+      "name": "Landing to signup",
+      "before": {
+        "visualMs": 700.8999999985099,
+        "usableMs": 701.1999999992549
+      },
+      "after": {
+        "visualMs": 52.100000001490116,
+        "usableMs": 785.8000000007451
+      }
+    },
+    {
+      "name": "Close signup",
+      "before": {
+        "visualMs": 442.19999999925494,
+        "usableMs": 442.19999999925494
+      },
+      "after": {
+        "visualMs": 83.90000000223517,
+        "usableMs": 84.10000000149012
+      }
+    },
+    {
+      "name": "Signup to pricing (SDK and continuation stubs)",
+      "before": {
+        "visualMs": 96.89999999850988,
+        "usableMs": 1072
+      },
+      "after": {
+        "visualMs": 40.80000000074506,
+        "usableMs": 1060
+      }
+    }
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/billing",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/billing",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "POST"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000001",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000001/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "POST"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000001",
+      "method": "PATCH"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000001",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000001/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references/10000000-0000-4000-8000-000000000100",
+      "method": "GET"
+    },
+    {
+      "path": "/api/media/10000000-0000-4000-8000-000000000100.mp4",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/billing",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/billing",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "POST"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/f30a90a2-500a-4c30-b26e-550f74c93d56",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/f30a90a2-500a-4c30-b26e-550f74c93d56/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "POST"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/ee420da0-d813-4f06-8ed0-7d447daf1295",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/ee420da0-d813-4f06-8ed0-7d447daf1295/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references/10000000-0000-4000-8000-000000000100",
+      "method": "GET"
+    },
+    {
+      "path": "/api/media/10000000-0000-4000-8000-000000000100.mp4",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/billing",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/billing",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "POST"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000001",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000001/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "POST"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000001",
+      "method": "PATCH"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000001",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000001/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references/10000000-0000-4000-8000-000000000100",
+      "method": "GET"
+    },
+    {
+      "path": "/api/media/10000000-0000-4000-8000-000000000100.mp4",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/billing",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/billing",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "POST"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/2f34329a-3aa8-445e-ae01-0ac8432d3c1c",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/2f34329a-3aa8-445e-ae01-0ac8432d3c1c/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "POST"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/4b6da7ec-b071-4ce4-81c5-d63f6c860b76",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/4b6da7ec-b071-4ce4-81c5-d63f6c860b76/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references/10000000-0000-4000-8000-000000000100",
+      "method": "GET"
+    },
+    {
+      "path": "/api/media/10000000-0000-4000-8000-000000000100.mp4",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/billing",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/billing",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "POST"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000001",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000001/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "POST"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000001",
+      "method": "PATCH"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000001",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000001/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references/10000000-0000-4000-8000-000000000100",
+      "method": "GET"
+    },
+    {
+      "path": "/api/media/10000000-0000-4000-8000-000000000100.mp4",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/billing",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/billing",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "POST"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/65acf936-3479-4efe-b6db-38280f8e1aba",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/65acf936-3479-4efe-b6db-38280f8e1aba/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "POST"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/2e23b78f-5871-417f-afcf-88b779ba3210",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/2e23b78f-5871-417f-afcf-88b779ba3210/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references/10000000-0000-4000-8000-000000000100",
+      "method": "GET"
+    },
+    {
+      "path": "/api/media/10000000-0000-4000-8000-000000000100.mp4",
+      "method": "GET"
+    },
+    {
+      "path": "/api/profile",
+      "method": "GET"
+    },
+    {
+      "path": "/api/usage",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs",
+      "method": "GET"
+    },
+    {
+      "path": "/api/references",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+      "method": "GET"
+    },
+    {
+      "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+      "method": "GET"
+    }
+  ],
+  "fixtureOverrides": [
+    "Proxy is passthrough only in temporary copies",
+    "Browser Auth SDK is a 250 ms stub only in temporary copies",
+    "Auth continuation redirects to Pricing through a browser transport stub",
+    "Hidden client-link probes cover the reference detail and legacy edit alias only"
+  ],
+  "productHeads": {
+    "before": "bc79ce9",
+    "after": "f809f8da73127689155709124dfdace3da9b1510"
+  },
+  "serverOnlyFollowup": {
+    "commit": "3c1b1f55ecbcc2368c8b8ba30ba098d171db0753",
+    "description": "Non-admin IDs skip redundant Auth lookup; client code unchanged from browser fixture head. Verified separately by final suites/build."
+  },
+  "acceptance": {
+    "afterSamples": 51,
+    "over100ms": 3,
+    "maximumVisualMs": 105.5,
+    "misses": [
+      {
+        "round": 0,
+        "phase": "after",
+        "name": "Library to videos",
+        "visualMs": 103.10000000149012,
+        "usableMs": 982.4000000022352,
+        "path": "/studio"
+      },
+      {
+        "round": 1,
+        "phase": "after",
+        "name": "Close signup",
+        "visualMs": 100.69999999925494,
+        "usableMs": 100.69999999925494,
+        "path": "/"
+      },
+      {
+        "round": 2,
+        "phase": "after",
+        "name": "Library to videos",
+        "visualMs": 105.5,
+        "usableMs": 1054,
+        "path": "/studio"
+      }
+    ]
+  }
+}

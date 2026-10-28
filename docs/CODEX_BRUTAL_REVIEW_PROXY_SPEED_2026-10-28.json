@@ -1,0 +1,53 @@
+{
+  "profile": "Offline actual updateSession, claims stub, transport delay 250 ms, nine allowed navigation calls followed by an unusable plan. No production latency claim.",
+  "rows": [
+    {
+      "round": 0,
+      "path": "/studio",
+      "milliseconds": 252.624251
+    },
+    {
+      "round": 0,
+      "path": "/library",
+      "milliseconds": 250.794665
+    },
+    {
+      "round": 0,
+      "path": "/studio/fixture",
+      "milliseconds": 251.86489500000005
+    },
+    {
+      "round": 1,
+      "path": "/studio",
+      "milliseconds": 250.74119899999994
+    },
+    {
+      "round": 1,
+      "path": "/library",
+      "milliseconds": 252.07744200000002
+    },
+    {
+      "round": 1,
+      "path": "/studio/fixture",
+      "milliseconds": 250.92467299999998
+    },
+    {
+      "round": 2,
+      "path": "/studio",
+      "milliseconds": 251.30643299999997
+    },
+    {
+      "round": 2,
+      "path": "/library",
+      "milliseconds": 250.79366299999992
+    },
+    {
+      "round": 2,
+      "path": "/studio/fixture",
+      "milliseconds": 251.74610099999973
+    }
+  ],
+  "medianMs": 251.30643299999997,
+  "reads": 10,
+  "unusablePlanRedirect": "http://fixture/pricing"
+}
