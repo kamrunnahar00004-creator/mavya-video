@@ -22,7 +22,7 @@ export function LibraryView() {
     let alive = true;
     loadLibrary()
       .then((page) => { if (alive) { setRefs(page.items); setCursor(page.next); } })
-      .catch(() => alive && setRefs([]));
+      .catch(() => { if (alive) { setRefs([]); setError("Library is unavailable. Try again."); } });
     return () => {
       alive = false;
     };

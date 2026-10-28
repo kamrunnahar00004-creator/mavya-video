@@ -196,7 +196,7 @@ export function RunView() {
   if (missing === id) {
     return (
       <div className="card flex h-full flex-col items-center justify-center gap-3 text-muted">
-        Run not found
+        Couldn&apos;t load this video. Try again.
         <Link href="/studio" className="font-semibold text-accent">
           Back to runs
         </Link>

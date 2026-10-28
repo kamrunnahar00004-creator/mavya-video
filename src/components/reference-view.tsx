@@ -102,7 +102,7 @@ export function ReferenceView() {
   if (missing) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-muted">
-        Not found
+        Couldn&apos;t load this hook. Try again.
         <Link href="/library" className="text-accent">
           Back to library
         </Link>
