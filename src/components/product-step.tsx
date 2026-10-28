@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Globe, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { Check, Copy, Globe, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import type { Run, VideoScript } from "@/lib/types";
 
 type AIResult = Pick<Run, "product" | "script">;
@@ -46,38 +46,18 @@ export function ProductStep({ product, reading, error, failedUrl, onAnalyze }: {
   const brief = product?.brief;
   if (brief && !editing && !reading && !error) {
     return (
-      <div className="rounded-2xl border border-line bg-panel p-4">
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-tint text-accent">
-            <Globe className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-bold">{brief.name}</p>
-            <p className="text-[13.5px] text-muted">{brief.oneLiner}</p>
-          </div>
-          <button type="button" onClick={() => setEditing(true)} className="rounded-lg px-3 py-1.5 text-[13px] font-bold text-accent hover:bg-accent-tint">
-            Change
-          </button>
+      // The rest of the brief (audience, wow moment, features) is kept for the script and demo plan, not shown.
+      <div className="flex items-center gap-4 rounded-2xl border border-line bg-panel p-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-tint text-accent">
+          <Globe className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px] font-bold">{brief.name}</p>
+          <p className="truncate text-[13.5px] text-muted">{brief.oneLiner}</p>
         </div>
-        <dl className="mt-4 grid gap-3 border-t border-line pt-4 text-[13.5px] sm:grid-cols-2">
-          <div>
-            <dt className="font-semibold text-soft">For</dt>
-            <dd className="mt-0.5">{brief.audience}</dd>
-          </div>
-          <div>
-            <dt className="font-semibold text-soft">Wow moment</dt>
-            <dd className="mt-0.5">{brief.wowMoment}</dd>
-          </div>
-        </dl>
-        {brief.features.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {brief.features.map((f) => (
-              <span key={f} className="rounded-md bg-raised px-2 py-1 text-[12.5px] font-semibold text-muted">
-                {f}
-              </span>
-            ))}
-          </div>
-        )}
+        <button type="button" onClick={() => setEditing(true)} className="rounded-lg px-3 py-1.5 text-[13px] font-bold text-accent hover:bg-accent-tint">
+          Change
+        </button>
       </div>
     );
   }
@@ -201,19 +181,47 @@ export function ScriptCard({ runId, script, hookText, writing = false, onDone, o
           </ol>
         </>
       )}
-      <p className="mt-4 text-[12.5px] font-semibold text-soft">Demo, {script.shots.length} shots</p>
-      <ol className="mt-1.5 space-y-1.5 text-[13.5px]">
-        {script.shots.map((s, i) => (
-          <li key={i} className="flex gap-2">
-            <span className="w-5 shrink-0 font-bold text-soft">{i + 1}</span>
-            <span className="min-w-0">
-              <span className="font-semibold">{s.label}</span> <span className="text-soft">({s.seconds}s)</span>
-              <span className="block text-muted">{s.hint}</span>
+      {error && <p role="alert" className="mt-2 text-[13px] font-semibold text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+const sec = (n: number) => String(Math.round(n * 10) / 10);
+
+/** The demo as a timed script: from when to when, what to film, the text on screen. One click copies it all. */
+export function DemoScript({ shots }: { shots: VideoScript["shots"] }) {
+  const [copied, setCopied] = useState(false);
+  const lines = shots.map((s, i) => {
+    const from = shots.slice(0, i).reduce((sum, x) => sum + x.seconds, 0);
+    return { from, to: from + s.seconds, film: s.hint || s.label, text: s.text };
+  });
+  const copy = () => {
+    const text = lines.map((l) => `${sec(l.from)}-${sec(l.to)}s: ${l.film}${l.text ? `\nOn screen: "${l.text}"` : ""}`).join("\n\n");
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    }, () => undefined);
+  };
+  return (
+    <div className="rounded-2xl border border-line bg-panel p-4">
+      <div className="flex items-center gap-3">
+        <p className="min-w-0 flex-1 text-[14.5px] font-bold">Demo script</p>
+        <button type="button" onClick={copy} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-bold text-accent hover:bg-accent-tint">
+          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <ol className="mt-3 divide-y divide-line">
+        {lines.map((l, i) => (
+          <li key={i} className="flex gap-4 py-2.5">
+            <span className="w-14 shrink-0 pt-px text-[13px] font-bold tabular-nums text-soft">{sec(l.from)}-{sec(l.to)}s</span>
+            <span className="min-w-0 text-[14px]">
+              <span className="block font-semibold">{l.film}</span>
+              {l.text && <span className="mt-0.5 block text-muted">&ldquo;{l.text}&rdquo;</span>}
             </span>
           </li>
         ))}
       </ol>
-      {error && <p role="alert" className="mt-2 text-[13px] font-semibold text-red-600">{error}</p>}
     </div>
   );
 }

@@ -25,7 +25,7 @@ import dynamic from "next/dynamic";
 import { SourcePicker, UploadDrop, Thumb } from "@/components/source-picker";
 import { libraryMore, loadLibrary } from "@/lib/library-cache";
 const HistoryPanel = dynamic(() => import("@/components/history-panel").then(m => m.HistoryPanel));
-import { ProductStep, ScriptCard, readProduct, writeScript } from "@/components/product-step";
+import { DemoScript, ProductStep, ScriptCard, readProduct, writeScript } from "@/components/product-step";
 import { RunPreview, claimPlayback } from "@/components/run-preview";
 
 const ClipEditor = dynamic(() => import("@/components/editor-tools").then(m => m.ClipEditor));
@@ -91,6 +91,12 @@ export function RunView() {
   useEffect(() => {
     liveId.current = id;
   }, [id]);
+  // Steps 4 to 6 and the editor share one code chunk; fetch it while the seller is on the early steps, so opening
+  // one never shows an empty step while it downloads.
+  useEffect(() => {
+    const timer = setTimeout(() => void import("@/components/editor-tools").catch(() => undefined), 300);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -133,8 +139,8 @@ export function RunView() {
   /** The product brief and the script are written on the server (Gemini); take only those two sections back. */
   const takeAI = useCallback((u: Pick<Run, "product" | "script">) => setRun((r) => (r?.id === id ? { ...r, product: u.product ?? null, script: u.script ?? null } : r)), [id]);
 
-  /** The demo plan: shot by shot (seconds, camera, steps), from the stolen hook, the script and the product brief.
-   * Fills the demo shot list when nothing is filmed yet. */
+  /** The demo plan: shot by shot (seconds, what to film, text on screen), from the stolen hook, the script and the
+   * product brief. Step 5 shows it as a timed script; "Build it clip by clip" turns it into the shot list. */
   const writePlan = useCallback(async () => {
     wantPlan.current = null;
     setPlanning(id);
@@ -144,11 +150,7 @@ export function RunView() {
     setPlanning(null);
     if (!r?.script) return setToast(error ?? "Couldn't write the demo plan. Try again.");
     takeAI(r);
-    const cur = runRef.current;
-    if (cur?.id === id && r.script.shots.length && !demoClips(cur).some((c) => clipSrc(c))) {
-      save({ demo: { ...cur.demo, mode: "clips", clips: r.script.shots.map((s) => ({ id: uid(), label: s.label, hint: s.hint, target: s.seconds, camera: s.camera, steps: s.steps, text: s.text })) } });
-    }
-  }, [id, takeAI, save]);
+  }, [id, takeAI]);
 
   /** Paste or Analyze: step 1 counts as done at once and the next step opens; the site is read in the background. */
   const analyzeProduct = useCallback((url: string) => {
@@ -754,10 +756,17 @@ export function RunView() {
             </Block>
 
             <Block n={5} title="Add your demo" done={stepDone[4]} open={openSteps.includes(5)} summary={stepSummary[4]} onToggle={() => toggleStep(5)}>
+              {planningHere ? (
+                <div role="status" aria-label="Writing your demo script" className="space-y-3 rounded-2xl border border-line bg-panel p-4">
+                  <span className="shimmer block h-5 w-28 rounded" />
+                  {[0, 1, 2, 3].map((i) => <span key={i} className="shimmer block h-9 rounded-lg" />)}
+                </div>
+              ) : run.script?.shots.length && run.script.refId === (run.sourceRefId ?? null) ? (
+                <DemoScript shots={run.script.shots} />
+              ) : null}
               <DemoStep
                 run={run}
                 segs={segs}
-                planning={planningHere}
                 renderEditor={clipEditor}
                 onFiles={async (files) => {
                   setPicked((p) => Array.from(new Set([...(p ?? openSteps), 5])));
@@ -1443,6 +1452,9 @@ function GenerateStep({ run, source, seg, texts, gen, onGenerate, onPatch, onAdd
  * Times on the player are on-screen seconds from the clip's start; texts are stored on the whole timeline.
  */
 function Block({ n, title, done, pending = false, children, open = true, summary, onToggle }: { n: number; title: string; done: boolean; /** Done from the seller's side, still finishing in the background: the check carries a spinning ring. */ pending?: boolean; children: React.ReactNode; open?: boolean; summary?: string; onToggle?: () => void }) {
+  // Once opened, a step stays mounted and is only hidden: reopening is instant, its videos and state survive.
+  const [seen, setSeen] = useState(open);
+  if (open && !seen) setSeen(true);
   return (
     <section className={open ? "space-y-4 py-6" : "py-4"}>
       <button type="button" onClick={onToggle} aria-expanded={open} aria-busy={pending || undefined} className="flex w-full items-center gap-3 text-left">
@@ -1454,7 +1466,7 @@ function Block({ n, title, done, pending = false, children, open = true, summary
         {!open && summary && <span className="min-w-0 truncate text-[13.5px] text-muted">{summary}</span>}
         <ChevronDown className={`ml-auto h-4 w-4 shrink-0 text-soft transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && children}
+      {seen && <div hidden={!open} className="space-y-4">{children}</div>}
     </section>
   );
 }
