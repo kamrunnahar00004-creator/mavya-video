@@ -16,7 +16,7 @@ export function LibraryView() {
 
   useEffect(() => {
     let alive = true;
-    fetchPage<Reference>("/api/references?view=studio&scope=curated")
+    fetchPage<Reference>("/api/references?view=studio&scope=curated&all=1")
       .then((page) => { if (alive) { setRefs(page.items); setCursor(page.next); } })
       .catch(() => alive && setRefs([]));
     return () => {
@@ -50,7 +50,7 @@ export function LibraryView() {
             {Array.from({ length: 12 }, (_, i) => <div key={i} className="aspect-[9/16] animate-pulse rounded-xl bg-raised" />)}
           </div>
         ) : (
-          <SourcePicker onLoadMore={cursor ? async () => { const page = await fetchPage<Reference>("/api/references?view=studio&scope=curated", cursor); setRefs(old => [...(old ?? []), ...page.items]); setCursor(page.next); } : undefined} refs={refs} source={null} onRefsChange={setRefs} onPick={(r) => void startWithHook(r)} onClear={() => undefined} />
+          <SourcePicker onLoadMore={cursor ? async () => { const page = await fetchPage<Reference>("/api/references?view=studio&scope=curated&all=1", cursor); setRefs(old => [...(old ?? []), ...page.items]); setCursor(page.next); } : undefined} refs={refs} source={null} onRefsChange={setRefs} onPick={(r) => void startWithHook(r)} onClear={() => undefined} />
         )}
         {error && <p className="mt-3 text-[13px] text-red-500">{error}</p>}
       </div>

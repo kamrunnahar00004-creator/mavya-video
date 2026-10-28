@@ -81,7 +81,7 @@ export function RunView() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([fetch(`/api/runs/${id}`), fetchPage<Reference>("/api/references?view=studio")])
+    Promise.all([fetch(`/api/runs/${id}`), fetchPage<Reference>("/api/references?view=studio&all=1")])
       .then(async ([r, rs]) => {
         if (!r.ok) throw new Error("missing");
         const runData = (await r.json()) as Run;
@@ -516,7 +516,7 @@ export function RunView() {
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-3">
-              <SourcePicker onLoadMore={refCursor ? async () => { const p = await fetchPage<Reference>("/api/references?view=studio", refCursor); setRefs(old => [...new Map([...(old ?? []), ...p.items].map(r => [r.id,r])).values()]); setRefCursor(p.next); } : undefined} refs={refs} source={null} onRefsChange={setRefs} onPick={pickHook} onClear={() => undefined} />
+              <SourcePicker onLoadMore={refCursor ? async () => { const p = await fetchPage<Reference>("/api/references?view=studio&all=1", refCursor); setRefs(old => [...new Map([...(old ?? []), ...p.items].map(r => [r.id,r])).values()]); setRefCursor(p.next); } : undefined} refs={refs} source={null} onRefsChange={setRefs} onPick={pickHook} onClear={() => undefined} />
             </div>
           </div>
         </div>
@@ -543,7 +543,7 @@ export function RunView() {
                 </div>
               ) : source ? (
                 <>
-                  <SourcePicker onLoadMore={refCursor ? async () => { const p = await fetchPage<Reference>("/api/references?view=studio", refCursor); setRefs(old => [...new Map([...(old ?? []), ...p.items].map(r => [r.id,r])).values()]); setRefCursor(p.next); } : undefined} refs={refs} source={source} onRefsChange={setRefs} onPick={pickHook} onClear={resetHook} />
+                  <SourcePicker onLoadMore={refCursor ? async () => { const p = await fetchPage<Reference>("/api/references?view=studio&all=1", refCursor); setRefs(old => [...new Map([...(old ?? []), ...p.items].map(r => [r.id,r])).values()]); setRefCursor(p.next); } : undefined} refs={refs} source={source} onRefsChange={setRefs} onPick={pickHook} onClear={resetHook} />
                   {hook.source === "upload" && (
                     <NoteField
                       label="Additional context (optional)"
