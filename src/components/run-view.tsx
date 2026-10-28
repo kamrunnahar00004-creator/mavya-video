@@ -614,6 +614,15 @@ export function RunView() {
           <div className="mx-auto max-w-[760px] divide-y divide-line px-8">
             <Block n={1} title="Your product" done={stepDone[0]} pending={stepPending[0]} open={openSteps.includes(1)} summary={stepSummary[0]} onToggle={() => toggleStep(1)}>
               <ProductStep key={job?.error ? `failed:${job.url}` : "product"} product={run.product ?? null} reading={productReading} error={job?.error ?? null} failedUrl={job?.error ? job.url : undefined} onAnalyze={analyzeProduct} />
+              {/* The demo script lives with the product it films (founder 2026-10-28). */}
+              {planningHere ? (
+                <div role="status" aria-label="Writing your demo script" className="space-y-3 rounded-2xl border border-line bg-panel p-4">
+                  <span className="shimmer block h-5 w-36 rounded" />
+                  {[0, 1, 2, 3].map((i) => <span key={i} className="shimmer block h-12 rounded-lg" />)}
+                </div>
+              ) : run.product?.brief && !productReading && run.script?.shots.length && run.script.refId === (run.sourceRefId ?? null) ? (
+                <DemoScript shots={run.script.shots} />
+              ) : null}
             </Block>
 
             <Block n={2} title="Steal a hook that already works" done={stepDone[1]} open={openSteps.includes(2)} summary={stepSummary[1]} onToggle={() => toggleStep(2)}>
@@ -756,14 +765,6 @@ export function RunView() {
             </Block>
 
             <Block n={5} title="Add your demo" done={stepDone[4]} open={openSteps.includes(5)} summary={stepSummary[4]} onToggle={() => toggleStep(5)}>
-              {planningHere ? (
-                <div role="status" aria-label="Writing your demo script" className="space-y-3 rounded-2xl border border-line bg-panel p-4">
-                  <span className="shimmer block h-5 w-28 rounded" />
-                  {[0, 1, 2, 3].map((i) => <span key={i} className="shimmer block h-9 rounded-lg" />)}
-                </div>
-              ) : run.script?.shots.length && run.script.refId === (run.sourceRefId ?? null) ? (
-                <DemoScript shots={run.script.shots} />
-              ) : null}
               <DemoStep
                 run={run}
                 segs={segs}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Globe, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { Check, Copy, Globe, Loader2, RefreshCw, Sparkles, Type } from "lucide-react";
 import type { Run, VideoScript } from "@/lib/types";
 
 type AIResult = Pick<Run, "product" | "script">;
@@ -175,41 +175,57 @@ export function ScriptCard({ runId, script, hookText, writing = false, onDone, o
 }
 
 const sec = (n: number) => String(Math.round(n * 10) / 10);
+const clock = (n: number) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, "0")}`;
 
-/** The demo as a timed script: from when to when, what to film, the text on screen. One click copies it all. */
+/**
+ * The demo as a shot timeline: when each shot starts and how long it runs, what to film, and the text that appears on
+ * screen (one dark chip per caption, like on the video). One click copies it all as plain text.
+ */
 export function DemoScript({ shots }: { shots: VideoScript["shots"] }) {
   const [copied, setCopied] = useState(false);
   const lines = shots.map((s, i) => {
     const from = shots.slice(0, i).reduce((sum, x) => sum + x.seconds, 0);
-    return { from, to: from + s.seconds, film: s.hint || s.label, text: s.text };
+    return { from, seconds: s.seconds, film: s.hint || s.label, captions: s.text.split(/\s+\/\s+/).map((t) => t.trim()).filter(Boolean) };
   });
+  const total = lines.reduce((sum, l) => sum + l.seconds, 0);
   const copy = () => {
-    const text = lines.map((l) => `${sec(l.from)}-${sec(l.to)}s: ${l.film}${l.text ? `\nOn screen: "${l.text}"` : ""}`).join("\n\n");
+    const text = lines.map((l) => `${sec(l.from)}-${sec(l.from + l.seconds)}s: ${l.film}${l.captions.length ? `\nOn screen: ${l.captions.map((c) => `"${c}"`).join(", ")}` : ""}`).join("\n\n");
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     }, () => undefined);
   };
   return (
-    <div className="rounded-2xl border border-line bg-panel p-4">
-      <div className="flex items-center gap-3">
-        <p className="min-w-0 flex-1 text-[14.5px] font-bold">Demo script</p>
-        <button type="button" onClick={copy} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-bold text-accent hover:bg-accent-tint">
+    <section aria-label="Demo script" className="rounded-2xl border border-line bg-panel">
+      <div className="flex items-center gap-3 px-4 pb-1 pt-3.5">
+        <h3 className="text-[15px] font-bold">Demo script</h3>
+        <span className="text-[13px] tabular-nums text-soft">{lines.length} shots · {sec(total)}s</span>
+        <button type="button" onClick={copy} className="ml-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-bold text-accent hover:bg-accent-tint">
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
-      <ol className="mt-3 divide-y divide-line">
+      <ol className="px-4 pb-2">
         {lines.map((l, i) => (
-          <li key={i} className="flex gap-4 py-2.5">
-            <span className="w-14 shrink-0 pt-px text-[13px] font-bold tabular-nums text-soft">{sec(l.from)}-{sec(l.to)}s</span>
-            <span className="min-w-0 text-[14px]">
-              <span className="block font-semibold">{l.film}</span>
-              {l.text && <span className="mt-0.5 block text-muted">&ldquo;{l.text}&rdquo;</span>}
+          <li key={i} className="grid grid-cols-[52px_minmax(0,1fr)] gap-x-4 border-t border-line py-3.5 first:border-t-0">
+            <span className="pt-px">
+              <span className="block text-[14px] font-bold tabular-nums text-text">{clock(l.from)}</span>
+              <span className="block text-[12.5px] tabular-nums text-soft">{sec(l.seconds)}s</span>
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[14.5px] leading-snug text-text">{l.film}</span>
+              {l.captions.length > 0 && (
+                <span className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <Type role="img" aria-label="On screen" className="h-3.5 w-3.5 shrink-0 text-soft" />
+                  {l.captions.map((c, j) => (
+                    <span key={j} className="rounded-md bg-ink px-2 py-1 text-[12.5px] font-semibold leading-none text-white">{c}</span>
+                  ))}
+                </span>
+              )}
             </span>
           </li>
         ))}
       </ol>
-    </div>
+    </section>
   );
 }
