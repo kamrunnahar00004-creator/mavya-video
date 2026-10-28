@@ -5,7 +5,8 @@ import { coverLinks } from "@/lib/server/covers";
 import type { Asset, Reference, Run } from "@/lib/types";
 
 export const PAGE_SIZE = 24;
-const ALL_REFERENCES = 500;
+const ALL_REFERENCES = 2000;
+const DATABASE_BATCH = 500;
 type Kind = "runs" | "references" | "assets";
 type Cursor = { at: string; id: string };
 function cursor(raw: string | null): Cursor | null {
@@ -31,14 +32,27 @@ export async function listPage(kind: Kind, who: string, request: Request) {
   let items: (Run | Reference | Asset)[];
   let next: string | null = null;
   if (cloud()) {
-    let query = createSupabaseAdminClient().from(table).select(kind === "assets" ? "media_id,name,kind,created_at" : kind === "references" ? (refSummary ? "id,owner,created_at,refStyle:data->ai->style," + refKeys.map(k => k + ":data->" + k).join(",") : "id,owner,data,created_at") : summary ? "id,created_at,title:data->>title,updatedAt:data->>updatedAt,sourceRefId:data->>sourceRefId,hook:data->hook,demo:data->demo,product:data->product,sounds:data->sounds,sound:data->sound" : "id,data,created_at");
-    query = kind === "references" ? curatedOnly ? query.eq("owner", "curated") : query.or(`owner.eq.curated,user_id.eq.${who}`) : query.eq("user_id", who);
-    if (after) query = query.or(`created_at.lt.${after.at},and(created_at.eq.${after.at},${idKey}.lt.${after.id})`);
-    const { data, error } = await query.order("created_at", { ascending: false }).order(idKey, { ascending: false }).limit(size);
-    if (error) throw error;
-    const rows = (data ?? []) as unknown as {id: string; owner: Reference["owner"]; data: Run | Reference; media_id: string; name: string; kind: Asset["kind"]; created_at: string}[];
+    // A hosted PostgREST max_rows cap must not silently turn all=1 into a truncated list.
+    // Read with keyset batches, preserving owner filters on every query. Eight queries is a hard ceiling.
+    type Row = {id: string; owner: Reference["owner"]; data: Run | Reference; media_id: string; name: string; kind: Asset["kind"]; created_at: string};
+    const rows: Row[] = [];
+    let batchAfter = after;
+    let continuation = false;
+    for (let batch = 0; batch < (size === ALL_REFERENCES ? 8 : 1) && rows.length < size; batch++) {
+      let query = createSupabaseAdminClient().from(table).select(kind === "assets" ? "media_id,name,kind,created_at" : kind === "references" ? (refSummary ? "id,owner,created_at,refStyle:data->ai->style," + refKeys.map(k => k + ":data->" + k).join(",") : "id,owner,data,created_at") : summary ? "id,created_at,title:data->>title,updatedAt:data->>updatedAt,sourceRefId:data->>sourceRefId,hook:data->hook,demo:data->demo,product:data->product,sounds:data->sounds,sound:data->sound" : "id,data,created_at");
+      query = kind === "references" ? curatedOnly ? query.eq("owner", "curated") : query.or(`owner.eq.curated,user_id.eq.${who}`) : query.eq("user_id", who);
+      if (batchAfter) query = query.or(`created_at.lt.${batchAfter.at},and(created_at.eq.${batchAfter.at},${idKey}.lt.${batchAfter.id})`);
+      const { data, error } = await query.order("created_at", { ascending: false }).order(idKey, { ascending: false }).limit(Math.min(size - rows.length, DATABASE_BATCH));
+      if (error) throw error;
+      const page = (data ?? []) as unknown as Row[];
+      if (!page.length) { continuation = false; break; }
+      rows.push(...page);
+      const last = page.at(-1)!;
+      batchAfter = { at: last.created_at, id: kind === "assets" ? last.media_id : last.id };
+      continuation = size === ALL_REFERENCES || rows.length === size;
+    }
     items = rows.map(r => kind === "assets" ? { mediaId: r.media_id, name: r.name, kind: r.kind, createdAt: r.created_at } : kind === "references" ? refSummary ? { ...r, id: r.id, owner: r.owner, createdAt: r.created_at, ai: (r as unknown as {refStyle?: string}).refStyle ? {style: (r as unknown as {refStyle: string}).refStyle} : undefined } as unknown as Reference : { ...r.data, id: r.id, owner: r.owner } as Reference : summary ? { ...(r as unknown as Run), createdAt: r.created_at } : r.data);
-    if (rows.length === size) { const last = rows.at(-1)!; next = token(last.created_at, kind === "assets" ? last.media_id : last.id); }
+    if (continuation && rows.length) { const last = rows.at(-1)!; next = token(last.created_at, kind === "assets" ? last.media_id : last.id); }
   } else {
     const values = kind === "assets" ? await listAssets(who) : kind === "references" ? await listReferences(who) : await listRuns(who);
     const idOf = (v: Run | Reference | Asset) => "mediaId" in v && !("id" in v) ? v.mediaId : (v as Run | Reference).id;

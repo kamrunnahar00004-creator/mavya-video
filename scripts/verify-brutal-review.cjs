@@ -38,7 +38,7 @@ async function library() {
   let cursor = null, seen = [];
   do {
     const page = await lists.listPage('references', id(1), new Request('http://fixture?all=1&scope=curated' + (cursor ? '&cursor=' + cursor : '')));
-    assert.ok(page.items.length <= 500);
+    assert.ok(page.items.length <= 2000);
     for (const item of page.items) {
       const u = new URL(item.analysis.segments[0].thumb, 'http://fixture');
       assert.ok(u.searchParams.get('ids').split(',').length <= 24, 'large lists still use valid thumbnail batches');
@@ -46,6 +46,26 @@ async function library() {
     seen.push(...page.items.map(r => r.id)); cursor = page.next;
   } while (cursor);
   assert.equal(seen.length, 2301); assert.equal(new Set(seen).size, 2301);
+  let reads = 0;
+  const cloud = load('src/lib/server/list-pages.ts', {
+    '@/lib/server/store': { cloud: () => true }, '@/lib/server/covers': { coverLinks: async () => new Map() },
+    '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from: () => {
+      let after = null, bounded = false;
+      return { select() { return this; }, eq(k,v) { if(k==='owner' && v==='curated') bounded=true; return this; }, or(value) { if(value.includes('owner.eq.curated')) bounded=true; const m=value.match(/id.lt.([0-9a-f-]+)/); if(m)after=m[1]; return this; }, order() { return this; }, async limit(n) {
+        assert.ok(bounded, 'owner scope on every batch'); assert.ok(n<=500); reads++;
+        return { data: [...refs].reverse().filter(r=>!after || r.id<after).slice(0,Math.min(n,137)).map(r=>({id:r.id,owner:r.owner,created_at:r.createdAt,data:r})), error:null };
+      } };
+    } }) }
+  });
+  cursor = null; seen = [];
+  do {
+    const before = reads;
+    const page = await cloud.listPage('references',id(1),new Request('http://fixture?all=1&scope=curated'+(cursor?'&cursor='+cursor:'')));
+    assert.ok(reads-before<=8,'bounded database work even under a small hosted row cap');
+    seen.push(...page.items.map(r=>r.id)); cursor=page.next;
+  } while(cursor);
+  assert.equal(seen.length,2301); assert.equal(new Set(seen).size,2301);
+
 }
 
 async function creation() {

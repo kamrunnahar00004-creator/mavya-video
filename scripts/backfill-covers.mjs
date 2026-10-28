@@ -1,6 +1,6 @@
 // One-time (safe to re-run): small WebP card covers for every library item that has a stored thumbnail.
 // Writes R2 covers/<thumbnail media id>.webp (360 px wide) and sets data.smallCover = true on the library row.
-// New items get theirs automatically the first time the library lists them (src/lib/server/covers.ts).
+// Curated items only. List GETs never write derivatives. A changed row fails the compare-and-set instead of losing edits.
 // Usage: node --env-file=.env.local scripts/backfill-covers.mjs [--dry]
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createClient } from "@supabase/supabase-js";
