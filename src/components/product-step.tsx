@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Globe, Loader2, RefreshCw, Sparkles, Type } from "lucide-react";
+import { Check, Copy, Globe, ListOrdered, Loader2, RefreshCw, Smartphone, Sparkles, Type } from "lucide-react";
 import type { Run, VideoScript } from "@/lib/types";
 
 type AIResult = Pick<Run, "product" | "script">;
@@ -174,22 +174,34 @@ export function ScriptCard({ runId, script, hookText, writing = false, onDone, o
   );
 }
 
-const sec = (n: number) => String(Math.round(n * 10) / 10);
-const clock = (n: number) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, "0")}`;
+const sec = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
 /**
- * The demo as a shot timeline: when each shot starts and how long it runs, what to film, and the text that appears on
- * screen (one dark chip per caption, like on the video). One click copies it all as plain text.
+ * The demo, shot by shot, as clear as a shooting script: the time range, the shot, how to hold the phone (Camera), what
+ * to do in order (Steps) and the text that appears (On screen, one dark chip per caption). Copy gives the same as text.
  */
 export function DemoScript({ shots }: { shots: VideoScript["shots"] }) {
   const [copied, setCopied] = useState(false);
   const lines = shots.map((s, i) => {
     const from = shots.slice(0, i).reduce((sum, x) => sum + x.seconds, 0);
-    return { from, seconds: s.seconds, film: s.hint || s.label, captions: s.text.split(/\s+\/\s+/).map((t) => t.trim()).filter(Boolean) };
+    return {
+      time: `${sec(from)} - ${sec(from + s.seconds)}s`,
+      title: s.label || s.hint,
+      camera: s.camera,
+      steps: s.steps.length ? s.steps : s.hint ? [s.hint] : [],
+      captions: s.text.split(/\s+\/\s+/).map((t) => t.trim()).filter(Boolean),
+    };
   });
-  const total = lines.reduce((sum, l) => sum + l.seconds, 0);
+  const total = shots.reduce((sum, s) => sum + s.seconds, 0);
   const copy = () => {
-    const text = lines.map((l) => `${sec(l.from)}-${sec(l.from + l.seconds)}s: ${l.film}${l.captions.length ? `\nOn screen: ${l.captions.map((c) => `"${c}"`).join(", ")}` : ""}`).join("\n\n");
+    const text = lines
+      .map((l) => [
+        `${l.time}  ${l.title}`,
+        l.camera && `Camera: ${l.camera}`,
+        l.steps.length && `Steps: ${l.steps.map((step, i) => `${i + 1}. ${step}`).join("  ")}`,
+        l.captions.length && `On screen: ${l.captions.map((c) => `"${c}"`).join(", ")}`,
+      ].filter(Boolean).join("\n"))
+      .join("\n\n");
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
@@ -207,22 +219,44 @@ export function DemoScript({ shots }: { shots: VideoScript["shots"] }) {
       </div>
       <ol className="px-4 pb-2">
         {lines.map((l, i) => (
-          <li key={i} className="grid grid-cols-[52px_minmax(0,1fr)] gap-x-4 border-t border-line py-3.5 first:border-t-0">
-            <span className="pt-px">
-              <span className="block text-[14px] font-bold tabular-nums text-text">{clock(l.from)}</span>
-              <span className="block text-[12.5px] tabular-nums text-soft">{sec(l.seconds)}s</span>
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[14.5px] leading-snug text-text">{l.film}</span>
-              {l.captions.length > 0 && (
-                <span className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <Type role="img" aria-label="On screen" className="h-3.5 w-3.5 shrink-0 text-soft" />
-                  {l.captions.map((c, j) => (
-                    <span key={j} className="rounded-md bg-ink px-2 py-1 text-[12.5px] font-semibold leading-none text-white">{c}</span>
-                  ))}
-                </span>
+          <li key={i} className="border-t border-line py-4 first:border-t-0">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="rounded-md bg-accent-tint px-2 py-1 text-[13px] font-bold tabular-nums text-accent">{l.time}</span>
+              <h4 className="text-[15px] font-bold">{l.title}</h4>
+            </div>
+            <dl className="mt-3 grid grid-cols-[84px_minmax(0,1fr)] gap-x-3 gap-y-2.5 text-[14px]">
+              {l.camera && (
+                <>
+                  <dt className="flex items-center gap-1.5 self-start pt-px text-[12.5px] font-semibold text-soft"><Smartphone className="h-3.5 w-3.5" />Camera</dt>
+                  <dd className="leading-snug text-text">{l.camera}</dd>
+                </>
               )}
-            </span>
+              {l.steps.length > 0 && (
+                <>
+                  <dt className="flex items-center gap-1.5 self-start pt-px text-[12.5px] font-semibold text-soft"><ListOrdered className="h-3.5 w-3.5" />Steps</dt>
+                  <dd>
+                    <ol className="space-y-1.5">
+                      {l.steps.map((step, j) => (
+                        <li key={j} className="flex items-start gap-2 leading-snug text-text">
+                          <span className="mt-px flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-raised text-[11.5px] font-bold tabular-nums text-muted">{j + 1}</span>
+                          {step}
+                        </li>
+                      ))}
+                    </ol>
+                  </dd>
+                </>
+              )}
+              {l.captions.length > 0 && (
+                <>
+                  <dt className="flex items-center gap-1.5 self-start pt-1 text-[12.5px] font-semibold text-soft"><Type className="h-3.5 w-3.5" />On screen</dt>
+                  <dd className="flex flex-wrap gap-1.5">
+                    {l.captions.map((c, j) => (
+                      <span key={j} className="rounded-md bg-ink px-2 py-1.5 text-[13px] font-semibold leading-none text-white">{c}</span>
+                    ))}
+                  </dd>
+                </>
+              )}
+            </dl>
           </li>
         ))}
       </ol>

@@ -14,11 +14,23 @@ import type { Reference, VideoScript } from "@/lib/types";
 export const maxDuration = 180;
 type Recipe = {
   hook?: { end?: number; camera?: string; setting?: string; mood?: string; spoken?: string; beats?: { start: number; end: number; action: string }[] };
-  onScreenText?: { text: string; start?: number; end?: number }[];
-  demo?: { method?: string; pacing?: string; shots?: { label?: string; seconds?: number; text?: string; hint?: string }[] };
+  onScreenText?: { text: string; start?: number; end?: number; style?: string; position?: string }[];
+  demo?: { method?: string; pacing?: string; shots?: { label?: string; seconds?: number; text?: string; hint?: string; camera?: string; steps?: string[] }[] };
   whyItWorks?: string;
 };
 const recipeOf = (r: Reference) => (r as Reference & { recipe?: Recipe }).recipe;
+
+/** The stolen hook in full: its demo shot by shot (camera, actions, captions, timing) is the template for the new one. */
+function template(r: Reference) {
+  const rc = recipeOf(r)!;
+  return {
+    ...sample(r),
+    demoMethod: rc.demo?.method ?? "",
+    demoPacing: rc.demo?.pacing ?? "",
+    demo: (rc.demo?.shots ?? []).map((s) => ({ label: s.label, seconds: s.seconds, camera: s.camera, steps: s.steps, hint: s.hint, text: s.text })),
+    onScreenText: ((rc.onScreenText ?? []) as NonNullable<Recipe["onScreenText"]>).map((t) => ({ text: t.text, style: t.style, position: t.position })),
+  };
+}
 
 /** A library hook, compact enough to put a few in one prompt. */
 function sample(r: Reference) {
@@ -77,15 +89,16 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/runs/[id]/
     .slice(0, 8)
     .map(sample);
 
-  const template = source && recipeOf(source) ? JSON.stringify(sample(source)) : null;
+  const stolen = source && recipeOf(source) ? JSON.stringify(template(source)) : null;
   const prompt = `You write short-form marketing videos (HOOK + DEMO) for software founders. Quality comes from data:
 copy what already went viral, adapted to this product. Never invent features, numbers or results the brief does not support.
 
 THE PRODUCT (read from its website):
 ${JSON.stringify(brief)}
 
-${template ? `THE HOOK TO RECREATE (an analyzed viral video; keep its structure, rhythm, tone and length):
-${template}` : `THE HOOK THE FOUNDER DESCRIBED (turn it into beats, in the style of the examples):
+${stolen ? `THE VIDEO THE FOUNDER STOLE (an analyzed viral video; recreate it for THIS product: its hook structure, rhythm,
+tone and length, and its demo shot for shot):
+${stolen}` : `THE HOOK THE FOUNDER DESCRIBED (turn it into beats, in the style of the examples):
 ${described}`}
 
 THE STRONGEST HOOKS IN THE LIBRARY (analyzed viral videos, for patterns of hook text, pacing and demo structure):
@@ -95,7 +108,7 @@ Write:
 - hookText: the on-screen hook text for THIS product, in the same voice and length as the hook to recreate (lowercase, slang and emoji only if it uses them). It must make people curious about what is on the screen, without naming the product yet.
 - hookAlternatives: 2 other hook texts in the same voice.
 - hookBeats: what the person does in the hook, beat by beat with seconds, same timing as the hook to recreate. Say "the creator", never describe a real person.
-- shots: the demo for THIS product, 3 to 6 shots, following the hook's demo structure and pacing and the product's demoFlow, ending on the wow moment. For each: label (2 to 4 words), hint (one sentence written to the founder: what to film), steps (1 to 3 short on-screen actions in the real product), camera (how to hold the phone), text (the on-screen caption for that shot, same voice as the hook), seconds.`;
+- shots: the demo for THIS product, 3 to 6 shots, ending on the wow moment.${stolen ? ` Mirror the stolen video's demo shot for shot: the same number of shots where the product allows, the same order of beats, about the same seconds per shot, the same camera setups and the same on-screen text format (numbering, length, casing, emoji, and a closing call to action if it has one). Swap in THIS product's real screens and actions from its demoFlow; keep the form, change the content.` : ` Follow the strongest library demos' structure and pacing and the product's demoFlow.`} For each: label (2 to 4 words), hint (one sentence written to the founder: what to film), steps (1 to 3 short on-screen actions in the real product), camera (how to hold the phone, specific: angle, distance, what is in frame), text (the on-screen caption for that shot, same voice as the hook), seconds.`;
 
   const budget = await beginAI(who, run, "script", { product: run.product, source: source, described });
   if (budget.response) return budget.response;
