@@ -42,7 +42,7 @@ async function one({ id, mediaId }) {
     if (error) throw error;
     const currentMedia = (data.data.analysis?.segments?.[0]?.thumb ?? data.data.thumbUrl ?? "").match(MEDIA_ID)?.[1];
     if (currentMedia !== mediaId) throw new Error("Thumbnail changed during backfill");
-    const updated = await db.from("library").update({ data: { ...data.data, smallCover: true } }).eq("id", id).eq("owner", "curated").eq("data", data.data).select("id");
+    const updated = await db.from("library").update({ data: { ...data.data, smallCover: true } }).eq("id", id).eq("owner", "curated").eq("data", JSON.stringify(data.data)).select("id");
     if (!updated.error && !updated.data?.length) throw new Error("Concurrent edit, retry later");
     if (updated.error) throw updated.error;
     ok++; before += original.length; after += webp.length;
