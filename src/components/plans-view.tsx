@@ -37,6 +37,7 @@ export function PlansView() {
     if (current) {
       await reload();
       setBusy(null);
+      window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/settings/billing" }));
       router.push("/settings/billing");
     }
     // Checkout: the page is leaving for Stripe, so the button stays busy.

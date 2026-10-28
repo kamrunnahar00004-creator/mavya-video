@@ -75,6 +75,8 @@ export function RunView() {
   /** The full editor (Edit under the phone) is open. */
   const [editing, setEditing] = useState(false);
   const runRef = useRef<Run | null>(null);
+  const deleting = useRef(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   useEffect(() => {
     runRef.current = run;
@@ -92,33 +94,18 @@ export function RunView() {
       if (!response.ok) throw Error("missing");
       const data = await response.json() as Run;
       if (!alive) return;
-      setRun(data);
       if (data.sourceRefId) {
         const selected = await fetch(`/api/references/${data.sourceRefId}`);
         if (!selected.ok) throw Error("source");
         const full = await selected.json() as Reference;
         if (alive) setRefs(old => [full, ...(old ?? []).filter(r => r.id !== full.id)]);
       } else setRefs(old => old ?? []);
+      if (alive) setRun(data);
     }).catch(() => alive && setMissing(id));
     return () => {
       alive = false;
     };
   }, [id]);
-
-  // The picked hook gets its full recipe (demo shots for "Film your demo"); the library list only carries a short one.
-  const sourceId = run?.sourceRefId ?? null;
-  const sourcePartial = Boolean(sourceId && refs?.find((r) => r.id === sourceId)?.partial);
-  useEffect(() => {
-    if (!sourceId || !sourcePartial) return;
-    let alive = true;
-    fetch(`/api/references/${sourceId}`)
-      .then((res) => (res.ok ? (res.json() as Promise<Reference>) : null))
-      .then((full) => { if (alive && full) setRefs((cur) => cur?.map((r) => (r.id === sourceId ? { ...r, ...full, coverUrl: r.coverUrl, partial: false } : r)) ?? cur); })
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, [sourceId, sourcePartial]);
 
   useEffect(() => {
     if (!toast) return;
@@ -260,7 +247,7 @@ export function RunView() {
       // Still usable without cut detection (default 3s hook).
     }
     setRefs((cur) => [r, ...(cur ?? [])]);
-    pickHook(r, "upload");
+    await pickHook(r, "upload");
   };
   const segs = timeline(run, source);
   const videoLen = videoLength(segs);
@@ -508,16 +495,20 @@ export function RunView() {
         <button
           type="button"
           onClick={async () => {
-            if (!confirm("Delete this run?")) return;
+            if (deleting.current || !confirm("Delete this run?")) return;
+            deleting.current = true; setDeleteBusy(true);
             const response = await fetch(`/api/runs/${run.id}`, { method: "DELETE" }).catch(() => null);
+            deleting.current = false; setDeleteBusy(false);
             if (!response?.ok) return setToast("Couldn't delete the video. Try again.");
+            window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/studio" }));
             router.push("/studio");
           }}
           className="rounded-lg p-2 text-soft hover:bg-raised hover:text-text"
+          disabled={deleteBusy}
           aria-label="Delete video"
           title="Delete video"
         >
-          <Trash2 className="h-4 w-4" />
+          {deleteBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
         </button>
         <ExportButton
           run={run}
@@ -539,7 +530,7 @@ export function RunView() {
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-3">
-              <SourcePicker onLoadMore={refCursor ? async () => { const p = await libraryMore(refCursor); setRefs(old => [...new Map([...(old ?? []), ...p.items].map(r => [r.id,r])).values()]); setRefCursor(p.next); } : undefined} refs={refs} source={null} onRefsChange={setRefs} onPick={pickHook} onClear={() => undefined} />
+              <SourcePicker onLoadMore={refCursor ? async () => { const p = await libraryMore(refCursor); setRefs(old => [...new Map([...p.items, ...(old ?? [])].map(r => [r.id,r])).values()]); setRefCursor(p.next); } : undefined} refs={refs} source={null} onRefsChange={setRefs} onPick={pickHook} onClear={() => undefined} />
             </div>
           </div>
         </div>
@@ -566,7 +557,7 @@ export function RunView() {
                 </div>
               ) : source ? (
                 <>
-                  <SourcePicker onLoadMore={refCursor ? async () => { const p = await libraryMore(refCursor); setRefs(old => [...new Map([...(old ?? []), ...p.items].map(r => [r.id,r])).values()]); setRefCursor(p.next); } : undefined} refs={refs} source={source} onRefsChange={setRefs} onPick={pickHook} onClear={resetHook} />
+                  <SourcePicker onLoadMore={refCursor ? async () => { const p = await libraryMore(refCursor); setRefs(old => [...new Map([...p.items, ...(old ?? [])].map(r => [r.id,r])).values()]); setRefCursor(p.next); } : undefined} refs={refs} source={source} onRefsChange={setRefs} onPick={pickHook} onClear={resetHook} />
                   {hook.source === "upload" && (
                     <NoteField
                       label="Additional context (optional)"
@@ -783,7 +774,7 @@ export function RunView() {
               refreshKey={libraryKey}
               onClose={() => setLibraryOpen(false)}
               onUseHook={(r) => {
-                pickHook(r, r.owner === "user" ? "upload" : "library");
+                void pickHook(r, r.owner === "user" ? "upload" : "library").catch(() => setToast("Could not load the hook. Try again."));
                 setLibraryOpen(false);
                 setToast("Hook replaced");
               }}
@@ -1228,6 +1219,7 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
         setBusy(false);
         requestKey.current = null;
         try { sessionStorage.removeItem(storageKey); } catch { /* Storage can be unavailable. */ }
+        window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/settings/plans" }));
         router.push("/settings/plans");
         return;
       }

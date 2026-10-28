@@ -4,7 +4,7 @@ import { authError } from "@/lib/auth-error";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2, X } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -21,10 +21,9 @@ const noop = () => () => undefined;
 /** Renders the popup when the URL asks for it; closing removes the parameters. */
 export function AuthModalHost() {
   const params = useSearchParams();
-  const router = useRouter();
   const pathname = usePathname();
   const auth = params.get("auth");
-  const close = useCallback(() => router.replace(pathname, { scroll: false }), [router, pathname]);
+  const close = useCallback(() => window.history.replaceState(null, "", pathname), [pathname]);
   // The popup portals into <body>, so it renders in the browser only.
   const inBrowser = useSyncExternalStore(noop, () => true, () => false);
   const [signedOut, setSignedOut] = useState(false);
@@ -41,7 +40,14 @@ export function AuthModalHost() {
     }).catch(() => { if (active) setSignedOut(true); });
     return () => { active = false; };
   }, [auth, next]);
-  if (!inBrowser || !signedOut || (auth !== "login" && auth !== "signup")) return null;
+  if (!inBrowser || (auth !== "login" && auth !== "signup")) return null;
+  if (!signedOut) return createPortal(
+    <div role="status" aria-label="Checking account" className="landing-theme fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,13,11,0.55)] px-4 py-8 backdrop-blur-sm">
+      <div className="flex min-h-[420px] w-full max-w-[460px] items-center justify-center rounded-2xl border border-line bg-panel p-6">
+        <Loader2 className="h-5 w-5 animate-spin" />
+      </div>
+    </div>, document.body);
+
   return <AuthModal key={auth} initialMode={auth} next={safeNext(params.get("next"))} error={params.get("error") ? "Sign-in didn't finish. Try again." : null} onClose={close} />;
 }
 

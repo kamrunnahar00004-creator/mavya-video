@@ -13,7 +13,7 @@ async function modal(){
  const client={auth:{getUser:async()=>({data:{user}}),resetPasswordForEmail:async(email,options)=>{calls.push(['reset',email,options]);if(resetThrow)throw Error('network');return {error:resetError};},signUp:async input=>{calls.push(['signup',input]);return result;},signInWithPassword:async input=>{calls.push(['password',input]);return result;},signInWithOAuth:async input=>{calls.push(['google',input]);return {error:null};}}};
  const safeNext=load('src/lib/auth-next.ts').safeNext,authError=load('src/lib/auth-error.ts').authError;
  const h=harness('src/components/auth-modal.tsx',{'@/lib/auth-next':{safeNext},'@/lib/auth-error':{authError},'react-dom':{createPortal:x=>x},'next/navigation':{useSearchParams:()=>new URLSearchParams({auth,next:'/library'}),useRouter:()=>({replace(){}}),usePathname:()=>'/'} ,'lucide-react':{Eye:'Eye',EyeOff:'EyeOff',Loader2:'Loader2',X:'X'},'@/lib/supabase/client':{createSupabaseBrowserClient:()=>client}},{window:{location:{origin:'https://fixture.invalid',assign:url=>navigations.push(url)}},document:{body:{}}});
- async function open(mode){auth=mode;h.reset();assert.equal(h.render(h.api.AuthModalHost),null);await h.effects()[0]();await new Promise(r=>setImmediate(r));const host=h.render(h.api.AuthModalHost);assert.ok(host);h.reset();return host;}
+ async function open(mode){auth=mode;h.reset();assert.equal(h.render(h.api.AuthModalHost).props["aria-label"],"Checking account");await h.effects()[0]();await new Promise(r=>setImmediate(r));const host=h.render(h.api.AuthModalHost);assert.ok(host);h.reset();return host;}
  async function submit(mode,error=null,session={}){
   result={data:{session},error};const host=await open(mode);let tree=h.render(host.type,host.props);
   for(const node of nodes(tree).filter(n=>n.type==='input')){if(node.props.type==='email')node.props.onChange({target:{value:'fixture@example.invalid'}});else if(node.props.autoComplete==='new-password'||node.props.autoComplete==='current-password')node.props.onChange({target:{value:'password123'}});}
@@ -36,7 +36,7 @@ async function modal(){
   else assert.ok(nodes(tree).some(n=>n.props.role==='status'));
   nodes(tree).find(n=>n.type==='button'&&n.props.children==='Log in').props.onClick();assert.ok(nodes(h.render(host.type,host.props)).some(n=>n.props.children==='Welcome back'));
  }
- user={id:'known'};h.reset();h.render(h.api.AuthModalHost);h.effects()[0]();await new Promise(r=>setImmediate(r));assert.equal(navigations.at(-1),'/auth/continue?next=%2Flibrary');assert.equal(h.render(h.api.AuthModalHost),null);
+ user={id:'known'};h.reset();h.render(h.api.AuthModalHost);h.effects()[0]();await new Promise(r=>setImmediate(r));assert.equal(navigations.at(-1),'/auth/continue?next=%2Flibrary');assert.equal(h.render(h.api.AuthModalHost).props['aria-label'],'Checking account');
 }
 async function gate(){
  let claims=null,plan=null,fail=false,calls=[];

@@ -20,10 +20,14 @@ export function ReferenceView() {
   const [time, setTime] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const started = useRef(false);
+  const creation = useRef<string | null>(null);
+  const actionLock = useRef(false);
+  const [action, setAction] = useState<"create" | "delete" | null>(null);
 
   const save = useCallback(
     async (analysis: Analysis) => {
-      await fetch(`/api/references/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ analysis }) });
+      const response = await fetch(`/api/references/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ analysis }) });
+      if (!response.ok) throw Error("Couldn't save the hook. Try again.");
     },
     [id]
   );
@@ -71,7 +75,7 @@ export function ReferenceView() {
     const analysis = { ...ref.analysis, segments: ref.analysis.segments.map((s, k) => (k === i ? { ...s, ...patch } : s)) };
     setRef({ ...ref, analysis });
     if (pending.current) clearTimeout(pending.current);
-    pending.current = setTimeout(() => void save(analysis), 500);
+    pending.current = setTimeout(() => void save(analysis).catch(() => setError("Could not save the hook. Try again.")), 500);
   }
 
   function seek(t: number) {
@@ -83,10 +87,16 @@ export function ReferenceView() {
 
   async function remove() {
     if (!confirm("Delete this video from the library?")) return;
+    if (actionLock.current) return;
+    actionLock.current = true; setAction("delete");
     const response = await fetch(`/api/references/${id}`, { method: "DELETE" }).catch(() => null);
-    if (!response?.ok) return alert("Couldn't delete the hook. Try again.");
+    actionLock.current = false; setAction(null);
+    if (!response?.ok) return setError("Couldn't delete the hook. Try again.");
+    window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/library" }));
     router.push("/library");
   }
+
+  if (action === "create") return <RouteSkeleton path="/studio/new" />;
 
   if (missing) {
     return (
@@ -125,8 +135,8 @@ export function ReferenceView() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={remove} className="rounded-md p-2 text-soft hover:bg-raised hover:text-red-400" aria-label="Delete">
-            <Trash2 className="h-4 w-4" />
+          <button type="button" onClick={remove} disabled={action !== null} className="rounded-md p-2 text-soft hover:bg-raised hover:text-red-400" aria-label="Delete">
+            {action === "delete" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
           </button>
           {a && (
             <button type="button" onClick={() => void runAnalysis(ref)} disabled={progress !== null} className="flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-[13px] font-medium text-muted hover:bg-raised hover:text-text disabled:opacity-40">
@@ -138,14 +148,19 @@ export function ReferenceView() {
             type="button"
             disabled={!a}
             onClick={async () => {
-              const run = (await (await fetch("/api/runs", { method: "POST" })).json()) as { id: string; hook: Record<string, unknown> };
-              const seg = a?.segments.find((s) => s.role === "hook");
-              await fetch(`/api/runs/${run.id}`, {
-                method: "PATCH",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ sourceRefId: ref.id, title: ref.title, hook: { ...run.hook, start: seg?.start ?? 0, end: seg?.end ?? 3 } }),
-              });
-              router.push(`/studio/${run.id}`);
+              if (actionLock.current) return;
+              actionLock.current = true; setAction("create");
+              creation.current ??= crypto.randomUUID();
+              try {
+                const response = await fetch("/api/runs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: creation.current, sourceRefId: id }) });
+                if (response.status === 402) { window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/pricing" })); router.push("/pricing"); return; }
+                if (!response.ok) throw Error();
+                const run = await response.json() as { id: string };
+                window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: `/studio/${run.id}` }));
+                router.push(`/studio/${run.id}`);
+                creation.current = null;
+              } catch { setError("Couldn't create the video. Try again."); }
+              finally { actionLock.current = false; setAction(null); }
             }}
             className="btn-primary px-3.5 py-1.5 text-[13.5px]"
           >

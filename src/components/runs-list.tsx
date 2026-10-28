@@ -74,6 +74,7 @@ export function RunsList() {
   const [view, setView] = useState<View>("grid");
   const [editing, setEditing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -85,7 +86,7 @@ export function RunsList() {
     }
     fetchPage<Run>("/api/runs?view=summary")
       .then((page) => { if (alive) { setRuns(page.items); setCursor(page.next); } })
-      .catch(() => alive && setRuns([]));
+      .catch(() => { if (alive) { setRuns([]); setError("Videos are unavailable. Try again."); } });
     return () => {
       alive = false;
     };
@@ -108,7 +109,7 @@ export function RunsList() {
     setError(null);
     try {
       const res = await fetch("/api/runs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: creation.current }) });
-      if (res.status === 402) { router.push("/pricing"); return; }
+      if (res.status === 402) { window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/pricing" })); router.push("/pricing"); return; }
       if (!res.ok) throw Error();
       const run = (await res.json()) as Run;
       window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: `/studio/${run.id}` }));
@@ -133,7 +134,9 @@ export function RunsList() {
 
   async function remove(r: Run) {
     if (!confirm(`Delete "${titleOf(r)}"? This can't be undone.`)) return;
+    setDeleting(r.id);
     const response = await fetch(`/api/runs/${r.id}`, { method: "DELETE" }).catch(() => null);
+    setDeleting(null);
     if (!response?.ok) return setError("Couldn't delete the video. Try again.");
     setRuns((all) => all?.filter((x) => x.id !== r.id) ?? null);setError(null);
   }
@@ -156,6 +159,7 @@ export function RunsList() {
       </button>
       <button
         type="button"
+        disabled={deleting === r.id}
         aria-label="Delete"
         title="Delete"
         onClick={(e) => {
@@ -164,7 +168,7 @@ export function RunsList() {
         }}
         className={onDark ? "flex h-8 w-8 items-center justify-center rounded-md bg-black/55 text-white hover:bg-red-600" : `${iconBtn} hover:!bg-red-50 hover:!text-red-600`}
       >
-        <Trash2 className="h-4 w-4" />
+        {deleting === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
       </button>
     </div>
   );

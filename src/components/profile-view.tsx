@@ -18,6 +18,7 @@ export function ProfileView() {
   const file = useRef<HTMLInputElement>(null);
 
   const reload = useCallback(async (signal?: AbortSignal) => {
+    setUnavailable(false);
     try {
       const response = await fetch("/api/profile", { cache: "no-store", signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000) });
       if (!response.ok) throw Error("Profile unavailable");
@@ -95,7 +96,7 @@ export function ProfileView() {
                 Upload
               </button>
               {p.avatar && (
-                <button type="button" onClick={() => void save({ avatar: "" }, "Picture removed").catch((e: Error) => setToast(e.message))} disabled={busy !== null} className="text-[13.5px] font-semibold text-muted hover:text-text">
+                <button type="button" onClick={async () => { setBusy("photo"); try { await save({ avatar: "" }, "Picture removed"); } catch (e) { setToast((e as Error).message); } finally { setBusy(null); } }} disabled={busy !== null} className="text-[13.5px] font-semibold text-muted hover:text-text">
                   Remove
                 </button>
               )}

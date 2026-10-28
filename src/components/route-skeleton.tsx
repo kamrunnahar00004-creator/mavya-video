@@ -5,7 +5,7 @@ export function RouteSkeleton({ path = "/studio" }: { path?: string }) {
   const library = path.startsWith("/library");
   return (
     <div role="status" aria-label="Loading page" aria-busy="true" className="card flex h-full flex-col overflow-hidden bg-panel" data-route-skeleton={path}>
-      <div className={settings ? "mx-auto w-full max-w-[760px] px-6 pt-10" : "border-b border-line px-6 py-4"}>
+      <div className={settings ? `mx-auto w-full px-6 pt-10 ${path === "/settings/plans" ? "max-w-[1180px]" : "max-w-[760px]"}` : "border-b border-line px-6 py-4"}>
         <div className="shimmer h-7 w-40 rounded-lg" />
         {settings && <div className="mt-3 h-5 w-64 rounded bg-raised" />}
       </div>

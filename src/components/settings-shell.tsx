@@ -106,6 +106,7 @@ export function useAccount({ billing: withBilling = false } = {}) {
   const inFlight=useRef<Promise<{usage:Usage|null;billing:Billing|null}>|null>(null);
   const reload = useCallback(() => {
     if(inFlight.current)return inFlight.current;
+    setLoaded(false); setError(false);
     const operation=(async()=>{
       const [u,b]=await Promise.all([get<Usage>("/api/usage"),withBilling?get<Billing>("/api/billing"):null]);
       setError(!u||(withBilling&&!b));
