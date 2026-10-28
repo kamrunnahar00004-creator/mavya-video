@@ -27,6 +27,34 @@ async function auth() {
   user = null; assert.equal(await usage.adminUser(id(1)), false);
 }
 
+async function backgroundPlayback() {
+  class Video {
+    constructor({paused=false,muted=true}={}) { this.paused=paused; this.muted=muted; this.isConnected=true; this.plays=0; }
+    pause() { this.paused=true; }
+    play() { this.paused=false; this.plays++; return Promise.resolve(); }
+  }
+  const playing=new Video(), deliberatelyPaused=new Video({paused:true}), unmuted=new Video({muted:false}), late=new Video();
+  const effects=[],frames=[];let playListener=null;
+  const jsx=(type,props)=>({type,props});
+  const host=load('src/components/auth-modal.tsx', {
+    '@/lib/auth-next':{safeNext:()=>'/studio'},'@/lib/auth-error':{},'@/lib/supabase/client':{},'lucide-react':{},
+    'react':{useState:value=>[value,()=>{}],useCallback:f=>f,useSyncExternalStore:()=>true,useEffect:f=>effects.push(f)},
+    'react-dom':{createPortal:x=>x,flushSync:f=>f()},'react/jsx-runtime':{jsx,jsxs:jsx},
+    'next/navigation':{useSearchParams:()=>new URLSearchParams('auth=signup'),usePathname:()=>'/'}
+  },{}, {
+    URLSearchParams,HTMLVideoElement:Video,requestAnimationFrame:f=>frames.push(f),
+    window:{matchMedia:()=>({matches:false})},
+    document:{body:{},hidden:false,querySelectorAll:()=>[playing,deliberatelyPaused,unmuted],addEventListener:(_name,listener)=>{playListener=listener;},removeEventListener:(_name,listener)=>{assert.equal(listener,playListener);playListener=null;}}
+  });
+  assert.equal(host.AuthModalHost().props['aria-label'],'Checking account');
+  const restore=effects[1]();
+  assert.equal(playing.paused,true);assert.equal(unmuted.paused,true);
+  playListener({target:late});assert.equal(late.paused,true,'late background play attempts are also stopped');
+  restore();assert.equal(playListener,null);assert.equal(playing.plays,0,'resume waits for removal paint');
+  frames[0]();await new Promise(r=>setTimeout(r,10));
+  assert.equal(playing.plays,1);assert.equal(late.plays,1);assert.equal(deliberatelyPaused.plays,0);assert.equal(unmuted.plays,0,'never start audible playback');
+}
+
 async function library() {
   let calls = 0, account = 'one';
   const cache = load('src/lib/library-cache.ts', { '@/lib/list-client': { fetchPage: async () => { calls++; return { items: [account], next: null }; } } });
@@ -111,4 +139,4 @@ async function deletion() {
   await route.advanceDeletion(id(1)); assert.deepEqual(deleted, ['covers/' + id(5) + '.jpg.webp'], 'old auth-phase deletions also finish derivatives before auth removal');
 }
 
-(async () => { await covers(); await auth(); await library(); await creation(); await deletion(); console.log('PASS: curated-only grants, fresh authorization, account-safe catalog, 2301-row continuation, valid image batches, atomic retry creation and derivative deletion'); })().catch(error => { console.error(error); process.exitCode = 1; });
+(async () => { await covers(); await auth(); await backgroundPlayback(); await library(); await creation(); await deletion(); console.log('PASS: curated-only grants, fresh authorization, bounded background playback, account-safe catalog, 2301-row continuation, valid image batches, atomic retry creation and derivative deletion'); })().catch(error => { console.error(error); process.exitCode = 1; });
