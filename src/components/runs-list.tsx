@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LayoutGrid, List, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { fetchPage } from "@/lib/list-client";
-import { loadLibrary } from "@/lib/library-cache";
 import { runSteps } from "@/lib/edit";
 import { fmtDate, type Reference, type Run } from "@/lib/types";
 
@@ -84,8 +83,6 @@ export function RunsList() {
     fetchPage<Run>("/api/runs?view=summary")
       .then((page) => { if (alive) { setRuns(page.items); setCursor(page.next); } })
       .catch(() => alive && setRuns([]));
-    // Warm the hook library in the background, so New video opens without waiting for it.
-    void loadLibrary().catch(() => undefined);
     return () => {
       alive = false;
     };

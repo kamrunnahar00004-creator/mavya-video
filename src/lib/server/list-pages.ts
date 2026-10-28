@@ -81,9 +81,12 @@ export async function listPage(kind: Kind, who: string, request: Request) {
     missingCovers = refs.filter(ref => !ref.smallCover);
   }
   if (kind === "references") {
-  const imageURL = "/api/references/thumbnails?ids=" + items.map(value => (value as Reference).id).join(",");
+  
   items = items.map((value, tile) => {
     const ref = value as Reference;
+    const group = Math.floor(tile / PAGE_SIZE) * PAGE_SIZE;
+    const imageURL = "/api/references/thumbnails?ids=" + items.slice(group, group + PAGE_SIZE).map(v => (v as Reference).id).join(",");
+    tile %= PAGE_SIZE;
     return { ...ref, thumbUrl: ref.thumbUrl?.startsWith("data:") ? `${imageURL}&segment=0#svgView(viewBox(0,${tile * 320},180,320))` : ref.thumbUrl, analysis: ref.analysis ? { ...ref.analysis, segments: ref.analysis.segments.map((seg, index) => ({ ...seg, thumb: seg.thumb?.startsWith("data:") ? `${imageURL}&segment=${index}#svgView(viewBox(0,${tile * 320},180,320))` : seg.thumb })) } : ref.analysis };
   });
   }
