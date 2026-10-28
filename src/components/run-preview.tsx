@@ -110,7 +110,7 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
                         <AvatarPlaceholder tones={AVATAR_TONES[hook.face.index]} />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={hook.face.kind === "character" ? `/characters/${hook.face.id}.jpg` : `/api/media/${hook.face.mediaId}`} alt="" className="h-full w-full object-cover" />
+                        <img src={hook.face.kind === "character" ? `/characters/thumbs/${hook.face.id}.jpg` : `/api/media/${hook.face.mediaId}`} alt="" className="h-full w-full object-cover" />
                       )}
                     </span>
                     Face swap preview

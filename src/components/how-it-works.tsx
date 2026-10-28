@@ -277,7 +277,7 @@ function CharacterPanel() {
       <div className={BODY}>
         <div key={id} className={`${MEDIA} ${FADE_IN}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/characters/${id}.webp`} alt={name} className="absolute inset-0 h-full w-full object-cover" />
+          <img src={`/characters/view/${id}.webp`} alt={name} className="absolute inset-0 h-full w-full object-cover" />
           <span className="absolute inset-x-2 bottom-2 rounded-md bg-black/55 px-2 py-1.5 backdrop-blur">
             <span className="block text-[10.5px] font-semibold text-white">Generating hook</span>
             <span className="mt-1 block h-1 overflow-hidden rounded-full bg-white/25">
@@ -313,7 +313,7 @@ function CharacterPanel() {
             onClick={() => pick(i)}
             aria-label={c}
             className={`aspect-square cursor-pointer rounded-lg bg-raised bg-cover bg-center transition-[box-shadow,opacity] ${i === sel ? "ring-[3px] ring-accent" : "opacity-85 hover:opacity-100"}`}
-            style={{ backgroundImage: `url(/characters/thumbs/${c}.webp)` }}
+            style={{ backgroundImage: `url(/characters/thumbs/${c}.jpg)` }}
           />
         ))}
       </div>

@@ -324,7 +324,7 @@ export function RunView() {
     try { return job ? new URL(/^https?:\/\//i.test(job.url) ? job.url : `https://${job.url}`).hostname.replace(/^www\./, "") : undefined; } catch { return job?.url; }
   })();
   const ch = hook.face?.kind === "character" ? characterById(hook.face.id) : null;
-  const facePhoto = ch ? ch.src : hook.face?.kind === "photo" ? `/api/media/${hook.face.mediaId}` : null;
+  const facePhoto = ch ? ch.view : hook.face?.kind === "photo" ? `/api/media/${hook.face.mediaId}` : null;
   // The open step: the user's choice, else the first unfinished one. Finishing a step clears the choice (moves on).
   const openSteps = picked ?? [current];
   const toggleStep = (n: number) => setPicked(openSteps.includes(n) ? openSteps.filter((x) => x !== n) : [...openSteps, n]);
@@ -1088,6 +1088,15 @@ function CharacterStep({ face, mode, onMode, onFace }: { face: Hook["face"] | nu
   );
 }
 
+/** The sharp picture over its thumb: invisible until decoded, then a short fade. */
+function SharpImage({ src, alt }: { src: string; alt: string }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={alt} decoding="async" ref={(el) => { if (el?.complete && el.naturalWidth && !loaded) setLoaded(true); }} onLoad={() => setLoaded(true)} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-150 ${loaded ? "opacity-100" : "opacity-0"}`} />
+  );
+}
+
 /** Overlay with the whole cast; click a face for the large view, then "Use <name>". */
 function CharacterBrowser({ current, onPick, onClose }: { current: Hook["face"] | null; onPick: (id: string) => void; onClose: () => void }) {
   const [viewing, setViewing] = useState<number | null>(null);
@@ -1125,6 +1134,7 @@ function CharacterBrowser({ current, onPick, onClose }: { current: Hook["face"] 
                   key={c.id}
                   type="button"
                   onClick={() => setViewing(i)}
+                  onPointerEnter={() => { new Image().src = c.view; }}
                   className={`group relative aspect-[3/4] overflow-hidden rounded-xl border-2 transition-[border-color,box-shadow] ${on ? "border-accent" : "border-transparent hover:border-line-strong"}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1148,8 +1158,17 @@ function CharacterBrowser({ current, onPick, onClose }: { current: Hook["face"] 
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="fade-in flex max-h-full flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={shown.src} alt={shown.name} className="max-h-[calc(100vh-160px)] rounded-2xl object-contain shadow-[0_24px_64px_rgba(0,0,0,0.35)]" />
+            {/* Fixed frame: the already-loaded thumb shows at once, the sharp picture fades in over it, nothing moves. */}
+            <div className="relative aspect-[768/1376] h-[calc(100vh-160px)] max-w-[calc(100vw-160px)] overflow-hidden rounded-2xl bg-ink shadow-[0_24px_64px_rgba(0,0,0,0.35)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={shown.thumb} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <SharpImage key={shown.id} src={shown.view} alt={shown.name} />
+            </div>
+            {[-1, 1].map((d) => {
+              const next = CHARACTERS[(viewing + d + CHARACTERS.length) % CHARACTERS.length];
+              // eslint-disable-next-line @next/next/no-img-element
+              return <img key={next.id} src={next.view} alt="" aria-hidden className="hidden" />;
+            })}
             <div className="flex items-center gap-3">
               <span className="text-[18px] font-extrabold text-white">{shown.name}</span>
               <button type="button" onClick={() => onPick(shown.id)} className="btn-primary px-5 py-2.5 text-[14px]">
@@ -1325,7 +1344,7 @@ function GenerateStep({ run, source, seg, texts, gen, onGenerate, onPatch, onAdd
   };
 
   const mini = "h-[42px] w-[26px] rounded-[5px] border-2 border-white bg-ink object-cover object-top shadow-sm";
-  const facePhoto = ch ? ch.src : face?.kind === "photo" ? `/api/media/${face.mediaId}` : null;
+  const facePhoto = ch ? ch.view : face?.kind === "photo" ? `/api/media/${face.mediaId}` : null;
   const who = ch ? ch.name : "your character";
   const cover = busy ? (
     <GenerateProgress photo={facePhoto} who={who} startedAt={startedAt} estimate={220} />
