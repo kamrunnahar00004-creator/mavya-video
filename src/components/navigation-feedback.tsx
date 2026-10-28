@@ -28,9 +28,11 @@ export function NavigationFeedback() {
     if (!target || target.from !== pathname) return;
     const content = document.querySelector<HTMLElement>("[data-route-content]");
     if (!content) return;
-    const wasInert = content.inert;
+    const wasInert = content.inert, wasVisibility = content.style.contentVisibility;
     content.inert = true;
-    return () => { content.inert = wasInert; };
+    // The opaque destination covers this page. Skip its grid layout/paint while waiting.
+    content.style.contentVisibility = "hidden";
+    return () => { content.inert = wasInert; content.style.contentVisibility = wasVisibility; };
   }, [target, pathname]);
   useEffect(() => {
     if (!target) return;

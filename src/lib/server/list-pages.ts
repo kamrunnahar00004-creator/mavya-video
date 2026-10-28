@@ -103,7 +103,7 @@ export async function listPage(kind: Kind, who: string, request: Request) {
   });
   let missingCovers: Reference[] = [];
   if (kind === "references" && cloud()) {
-    // Small WebP cards straight from R2; references without one yet keep their thumbnail and get one in the background.
+    // Existing curated WebP covers; missing covers retain their access-controlled thumbnail.
     const refs = items as Reference[];
     const links = await coverLinks(refs);
     items = refs.map(ref => links.has(ref.id) ? { ...ref, coverUrl: links.get(ref.id) } : ref);

@@ -72,6 +72,7 @@ async function main() {
   `});
   const rows = [];
   for (let round = 0; round < Number(process.env.ROUNDS ?? 3); round++) for (const [phase, port] of [['before', 3460], ...(!process.env.BEFORE_ONLY ? [['after', Number(process.env.AFTER_PORT ?? 3461)]] : [])]) for (const [name, source, target] of scenarios.filter(([name]) => !process.env.FILTER || name.toLowerCase().includes(process.env.FILTER.toLowerCase()))) {
+    const sourceRequestOffset=requests.length;
     console.log('START', round, phase, name);
     await send('Network.clearBrowserCache');
     const launched = Date.now();
@@ -130,8 +131,8 @@ async function main() {
       let start = 0; const target = ${JSON.stringify(target)}, main = document.querySelector('main') || document.body;
       if (!main || document.title === '') { resolve({error:'Source did not load'}); return; }
       let mainChanged = false;
-      const hadDialog = !!document.querySelector('[role="dialog"]'); let visual = null, usable = null, started = false;
-      const done = () => { observer.disconnect(); clearInterval(timer); resolve({visualMs:visual, usableMs:usable, path:location.pathname}); };
+      const hadDialog = !!document.querySelector('[role="dialog"]'); let visual = null, usable = null, started = false, handlerMs = null, firstChangeMs = null;
+      const done = () => { observer.disconnect(); clearInterval(timer); resolve({visualMs:visual, usableMs:usable, handlerMs, firstChangeMs, path:location.pathname}); };
       const ready = () => {
         if (target === 'signup') return !!document.querySelector('[role="dialog"] input[type="email"]');
         if (target === 'closeAuth') return !document.querySelector('[role="dialog"]') && !location.search.includes('auth=');
@@ -152,7 +153,7 @@ async function main() {
         const pending = document.querySelector('[aria-label="Opening page"]') || document.querySelector('[aria-label="Checking account"]');
         const changed = pending || document.querySelector('[data-navigation-pending]') || document.querySelector('[data-route-skeleton]') || (target === 'signup' ? !!document.querySelector('[role="dialog"]') : target === 'closeAuth' ? !document.querySelector('[role="dialog"]') : mainChanged || !!document.querySelector('[role="dialog"]') !== hadDialog);
         if (visual === null && changed) {
-          visual = -1; requestAnimationFrame(() => requestAnimationFrame(() => { visual = performance.now()-start; }));
+          firstChangeMs = performance.now()-start; visual = -1; requestAnimationFrame(() => requestAnimationFrame(() => { visual = performance.now()-start; }));
         }
         if (usable === null && ready()) { usable = -1; requestAnimationFrame(() => requestAnimationFrame(() => { usable = performance.now()-start; })); }
         if (visual > 0 && usable > 0) done();
@@ -182,16 +183,16 @@ async function main() {
       else if (target === 'editor') node = Array.from(main.querySelectorAll('button')).find(b => b.textContent.trim()==='Edit video');
       else node = Array.from(document.querySelectorAll('a')).find(a => a.getAttribute('href')===target);
       if (!node) { observer.disconnect(); clearInterval(timer); resolve({error:'Missing control',target}); return; }
-      start = performance.now(); started = true; node.click(); check(); setTimeout(done,9000);
+      start = performance.now(); started = true; node.click(); handlerMs = performance.now()-start; check(); setTimeout(done,9000);
     })`);
     const tasks=await evaluate(`({largestTask:Math.max(0,...window.__longTasks.map(x=>x.duration)),cards:Array.from(document.querySelectorAll('main button')).filter(b=>b.textContent.includes('Use this hook')).length})`);
-    rows.push({ round, phase, name, catalogRequests:requests.slice(requestOffset).filter(r=>r.path==='/api/references').length, ...tasks,...result });
+    rows.push({ round, phase, name, catalogRequests:requests.slice(target==='first'?sourceRequestOffset:requestOffset).filter(r=>r.path==='/api/references').length, ...tasks,...result });
     console.log('RESULT', phase, name, JSON.stringify(result));
     if (result.error || result.usableMs === null || result.visualMs === null) console.error('INCOMPLETE', phase, name, result);
   }
   const median = values => values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
   const summary = scenarios.map(([name]) => ({ name, ...Object.fromEntries(['before', 'after'].map(phase => [phase, Object.fromEntries(['visualMs', 'usableMs'].map(key => [key, median(rows.filter(r => r.name === name && r.phase === phase).map(r => r[key]))]))])) }));
-  const result = { profile: 'Offline credential-free production builds; Chrome 156, 1440x1000, CPU 2x, 250 ms network latency, 10/2 Mbps, API fixture delay 250 ms, intentionally slow library 1500 ms, cold caches and prefetch delayed 2500 ms (it may finish before click). Visual is two animation frames after the first relevant main-content/pending DOM mutation; scripts, styles, comments and hidden route probes are ignored, not a hardware display measurement. Three rounds. API network never reaches servers. No authenticated proxy RPC latency included.', rows, summary, errors, requests,
+  const result = { catalogCount:Number(process.env.CATALOG_COUNT??331), profile: 'Offline credential-free production builds; Chrome 156, 1440x1000, CPU 2x, 250 ms network latency, 10/2 Mbps, API fixture delay 250 ms, intentionally slow library 1500 ms, cold caches and prefetch delayed 2500 ms (it may finish before click). Visual is two animation frames after the first relevant main-content/pending DOM mutation; scripts, styles, comments and hidden route probes are ignored, not a hardware display measurement. Three rounds. API network never reaches servers. No authenticated proxy RPC latency included.', rows, summary, errors, requests,
     fixtureOverrides: ['Proxy is passthrough only in temporary copies; all APIs intercepted; no authenticated session'],
     productHeads: {before:'7491331',after:process.env.AFTER_COMMIT??'not supplied'}
   };

@@ -43,14 +43,14 @@ function database(rows){
  return {client,stats};
 }
 async function payload(){
- const before=fs.readFileSync('/tmp/mavya-library-before-location','utf8').trim(),rows=fixture();
+ const rows=fixture();
  async function request(root,view,scope='curated',who='alice'){
-  const db=database(rows),list=load(root+'src/lib/server/list-pages.ts',{'@/lib/server/store':{cloud:()=>true},'@/lib/supabase/server':{createSupabaseAdminClient:()=>db.client},'@/lib/server/covers':{coverLinks:async refs=>new Map(refs.filter(r=>r.smallCover&&r.owner==='curated').map(r=>[r.id,'https://media.invalid/covers/'+r.id+'.webp?X-Amz-Expires=3600&X-Amz-Signature='+'F'.repeat(64)]))}});
-  const route=load(root+'src/app/api/references/route.ts',{'@/lib/server/list-pages':list,'next/server':{connection:async()=>{}},'@/lib/server/store':{},'@/lib/server/who':{currentUser:async()=>who,signInFirst:()=>new Response(null,{status:401})},'@/lib/taxonomy':{HOOK_STYLES:[],NICHES:[]}});
+  const db=database(rows),list=load(root==='before'?'scripts/fixtures/library-before-list-pages.ts.fixture':'src/lib/server/list-pages.ts',{'@/lib/server/store':{cloud:()=>true},'@/lib/supabase/server':{createSupabaseAdminClient:()=>db.client},'@/lib/server/covers':{coverLinks:async refs=>new Map(refs.filter(r=>r.smallCover&&r.owner==='curated').map(r=>[r.id,'https://media.invalid/covers/'+r.id+'.webp?X-Amz-Expires=3600&X-Amz-Signature='+'F'.repeat(64)]))}});
+  const route=load(root==='before'?'scripts/fixtures/library-before-route.ts.fixture':'src/app/api/references/route.ts',{'@/lib/server/list-pages':list,'next/server':{connection:async()=>{}},'@/lib/server/store':{},'@/lib/server/who':{currentUser:async()=>who,signInFirst:()=>new Response(null,{status:401})},'@/lib/taxonomy':{HOOK_STYLES:[],NICHES:[]}});
   const response=await route.GET(new Request('http://fixture/api/references?view='+view+'&all=1&scope='+scope)),raw=await response.text();
   return {response,raw,db:db.stats};
  }
- const old=await request(before+'/','studio'),now=await request('','catalog');
+ const old=await request('before','studio'),now=await request('','catalog');
  assert.equal(now.response.status,200);assert.match(now.response.headers.get('cache-control'),/no-store/,'no stacked HTTP cache lifetime');
  const items=JSON.parse(now.raw);assert.equal(items.length,331);assert.ok(items.every(r=>r.owner==='curated'&&r.partial===true&&r.analysis===null&&!('recipe'in r)));assert.ok(!now.raw.includes('PRIVATE'));
  for(const select of now.db.selects){assert.ok(!select.includes('recipe'));assert.ok(!select.includes('analysis:data->analysis'));assert.ok(select.includes('data->analysis->segments->0->>thumb'));}
