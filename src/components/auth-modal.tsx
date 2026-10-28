@@ -23,6 +23,7 @@ export function AuthModalHost() {
   const params = useSearchParams();
   const pathname = usePathname();
   const auth = params.get("auth");
+  const authOpen = auth === "login" || auth === "signup";
   const [closed, setClosed] = useState(false);
   const close = useCallback(() => { flushSync(() => setClosed(true)); window.history.replaceState(null, "", pathname); }, [pathname]);
   // The popup portals into <body>, so it renders in the browser only.
@@ -41,6 +42,25 @@ export function AuthModalHost() {
     }).catch(() => { if (active) setSignedOut(true); });
     return () => { active = false; };
   }, [auth, next]);
+  useEffect(() => {
+    if (!authOpen) return;
+    // Background video decoding and animation are wasted while an auth overlay covers the page.
+    const playing = new Set<HTMLVideoElement>();
+    const pause = (video: HTMLVideoElement) => {
+      if (!video.paused) { playing.add(video); video.pause(); }
+    };
+    const onPlay = (event: Event) => { if (event.target instanceof HTMLVideoElement) pause(event.target); };
+    document.querySelectorAll("video").forEach(pause);
+    document.addEventListener("play", onPlay, true);
+    return () => {
+      document.removeEventListener("play", onPlay, true);
+      // Restore only previously playing muted videos, after the modal's removal can paint.
+      requestAnimationFrame(() => setTimeout(() => {
+        if (document.hidden || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        playing.forEach(video => { if (video.isConnected && video.muted) void video.play().catch(() => undefined); });
+      }, 0));
+    };
+  }, [authOpen]);
   if (!inBrowser || closed || (auth !== "login" && auth !== "signup")) return null;
   if (!signedOut) return createPortal(
     <div role="status" aria-label="Checking account" className="landing-theme fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,13,11,0.55)] px-4 py-8 backdrop-blur-sm">
