@@ -4,7 +4,7 @@ import { fillCovers } from "@/lib/server/covers";
 import { createReference, mediaAccess } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { HOOK_STYLES, NICHES } from "@/lib/taxonomy";
-import type { Platform } from "@/lib/types";
+import type { Platform, Reference } from "@/lib/types";
 
 const PLATFORMS = new Set<Platform>(["tiktok", "instagram", "youtube", "other"]);
 const pick = <T extends readonly string[]>(list: T, v: unknown) => (typeof v === "string" && (list as readonly string[]).includes(v) ? v : undefined);
@@ -31,7 +31,10 @@ export async function GET(request: Request) {
   if (view === "studio") {
     // Curation history and model explanations never appear in the studio.
     const keys = ["id", "title", "platform", "sourceUrl", "views", "mediaId", "mime", "createdAt", "analysis", "owner", "niche", "hookStyle", "thumbUrl", "author", "likes", "comments", "caption", "summary", "recipe", "postedAt", "pending", "review", "followers", "coverUrl"] as const;
-    return respond(refs.map((r) => ({ ...Object.fromEntries(keys.map((k) => [k, r[k]])), ai: r.ai ? { style: r.ai.style } : undefined })));
+    // The whole-library list carries only the recipe parts a card or a pick reads (85% of its size is the rest).
+    const whole = new URL(request.url).searchParams.get("all") === "1";
+    const short = (recipe: Reference["recipe"]) => recipe && { onScreenText: recipe.onScreenText?.slice(0, 1), hook: recipe.hook };
+    return respond(refs.map((r) => ({ ...Object.fromEntries(keys.map((k) => [k, r[k]])), ai: r.ai ? { style: r.ai.style } : undefined, ...(whole ? { recipe: short(r.recipe), partial: true } : {}) })));
   }
   return respond(refs);
   } catch (error) { return listError(error); }

@@ -21,8 +21,8 @@ import { AvatarPlaceholder } from "@/components/frames";
 import { ExportButton } from "@/components/export-button";
 import { pollDelay, waitForPoll } from "@/lib/polling";
 import dynamic from "next/dynamic";
-import { fetchPage } from "@/lib/list-client";
 import { SourcePicker, UploadDrop, Thumb } from "@/components/source-picker";
+import { libraryMore, loadLibrary } from "@/lib/library-cache";
 const HistoryPanel = dynamic(() => import("@/components/history-panel").then(m => m.HistoryPanel));
 import { ProductStep, ScriptCard } from "@/components/product-step";
 import { RunPreview, claimPlayback } from "@/components/run-preview";
@@ -81,11 +81,11 @@ export function RunView() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([fetch(`/api/runs/${id}`), fetchPage<Reference>("/api/references?view=studio&all=1")])
+    Promise.all([fetch(`/api/runs/${id}`), loadLibrary()])
       .then(async ([r, rs]) => {
         if (!r.ok) throw new Error("missing");
         const runData = (await r.json()) as Run;
-        const refData = rs.items;
+        const refData = [...rs.items];
         if (runData.sourceRefId && !refData.some(r => r.id === runData.sourceRefId)) {
           const selected = await fetch(`/api/references/${runData.sourceRefId}`);
           if (!selected.ok) throw Error("missing");
@@ -101,6 +101,21 @@ export function RunView() {
       alive = false;
     };
   }, [id]);
+
+  // The picked hook gets its full recipe (demo shots for "Film your demo"); the library list only carries a short one.
+  const sourceId = run?.sourceRefId ?? null;
+  const sourcePartial = Boolean(sourceId && refs?.find((r) => r.id === sourceId)?.partial);
+  useEffect(() => {
+    if (!sourceId || !sourcePartial) return;
+    let alive = true;
+    fetch(`/api/references/${sourceId}`)
+      .then((res) => (res.ok ? (res.json() as Promise<Reference>) : null))
+      .then((full) => { if (alive && full) setRefs((cur) => cur?.map((r) => (r.id === sourceId ? { ...r, ...full, coverUrl: r.coverUrl, partial: false } : r)) ?? cur); })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [sourceId, sourcePartial]);
 
   useEffect(() => {
     if (!toast) return;
@@ -516,7 +531,7 @@ export function RunView() {
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-3">
-              <SourcePicker onLoadMore={refCursor ? async () => { const p = await fetchPage<Reference>("/api/references?view=studio&all=1", refCursor); setRefs(old => [...new Map([...(old ?? []), ...p.items].map(r => [r.id,r])).values()]); setRefCursor(p.next); } : undefined} refs={refs} source={null} onRefsChange={setRefs} onPick={pickHook} onClear={() => undefined} />
+              <SourcePicker onLoadMore={refCursor ? async () => { const p = await libraryMore(refCursor); setRefs(old => [...new Map([...(old ?? []), ...p.items].map(r => [r.id,r])).values()]); setRefCursor(p.next); } : undefined} refs={refs} source={null} onRefsChange={setRefs} onPick={pickHook} onClear={() => undefined} />
             </div>
           </div>
         </div>
@@ -543,7 +558,7 @@ export function RunView() {
                 </div>
               ) : source ? (
                 <>
-                  <SourcePicker onLoadMore={refCursor ? async () => { const p = await fetchPage<Reference>("/api/references?view=studio&all=1", refCursor); setRefs(old => [...new Map([...(old ?? []), ...p.items].map(r => [r.id,r])).values()]); setRefCursor(p.next); } : undefined} refs={refs} source={source} onRefsChange={setRefs} onPick={pickHook} onClear={resetHook} />
+                  <SourcePicker onLoadMore={refCursor ? async () => { const p = await libraryMore(refCursor); setRefs(old => [...new Map([...(old ?? []), ...p.items].map(r => [r.id,r])).values()]); setRefCursor(p.next); } : undefined} refs={refs} source={source} onRefsChange={setRefs} onPick={pickHook} onClear={resetHook} />
                   {hook.source === "upload" && (
                     <NoteField
                       label="Additional context (optional)"

@@ -60,6 +60,8 @@ export type Reference = {
     /** Prompt for generating a new hook in the same style; {CHARACTER} marks the person. */
     hookPrompt?: string;
   };
+  /** The whole-library list sends a short recipe (first on-screen text, hook end); fetch /api/references/<id> for all. */
+  partial?: boolean;
   postedAt?: string;
   /** Curated but not yet fit-checked: hidden from users. */
   pending?: boolean;
