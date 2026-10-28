@@ -95,7 +95,7 @@ export function RunView() {
       const data = await response.json() as Run;
       if (!alive) return;
       if (data.sourceRefId) {
-        const selected = await fetch(`/api/references/${data.sourceRefId}`);
+        const selected = await fetch(`/api/references/${data.sourceRefId}`, { cache: "no-store" });
         if (!selected.ok) throw Error("source");
         const full = await selected.json() as Reference;
         if (alive) setRefs(old => [full, ...(old ?? []).filter(r => r.id !== full.id)]);
@@ -215,7 +215,7 @@ export function RunView() {
   const texts = runTexts(run);
   const pickHook = async (ref: Reference, from: HookSource = "library") => {
     if (ref.partial) {
-      const response = await fetch(`/api/references/${ref.id}`);
+      const response = await fetch(`/api/references/${ref.id}`, { cache: "no-store" });
       if (!response.ok) throw Error("Couldn't load the hook. Try again.");
       const full = await response.json() as Reference;
       ref = { ...full, coverUrl: ref.coverUrl, partial: false };

@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const {performance}=require('node:perf_hooks');
 const { load } = require('./check-module.cjs');
 const id = n => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
@@ -58,11 +59,10 @@ async function backgroundPlayback() {
 }
 
 async function library() {
-  let calls = 0, account = 'one';
-  const cache = load('src/lib/library-cache.ts', { '@/lib/list-client': { fetchPage: async () => { calls++; return { items: [account], next: null }; } } });
-  assert.deepEqual(Array.from((await cache.loadLibrary()).items), ['one']);
-  account = 'two'; assert.deepEqual(Array.from((await cache.loadLibrary()).items), ['two']);
-  assert.equal(calls, 2, 'no module data from the previous account or a stale upload');
+  let calls = 0;
+  const cache = load('src/lib/library-cache.ts', { '@/lib/list-client': { fetchPage: async url => { assert.match(url,/scope=curated/); calls++; return { items: [{id:id(1),owner:'curated',partial:true}], next: null }; } } },{},{performance});
+  await cache.loadLibrary(); await cache.loadLibrary(); assert.equal(calls,1);
+  cache.invalidateLibrary(); await cache.loadLibrary(); assert.equal(calls,2,'explicit invalidation fetches again');
   const refs = Array.from({ length: 2301 }, (_, n) => ({ id: id(n), owner: 'curated', createdAt: '2026-10-28T00:00:00Z', analysis: { segments: [{ role: 'hook', start: 0, end: 3, thumb: 'data:image/png;base64,AAAA' }] } }));
   const lists = load('src/lib/server/list-pages.ts', { '@/lib/server/store': { cloud: () => false, listReferences: async () => refs }, '@/lib/server/covers': {}, '@/lib/supabase/server': {} });
   let cursor = null, seen = [];

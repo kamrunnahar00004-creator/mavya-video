@@ -1,5 +1,6 @@
 "use client";
 import { flushSync } from "react-dom";
+import { invalidateLibrary } from "@/lib/library-cache";
 import { RouteSkeleton } from "@/components/route-skeleton";
 import { MediaVideo } from "@/components/media-video";
 
@@ -29,6 +30,7 @@ export function ReferenceView() {
     async (analysis: Analysis) => {
       const response = await fetch(`/api/references/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ analysis }) });
       if (!response.ok) throw Error("Couldn't save the hook. Try again.");
+      invalidateLibrary();
     },
     [id]
   );
@@ -93,6 +95,7 @@ export function ReferenceView() {
     const response = await fetch(`/api/references/${id}`, { method: "DELETE" }).catch(() => null);
     actionLock.current = false; setAction(null);
     if (!response?.ok) return setError("Couldn't delete the hook. Try again.");
+    invalidateLibrary();
     window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/library" }));
     router.push("/library");
   }

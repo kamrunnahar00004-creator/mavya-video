@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "@/components/pending-link";
 import { useRouter } from "next/navigation";
 import { LayoutGrid, List, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { loadLibrary } from "@/lib/library-cache";
 import { fetchPage } from "@/lib/list-client";
 import { runSteps } from "@/lib/edit";
 import { fmtDate, type Reference, type Run } from "@/lib/types";
@@ -79,6 +80,7 @@ export function RunsList() {
 
   useEffect(() => {
     let alive = true;
+    void loadLibrary().catch(() => undefined);
     try {
       const saved = localStorage.getItem(VIEW_KEY);
       if (saved === "list" || saved === "grid") queueMicrotask(() => alive && setView(saved));
