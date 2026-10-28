@@ -1,0 +1,2097 @@
+{
+  "baseline": "7491331",
+  "productCommit": "ce5795a1b0fbf0de18b08ddcb5b8c3ca101189f1",
+  "navigation": {
+    "catalogCount": 331,
+    "profile": "Offline credential-free production builds; Chrome 156, 1440x1000, CPU 2x, 250 ms network latency, 10/2 Mbps, API fixture delay 250 ms, intentionally slow library 1500 ms, cold caches and prefetch delayed 2500 ms (it may finish before click). Visual is two animation frames after the first relevant main-content/pending DOM mutation; scripts, styles, comments and hidden route probes are ignored, not a hardware display measurement. Three rounds. API network never reaches servers. No authenticated proxy RPC latency included.",
+    "rows": [
+      {
+        "round": 0,
+        "phase": "before",
+        "name": "Videos to library",
+        "catalogRequests": 1,
+        "largestTask": 275,
+        "cards": 331,
+        "visualMs": 71.60000000149012,
+        "usableMs": 2761.3000000044703,
+        "handlerMs": 27.200000002980232,
+        "firstChangeMs": 27.700000002980232,
+        "path": "/library"
+      },
+      {
+        "round": 0,
+        "phase": "before",
+        "name": "Library first visit",
+        "catalogRequests": 1,
+        "largestTask": 269,
+        "cards": 331,
+        "visualMs": 1159.7000000029802,
+        "usableMs": 3601.4000000059605,
+        "path": "/library",
+        "longTasks": [
+          {
+            "start": 1077.2000000029802,
+            "duration": 74
+          },
+          {
+            "start": 1264.8000000044703,
+            "duration": 50
+          },
+          {
+            "start": 3144.9000000059605,
+            "duration": 269
+          },
+          {
+            "start": 3414.5,
+            "duration": 181
+          }
+        ]
+      },
+      {
+        "round": 0,
+        "phase": "before",
+        "name": "Library repeat visit",
+        "catalogRequests": 1,
+        "largestTask": 328,
+        "cards": 331,
+        "visualMs": 16.700000002980232,
+        "usableMs": 571.3000000044703,
+        "handlerMs": 4.200000002980232,
+        "firstChangeMs": 4.200000002980232,
+        "path": "/library"
+      },
+      {
+        "round": 0,
+        "phase": "before",
+        "name": "Library to videos",
+        "catalogRequests": 0,
+        "largestTask": 298,
+        "cards": 331,
+        "visualMs": 239.70000000298023,
+        "usableMs": 1010.7000000029802,
+        "handlerMs": 15.900000005960464,
+        "firstChangeMs": 18,
+        "path": "/studio"
+      },
+      {
+        "round": 0,
+        "phase": "before",
+        "name": "Open video",
+        "catalogRequests": 1,
+        "largestTask": 74,
+        "cards": 0,
+        "visualMs": 28.299999997019768,
+        "usableMs": 1183.7999999970198,
+        "handlerMs": 9.299999997019768,
+        "firstChangeMs": 9.5,
+        "path": "/studio/10000000-0000-4000-8000-000000000000"
+      },
+      {
+        "round": 0,
+        "phase": "before",
+        "name": "Use library hook",
+        "catalogRequests": 1,
+        "largestTask": 280,
+        "cards": 331,
+        "visualMs": 53.30000000447035,
+        "usableMs": 1912.8000000044703,
+        "handlerMs": 34.70000000298023,
+        "firstChangeMs": 35.5,
+        "path": "/studio/6cb24002-aa31-40cd-8018-a8ec7f3b6964"
+      },
+      {
+        "round": 0,
+        "phase": "after",
+        "name": "Videos to library",
+        "catalogRequests": 0,
+        "largestTask": 329,
+        "cards": 48,
+        "visualMs": 32,
+        "usableMs": 1159.1000000014901,
+        "handlerMs": 15.5,
+        "firstChangeMs": 15.600000001490116,
+        "path": "/library"
+      },
+      {
+        "round": 0,
+        "phase": "after",
+        "name": "Library first visit",
+        "catalogRequests": 1,
+        "largestTask": 106,
+        "cards": 48,
+        "visualMs": 1201.6000000014901,
+        "usableMs": 3216.3000000044703,
+        "path": "/library",
+        "longTasks": [
+          {
+            "start": 1086.2000000029802,
+            "duration": 106
+          },
+          {
+            "start": 1226.7000000029802,
+            "duration": 57
+          }
+        ]
+      },
+      {
+        "round": 0,
+        "phase": "after",
+        "name": "Library repeat visit",
+        "catalogRequests": 0,
+        "largestTask": 104,
+        "cards": 48,
+        "visualMs": 24.599999994039536,
+        "usableMs": 233.39999999850988,
+        "handlerMs": 5.699999995529652,
+        "firstChangeMs": 5.899999998509884,
+        "path": "/library"
+      },
+      {
+        "round": 0,
+        "phase": "after",
+        "name": "Library to videos",
+        "catalogRequests": 0,
+        "largestTask": 56,
+        "cards": 48,
+        "visualMs": 31.100000001490116,
+        "usableMs": 939.2000000029802,
+        "handlerMs": 10.700000002980232,
+        "firstChangeMs": 10.700000002980232,
+        "path": "/studio"
+      },
+      {
+        "round": 0,
+        "phase": "after",
+        "name": "Open video",
+        "catalogRequests": 0,
+        "largestTask": 59,
+        "cards": 0,
+        "visualMs": 39.100000001490116,
+        "usableMs": 1136.1000000014901,
+        "handlerMs": 8.300000004470348,
+        "firstChangeMs": 8.5,
+        "path": "/studio/10000000-0000-4000-8000-000000000000"
+      },
+      {
+        "round": 0,
+        "phase": "after",
+        "name": "Use library hook",
+        "catalogRequests": 0,
+        "largestTask": 96,
+        "cards": 48,
+        "visualMs": 26.5,
+        "usableMs": 1623.3999999985099,
+        "handlerMs": 17,
+        "firstChangeMs": 17.30000000447035,
+        "path": "/studio/58721ada-3c88-4042-82ac-e1270d2e6cc8"
+      },
+      {
+        "round": 1,
+        "phase": "before",
+        "name": "Videos to library",
+        "catalogRequests": 1,
+        "largestTask": 407,
+        "cards": 331,
+        "visualMs": 30.400000005960464,
+        "usableMs": 2834.9000000059605,
+        "handlerMs": 9.700000002980232,
+        "firstChangeMs": 9.800000004470348,
+        "path": "/library"
+      },
+      {
+        "round": 1,
+        "phase": "before",
+        "name": "Library first visit",
+        "catalogRequests": 1,
+        "largestTask": 404,
+        "cards": 331,
+        "visualMs": 1207.8000000044703,
+        "usableMs": 3780.8000000044703,
+        "path": "/library",
+        "longTasks": [
+          {
+            "start": 1122.3999999985099,
+            "duration": 72
+          },
+          {
+            "start": 3157.2000000029802,
+            "duration": 210
+          },
+          {
+            "start": 3367.5,
+            "duration": 404
+          }
+        ]
+      },
+      {
+        "round": 1,
+        "phase": "before",
+        "name": "Library repeat visit",
+        "catalogRequests": 1,
+        "largestTask": 328,
+        "cards": 331,
+        "visualMs": 45.600000001490116,
+        "usableMs": 620.2000000029802,
+        "handlerMs": 12.799999997019768,
+        "firstChangeMs": 13.100000001490116,
+        "path": "/library"
+      },
+      {
+        "round": 1,
+        "phase": "before",
+        "name": "Library to videos",
+        "catalogRequests": 0,
+        "largestTask": 228,
+        "cards": 331,
+        "visualMs": 237.5,
+        "usableMs": 1116.7000000029802,
+        "handlerMs": 8.300000004470348,
+        "firstChangeMs": 8.5,
+        "path": "/studio"
+      },
+      {
+        "round": 1,
+        "phase": "before",
+        "name": "Open video",
+        "catalogRequests": 1,
+        "largestTask": 73,
+        "cards": 0,
+        "visualMs": 20.900000005960464,
+        "usableMs": 1080.3000000044703,
+        "handlerMs": 4.5,
+        "firstChangeMs": 4.5,
+        "path": "/studio/10000000-0000-4000-8000-000000000000"
+      },
+      {
+        "round": 1,
+        "phase": "before",
+        "name": "Use library hook",
+        "catalogRequests": 1,
+        "largestTask": 709,
+        "cards": 331,
+        "visualMs": 38.69999999552965,
+        "usableMs": 1960.6999999955297,
+        "handlerMs": 23.399999998509884,
+        "firstChangeMs": 23.600000001490116,
+        "path": "/studio/6a7277b1-54c9-41fc-8166-609a9f66473e"
+      },
+      {
+        "round": 1,
+        "phase": "after",
+        "name": "Videos to library",
+        "catalogRequests": 0,
+        "largestTask": 109,
+        "cards": 48,
+        "visualMs": 61.30000000447035,
+        "usableMs": 1110.9000000059605,
+        "handlerMs": 14.300000004470348,
+        "firstChangeMs": 14.700000002980232,
+        "path": "/library"
+      },
+      {
+        "round": 1,
+        "phase": "after",
+        "name": "Library first visit",
+        "catalogRequests": 1,
+        "largestTask": 139,
+        "cards": 48,
+        "visualMs": 1181.3999999985099,
+        "usableMs": 3300.5999999940395,
+        "path": "/library",
+        "longTasks": [
+          {
+            "start": 1087.1999999955297,
+            "duration": 82
+          },
+          {
+            "start": 3048.39999999851,
+            "duration": 139
+          },
+          {
+            "start": 3194.0999999940395,
+            "duration": 103
+          }
+        ]
+      },
+      {
+        "round": 1,
+        "phase": "after",
+        "name": "Library repeat visit",
+        "catalogRequests": 0,
+        "largestTask": 64,
+        "cards": 48,
+        "visualMs": 27.5,
+        "usableMs": 175.70000000298023,
+        "handlerMs": 7.5,
+        "firstChangeMs": 7.700000002980232,
+        "path": "/library"
+      },
+      {
+        "round": 1,
+        "phase": "after",
+        "name": "Library to videos",
+        "catalogRequests": 0,
+        "largestTask": 60,
+        "cards": 48,
+        "visualMs": 17.899999998509884,
+        "usableMs": 973.8999999985099,
+        "handlerMs": 8.100000001490116,
+        "firstChangeMs": 8.200000002980232,
+        "path": "/studio"
+      },
+      {
+        "round": 1,
+        "phase": "after",
+        "name": "Open video",
+        "catalogRequests": 0,
+        "largestTask": 70,
+        "cards": 0,
+        "visualMs": 25.799999997019768,
+        "usableMs": 1089.2999999970198,
+        "handlerMs": 5.199999995529652,
+        "firstChangeMs": 5.199999995529652,
+        "path": "/studio/10000000-0000-4000-8000-000000000000"
+      },
+      {
+        "round": 1,
+        "phase": "after",
+        "name": "Use library hook",
+        "catalogRequests": 0,
+        "largestTask": 128,
+        "cards": 48,
+        "visualMs": 20.700000002980232,
+        "usableMs": 1333.1000000014901,
+        "handlerMs": 10.600000001490116,
+        "firstChangeMs": 10.700000002980232,
+        "path": "/studio/2b8725f9-eecd-4592-b0ba-10aa939854c2"
+      },
+      {
+        "round": 2,
+        "phase": "before",
+        "name": "Videos to library",
+        "catalogRequests": 1,
+        "largestTask": 293,
+        "cards": 331,
+        "visualMs": 26.5,
+        "usableMs": 2684.89999999851,
+        "handlerMs": 9,
+        "firstChangeMs": 9.100000001490116,
+        "path": "/library"
+      },
+      {
+        "round": 2,
+        "phase": "before",
+        "name": "Library first visit",
+        "catalogRequests": 1,
+        "largestTask": 286,
+        "cards": 331,
+        "visualMs": 906.5,
+        "usableMs": 3580.60000000149,
+        "path": "/library",
+        "longTasks": [
+          {
+            "start": 1222.7999999970198,
+            "duration": 59
+          },
+          {
+            "start": 3095,
+            "duration": 286
+          },
+          {
+            "start": 3382,
+            "duration": 194
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "phase": "before",
+        "name": "Library repeat visit",
+        "catalogRequests": 1,
+        "largestTask": 348,
+        "cards": 331,
+        "visualMs": 34.30000000447035,
+        "usableMs": 903.3999999985099,
+        "handlerMs": 7.700000002980232,
+        "firstChangeMs": 7.899999998509884,
+        "path": "/library"
+      },
+      {
+        "round": 2,
+        "phase": "before",
+        "name": "Library to videos",
+        "catalogRequests": 0,
+        "largestTask": 328,
+        "cards": 331,
+        "visualMs": 247.70000000298023,
+        "usableMs": 1065,
+        "handlerMs": 3.9000000059604645,
+        "firstChangeMs": 3.9000000059604645,
+        "path": "/studio"
+      },
+      {
+        "round": 2,
+        "phase": "before",
+        "name": "Open video",
+        "catalogRequests": 1,
+        "largestTask": 58,
+        "cards": 0,
+        "visualMs": 28.80000000447035,
+        "usableMs": 1068.8999999985099,
+        "handlerMs": 11.5,
+        "firstChangeMs": 11.700000002980232,
+        "path": "/studio/10000000-0000-4000-8000-000000000000"
+      },
+      {
+        "round": 2,
+        "phase": "before",
+        "name": "Use library hook",
+        "catalogRequests": 1,
+        "largestTask": 321,
+        "cards": 331,
+        "visualMs": 49.69999999552965,
+        "usableMs": 1881.3999999985099,
+        "handlerMs": 35.5,
+        "firstChangeMs": 36.19999999552965,
+        "path": "/studio/5caa1ff3-37b0-4eb7-8656-095f6edff541"
+      },
+      {
+        "round": 2,
+        "phase": "after",
+        "name": "Videos to library",
+        "catalogRequests": 0,
+        "largestTask": 79,
+        "cards": 48,
+        "visualMs": 43.5,
+        "usableMs": 1240.3999999985099,
+        "handlerMs": 10.299999997019768,
+        "firstChangeMs": 10.899999998509884,
+        "path": "/library"
+      },
+      {
+        "round": 2,
+        "phase": "after",
+        "name": "Library first visit",
+        "catalogRequests": 1,
+        "largestTask": 95,
+        "cards": 48,
+        "visualMs": 1128,
+        "usableMs": 3226.89999999851,
+        "path": "/library",
+        "longTasks": [
+          {
+            "start": 1056.7999999970198,
+            "duration": 66
+          },
+          {
+            "start": 3063.7999999970198,
+            "duration": 95
+          },
+          {
+            "start": 3159.89999999851,
+            "duration": 61
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "phase": "after",
+        "name": "Library repeat visit",
+        "catalogRequests": 0,
+        "largestTask": 109,
+        "cards": 48,
+        "visualMs": 11.100000001490116,
+        "usableMs": 197.80000000447035,
+        "handlerMs": 4,
+        "firstChangeMs": 4,
+        "path": "/library"
+      },
+      {
+        "round": 2,
+        "phase": "after",
+        "name": "Library to videos",
+        "catalogRequests": 0,
+        "largestTask": 68,
+        "cards": 48,
+        "visualMs": 18.5,
+        "usableMs": 924.6000000014901,
+        "handlerMs": 4,
+        "firstChangeMs": 4.100000001490116,
+        "path": "/studio"
+      },
+      {
+        "round": 2,
+        "phase": "after",
+        "name": "Open video",
+        "catalogRequests": 0,
+        "largestTask": 58,
+        "cards": 0,
+        "visualMs": 16.600000001490116,
+        "usableMs": 1094.2999999970198,
+        "handlerMs": 4.199999995529652,
+        "firstChangeMs": 4.299999997019768,
+        "path": "/studio/10000000-0000-4000-8000-000000000000"
+      },
+      {
+        "round": 2,
+        "phase": "after",
+        "name": "Use library hook",
+        "catalogRequests": 0,
+        "largestTask": 119,
+        "cards": 48,
+        "visualMs": 48.69999999552965,
+        "usableMs": 1388.5,
+        "handlerMs": 28.799999997019768,
+        "firstChangeMs": 29,
+        "path": "/studio/2f913dd4-7a2f-4b90-b5cf-771d28f4f1fa"
+      }
+    ],
+    "summary": [
+      {
+        "name": "Videos to library",
+        "before": {
+          "visualMs": 30.400000005960464,
+          "usableMs": 2761.3000000044703
+        },
+        "after": {
+          "visualMs": 43.5,
+          "usableMs": 1159.1000000014901
+        }
+      },
+      {
+        "name": "Library first visit",
+        "before": {
+          "visualMs": 1159.7000000029802,
+          "usableMs": 3601.4000000059605
+        },
+        "after": {
+          "visualMs": 1181.3999999985099,
+          "usableMs": 3226.89999999851
+        }
+      },
+      {
+        "name": "Library repeat visit",
+        "before": {
+          "visualMs": 34.30000000447035,
+          "usableMs": 620.2000000029802
+        },
+        "after": {
+          "visualMs": 24.599999994039536,
+          "usableMs": 197.80000000447035
+        }
+      },
+      {
+        "name": "Library to videos",
+        "before": {
+          "visualMs": 239.70000000298023,
+          "usableMs": 1065
+        },
+        "after": {
+          "visualMs": 18.5,
+          "usableMs": 939.2000000029802
+        }
+      },
+      {
+        "name": "Open video",
+        "before": {
+          "visualMs": 28.299999997019768,
+          "usableMs": 1080.3000000044703
+        },
+        "after": {
+          "visualMs": 25.799999997019768,
+          "usableMs": 1094.2999999970198
+        }
+      },
+      {
+        "name": "Use library hook",
+        "before": {
+          "visualMs": 49.69999999552965,
+          "usableMs": 1912.8000000044703
+        },
+        "after": {
+          "visualMs": 26.5,
+          "usableMs": 1388.5
+        }
+      }
+    ],
+    "errors": [],
+    "requests": [
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "POST"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/6cb24002-aa31-40cd-8018-a8ec7f3b6964",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/6cb24002-aa31-40cd-8018-a8ec7f3b6964/export",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "POST"
+      },
+      {
+        "path": "/api/runs/58721ada-3c88-4042-82ac-e1270d2e6cc8",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/58721ada-3c88-4042-82ac-e1270d2e6cc8/export",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "POST"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/6a7277b1-54c9-41fc-8166-609a9f66473e",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/6a7277b1-54c9-41fc-8166-609a9f66473e/export",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "POST"
+      },
+      {
+        "path": "/api/runs/2b8725f9-eecd-4592-b0ba-10aa939854c2",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/2b8725f9-eecd-4592-b0ba-10aa939854c2/export",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "POST"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/5caa1ff3-37b0-4eb7-8656-095f6edff541",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/5caa1ff3-37b0-4eb7-8656-095f6edff541/export",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "POST"
+      },
+      {
+        "path": "/api/runs/2f913dd4-7a2f-4b90-b5cf-771d28f4f1fa",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs/2f913dd4-7a2f-4b90-b5cf-771d28f4f1fa/export",
+        "method": "GET"
+      }
+    ],
+    "fixtureOverrides": [
+      "Proxy is passthrough only in temporary copies; all APIs intercepted; no authenticated session"
+    ],
+    "productHeads": {
+      "before": "7491331",
+      "after": "ce5795a1b0fbf0de18b08ddcb5b8c3ca101189f1"
+    }
+  },
+  "largeCatalog": {
+    "catalogCount": 2000,
+    "profile": "Offline credential-free production builds; Chrome 156, 1440x1000, CPU 2x, 250 ms network latency, 10/2 Mbps, API fixture delay 250 ms, intentionally slow library 1500 ms, cold caches and prefetch delayed 2500 ms (it may finish before click). Visual is two animation frames after the first relevant main-content/pending DOM mutation; scripts, styles, comments and hidden route probes are ignored, not a hardware display measurement. Three rounds. API network never reaches servers. No authenticated proxy RPC latency included.",
+    "rows": [
+      {
+        "round": 0,
+        "phase": "before",
+        "name": "Library first visit",
+        "catalogRequests": 1,
+        "largestTask": 2791,
+        "cards": 2000,
+        "visualMs": 871.6999999955297,
+        "usableMs": 8994.19999999553,
+        "path": "/library",
+        "longTasks": [
+          {
+            "start": 1153.5,
+            "duration": 327
+          },
+          {
+            "start": 1750.1000000014901,
+            "duration": 101
+          },
+          {
+            "start": 3570.2999999970198,
+            "duration": 63
+          },
+          {
+            "start": 3639.5,
+            "duration": 2534
+          },
+          {
+            "start": 6177.5,
+            "duration": 2791
+          },
+          {
+            "start": 8993.39999999851,
+            "duration": 68
+          },
+          {
+            "start": 9063.79999999702,
+            "duration": 88
+          }
+        ]
+      },
+      {
+        "round": 0,
+        "phase": "after",
+        "name": "Library first visit",
+        "catalogRequests": 1,
+        "largestTask": 435,
+        "cards": 48,
+        "visualMs": 1093.2000000029802,
+        "usableMs": 4349.10000000149,
+        "path": "/library",
+        "longTasks": [
+          {
+            "start": 1001.7000000029802,
+            "duration": 80
+          },
+          {
+            "start": 1142.1000000014901,
+            "duration": 435
+          },
+          {
+            "start": 1644,
+            "duration": 64
+          },
+          {
+            "start": 2034.3000000044703,
+            "duration": 182
+          },
+          {
+            "start": 4019.7000000029802,
+            "duration": 146
+          },
+          {
+            "start": 4166.80000000447,
+            "duration": 165
+          }
+        ]
+      },
+      {
+        "round": 1,
+        "phase": "before",
+        "name": "Library first visit",
+        "catalogRequests": 1,
+        "largestTask": 2515,
+        "cards": 2000,
+        "visualMs": 848.1000000014901,
+        "usableMs": 7494.60000000149,
+        "path": "/library",
+        "longTasks": [
+          {
+            "start": 1142.3999999985099,
+            "duration": 74
+          },
+          {
+            "start": 3120.2000000029802,
+            "duration": 51
+          },
+          {
+            "start": 3179,
+            "duration": 2515
+          },
+          {
+            "start": 5700.20000000298,
+            "duration": 1778
+          },
+          {
+            "start": 7493.89999999851,
+            "duration": 53
+          },
+          {
+            "start": 7550.30000000447,
+            "duration": 95
+          },
+          {
+            "start": 7876.10000000149,
+            "duration": 65
+          }
+        ]
+      },
+      {
+        "round": 1,
+        "phase": "after",
+        "name": "Library first visit",
+        "catalogRequests": 1,
+        "largestTask": 94,
+        "cards": 48,
+        "visualMs": 833,
+        "usableMs": 3221.6999999955297,
+        "path": "/library",
+        "longTasks": [
+          {
+            "start": 1127.1000000014901,
+            "duration": 51
+          },
+          {
+            "start": 3057.2999999970198,
+            "duration": 94
+          },
+          {
+            "start": 3151.5,
+            "duration": 63
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "phase": "before",
+        "name": "Library first visit",
+        "catalogRequests": 1,
+        "largestTask": 2345,
+        "cards": 2000,
+        "visualMs": 825.8999999985099,
+        "usableMs": 7463.29999999702,
+        "path": "/library",
+        "longTasks": [
+          {
+            "start": 1132.5,
+            "duration": 59
+          },
+          {
+            "start": 3092.39999999851,
+            "duration": 60
+          },
+          {
+            "start": 3155,
+            "duration": 1945
+          },
+          {
+            "start": 5105.79999999702,
+            "duration": 2345
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "phase": "after",
+        "name": "Library first visit",
+        "catalogRequests": 1,
+        "largestTask": 128,
+        "cards": 48,
+        "visualMs": 862.0999999940395,
+        "usableMs": 3341.39999999851,
+        "path": "/library",
+        "longTasks": [
+          {
+            "start": 771.1999999955297,
+            "duration": 50
+          },
+          {
+            "start": 1155.2999999970198,
+            "duration": 53
+          },
+          {
+            "start": 3128.5999999940395,
+            "duration": 79
+          },
+          {
+            "start": 3211.5999999940395,
+            "duration": 128
+          }
+        ]
+      }
+    ],
+    "summary": [
+      {
+        "name": "Videos to library",
+        "before": {},
+        "after": {}
+      },
+      {
+        "name": "Library first visit",
+        "before": {
+          "visualMs": 848.1000000014901,
+          "usableMs": 7494.60000000149
+        },
+        "after": {
+          "visualMs": 862.0999999940395,
+          "usableMs": 3341.39999999851
+        }
+      },
+      {
+        "name": "Library repeat visit",
+        "before": {},
+        "after": {}
+      },
+      {
+        "name": "Library to videos",
+        "before": {},
+        "after": {}
+      },
+      {
+        "name": "Open video",
+        "before": {},
+        "after": {}
+      },
+      {
+        "name": "Use library hook",
+        "before": {},
+        "after": {}
+      }
+    ],
+    "errors": [],
+    "requests": [
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      }
+    ],
+    "fixtureOverrides": [
+      "Proxy is passthrough only in temporary copies; all APIs intercepted; no authenticated session"
+    ],
+    "productHeads": {
+      "before": "7491331",
+      "after": "ce5795a1b0fbf0de18b08ddcb5b8c3ca101189f1"
+    }
+  },
+  "initialRenderEvidence": {
+    "profile": "Offline credential-free production builds; Chrome 156, 1440x1000, CPU 2x, 250 ms network latency, 10/2 Mbps, API fixture delay 250 ms, intentionally slow library 1500 ms, cold caches and prefetch delayed 2500 ms (it may finish before click). Visual is two animation frames after the first relevant main-content/pending DOM mutation; scripts, styles, comments and hidden route probes are ignored, not a hardware display measurement. Three rounds. API network never reaches servers. No authenticated proxy RPC latency included.",
+    "rows": [
+      {
+        "round": 0,
+        "phase": "before",
+        "name": "Library first visit",
+        "catalogRequests": 0,
+        "largestTask": 1439,
+        "cards": 2000,
+        "visualMs": 881.2000000029802,
+        "usableMs": 6370.80000000447,
+        "path": "/library",
+        "longTasks": [
+          {
+            "start": 1188,
+            "duration": 203
+          },
+          {
+            "start": 1420.1000000014901,
+            "duration": 54
+          },
+          {
+            "start": 1721.8000000044703,
+            "duration": 108
+          },
+          {
+            "start": 3534.60000000149,
+            "duration": 59
+          },
+          {
+            "start": 3598.39999999851,
+            "duration": 1318
+          },
+          {
+            "start": 4918.89999999851,
+            "duration": 1439
+          }
+        ]
+      },
+      {
+        "round": 1,
+        "phase": "before",
+        "name": "Library first visit",
+        "catalogRequests": 0,
+        "largestTask": 1272,
+        "cards": 2000,
+        "visualMs": 1003.3999999985099,
+        "usableMs": 5686.20000000298,
+        "path": "/library",
+        "longTasks": [
+          {
+            "start": 1306.2000000029802,
+            "duration": 55
+          },
+          {
+            "start": 3238.2000000029802,
+            "duration": 1159
+          },
+          {
+            "start": 4398.39999999851,
+            "duration": 1272
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "phase": "before",
+        "name": "Library first visit",
+        "catalogRequests": 0,
+        "largestTask": 1363,
+        "cards": 2000,
+        "visualMs": 1254.3999999985099,
+        "usableMs": 5658.69999999553,
+        "path": "/library",
+        "longTasks": [
+          {
+            "start": 1161.5,
+            "duration": 88
+          },
+          {
+            "start": 1281.1999999955297,
+            "duration": 55
+          },
+          {
+            "start": 3310.39999999851,
+            "duration": 970
+          },
+          {
+            "start": 4280.39999999851,
+            "duration": 1363
+          }
+        ]
+      }
+    ],
+    "summary": [
+      {
+        "name": "Videos to library",
+        "before": {},
+        "after": {}
+      },
+      {
+        "name": "Library first visit",
+        "before": {
+          "visualMs": 1003.3999999985099,
+          "usableMs": 5686.20000000298
+        },
+        "after": {}
+      },
+      {
+        "name": "Library repeat visit",
+        "before": {},
+        "after": {}
+      },
+      {
+        "name": "Library to videos",
+        "before": {},
+        "after": {}
+      },
+      {
+        "name": "Open video",
+        "before": {},
+        "after": {}
+      },
+      {
+        "name": "Use library hook",
+        "before": {},
+        "after": {}
+      }
+    ],
+    "errors": [],
+    "requests": [
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      }
+    ],
+    "fixtureOverrides": [
+      "Proxy is passthrough only in temporary copies; all APIs intercepted; no authenticated session"
+    ],
+    "productHeads": {
+      "before": "7491331",
+      "after": "not supplied"
+    }
+  },
+  "paintDiagnosis": {
+    "catalogCount": 331,
+    "profile": "Offline credential-free production builds; Chrome 156, 1440x1000, CPU 2x, 250 ms network latency, 10/2 Mbps, API fixture delay 250 ms, intentionally slow library 1500 ms, cold caches and prefetch delayed 2500 ms (it may finish before click). Visual is two animation frames after the first relevant main-content/pending DOM mutation; scripts, styles, comments and hidden route probes are ignored, not a hardware display measurement. Three rounds. API network never reaches servers. No authenticated proxy RPC latency included.",
+    "rows": [
+      {
+        "round": 0,
+        "phase": "before",
+        "name": "Library to videos",
+        "catalogRequests": 0,
+        "largestTask": 411,
+        "cards": 331,
+        "visualMs": 208.60000000149012,
+        "usableMs": 1252.1000000014901,
+        "handlerMs": 22.200000002980232,
+        "firstChangeMs": 22.399999998509884,
+        "path": "/studio"
+      },
+      {
+        "round": 0,
+        "phase": "after",
+        "name": "Library to videos",
+        "catalogRequests": 0,
+        "largestTask": 306,
+        "cards": 48,
+        "visualMs": 78.69999999552965,
+        "usableMs": 1049.5,
+        "handlerMs": 19.299999997019768,
+        "firstChangeMs": 19.399999998509884,
+        "path": "/studio"
+      },
+      {
+        "round": 1,
+        "phase": "before",
+        "name": "Library to videos",
+        "catalogRequests": 0,
+        "largestTask": 543,
+        "cards": 331,
+        "visualMs": 511.1000000014901,
+        "usableMs": 1520.3999999985099,
+        "handlerMs": 7,
+        "firstChangeMs": 7,
+        "path": "/studio"
+      },
+      {
+        "round": 1,
+        "phase": "after",
+        "name": "Library to videos",
+        "catalogRequests": 0,
+        "largestTask": 138,
+        "cards": 48,
+        "visualMs": 125.09999999403954,
+        "usableMs": 964.1999999955297,
+        "handlerMs": 10.5,
+        "firstChangeMs": 10.699999995529652,
+        "path": "/studio"
+      },
+      {
+        "round": 2,
+        "phase": "before",
+        "name": "Library to videos",
+        "catalogRequests": 0,
+        "largestTask": 269,
+        "cards": 331,
+        "visualMs": 118.79999999701977,
+        "usableMs": 1011.5,
+        "handlerMs": 7.799999997019768,
+        "firstChangeMs": 7.899999998509884,
+        "path": "/studio"
+      },
+      {
+        "round": 2,
+        "phase": "after",
+        "name": "Library to videos",
+        "catalogRequests": 0,
+        "largestTask": 74,
+        "cards": 48,
+        "visualMs": 94.10000000149012,
+        "usableMs": 1001.8999999985099,
+        "handlerMs": 11.800000004470348,
+        "firstChangeMs": 11.899999998509884,
+        "path": "/studio"
+      }
+    ],
+    "summary": [
+      {
+        "name": "Videos to library",
+        "before": {},
+        "after": {}
+      },
+      {
+        "name": "Library first visit",
+        "before": {},
+        "after": {}
+      },
+      {
+        "name": "Library repeat visit",
+        "before": {},
+        "after": {}
+      },
+      {
+        "name": "Library to videos",
+        "before": {
+          "visualMs": 208.60000000149012,
+          "usableMs": 1252.1000000014901
+        },
+        "after": {
+          "visualMs": 94.10000000149012,
+          "usableMs": 1001.8999999985099
+        }
+      },
+      {
+        "name": "Open video",
+        "before": {},
+        "after": {}
+      },
+      {
+        "name": "Use library hook",
+        "before": {},
+        "after": {}
+      }
+    ],
+    "errors": [],
+    "requests": [
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      }
+    ],
+    "fixtureOverrides": [
+      "Proxy is passthrough only in temporary copies; all APIs intercepted; no authenticated session"
+    ],
+    "productHeads": {
+      "before": "7491331",
+      "after": "not supplied"
+    }
+  },
+  "functionalBrowser": {
+    "initial": {
+      "cards": 48,
+      "rect": {
+        "width": 140,
+        "height": 248.875
+      }
+    },
+    "focus": {
+      "cards": 96,
+      "index": "32"
+    },
+    "tab": "33",
+    "end": {
+      "count": 2000,
+      "unique": 2000
+    },
+    "filtered": {
+      "cards": 48,
+      "first": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB1sAAAAASUVORK5CYII=",
+      "views": "2.0KUse this hook"
+    },
+    "restored": {
+      "path": "/studio",
+      "inert": false,
+      "visibility": "visible"
+    },
+    "errors": [],
+    "apiCalls": [
+      {
+        "path": "/api/profile",
+        "method": "GET"
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET"
+      },
+      {
+        "path": "/api/references",
+        "method": "GET"
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET"
+      }
+    ],
+    "scope": "Offline actual SourcePicker: 2000 rows, scroll/focus/tab/filter, no provider/media playback"
+  },
+  "payload": {
+    "fixture": "331 synthetic curated references plus two private rows; actual list and handler code, projected PostgREST response simulation; not production bytes",
+    "before": {
+      "databaseBytes": 27596021,
+      "httpBytes": 7739376,
+      "gzipBytes": 72356,
+      "reads": 2
+    },
+    "after": {
+      "databaseBytes": 195510,
+      "httpBytes": 263363,
+      "gzipBytes": 8631,
+      "reads": 2
+    },
+    "projection": "id,owner,created_at,refStyle:data->ai->>style,thumb:data->analysis->segments->0->>thumb,thumbFallback:data->>thumbUrl,reviewVerdict:data->review->>verdict,title:data->title,platform:data->platform,sourceUrl:data->sourceUrl,views:data->views,mediaId:data->mediaId,mime:data->mime,author:data->author,likes:data->likes,comments:data->comments,caption:data->caption,summary:data->summary,postedAt:data->postedAt,pending:data->pending,followers:data->followers,smallCover:data->smallCover"
+  }
+}
