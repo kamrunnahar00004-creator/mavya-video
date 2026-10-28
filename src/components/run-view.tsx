@@ -25,7 +25,7 @@ import dynamic from "next/dynamic";
 import { SourcePicker, UploadDrop, Thumb } from "@/components/source-picker";
 import { libraryMore, loadLibrary } from "@/lib/library-cache";
 const HistoryPanel = dynamic(() => import("@/components/history-panel").then(m => m.HistoryPanel));
-import { ProductStep, ScriptCard } from "@/components/product-step";
+import { ProductStep, ScriptCard, readProduct, writeScript } from "@/components/product-step";
 import { RunPreview, claimPlayback } from "@/components/run-preview";
 
 const ClipEditor = dynamic(() => import("@/components/editor-tools").then(m => m.ClipEditor));
@@ -77,10 +77,20 @@ export function RunView() {
   const runRef = useRef<Run | null>(null);
   const deleting = useRef(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  /** Step 1 reads the site in the background: the link being read, or the one that failed (with its error). */
+  const [productJob, setProductJob] = useState<{ runId: string; url: string; error?: string } | null>(null);
+  /** The demo plan (script) being written, started by the Generate click. */
+  const [planning, setPlanning] = useState<string | null>(null);
+  /** Generate was clicked: write the demo plan as soon as the product brief is in. */
+  const wantPlan = useRef<string | null>(null);
+  const liveId = useRef(id);
 
   useEffect(() => {
     runRef.current = run;
   }, [run]);
+  useEffect(() => {
+    liveId.current = id;
+  }, [id]);
 
   useEffect(() => {
     let alive = true;
@@ -122,6 +132,44 @@ export function RunView() {
   );
   /** The product brief and the script are written on the server (Gemini); take only those two sections back. */
   const takeAI = useCallback((u: Pick<Run, "product" | "script">) => setRun((r) => (r?.id === id ? { ...r, product: u.product ?? null, script: u.script ?? null } : r)), [id]);
+
+  /** The demo plan: shot by shot (seconds, camera, steps), from the stolen hook, the script and the product brief.
+   * Fills the demo shot list when nothing is filmed yet. */
+  const writePlan = useCallback(async () => {
+    wantPlan.current = null;
+    setPlanning(id);
+    const saved = await waitRunSaves(id);
+    const { run: r, error } = saved ? await writeScript(id) : { run: undefined, error: "Couldn't save your changes. Try again." };
+    if (liveId.current !== id) return;
+    setPlanning(null);
+    if (!r?.script) return setToast(error ?? "Couldn't write the demo plan. Try again.");
+    takeAI(r);
+    const cur = runRef.current;
+    if (cur?.id === id && r.script.shots.length && !demoClips(cur).some((c) => clipSrc(c))) {
+      save({ demo: { ...cur.demo, mode: "clips", clips: r.script.shots.map((s) => ({ id: uid(), label: s.label, hint: s.hint, target: s.seconds, camera: s.camera, steps: s.steps, text: s.text })) } });
+    }
+  }, [id, takeAI, save]);
+
+  /** Paste or Analyze: step 1 counts as done at once and the next step opens; the site is read in the background. */
+  const analyzeProduct = useCallback((url: string) => {
+    setProductJob({ runId: id, url });
+    setPicked(undefined);
+    void readProduct(id, url).then(({ run: r, error }) => {
+      if (liveId.current !== id) return;
+      if (r?.product) {
+        takeAI(r);
+        setProductJob((job) => (job?.url === url ? null : job));
+        if (wantPlan.current === id) void writePlan();
+      } else {
+        setProductJob((job) => (job?.url === url ? { runId: id, url, error: error ?? "Couldn't read that site. Try again." } : job));
+        setPicked([1]);
+      }
+    });
+  }, [id, takeAI, writePlan]);
+
+  const onGenerated = useCallback((updated: Run) => setRun((r) => r?.id === updated.id ? { ...r, hook: updated.hook, texts: updated.texts, project: null } : r), []);
+  const onGenerateFailed = useCallback(() => setPicked([4]), []);
+  const gen = useHookGeneration(id, onGenerated, onGenerateFailed);
 
   /** Text edits from the preview: applied live, saved shortly after (coalesced). */
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -252,14 +300,37 @@ export function RunView() {
   const segs = timeline(run, source);
   const videoLen = videoLength(segs);
   const hasDemo = demoClips(run).some((c) => clipSrc(c));
+  const job = productJob?.runId === run.id ? productJob : null;
+  const productReading = Boolean(job && !job.error);
+  const planningHere = planning === run.id;
+  // Started work counts as done (the next step opens at once); the check spins until the result is in.
   const stepDone = runSteps(run);
+  if (productReading) stepDone[0] = true;
+  if (job?.error) stepDone[0] = false;
+  if (gen.busy) stepDone[3] = true;
+  const stepPending = [productReading, false, false, gen.busy, false, false];
   const current = stepDone.findIndex((d) => !d) + 1 || stepDone.length; // 1-based; all done = last step
+  /** Generate: the hook clip and the demo plan start together; step 5 opens while both run. */
+  const startGenerate = (note?: string) => {
+    if (gen.busy) return;
+    setPicked([5]);
+    void gen.generate(note);
+    // A link still being read replaces the script when it lands, so the plan is written after it.
+    if (!productReading && run.script && run.script.refId === (run.sourceRefId ?? null)) return;
+    wantPlan.current = run.id;
+    if (run.product?.brief && !productReading && !planningHere) void writePlan();
+  };
+  const host = (() => {
+    try { return job ? new URL(/^https?:\/\//i.test(job.url) ? job.url : `https://${job.url}`).hostname.replace(/^www\./, "") : undefined; } catch { return job?.url; }
+  })();
+  const ch = hook.face?.kind === "character" ? characterById(hook.face.id) : null;
+  const facePhoto = ch ? ch.src : hook.face?.kind === "photo" ? `/api/media/${hook.face.mediaId}` : null;
   // The open step: the user's choice, else the first unfinished one. Finishing a step clears the choice (moves on).
   const openSteps = picked ?? [current];
   const toggleStep = (n: number) => setPicked(openSteps.includes(n) ? openSteps.filter((x) => x !== n) : [...openSteps, n]);
   const faceName = hook.face?.kind === "character" ? characterById(hook.face.id)?.name : hook.face?.kind === "photo" ? "Your photo" : hook.face?.kind === "described" ? hook.face.text : undefined;
   const stepSummary = [
-    run.product?.brief.name,
+    productReading ? host : run.product?.brief.name,
     (source ? (source.author ? `Hook from @${source.author}` : source.title) : undefined) ?? (hook.source === "describe" && hook.describeReady ? hook.describe : undefined),
     faceName,
     hook.generated ? "Hook ready" : undefined,
@@ -539,8 +610,8 @@ export function RunView() {
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:grid xl:grid-cols-[minmax(0,1fr)_400px] xl:overflow-hidden">
         <div className="shrink-0 xl:min-h-0 xl:overflow-y-auto">
           <div className="mx-auto max-w-[760px] divide-y divide-line px-8">
-            <Block n={1} title="Your product" done={stepDone[0]} open={openSteps.includes(1)} summary={stepSummary[0]} onToggle={() => toggleStep(1)}>
-              <ProductStep runId={run.id} product={run.product ?? null} onDone={takeAI} />
+            <Block n={1} title="Your product" done={stepDone[0]} pending={stepPending[0]} open={openSteps.includes(1)} summary={stepSummary[0]} onToggle={() => toggleStep(1)}>
+              <ProductStep key={job?.error ? `failed:${job.url}` : "product"} product={run.product ?? null} reading={productReading} error={job?.error ?? null} failedUrl={job?.error ? job.url : undefined} onAnalyze={analyzeProduct} />
             </Block>
 
             <Block n={2} title="Steal a hook that already works" done={stepDone[1]} open={openSteps.includes(2)} summary={stepSummary[1]} onToggle={() => toggleStep(2)}>
@@ -645,6 +716,7 @@ export function RunView() {
                   runId={run.id}
                   script={run.script && run.script.refId === (source?.id ?? null) ? run.script : null}
                   hookText={texts.find((x) => x.id === "hook")?.text ?? hook.text}
+                  writing={planningHere}
                   onDone={takeAI}
                   onUseHookText={(text) => save({ hook: { ...hook, text }, texts: withHookText({ text }) })}
                 />
@@ -664,13 +736,14 @@ export function RunView() {
               />
             </Block>
 
-            <Block n={4} title="Generate your hook" done={stepDone[3]} open={openSteps.includes(4)} summary={stepSummary[3]} onToggle={() => toggleStep(4)}>
+            <Block n={4} title="Generate your hook" done={stepDone[3]} pending={stepPending[3]} open={openSteps.includes(4)} summary={stepSummary[3]} onToggle={() => toggleStep(4)}>
               <GenerateStep
                 run={run}
                 source={source}
                 seg={segs[0]}
                 texts={texts}
-                onGenerated={(updated) => setRun((r) => r?.id === updated.id ? { ...r, hook: updated.hook, texts: updated.texts, project: null } : r)}
+                gen={gen}
+                onGenerate={startGenerate}
                 onPatch={patchText}
                 onAdd={addText}
                 onAdjust={(a) => liveAdjust("hook", a)}
@@ -684,6 +757,7 @@ export function RunView() {
               <DemoStep
                 run={run}
                 segs={segs}
+                planning={planningHere}
                 renderEditor={clipEditor}
                 onFiles={async (files) => {
                   setPicked((p) => Array.from(new Set([...(p ?? openSteps), 5])));
@@ -750,7 +824,7 @@ export function RunView() {
         </div>
 
         <aside className="flex shrink-0 flex-col items-center justify-center border-l border-line bg-raised p-6 xl:min-h-0 xl:overflow-y-auto">
-          <RunPreview run={run} source={source} texts={texts} />
+          <RunPreview run={run} source={source} texts={texts} hookCover={gen.busy && !hook.generated ? <GenerateProgress photo={facePhoto} who={ch ? ch.name : "your character"} startedAt={gen.startedAt} estimate={220} /> : undefined} />
           <button
             type="button"
             onClick={() => {
@@ -1114,45 +1188,24 @@ function lookBefore(texts: TextLayer[], at: number): TextLayer | undefined {
 const optionBtn = (on: boolean) =>
   `flex items-center gap-1.5 rounded-lg border px-3.5 py-2.5 text-[14px] font-semibold ${on ? "border-accent bg-accent-tint text-accent" : "border-line-strong bg-panel text-text hover:border-accent hover:text-accent"}`;
 
-/** Step 4: the hook clip, in the shared clip editor. Before generating, the video box shows the inputs and a Generate button.
+type Generation = ReturnType<typeof useHookGeneration>;
+
+/** The hook generation job, owned by the page so it keeps running (and polling) while step 4 is closed.
  * Generate runs Kling Motion Control (fal.ai) on the server, as a background job: POST /api/runs/[id]/generate, then poll until the clip is saved. */
-function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, onRemove, onParts, onAdjust, onApplyAll }: {
-  run: Run;
-  source: Reference | null;
-  seg: Seg;
-  texts: TextLayer[];
-  onGenerated: (updated: Run) => void;
-  onPatch: (id: string, patch: Partial<TextLayer>) => void;
-  onAdd: (afterId: string | null, window: [number, number]) => void;
-  onRemove: (id: string) => void;
-  onParts: (parts: Part[]) => void;
-  onAdjust: (a: Partial<Adjust>) => void;
-  onApplyAll?: (id: string) => void;
-}) {
-  const hook = run.hook;
+function useHookGeneration(runId: string, onGenerated: (updated: Run) => void, onFailed: () => void) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState(0);
-  const described = hook.source === "describe" && hook.describeReady ? hook.describe : null;
-  const face = hook.face ?? null;
-  const ch = face?.kind === "character" ? characterById(face.id) : null;
-  const ready = (Boolean(source) || Boolean(described)) && Boolean(face);
-
-  // Regenerate: optional note on what went wrong, passed to the next generation.
-  const [regen, setRegen] = useState(false);
-  const [fix, setFix] = useState("");
-
   const [jobId, setJobId] = useState<string | null>(null);
   const submitting = useRef(false);
   const requestKey = useRef<string | null>(null);
-  const doneCallback = useRef(onGenerated);
-  useEffect(() => { doneCallback.current = onGenerated; }, [onGenerated]);
-
+  const callbacks = useRef({ onGenerated, onFailed });
+  useEffect(() => { callbacks.current = { onGenerated, onFailed }; }, [onGenerated, onFailed]);
   // Resume only a previously reserved explicit request. Provider task IDs never enter browser state.
   useEffect(() => {
     const abort = new AbortController();
-    void fetch(`/api/runs/${run.id}/generate`, { signal: abort.signal, cache: "no-store" })
+    void fetch(`/api/runs/${runId}/generate`, { signal: abort.signal, cache: "no-store" })
       .then((r) => r.json())
       .then((reply) => {
         if (abort.signal.aborted || submitting.current || !reply.job) return;
@@ -1161,21 +1214,24 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
         setJobId(reply.job);
       }).catch(() => undefined);
     return () => abort.abort();
-  }, [run.id]);
+  }, [runId]);
 
   useEffect(() => {
     if (!jobId) return;
     const abort = new AbortController();
-    const storageKey = `mavya-generation:${run.id}`;
+    const storageKey = `mavya-generation:${runId}`;
     void (async () => {
       let failures = 0;
       for (let i = 0; i < 400 && !abort.signal.aborted; i++) {
-        const response = await fetch(`/api/runs/${run.id}/generate?job=${jobId}`, { signal: abort.signal, cache: "no-store" }).catch(() => null);
+        const response = await fetch(`/api/runs/${runId}/generate?job=${jobId}`, { signal: abort.signal, cache: "no-store" }).catch(() => null);
         const check = await response?.json().catch(() => null) as { state?: string; error?: string; run?: Run } | null;
         if (abort.signal.aborted) return;
         if (check?.state === "done" || check?.state === "failed" || response?.status === 404) {
-          if (check?.state === "done" && check.run) doneCallback.current(check.run);
-          else setGenError(check?.error ?? "The generation failed. Try again.");
+          if (check?.state === "done" && check.run) callbacks.current.onGenerated(check.run);
+          else {
+            setGenError(check?.error ?? "The generation failed. Try again.");
+            callbacks.current.onFailed();
+          }
           setBusy(false);
           setJobId(null);
           requestKey.current = null;
@@ -1189,28 +1245,27 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
         setBusy(false);
         setJobId(null);
         setGenError("This is taking too long. Try again.");
+        callbacks.current.onFailed();
       }
     })();
     return () => abort.abort();
-  }, [jobId, run.id]);
+  }, [jobId, runId]);
 
   async function generate(note?: string) {
     if (busy || submitting.current) return;
     submitting.current = true;
-    setRegen(false);
-    setFix("");
     setGenError(null);
     setBusy(true);
     setStartedAt(Date.now());
-    const storageKey = `mavya-generation:${run.id}`;
+    const storageKey = `mavya-generation:${runId}`;
     if (!requestKey.current) {
       try { requestKey.current = sessionStorage.getItem(storageKey); } catch { /* Storage can be unavailable. */ }
       requestKey.current ??= crypto.randomUUID();
       try { sessionStorage.setItem(storageKey, requestKey.current); } catch { /* Storage can be unavailable. */ }
     }
     try {
-      if (!(await waitRunSaves(run.id))) throw new Error("Couldn't save your changes. Try again.");
-      const response = await fetch(`/api/runs/${run.id}/generate`, {
+      if (!(await waitRunSaves(runId))) throw new Error("Couldn't save your changes. Try again.");
+      const response = await fetch(`/api/runs/${runId}/generate`, {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ key: requestKey.current, note }),
       });
@@ -1228,10 +1283,46 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
     } catch (error) {
       setGenError(error instanceof Error ? error.message : "Couldn't start the generation. Try again.");
       setBusy(false);
+      callbacks.current.onFailed();
     } finally {
       submitting.current = false;
     }
   }
+
+  return { busy, error: genError, startedAt, generate };
+}
+
+/** Step 4: the hook clip, in the shared clip editor. Before generating, the video box shows the inputs and a Generate button.
+ * The job itself lives on the page (`gen`), so this step can close as soon as Generate is clicked. */
+function GenerateStep({ run, source, seg, texts, gen, onGenerate, onPatch, onAdd, onRemove, onParts, onAdjust, onApplyAll }: {
+  run: Run;
+  source: Reference | null;
+  seg: Seg;
+  texts: TextLayer[];
+  gen: Generation;
+  onGenerate: (note?: string) => void;
+  onPatch: (id: string, patch: Partial<TextLayer>) => void;
+  onAdd: (afterId: string | null, window: [number, number]) => void;
+  onRemove: (id: string) => void;
+  onParts: (parts: Part[]) => void;
+  onAdjust: (a: Partial<Adjust>) => void;
+  onApplyAll?: (id: string) => void;
+}) {
+  const hook = run.hook;
+  const { busy, error: genError, startedAt } = gen;
+  const described = hook.source === "describe" && hook.describeReady ? hook.describe : null;
+  const face = hook.face ?? null;
+  const ch = face?.kind === "character" ? characterById(face.id) : null;
+  const ready = (Boolean(source) || Boolean(described)) && Boolean(face);
+
+  // Regenerate: optional note on what went wrong, passed to the next generation.
+  const [regen, setRegen] = useState(false);
+  const [fix, setFix] = useState("");
+  const generate = (note?: string) => {
+    setRegen(false);
+    setFix("");
+    onGenerate(note);
+  };
 
   const mini = "h-[42px] w-[26px] rounded-[5px] border-2 border-white bg-ink object-cover object-top shadow-sm";
   const facePhoto = ch ? ch.src : face?.kind === "photo" ? `/api/media/${face.mediaId}` : null;
@@ -1332,12 +1423,13 @@ function GenerateStep({ run, source, seg, texts, onGenerated, onPatch, onAdd, on
  * (play, trim + Cut + Undo, text bars, zoom keyframes), Advanced settings, the text rows, and full screen.
  * Times on the player are on-screen seconds from the clip's start; texts are stored on the whole timeline.
  */
-function Block({ n, title, done, children, open = true, summary, onToggle }: { n: number; title: string; done: boolean; children: React.ReactNode; open?: boolean; summary?: string; onToggle?: () => void }) {
+function Block({ n, title, done, pending = false, children, open = true, summary, onToggle }: { n: number; title: string; done: boolean; /** Done from the seller's side, still finishing in the background: the check carries a spinning ring. */ pending?: boolean; children: React.ReactNode; open?: boolean; summary?: string; onToggle?: () => void }) {
   return (
     <section className={open ? "space-y-4 py-6" : "py-4"}>
-      <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-3 text-left">
-        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${done ? "bg-accent text-white" : open ? "bg-accent-tint text-accent" : "bg-raised text-soft"}`}>
+      <button type="button" onClick={onToggle} aria-expanded={open} aria-busy={pending || undefined} className="flex w-full items-center gap-3 text-left">
+        <span className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${done ? "bg-accent text-white" : open ? "bg-accent-tint text-accent" : "bg-raised text-soft"}`}>
           {done ? <Check className="h-4 w-4" strokeWidth={3} /> : n}
+          {done && pending && <span aria-hidden className="absolute -inset-[3px] rounded-full border-2 border-accent/20 border-t-accent motion-safe:animate-spin" />}
         </span>
         <h2 className={`shrink-0 text-[17px] font-extrabold tracking-tight ${open || done ? "text-text" : "text-soft"}`}>{title}</h2>
         {!open && summary && <span className="min-w-0 truncate text-[13.5px] text-muted">{summary}</span>}

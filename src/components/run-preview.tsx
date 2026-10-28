@@ -17,7 +17,7 @@ import { AvatarPlaceholder } from "@/components/frames";
  * The finished video on a phone, to watch: hook, then the demo clips, with texts and sound, on one clock.
  * Watch only (every edit happens in its step); play / pause and a progress bar you can scrub.
  */
-export function RunPreview({ run, source, texts }: { run: Run; source: Reference | null; texts: TextLayer[] }) {
+export function RunPreview({ run, source, texts, hookCover }: { run: Run; source: Reference | null; texts: TextLayer[]; /** Shown over the hook part while it is generated. */ hookCover?: React.ReactNode }) {
   const hook = run.hook;
   const segs = timeline(run, source);
   const total = videoLength(segs);
@@ -120,6 +120,7 @@ export function RunPreview({ run, source, texts }: { run: Run; source: Reference
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-[#14121f] text-[12px] font-semibold text-white/40">{seg.id === "hook" ? "Your hook" : "Your demo"}</div>
             )}
+            {seg.id === "hook" && hookCover}
             {texts.filter((x) => x.text.trim() && time >= x.start && time < x.end).map((x) => <TextOverlay key={x.id} x={x} />)}
             {!playing && (
               <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">

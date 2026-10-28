@@ -1832,9 +1832,11 @@ function ShotBrief({ clip }: { clip: DemoClip }) {
 }
 
 /** Step 4: one finished demo video, or a shot list filmed clip by clip. Every clip opens in the same ClipEditor as the hook. */
-export function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, onRename, onDelete, onMove, onReset }: {
+export function DemoStep({ run, segs, planning = false, renderEditor, onFiles, onClips, onUpload, onRename, onDelete, onMove, onReset }: {
   run: Run;
   segs: Seg[];
+  /** The demo plan is being written; it fills the shot list when nothing is filmed yet. */
+  planning?: boolean;
   renderEditor: (seg: Seg) => React.ReactNode;
   /** One video = one demo; several = clips in file-name order. */
   onFiles: (files: File[]) => Promise<void>;
@@ -1894,6 +1896,23 @@ export function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, 
   const fileInput = (id: string, onFile: (f: File) => Promise<void>) => (
     <input type="file" accept="video/*" className="hidden" onChange={(e) => void take(id, e.target.files?.[0], onFile).then(() => (e.target.value = ""))} />
   );
+
+  // The plan is on its way and would replace these rows: hold their place instead of jumping.
+  if (planning && !clips.some((c) => clipSrc(c))) {
+    return (
+      <div role="status" aria-label="Writing your demo plan" className="space-y-3">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="flex items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5">
+            <span className="shimmer h-[56px] w-[32px] shrink-0 rounded-md" />
+            <span className="min-w-0 flex-1 space-y-2">
+              <span className="shimmer block h-4 w-40 rounded" />
+              <span className="shimmer block h-3 w-24 rounded" />
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   if (!mode) {
     return (

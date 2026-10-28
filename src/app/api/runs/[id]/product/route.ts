@@ -45,7 +45,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/p
     return Response.json({ error: "Enter your website, e.g. yourapp.com" }, { status: 400 });
   }
 
-  const budget = await beginAI(who, run, "product", { url: url.toString() });
+  // `previous` lets the result land while the seller keeps editing other steps (migration 0017).
+  const budget = await beginAI(who, run, "product", { url: url.toString(), previous: run.product ?? null });
   if (budget.response) return budget.response;
   let brief: ProductBrief;
   try {

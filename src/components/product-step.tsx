@@ -6,39 +6,45 @@ import type { Run, VideoScript } from "@/lib/types";
 
 type AIResult = Pick<Run, "product" | "script">;
 
-async function post(url: string, body?: unknown): Promise<{ run?: Run; error?: string }> {
+async function post(url: string, body?: unknown): Promise<{ run?: Run; error?: string; status?: number }> {
   try {
     const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body ?? {}) });
     const data = (await res.json().catch(() => null)) as (Run & { error?: string }) | null;
-    if (!res.ok || !data) return { error: data?.error ?? "Something went wrong. Try again." };
+    if (!res.ok || !data) return { error: data?.error ?? "Something went wrong. Try again.", status: res.status };
     return { run: data };
   } catch {
     return { error: "Couldn't reach Mavya. Check your connection." };
   }
 }
 
+/** Read the site into a brief. A 409 means the run moved under the request (before migration 0017): try once more. */
+export async function readProduct(runId: string, url: string): Promise<{ run?: Run; error?: string }> {
+  const first = await post(`/api/runs/${runId}/product`, { url });
+  return first.status === 409 ? post(`/api/runs/${runId}/product`, { url }) : first;
+}
+
+/** Write the script and demo shot plan for this product and hook. Same single retry on 409. */
+export async function writeScript(runId: string): Promise<{ run?: Run; error?: string }> {
+  const first = await post(`/api/runs/${runId}/script`);
+  return first.status === 409 ? post(`/api/runs/${runId}/script`) : first;
+}
+
 /**
- * Step 1 "Your product": the website goes in, Analyze (an explicit click, it runs Gemini) reads it into a brief that
- * the script and the demo steps are written from.
+ * Step 1 "Your product": the website goes in (paste or Analyze, both explicit; it runs Gemini). The page reads it in
+ * the background and moves on at once; `reading` is that request, `error` its failure (the step reopens with it).
  */
-export function ProductStep({ runId, product, onDone }: { runId: string; product: Run["product"] | null; onDone: (r: AIResult) => void }) {
-  const [url, setUrl] = useState(product?.url ?? "");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export function ProductStep({ product, reading, error, failedUrl, onAnalyze }: { product: Run["product"] | null; reading: boolean; error: string | null; failedUrl?: string; onAnalyze: (url: string) => void }) {
+  const [url, setUrl] = useState(failedUrl ?? product?.url ?? "");
   const [editing, setEditing] = useState(false);
 
-  const analyze = async () => {
-    setBusy(true);
-    setError(null);
-    const { run, error: e } = await post(`/api/runs/${runId}/product`, { url });
-    setBusy(false);
-    if (e || !run) return setError(e ?? "Something went wrong.");
+  const analyze = (value = url) => {
+    if (!value.trim() || reading) return;
     setEditing(false);
-    onDone(run);
+    onAnalyze(value.trim());
   };
 
   const brief = product?.brief;
-  if (brief && !editing) {
+  if (brief && !editing && !reading && !error) {
     return (
       <div className="rounded-2xl border border-line bg-panel p-4">
         <div className="flex items-start gap-3">
@@ -80,7 +86,7 @@ export function ProductStep({ runId, product, onDone }: { runId: string; product
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (url.trim() && !busy) void analyze();
+        analyze();
       }}
       className="rounded-2xl border border-line bg-panel p-4"
     >
@@ -94,13 +100,23 @@ export function ProductStep({ runId, product, onDone }: { runId: string; product
           inputMode="url"
           autoComplete="url"
           value={url}
+          disabled={reading}
           onChange={(e) => setUrl(e.target.value)}
+          onPaste={(e) => {
+            // Pasting a whole link is the action: read it right away, no extra click.
+            const pasted = e.clipboardData.getData("text").trim();
+            if (!url.trim() && /^(https?:\/\/)?[^\s/]+\.[^\s]{2,}$/i.test(pasted)) {
+              e.preventDefault();
+              setUrl(pasted);
+              analyze(pasted);
+            }
+          }}
           placeholder="yourapp.com"
-          className="min-w-0 flex-1 rounded-lg border border-line-strong bg-panel px-3 py-2.5 text-[14.5px] outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+          className="min-w-0 flex-1 rounded-lg border border-line-strong bg-panel px-3 py-2.5 text-[14.5px] outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
         />
-        <button type="submit" disabled={!url.trim() || busy} className="btn-primary px-4 py-2.5 text-[14px] disabled:opacity-50">
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          {busy ? "Reading your site..." : "Analyze"}
+        <button type="submit" disabled={!url.trim() || reading} className="btn-primary px-4 py-2.5 text-[14px] disabled:opacity-50">
+          {reading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          Analyze
         </button>
         {editing && (
           <button type="button" onClick={() => setEditing(false)} className="rounded-lg px-3 text-[14px] font-semibold text-muted hover:text-text">
@@ -117,14 +133,16 @@ export function ProductStep({ runId, product, onDone }: { runId: string; product
  * The script for this product and hook, written from the library's analyzed viral hooks (Write my script is an
  * explicit click). The hook lines are one click from the hook text; the demo shots fill "Film your demo".
  */
-export function ScriptCard({ runId, script, hookText, onDone, onUseHookText }: { runId: string; script: VideoScript | null; hookText: string; onDone: (r: AIResult) => void; onUseHookText: (text: string) => void }) {
-  const [busy, setBusy] = useState(false);
+export function ScriptCard({ runId, script, hookText, writing = false, onDone, onUseHookText }: { runId: string; script: VideoScript | null; hookText: string; /** The page is already writing it (started by Generate). */ writing?: boolean; onDone: (r: AIResult) => void; onUseHookText: (text: string) => void }) {
+  const [own, setOwn] = useState(false);
+  const busy = own || writing;
   const [error, setError] = useState<string | null>(null);
   const write = async () => {
-    setBusy(true);
+    if (busy) return;
+    setOwn(true);
     setError(null);
-    const { run, error: e } = await post(`/api/runs/${runId}/script`);
-    setBusy(false);
+    const { run, error: e } = await writeScript(runId);
+    setOwn(false);
     if (e || !run) return setError(e ?? "Something went wrong.");
     onDone(run);
   };

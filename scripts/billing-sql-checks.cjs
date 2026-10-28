@@ -137,6 +137,34 @@ async function main() {
     const scriptToken=JSON.parse(sql(`select mavya_begin_ai('${other}','${project}','script',(select data->>'updatedAt' from runs where id='${project}'),${literal({source})},true)`)).token;
     sql(`update library set data='{"title":"after"}' where id='${reference}'`);
     assert.equal(sql(`select mavya_finish_ai('${other}','${project}','script','${scriptToken}','{"script":{}}')`),'');
+    for(let i=0;i<2;i++)sql(fs.readFileSync(path.join(root,'supabase/migrations/0017_ai_input_cas.sql'),'utf8'));
+    sql(`delete from ai_daily_usage where user_id='${other}'`);
+    const begin=(kind,input)=>JSON.parse(sql(`select mavya_begin_ai('${other}','${project}','${kind}',(select data->>'updatedAt' from runs where id='${project}'),${literal(input)},true)`)).token;
+    const finish=(kind,token,patch)=>sql(`select mavya_finish_ai('${other}','${project}','${kind}','${token}',${literal(patch)})`);
+    const patch=p=>sql(`select mavya_patch_run('${other}','${project}',${literal(p)})`);
+    const product=()=>JSON.parse(sql(`select coalesce(data->'product','null'::jsonb) from runs where id='${project}'`));
+    // Product: unrelated edits during reading keep the result; a newer product drops it; pre-0017 requests keep the old check.
+    let aiToken=begin('product',{url:'a',previous:product()});patch({title:'picked a hook'});
+    assert.ok(JSON.parse(finish('product',aiToken,{product:{url:'a'}})).product);
+    aiToken=begin('product',{url:'b',previous:product()});patch({product:{url:'c'}});
+    assert.equal(finish('product',aiToken,{product:{url:'b'}}),'');
+    aiToken=begin('product',{url:'d'});patch({title:'old style'});
+    assert.equal(finish('product',aiToken,{product:{url:'d'}}),'');
+    // Script from a library hook: unrelated edits keep it; another hook or another product drops it.
+    patch({sourceRefId:reference});
+    const libSource={id:reference,owner:'curated',title:'after'};
+    aiToken=begin('script',{product:product(),source:libSource});patch({title:'character picked'});
+    assert.ok(JSON.parse(finish('script',aiToken,{script:{shots:[]}})).script);
+    aiToken=begin('script',{product:product(),source:libSource});patch({sourceRefId:'50000000-0000-4000-8000-000000000099'});
+    assert.equal(finish('script',aiToken,{script:{}}),'');
+    patch({sourceRefId:reference});aiToken=begin('script',{product:product(),source:libSource});patch({product:{url:'e'}});
+    assert.equal(finish('script',aiToken,{script:{}}),'');
+    // Script from a described hook: trimmed text must match.
+    patch({sourceRefId:null,hook:{source:'describe',describe:' spit-take \n'}});
+    aiToken=begin('script',{product:product(),source:null,described:'spit-take'});patch({title:'generating'});
+    assert.ok(JSON.parse(finish('script',aiToken,{script:{shots:[]}})).script);
+    aiToken=begin('script',{product:product(),source:null,described:'spit-take'});patch({hook:{source:'describe',describe:'other'}});
+    assert.equal(finish('script',aiToken,{script:{}}),'');
     for(let i=0;i<2;i++)sql(fs.readFileSync(path.join(root,'supabase/migrations/0012_generation_temp_ownership.sql'),'utf8'));
     sql(`insert into temporary_objects(key,user_id) values('tmp/gen/fixture.jpg','${other}')`);
     const generation=sql(`insert into generations(user_id) values('${other}') returning id` ).split('\n')[0];
