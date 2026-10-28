@@ -24,7 +24,7 @@ export function AuthModalHost() {
   const pathname = usePathname();
   const auth = params.get("auth");
   const [closed, setClosed] = useState(false);
-  const close = useCallback(() => { setClosed(true); window.history.replaceState(null, "", pathname); }, [pathname]);
+  const close = useCallback(() => { flushSync(() => setClosed(true)); window.history.replaceState(null, "", pathname); }, [pathname]);
   // The popup portals into <body>, so it renders in the browser only.
   const inBrowser = useSyncExternalStore(noop, () => true, () => false);
   const [signedOut, setSignedOut] = useState(false);

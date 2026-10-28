@@ -1,4 +1,5 @@
 "use client";
+import { flushSync } from "react-dom";
 import { RouteSkeleton } from "@/components/route-skeleton";
 import { MediaVideo } from "@/components/media-video";
 
@@ -105,7 +106,7 @@ export function RunsList() {
     if (creationBusy.current) return;
     creationBusy.current = true;
     creation.current ??= crypto.randomUUID();
-    setCreating(true);
+    flushSync(() => setCreating(true));
     setError(null);
     router.prefetch(`/studio/${creation.current}`);
     try {

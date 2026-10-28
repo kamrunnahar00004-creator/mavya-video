@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import { usePathname } from "next/navigation";
 import { RouteSkeleton } from "@/components/route-skeleton";
 
@@ -12,7 +13,7 @@ export function NavigationFeedback() {
   useEffect(() => {
     const navigate = (event: Event) => {
       const url = new URL((event as CustomEvent<string>).detail, window.location.href);
-      if (url.origin === window.location.origin && url.pathname !== pathname) setTarget({ from: pathname, to: url.pathname });
+      if (url.origin === window.location.origin && url.pathname !== pathname) flushSync(() => setTarget({ from: pathname, to: url.pathname }));
     };
     const end = () => setTarget(null);
     window.addEventListener("mavya:navigate", navigate);

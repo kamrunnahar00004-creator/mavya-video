@@ -1,4 +1,5 @@
 "use client";
+import { flushSync } from "react-dom";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -37,7 +38,7 @@ export function LibraryView() {
       return;
     }
     creation.current ??= { id: crypto.randomUUID(), source: ref.id };
-    setCreating(true);
+    flushSync(() => setCreating(true));
     router.prefetch(`/studio/${creation.current.id}`);
     try {
       const res = await fetch("/api/runs", { method: "POST", signal: AbortSignal.timeout(30_000), headers: { "content-type": "application/json" }, body: JSON.stringify({ id: creation.current.id, sourceRefId: ref.id }) });

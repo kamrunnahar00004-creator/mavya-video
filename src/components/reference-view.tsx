@@ -1,4 +1,5 @@
 "use client";
+import { flushSync } from "react-dom";
 import { RouteSkeleton } from "@/components/route-skeleton";
 import { MediaVideo } from "@/components/media-video";
 
@@ -149,7 +150,7 @@ export function ReferenceView() {
             disabled={!a}
             onClick={async () => {
               if (actionLock.current) return;
-              actionLock.current = true; setAction("create");
+              actionLock.current = true; flushSync(() => setAction("create"));
               creation.current ??= crypto.randomUUID();
               router.prefetch(`/studio/${creation.current}`);
               try {
