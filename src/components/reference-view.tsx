@@ -151,8 +151,9 @@ export function ReferenceView() {
               if (actionLock.current) return;
               actionLock.current = true; setAction("create");
               creation.current ??= crypto.randomUUID();
+              router.prefetch(`/studio/${creation.current}`);
               try {
-                const response = await fetch("/api/runs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: creation.current, sourceRefId: id }) });
+                const response = await fetch("/api/runs", { method: "POST", signal: AbortSignal.timeout(30_000), headers: { "content-type": "application/json" }, body: JSON.stringify({ id: creation.current, sourceRefId: id }) });
                 if (response.status === 402) { window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/pricing" })); router.push("/pricing"); return; }
                 if (!response.ok) throw Error();
                 const run = await response.json() as { id: string };

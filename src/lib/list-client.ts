@@ -1,6 +1,6 @@
 /** A page has the same array shape as before; continuation is explicit, never an implicit cap. */
 export async function fetchPage<T>(url: string, cursor?: string | null): Promise<{items: T[]; next: string | null}> {
-  const res = await fetch(url + (cursor ? (url.includes("?") ? "&" : "?") + "cursor=" + encodeURIComponent(cursor) : ""));
+  const res = await fetch(url + (cursor ? (url.includes("?") ? "&" : "?") + "cursor=" + encodeURIComponent(cursor) : ""), { signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw Error("List is unavailable. Try again.");
   const items = await res.json();
   if (!Array.isArray(items)) throw Error("List is unavailable. Try again.");

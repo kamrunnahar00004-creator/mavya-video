@@ -38,8 +38,9 @@ export function LibraryView() {
     }
     creation.current ??= { id: crypto.randomUUID(), source: ref.id };
     setCreating(true);
+    router.prefetch(`/studio/${creation.current.id}`);
     try {
-      const res = await fetch("/api/runs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: creation.current.id, sourceRefId: ref.id }) });
+      const res = await fetch("/api/runs", { method: "POST", signal: AbortSignal.timeout(30_000), headers: { "content-type": "application/json" }, body: JSON.stringify({ id: creation.current.id, sourceRefId: ref.id }) });
       if (res.status === 402) { window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/pricing" })); router.push("/pricing"); return; }
       if (!res.ok) throw Error();
       const run = await res.json() as Run;
