@@ -23,13 +23,14 @@ export function AuthModalHost() {
   const params = useSearchParams();
   const pathname = usePathname();
   const auth = params.get("auth");
-  const close = useCallback(() => window.history.replaceState(null, "", pathname), [pathname]);
+  const [closed, setClosed] = useState(false);
+  const close = useCallback(() => { setClosed(true); window.history.replaceState(null, "", pathname); }, [pathname]);
   // The popup portals into <body>, so it renders in the browser only.
   const inBrowser = useSyncExternalStore(noop, () => true, () => false);
   const [signedOut, setSignedOut] = useState(false);
   const next = safeNext(params.get("next"));
   useEffect(() => {
-    if (auth !== "login" && auth !== "signup") return;
+    if (auth !== "login" && auth !== "signup") { queueMicrotask(() => setClosed(false)); return; }
     let active = true;
     void createSupabaseBrowserClient().auth.getUser().then(({ data }) => {
       if (!active) return;
@@ -40,7 +41,7 @@ export function AuthModalHost() {
     }).catch(() => { if (active) setSignedOut(true); });
     return () => { active = false; };
   }, [auth, next]);
-  if (!inBrowser || (auth !== "login" && auth !== "signup")) return null;
+  if (!inBrowser || closed || (auth !== "login" && auth !== "signup")) return null;
   if (!signedOut) return createPortal(
     <div role="status" aria-label="Checking account" className="landing-theme fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,13,11,0.55)] px-4 py-8 backdrop-blur-sm">
       <div className="flex min-h-[420px] w-full max-w-[460px] items-center justify-center rounded-2xl border border-line bg-panel p-6">
