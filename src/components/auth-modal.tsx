@@ -3,7 +3,7 @@ import { safeNext } from "@/lib/auth-next";
 import { authError } from "@/lib/auth-error";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2, X } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -89,9 +89,15 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
     setSent(false);
   }
 
+  async function showPending() {
+    flushSync(() => setLoading(true));
+    // Let the pending button paint before auth setup or redirect work uses the main thread.
+    if (typeof requestAnimationFrame === "function") await new Promise<void>(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+  }
+
   async function handleGoogle() {
     setError(null);
-    setLoading(true);
+    await showPending();
     try {
       const { error: e } = await createSupabaseBrowserClient().auth.signInWithOAuth({ provider: "google", options: { redirectTo: callback(next) } });
       if (e) throw e;
@@ -112,7 +118,7 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
       if (password.length < 8) return setError("Password must be at least 8 characters.");
       if (password !== confirm) return setError("Passwords do not match.");
     }
-    setLoading(true);
+    await showPending();
     try {
       const supabase = createSupabaseBrowserClient();
       if (isSignup) {
@@ -142,7 +148,7 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
   /** Always the same answer, so the form never reveals which emails have an account. */
   async function sendReset() {
     if (!email.trim()) return setError("Enter your email.");
-    setLoading(true);
+    await showPending();
     try {
       const { error: e } = await createSupabaseBrowserClient().auth.resetPasswordForEmail(email.trim(), { redirectTo: callback("/reset-password") });
       if (e?.status === 429) return setError("Too many tries. Wait a minute and try again.");
