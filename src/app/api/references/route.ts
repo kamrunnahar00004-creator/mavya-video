@@ -13,18 +13,21 @@ export async function GET(request: Request) {
   const who = await currentUser();
   if (!who) return signInFirst();
   try {
+  const query = new URL(request.url).searchParams;
+  if (query.get("view") === "catalog" && query.get("scope") !== "curated") return Response.json({ error: "Invalid catalog scope" }, { status: 400 });
   const page = await listPage("references", who, request);
   const refs = page.items as import("@/lib/types").Reference[];
   const view = new URL(request.url).searchParams.get("view");
   const respond = (items: unknown[]) => {
     const response = pageResponse(items, page.next);
-    if (new URL(request.url).searchParams.get("scope") === "curated") {
+    if (view !== "catalog" && new URL(request.url).searchParams.get("scope") === "curated") {
       // Session-bound browser cache, never put owned data into a shared CDN cache.
       response.headers.set("Cache-Control", "private, max-age=60, must-revalidate");
       response.headers.set("Vary", "Cookie");
     }
     return response;
   };
+  if (view === "catalog") return respond(refs);
   if (view === "covers") return respond(refs.map((r) => ({ id: r.id, thumbUrl: r.analysis?.segments[0]?.thumb ?? r.thumbUrl })));
   if (view === "studio") {
     // Curation history and model explanations never appear in the studio.

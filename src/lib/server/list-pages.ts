@@ -20,9 +20,13 @@ function cursor(raw: string | null): Cursor | null {
 const token = (at: string, id: string) => Buffer.from(JSON.stringify({ at, id })).toString("base64url");
 /** Keyset continuation, including equal timestamps; each response and database read is bounded. */
 export async function listPage(kind: Kind, who: string, request: Request) {
-  const curatedOnly = kind === "references" && new URL(request.url).searchParams.get("scope") === "curated";
-  const refSummary = kind === "references" && new URL(request.url).searchParams.get("view") === "studio";
+  const catalog = kind === "references" && new URL(request.url).searchParams.get("view") === "catalog";
+  const compact = catalog || kind === "references" && new URL(request.url).searchParams.get("view") === "studio" && new URL(request.url).searchParams.get("all") === "1";
+  const curatedOnly = catalog || kind === "references" && new URL(request.url).searchParams.get("scope") === "curated";
+  const refSummary = compact || kind === "references" && new URL(request.url).searchParams.get("view") === "studio";
   const refKeys = ["title", "platform", "sourceUrl", "views", "mediaId", "mime", "analysis", "niche", "hookStyle", "thumbUrl", "author", "likes", "comments", "caption", "summary", "recipe", "postedAt", "pending", "review", "followers", "smallCover"];
+  const compactKeys = ["title", "platform", "sourceUrl", "views", "mediaId", "mime", "author", "likes", "comments", "caption", "summary", "postedAt", "pending", "followers", "smallCover"];
+  const compactSelect = "id,owner,created_at,refStyle:data->ai->>style,thumb:data->analysis->segments->0->>thumb,thumbFallback:data->>thumbUrl,reviewVerdict:data->review->>verdict," + compactKeys.map(k => k + ":data->" + k).join(",");
   const summary = kind === "runs" && new URL(request.url).searchParams.get("view") === "summary";
   const after = cursor(new URL(request.url).searchParams.get("cursor"));
   // The hook library loads whole (`all=1`) so its sort and style tabs cover every hook; still bounded.
@@ -39,7 +43,7 @@ export async function listPage(kind: Kind, who: string, request: Request) {
     let batchAfter = after;
     let continuation = false;
     for (let batch = 0; batch < (size === ALL_REFERENCES ? 8 : 1) && rows.length < size; batch++) {
-      let query = createSupabaseAdminClient().from(table).select(kind === "assets" ? "media_id,name,kind,created_at" : kind === "references" ? (refSummary ? "id,owner,created_at,refStyle:data->ai->style," + refKeys.map(k => k + ":data->" + k).join(",") : "id,owner,data,created_at") : summary ? "id,created_at,title:data->>title,updatedAt:data->>updatedAt,sourceRefId:data->>sourceRefId,hook:data->hook,demo:data->demo,product:data->product,sounds:data->sounds,sound:data->sound" : "id,data,created_at");
+      let query = createSupabaseAdminClient().from(table).select(kind === "assets" ? "media_id,name,kind,created_at" : kind === "references" ? (compact ? compactSelect : refSummary ? "id,owner,created_at,refStyle:data->ai->style," + refKeys.map(k => k + ":data->" + k).join(",") : "id,owner,data,created_at") : summary ? "id,created_at,title:data->>title,updatedAt:data->>updatedAt,sourceRefId:data->>sourceRefId,hook:data->hook,demo:data->demo,product:data->product,sounds:data->sounds,sound:data->sound" : "id,data,created_at");
       query = kind === "references" ? curatedOnly ? query.eq("owner", "curated") : query.or(`owner.eq.curated,user_id.eq.${who}`) : query.eq("user_id", who);
       if (batchAfter) query = query.or(`created_at.lt.${batchAfter.at},and(created_at.eq.${batchAfter.at},${idKey}.lt.${batchAfter.id})`);
       const { data, error } = await query.order("created_at", { ascending: false }).order(idKey, { ascending: false }).limit(Math.min(size - rows.length, DATABASE_BATCH));
@@ -56,7 +60,7 @@ export async function listPage(kind: Kind, who: string, request: Request) {
   } else {
     const values = kind === "assets" ? await listAssets(who) : kind === "references" ? await listReferences(who) : await listRuns(who);
     const idOf = (v: Run | Reference | Asset) => "mediaId" in v && !("id" in v) ? v.mediaId : (v as Run | Reference).id;
-    items = [...values].filter(v => !curatedOnly || (v as Reference).owner === "curated").sort((a,b) => b.createdAt.localeCompare(a.createdAt) || idOf(b).localeCompare(idOf(a))).filter(v => !after || v.createdAt < after.at || v.createdAt === after.at && idOf(v) < after.id).slice(0,size);
+    items = [...values].filter(v => !curatedOnly || ((v as Reference).owner ?? "curated") === "curated").sort((a,b) => b.createdAt.localeCompare(a.createdAt) || idOf(b).localeCompare(idOf(a))).filter(v => !after || v.createdAt < after.at || v.createdAt === after.at && idOf(v) < after.id).slice(0,size);
     if (items.length === size) { const last = items.at(-1)!; next = token(last.createdAt,idOf(last)); }
   }
   if (summary) items = items.map(value => {
@@ -86,6 +90,17 @@ export async function listPage(kind: Kind, who: string, request: Request) {
     }
     items = items.map(value => ({ ...value, cover: covers.get((value as Run).sourceRefId ?? "") }));
   }
+  if (compact) items = items.map(value => {
+    const ref = value as Reference & {thumb?: string; thumbFallback?: string; reviewVerdict?: "keep" | "drop"};
+    return {
+      id: ref.id, owner: cloud() ? ref.owner : ref.owner ?? "curated", createdAt: ref.createdAt, title: ref.title, platform: ref.platform, sourceUrl: ref.sourceUrl,
+      views: ref.views, mediaId: ref.mediaId, mime: ref.mime, author: ref.author, likes: ref.likes, comments: ref.comments,
+      caption: ref.caption, summary: ref.summary, postedAt: ref.postedAt, pending: ref.pending, followers: ref.followers,
+      smallCover: ref.smallCover, ai: ref.ai, partial: true, analysis: null,
+      thumbUrl: cloud() ? ref.thumb ?? ref.thumbFallback : ref.analysis?.segments[0]?.thumb ?? ref.thumbUrl,
+      review: (cloud() ? ref.reviewVerdict : ref.review?.verdict) ? { verdict: cloud() ? ref.reviewVerdict! : ref.review!.verdict } : undefined,
+    } as Reference;
+  });
   let missingCovers: Reference[] = [];
   if (kind === "references" && cloud()) {
     // Small WebP cards straight from R2; references without one yet keep their thumbnail and get one in the background.
@@ -95,11 +110,11 @@ export async function listPage(kind: Kind, who: string, request: Request) {
     missingCovers = refs.filter(ref => !ref.smallCover);
   }
   if (kind === "references") {
-
+  const version = catalog ? "&v=" + Date.now() : "";
   items = items.map((value, tile) => {
     const ref = value as Reference;
     const group = Math.floor(tile / PAGE_SIZE) * PAGE_SIZE;
-    const imageURL = "/api/references/thumbnails?ids=" + items.slice(group, group + PAGE_SIZE).map(v => (v as Reference).id).join(",");
+    const imageURL = "/api/references/thumbnails?ids=" + items.slice(group, group + PAGE_SIZE).map(v => (v as Reference).id).join(",") + version;
     tile %= PAGE_SIZE;
     return { ...ref, thumbUrl: ref.thumbUrl?.startsWith("data:") ? `${imageURL}&segment=0#svgView(viewBox(0,${tile * 320},180,320))` : ref.thumbUrl, analysis: ref.analysis ? { ...ref.analysis, segments: ref.analysis.segments.map((seg, index) => ({ ...seg, thumb: seg.thumb?.startsWith("data:") ? `${imageURL}&segment=${index}#svgView(viewBox(0,${tile * 320},180,320))` : seg.thumb })) } : ref.analysis };
   });
