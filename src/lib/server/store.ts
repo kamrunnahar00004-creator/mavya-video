@@ -180,25 +180,28 @@ export async function getRun(id: string, who: string): Promise<Run | null> {
   return data?.data ?? null;
 }
 
-export async function createRun(who: string): Promise<Run> {
+export async function createRun(who: string, requestedId?: string, source?: Reference): Promise<Run> {
   const now = new Date().toISOString();
   const run: Run = {
-    id: randomUUID(),
-    title: "Untitled run",
+    id: requestedId ?? randomUUID(),
+    title: source?.title ?? "Untitled run",
     createdAt: now,
     updatedAt: now,
-    sourceRefId: null,
-    hook: { mode: "upload", text: "How is this tool even legal?", clip: null, avatarIndex: null, variationIndex: null },
+    sourceRefId: source?.id ?? null,
+    hook: { mode: "upload", text: "How is this tool even legal?", clip: null, avatarIndex: null, variationIndex: null, ...(source ? { source: "library" as const, start: source.analysis?.segments.find(s => s.role === "hook")?.start ?? 0, end: source.analysis?.segments.find(s => s.role === "hook")?.end ?? 3 } : {}) },
     demo: { clip: null, frame: "laptop" },
     project: null,
   };
   if (!cloud()) {
-    await writeDb((d) => d.runs.push(run));
-    return run;
+    let result = run;
+    await writeDb((d) => { const existing = d.runs.find(r => r.id === run.id); if (existing) result = existing; else d.runs.push(run); });
+    return result;
   }
-  const { error } = await db().from("runs").insert({ id: run.id, user_id: who, data: run, created_at: now, updated_at: now });
+  const { error } = await db().from("runs").upsert({ id: run.id, user_id: who, data: run, created_at: now, updated_at: now }, { onConflict: "id", ignoreDuplicates: true });
   if (error) throw error;
-  return run;
+  const stored = await getRun(run.id, who);
+  if (!stored) throw Error("Video identity conflict");
+  return stored;
 }
 
 // Cloud merges sections under the database row lock, across all server instances.

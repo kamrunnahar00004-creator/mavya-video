@@ -1,8 +1,9 @@
 "use client";
+import { RouteSkeleton } from "@/components/route-skeleton";
 import { MediaVideo } from "@/components/media-video";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/pending-link";
 import { useRouter } from "next/navigation";
 import { LayoutGrid, List, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { fetchPage } from "@/lib/list-client";
@@ -67,6 +68,8 @@ export function RunsList() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [runs, setRuns] = useState<Run[] | null>(null);
+  const creation = useRef<string | null>(null);
+  const creationBusy = useRef(false);
   const [creating, setCreating] = useState(false);
   const [view, setView] = useState<View>("grid");
   const [editing, setEditing] = useState<string | null>(null);
@@ -98,23 +101,34 @@ export function RunsList() {
   }
 
   async function newRun() {
-    if (creating) return;
+    if (creationBusy.current) return;
+    creationBusy.current = true;
+    creation.current ??= crypto.randomUUID();
     setCreating(true);
-    // Next keeps this page's state when you leave it (cacheComponents), so the spinner must stop here,
-    // or it is still spinning when you come back to the dashboard.
+    setError(null);
     try {
-      const res = await fetch("/api/runs", { method: "POST" });
-      if (!res.ok) return;
+      const res = await fetch("/api/runs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: creation.current }) });
+      if (res.status === 402) { router.push("/pricing"); return; }
+      if (!res.ok) throw Error();
       const run = (await res.json()) as Run;
+      window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: `/studio/${run.id}` }));
       router.push(`/studio/${run.id}`);
+      creation.current = null;
+    } catch {
+      setError("Couldn't create the video. Try again.");
     } finally {
+      creationBusy.current = false;
       setCreating(false);
     }
   }
 
   async function rename(r: Run, title: string) {
     setRuns((all) => all?.map((x) => (x.id === r.id ? { ...x, title } : x)) ?? null);
-    await fetch(`/api/runs/${r.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title }) });
+    const response = await fetch(`/api/runs/${r.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title }) }).catch(() => null);
+    if (!response?.ok) {
+      setRuns(all => all?.map(x => x.id === r.id && x.title === title ? { ...x, title: r.title } : x) ?? null);
+      setError("Couldn't rename the video. Try again.");
+    }
   }
 
   async function remove(r: Run) {
@@ -154,6 +168,8 @@ export function RunsList() {
       </button>
     </div>
   );
+
+  if (creating) return <RouteSkeleton path="/studio/new" />;
 
   return (
     <div className="card flex h-full flex-col overflow-hidden">
@@ -208,7 +224,7 @@ export function RunsList() {
             {runs.map((r) => {
               const p = progress(r);
               return (
-                <Link prefetch={false} key={r.id} href={`/studio/${r.id}`} className="group block" onClick={(e) => editing === r.id && e.preventDefault()}>
+                <Link prefetch={null} key={r.id} href={`/studio/${r.id}`} className="group block" onClick={(e) => editing === r.id && e.preventDefault()}>
                   <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-[#1d1a2b] transition-transform group-hover:-translate-y-0.5">
                     <Cover run={r} />
                     <span className={`absolute left-2 top-2 rounded-md px-2 py-0.5 text-[12px] font-bold ${p.ready ? "bg-accent text-white" : "bg-white/90 text-text"}`}>{p.label}</span>
@@ -233,7 +249,7 @@ export function RunsList() {
               const p = progress(r);
               return (
                 <Link
-                  prefetch={false}
+                  prefetch={null}
                   key={r.id}
                   href={`/studio/${r.id}`}
                   onClick={(e) => editing === r.id && e.preventDefault()}

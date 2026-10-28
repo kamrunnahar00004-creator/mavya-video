@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { libraryMore, loadLibrary } from "@/lib/library-cache";
-import { patchRun } from "@/lib/client";
+import { RouteSkeleton } from "@/components/route-skeleton";
 import type { Reference, Run } from "@/lib/types";
 import { SourcePicker } from "@/components/source-picker";
 
 /** Viral library: the same hook grid as step 1, browsable without starting a video. */
 export function LibraryView() {
   const router = useRouter();
+  const creation = useRef<{ id: string; source: string } | null>(null);
+  const busy = useRef(false);
+  const [creating, setCreating] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
   const [refs, setRefs] = useState<Reference[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -26,17 +29,32 @@ export function LibraryView() {
 
   /** "Use this hook" here starts a new video with the hook already picked. */
   async function startWithHook(ref: Reference) {
+    if (busy.current) return;
+    busy.current = true;
+    if (creation.current && creation.current.source !== ref.id) {
+      setError("Retry the same hook to recover your video.");
+      busy.current = false;
+      return;
+    }
+    creation.current ??= { id: crypto.randomUUID(), source: ref.id };
+    setCreating(true);
     try {
-      const res = await fetch("/api/runs", { method: "POST" });
-      if (!res.ok) throw new Error();
-      const run = (await res.json()) as Run;
-      const seg = ref.analysis?.segments.find((s) => s.role === "hook");
-      await patchRun(run.id, { sourceRefId: ref.id, title: ref.title, hook: { ...run.hook, start: seg?.start ?? 0, end: seg?.end ?? 3 } });
+      const res = await fetch("/api/runs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: creation.current.id, sourceRefId: ref.id }) });
+      if (res.status === 402) { router.push("/pricing"); return; }
+      if (!res.ok) throw Error();
+      const run = await res.json() as Run;
+      window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: `/studio/${run.id}` }));
       router.push(`/studio/${run.id}`);
+      creation.current = null;
     } catch {
       setError("Could not start a video with this hook");
+    } finally {
+      busy.current = false;
+      setCreating(false);
     }
   }
+
+  if (creating) return <RouteSkeleton path="/studio/new" />;
 
   return (
     <div className="card h-full overflow-y-auto">
@@ -50,7 +68,7 @@ export function LibraryView() {
             {Array.from({ length: 12 }, (_, i) => <div key={i} className="aspect-[9/16] animate-pulse rounded-xl bg-raised" />)}
           </div>
         ) : (
-          <SourcePicker onLoadMore={cursor ? async () => { const page = await libraryMore(cursor); setRefs(old => [...(old ?? []), ...page.items]); setCursor(page.next); } : undefined} refs={refs} source={null} onRefsChange={setRefs} onPick={(r) => void startWithHook(r)} onClear={() => undefined} />
+          <SourcePicker onLoadMore={cursor ? async () => { const page = await libraryMore(cursor); setRefs(old => [...(old ?? []), ...page.items]); setCursor(page.next); } : undefined} refs={refs} source={null} onRefsChange={setRefs} onPick={startWithHook} onClear={() => undefined} />
         )}
         {error && <p className="mt-3 text-[13px] text-red-500">{error}</p>}
       </div>
