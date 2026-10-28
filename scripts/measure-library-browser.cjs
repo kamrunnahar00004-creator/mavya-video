@@ -12,6 +12,7 @@ async function main(){
   if(!u.pathname.startsWith('/api/'))return deliver('Fetch.continueRequest',{requestId});
   calls.push({path:u.pathname,method:request.method});let body={},code=200;
   if(u.pathname==='/api/references')body=refs;
+  else if(u.pathname==='/api/runs')body=[];
   else if(u.pathname==='/api/profile')body={email:'fixture@invalid.test',firstName:'Fixture',lastName:'User',avatar:''};
   else if(u.pathname==='/api/usage')body={plan:'starter',used:0,limit:20};
   else if(u.pathname.startsWith('/api/media/'))code=404;
@@ -35,7 +36,11 @@ async function main(){
  await evaluate(`document.querySelector('main .card').scrollTop=0;Array.from(document.querySelectorAll('[role="tab"]')).find(b=>b.textContent==='Voiceover').click()`);await sleep(150);
  const filtered=await evaluate(`({cards:document.querySelectorAll('[data-hook-index]').length,first:document.querySelector('[data-hook-index] img')?.getAttribute('src'),views:document.querySelector('[data-hook-index]').textContent})`);
  if(filtered.cards>=1000||!filtered.views.replaceAll('.0','').includes('2K'))throw Error('Filtered full-catalog sorting failed');
- const result={initial,focus,tab,end,filtered,errors,apiCalls:calls,scope:'Offline actual SourcePicker: 2000 rows, scroll/focus/tab/filter, no provider/media playback'};
+ await evaluate(`document.querySelector('a[href="/studio"]').click()`);
+ let restored=null;
+ for(let i=0;i<100;i++){await sleep(100);restored=await evaluate(`(()=>{const content=document.querySelector('[data-route-content]');return {path:location.pathname,inert:content?.inert,visibility:content?getComputedStyle(content).contentVisibility:null}})()`).catch(()=>null);if(restored?.path==='/studio'&&!restored.inert&&restored.visibility==='visible')break;}
+ if(restored?.path!=='/studio'||restored.inert||restored.visibility!=='visible')throw Error('Destination stayed hidden/inert');
+ const result={initial,focus,tab,end,filtered,restored,errors,apiCalls:calls,scope:'Offline actual SourcePicker: 2000 rows, scroll/focus/tab/filter, no provider/media playback'};
  fs.writeFileSync(process.argv[2],JSON.stringify(result,null,2));console.log(JSON.stringify(result));
  await send('Page.navigate',{url:'about:blank'});await sleep(100);await send('Fetch.disable');ws.close();if(errors.length)process.exitCode=1;
 }
