@@ -1,6 +1,6 @@
 import "server-only";
 import { cloud } from "@/lib/server/store";
-import { createSupabaseAdminClient, getClaimsUser } from "@/lib/supabase/server";
+import { createSupabaseAdminClient, getSessionUser } from "@/lib/supabase/server";
 import type { BillingCycle, PlanId } from "@/lib/plans";
 
 export type Allowance = { plan: PlanId | null; admin: boolean; used: number; limit: number | null; resetsAt: string | null };
@@ -10,7 +10,7 @@ export type Allowance = { plan: PlanId | null; admin: boolean; used: number; lim
  * confirmed, so anyone could register an unused admin address (Codex A0).
  */
 export async function adminUser(who: string): Promise<boolean> {
-  const user = await getClaimsUser();
+  const user = await getSessionUser();
   return user?.id === who && (process.env.ADMIN_USER_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean).includes(who);
 }
 
