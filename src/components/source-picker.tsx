@@ -1,6 +1,6 @@
 "use client";
 import { MediaVideo } from "@/components/media-video";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Eye, Heart, Link as LinkIcon, Loader2, Upload, X } from "lucide-react";
 import { analyzeVideo } from "@/lib/analyze";
 import { uploadFile } from "@/lib/client";
@@ -34,12 +34,22 @@ export function SourcePicker({ refs, source, onRefsChange, onPick, onClear, onLo
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<Reference | null>(null);
 
+  // Pending hooks (not yet fit-checked) are hidden from users; the curator sees them tagged.
+  // Dropped hooks stay in the data (training labels) but never show.
+  const library = useMemo(() => refs.filter((r) => (r.owner ?? "curated") === "curated" && (r.mediaId || r.sourceUrl) && (!r.pending || CURATOR) && r.review?.verdict !== "drop"), [refs]);
+  const list = useMemo(() => [...library].filter((r) => (style === "all" || r.ai?.style === style)).sort((a, b) => {
+    const x = sortValue(a, sort);
+    const y = sortValue(b, sort);
+    return typeof x === "number" && typeof y === "number" ? y - x : String(y).localeCompare(String(x));
+  }), [library, style, sort]);
+
+
   /** `isNew`: a just-uploaded video that isn't in `refs` yet. */
   async function pick(r: Reference, isNew = false) {
     setError(null);
     setBusyId(r.id);
     try {
-      if (r.analysis || !r.mediaId) { await onPick(r); return; }
+      if (r.partial || r.analysis || !r.mediaId) { await onPick(r); return; }
       const analysis = await analyzeVideo(`/api/media/${r.mediaId}`);
       const response = await fetch(`/api/references/${r.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ analysis }) });
       if (!response.ok) throw Error("Could not save the hook. Try again.");
@@ -81,14 +91,6 @@ export function SourcePicker({ refs, source, onRefsChange, onPick, onClear, onLo
     );
   }
 
-  // Pending hooks (not yet fit-checked) are hidden from users; the curator sees them tagged.
-  // Dropped hooks stay in the data (training labels) but never show.
-  const library = refs.filter((r) => (r.owner ?? "curated") === "curated" && (r.mediaId || r.sourceUrl) && (!r.pending || CURATOR) && r.review?.verdict !== "drop");
-  const list = [...library].filter((r) => (style === "all" || r.ai?.style === style)).sort((a, b) => {
-    const x = sortValue(a, sort);
-    const y = sortValue(b, sort);
-    return typeof x === "number" && typeof y === "number" ? y - x : String(y).localeCompare(String(x));
-  });
 
   return (
     <div className="space-y-4">
@@ -115,11 +117,7 @@ export function SourcePicker({ refs, source, onRefsChange, onPick, onClear, onLo
       {library.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line-strong bg-panel py-12 text-center text-[14px] text-muted">New hooks are on the way.</div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-3">
-          {list.map((r) => (
-            <HookCard key={r.id} r={r} busy={busyId === r.id} disabled={busyId !== null} onPick={() => (!r.mediaId && embedUrl(r) ? setPreview(r) : void pick(r))} />
-          ))}
-        </div>
+        <ProgressiveHooks key={sort + ":" + style} list={list} busyId={busyId} onPick={r => (!r.mediaId && embedUrl(r) ? setPreview(r) : void pick(r))} />
       )}
       {onLoadMore && <button type="button" disabled={loadingMore} className="btn-secondary px-4 py-2" onClick={async () => { setLoadingMore(true); try { await onLoadMore(); } catch { setError("List is unavailable. Try again."); } finally { setLoadingMore(false); } }}>Load more</button>}
       {error && <p className="text-[13px] text-red-500">{error}</p>}
@@ -136,6 +134,32 @@ export function SourcePicker({ refs, source, onRefsChange, onPick, onClear, onLo
 
     </div>
   );
+}
+
+/** Keep the full sorted catalog, but mount cards in small batches ahead of scroll/focus.
+ * This preserves ordinary tab order and card geometry without a new pagination control.
+ */
+function ProgressiveHooks({ list, busyId, onPick }: { list: Reference[]; busyId: string | null; onPick: (ref: Reference) => void }) {
+  const [shown, setShown] = useState(48);
+  const sentinel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = sentinel.current;
+    if (!node || shown >= list.length) return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) setShown(count => Math.min(count + 48, list.length));
+    }, { rootMargin: "600px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [shown, list.length]);
+  return <>
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-3" onFocusCapture={event => {
+      const index = Number((event.target as HTMLElement).closest("[data-hook-index]")?.getAttribute("data-hook-index"));
+      if (Number.isFinite(index) && index >= shown - 16) setShown(count => Math.min(count + 48, list.length));
+    }}>
+      {list.slice(0, shown).map((ref, index) => <HookCard key={ref.id} index={index} r={ref} busy={busyId === ref.id} disabled={busyId !== null} onPick={() => onPick(ref)} />)}
+    </div>
+    {shown < list.length && <div ref={sentinel} aria-hidden="true" className="h-px" />}
+  </>;
 }
 
 function SortMenu({ value, onChange }: { value: Sort; onChange: (s: Sort) => void }) {
@@ -183,13 +207,15 @@ function SortMenu({ value, onChange }: { value: Sort; onChange: (s: Sort) => voi
   );
 }
 
-function HookCard({ r, busy, disabled, onPick }: { r: Reference; busy: boolean; disabled: boolean; onPick: () => void }) {
+function HookCard({ r, busy, disabled, onPick, index }: { index: number; r: Reference; busy: boolean; disabled: boolean; onPick: () => void }) {
   const [hover, setHover] = useState(false);
   return (
     <button
       type="button"
       onClick={onPick}
       disabled={disabled}
+      data-hook-index={index}
+      style={{ contentVisibility: "auto" }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       className="group relative aspect-[9/16] overflow-hidden rounded-xl bg-ink text-left outline-2 outline-offset-2 outline-transparent transition-[outline-color] hover:outline-accent disabled:opacity-60"
