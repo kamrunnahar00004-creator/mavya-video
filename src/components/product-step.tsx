@@ -129,8 +129,8 @@ export function ScriptCard({ runId, script, hookText, writing = false, onDone, o
 
   if (!script) {
     return (
-      <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel p-4">
-        <p className="min-w-0 flex-1 text-[14.5px] font-bold">Your script</p>
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel p-4">
+        <p className="min-w-0 flex-1 text-[14.5px] font-bold">Hook text</p>
         <button type="button" onClick={() => void write()} disabled={busy} className="btn-primary px-4 py-2.5 text-[14px] disabled:opacity-60">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
           {busy ? "Writing..." : "Write my script"}
@@ -140,47 +140,35 @@ export function ScriptCard({ runId, script, hookText, writing = false, onDone, o
     );
   }
 
+  // Only the hook text options: the character's beats are copied from the original clip, nothing to act on here.
   const lines = [script.hookText, ...script.hookAlternatives].filter(Boolean);
   return (
-    <div className="mt-3 rounded-2xl border border-line bg-panel p-4">
+    <div className="rounded-2xl border border-line bg-panel p-4">
       <div className="flex items-center gap-3">
-        <p className="min-w-0 flex-1 text-[14.5px] font-bold">Your script</p>
-        <button type="button" onClick={() => void write()} disabled={busy} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-bold text-accent hover:bg-accent-tint disabled:opacity-60">
+        <p className="min-w-0 flex-1 text-[14.5px] font-bold">Hook text</p>
+        <button type="button" onClick={() => void write()} disabled={busy} className="-my-1 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-bold text-accent hover:bg-accent-tint disabled:opacity-60">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           Rewrite
         </button>
       </div>
-      <p className="mt-3 text-[12.5px] font-semibold text-soft">Hook text</p>
-      <div className="mt-1.5 space-y-1.5">
+      <div role="radiogroup" aria-label="Hook text" className="-mx-2 mt-2">
         {lines.map((line) => {
           const on = line === hookText;
           return (
             <button
               key={line}
               type="button"
+              role="radio"
+              aria-checked={on}
               onClick={() => onUseHookText(line)}
-              aria-pressed={on}
-              className={`flex w-full items-start gap-2.5 rounded-lg border px-3 py-2 text-left text-[14px] font-semibold ${on ? "border-accent bg-accent-tint" : "border-line hover:border-ink"}`}
+              className={`flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-[14.5px] transition-colors ${on ? "bg-accent-tint font-semibold text-text" : "text-muted hover:bg-raised hover:text-text"}`}
             >
-              <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${on ? "border-accent bg-accent text-white" : "border-line-strong"}`}>{on && <Check className="h-3 w-3" strokeWidth={3} />}</span>
+              <span className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] ${on ? "border-accent bg-accent text-white" : "border-line-strong"}`}>{on && <Check className="h-3 w-3" strokeWidth={3} />}</span>
               {line}
             </button>
           );
         })}
       </div>
-      {script.hookBeats.length > 0 && (
-        <>
-          <p className="mt-4 text-[12.5px] font-semibold text-soft">In the hook</p>
-          <ol className="mt-1.5 space-y-1 text-[13.5px] text-muted">
-            {script.hookBeats.map((b, i) => (
-              <li key={i} className="flex gap-2">
-                <span className="w-16 shrink-0 tabular-nums text-soft">{b.start.toFixed(1)}-{b.end.toFixed(1)}s</span>
-                {b.action}
-              </li>
-            ))}
-          </ol>
-        </>
-      )}
       {error && <p role="alert" className="mt-2 text-[13px] font-semibold text-red-600">{error}</p>}
     </div>
   );

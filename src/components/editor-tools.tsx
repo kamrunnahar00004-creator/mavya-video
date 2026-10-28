@@ -1896,9 +1896,10 @@ export function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, 
   );
 
   if (!mode) {
+    // No box of its own: it sits under the demo script as the step's actions.
     return (
-      <div className="rounded-2xl border border-line bg-panel">
-        <div className="flex flex-wrap items-center gap-2.5 p-4">
+      <div>
+        <div className="flex flex-wrap items-center gap-2.5">
           <label className={`btn-primary cursor-pointer px-4 py-2.5 text-[14px] ${busy ? "pointer-events-none opacity-60" : ""}`}>
             {busy === "single" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
             Upload your demo
@@ -1909,7 +1910,7 @@ export function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, 
             Build it clip by clip
           </button>
         </div>
-        {error && <p className="border-t border-line px-4 py-2.5 text-[13px] font-semibold text-red-600">{error}</p>}
+        {error && <p role="alert" className="mt-2.5 text-[13px] font-semibold text-red-600">{error}</p>}
       </div>
     );
   }

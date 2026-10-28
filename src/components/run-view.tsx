@@ -2,7 +2,7 @@
 import { RouteSkeleton } from "@/components/route-skeleton";
 import { MediaVideo } from "@/components/media-video";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "@/components/pending-link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Check, ChevronDown, Film, FolderOpen, Loader2, PenLine, RefreshCw, SlidersHorizontal, Sparkles, Trash2, Upload, X } from "lucide-react";
@@ -833,7 +833,7 @@ export function RunView() {
         </div>
 
         <aside className="flex shrink-0 flex-col items-center justify-center border-l border-line bg-raised p-6 xl:min-h-0 xl:overflow-y-auto">
-          <RunPreview run={run} source={source} texts={texts} hookCover={gen.busy && !hook.generated ? <GenerateProgress photo={facePhoto} who={ch ? ch.name : "your character"} startedAt={gen.startedAt} estimate={220} /> : undefined} />
+          <RunPreview run={run} source={source} texts={texts} hookCover={gen.busy && !hook.generated ? <Suspense fallback={<span className="absolute inset-0 bg-ink" />}><GenerateProgress photo={facePhoto} who={ch ? ch.name : "your character"} startedAt={gen.startedAt} estimate={220} /></Suspense> : undefined} />
           <button
             type="button"
             onClick={() => {
@@ -851,6 +851,7 @@ export function RunView() {
       {libraryOpen && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-40 bg-black/20" onClick={() => setLibraryOpen(false)}>
           <div className="absolute bottom-3 right-3 top-3" onClick={(e) => e.stopPropagation()}>
+            <Suspense fallback={<div className="shimmer h-full w-[420px] max-w-[calc(100vw-24px)] rounded-2xl" />}>
             <HistoryPanel
               run={run}
               refs={refs}
@@ -902,6 +903,7 @@ export function RunView() {
                 setToast("Sound replaced");
               }}
             />
+            </Suspense>
           </div>
         </div>
       )}
@@ -1466,7 +1468,13 @@ function Block({ n, title, done, pending = false, children, open = true, summary
         {!open && summary && <span className="min-w-0 truncate text-[13.5px] text-muted">{summary}</span>}
         <ChevronDown className={`ml-auto h-4 w-4 shrink-0 text-soft transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {seen && <div hidden={!open} className="space-y-4">{children}</div>}
+      {/* Its own Suspense: a step's on-demand code (editor, demo, sound) must never fall back to the route's loading.tsx,
+          which swaps the whole page for a skeleton. */}
+      {seen && (
+        <div hidden={!open} className="space-y-4">
+          <Suspense fallback={<div className="shimmer h-48 rounded-2xl" />}>{children}</Suspense>
+        </div>
+      )}
     </section>
   );
 }
