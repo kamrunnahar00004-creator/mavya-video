@@ -4,10 +4,10 @@ import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { ffmpegPath } from "@/lib/server/ffmpeg";
 import { geminiJSON } from "@/lib/server/gemini";
 import { putObject, signedGet } from "@/lib/server/r2";
 import { libraryFile, mediaToFile } from "@/lib/server/store";
@@ -50,13 +50,7 @@ const MATCH =
 const NEGATIVE = "text, captions, subtitles, watermark, logo, cut, scene change, extra fingers, deformed hands, distorted face, morphing, exaggerated expressions, overacting";
 
 const exec = promisify(execFile);
-function ffmpegPath(): string {
-  const require = createRequire(path.join(process.cwd(), "package.json"));
-  const bin = require("ffmpeg-static") as string | null;
-  if (!bin) throw new Error("ffmpeg unavailable");
-  return bin;
-}
-const ff = (...args: string[]) => exec(ffmpegPath(), ["-nostdin", "-v", "error", "-y", ...args], { timeout: 60_000, signal: workSignal(60_000) });
+const ff = async (...args: string[]) => exec(await ffmpegPath(), ["-nostdin", "-v", "error", "-y", ...args], { timeout: 60_000, signal: workSignal(60_000) });
 
 /** A lost create response may represent paid work. Never blindly replay it or launch a fallback. */
 export class HookStartUncertain extends Error {}
@@ -294,7 +288,7 @@ async function probeSeconds(video: Buffer): Promise<number | null> {
     const file = path.join(dir, "result.mp4");
     await writeFile(file, video);
     // ffmpeg -i with no output exits non-zero; the duration is in its stderr either way.
-    const stderr = await exec(ffmpegPath(), ["-hide_banner", "-i", file], { timeout: 20_000 }).then((r) => r.stderr, (e: { stderr?: string }) => e.stderr ?? "");
+    const stderr = await exec(await ffmpegPath(), ["-hide_banner", "-i", file], { timeout: 20_000 }).then((r) => r.stderr, (e: { stderr?: string }) => e.stderr ?? "");
     const d = /Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/.exec(stderr);
     const seconds = d ? +d[1] * 3600 + +d[2] * 60 + +d[3] : 0;
     if (seconds > 0) return Math.round(seconds * 100) / 100;

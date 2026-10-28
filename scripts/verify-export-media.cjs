@@ -30,11 +30,16 @@ async function main(){
   const replies=[Response.json({status:'COMPLETED'}),Response.json({video:{url:'https://fixture.invalid/out'}}),new Response(movie)];
   const hook=load('src/lib/server/hookgen.ts',{
    '@/lib/server/work-budget':{checkBudget(){},withWorkBudget:f=>f(),workSignal:()=>AbortSignal.timeout(1000)},
-   '@/lib/supabase/server':{},'@/lib/server/gemini':{},'@/lib/server/r2':{},'@/lib/server/store':{},
+   '@/lib/supabase/server':{},'@/lib/server/gemini':{},'@/lib/server/r2':{},'@/lib/server/store':{},'@/lib/server/ffmpeg':{ffmpegPath:async()=>ff},
    ...Object.fromEntries(['child_process','crypto','fs/promises','module','os','path','util'].map(name=>['node:'+name,require('node:'+name)]))
   },{FAL_KEY:'fixture-only'},{fetch:async()=>replies.shift()});
   assert.equal(hook.mp4Seconds(movie),null);
   const measured=await hook.checkHook('fal-ai/model|fixture');assert.equal(measured.state,'done');assert.ok(Math.abs(measured.seconds-2)<0.05);
+  // Deployed functions ship only the traced binary, not ffmpeg-static's index.js: resolve by file path, never require().
+  const binary=load('src/lib/server/ffmpeg.ts',Object.fromEntries(['fs','fs/promises','os','path'].map(name=>['node:'+name,require('node:'+name)])));
+  const resolved=await binary.ffmpegPath();assert.ok(/node_modules[\\/]ffmpeg-static[\\/]ffmpeg(\.exe)?$/.test(resolved),resolved);
+  assert.match(execFileSync(resolved,['-version']).toString(),/^ffmpeg version/);
+  for(const file of ['src/lib/server/hookgen.ts','src/lib/server/source-audio.ts'])assert.ok(!fs.readFileSync(file,'utf8').includes('ffmpeg-static'),`${file} must use lib/server/ffmpeg`);
   console.log('PASS: real silent offline 720p ffmpeg export, 30.30fps piece boundary, start/end overlays, inactive intervals and two-second audio');
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 }

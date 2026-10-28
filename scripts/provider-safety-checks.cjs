@@ -5,7 +5,7 @@ async function main(){
   '@/lib/server/work-budget':{checkBudget(){},withWorkBudget:f=>f(),workSignal:()=>AbortSignal.timeout(1000)},
   'node:child_process':{execFile(){}},'node:crypto':require('node:crypto'),'node:fs/promises':{mkdtemp:async()=>'/fixture',rm:async()=>{}},'node:module':require('node:module'),'node:os':require('node:os'),'node:path':require('node:path'),'node:util':require('node:util'),
   '@/lib/server/gemini':{},'@/lib/server/r2':{},'@/lib/server/store':{}
-  ,'@/lib/supabase/server':{}
+  ,'@/lib/supabase/server':{},'@/lib/server/ffmpeg':{ffmpegPath:async()=>'/fixture/ffmpeg'}
  };
  const api=load('src/lib/server/hookgen.ts',stubs,{FAL_KEY:'fixture-only'},{fetch:async()=>replies.shift()});
  let sent=0;
@@ -38,7 +38,7 @@ async function main(){
  }
  let probeText='Duration: 00:00:07.25',probes=0,cleaned=0;
  const probeApi=load('src/lib/server/hookgen.ts',{
-  ...stubs,'node:module':{createRequire:()=>()=>'/fixture/ffmpeg'},
+  ...stubs,
   'node:child_process':{execFile(_bin,_args,options,cb){probes++;assert.equal(options.timeout,20000);cb(Object.assign(Error('probe exits without output'),{stderr:probeText}));}},
   'node:fs/promises':{mkdtemp:async()=>'/fixture/probe',writeFile:async()=>{},rm:async()=>{cleaned++;}}
  },{FAL_KEY:'fixture-only'},{fetch:async()=>replies.shift()});
