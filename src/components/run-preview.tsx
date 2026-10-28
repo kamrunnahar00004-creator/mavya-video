@@ -23,7 +23,8 @@ export function RunPreview({ run, source, texts }: { run: Run; source: Reference
   const total = videoLength(segs);
 
   const [t, setT] = useState(0);
-  const [playing, setPlaying] = useState(true);
+  // Starts paused: the preview plays only when the seller presses play.
+  const [playing, setPlaying] = useState(false);
   usePlaybackClaims("phone", setPlaying);
 
   // One clock for the whole preview; loops.
