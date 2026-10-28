@@ -413,11 +413,14 @@ export function UploadDrop({ onAdded }: { onAdded: (r: Reference) => void }) {
 }
 
 export function Thumb({ r, className }: { r: Reference; className?: string }) {
-  const thumb = r.analysis?.segments[0]?.thumb ?? r.thumbUrl;
+  const original = r.analysis?.segments[0]?.thumb ?? r.thumbUrl;
+  // The small cover first; if its link fails (expired, missing), fall back to the full thumbnail.
+  const [coverFailed, setCoverFailed] = useState(false);
+  const thumb = r.coverUrl && !coverFailed ? r.coverUrl : original;
   if (thumb)
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={thumb} alt="" loading="lazy" decoding="async" className={`object-cover ${className ?? ""}`} />
+      <img src={thumb} alt="" loading="lazy" decoding="async" onError={thumb === r.coverUrl ? () => setCoverFailed(true) : undefined} className={`object-cover ${className ?? ""}`} />
     );
   if (r.mediaId) return <MediaVideo src={`/api/media/${r.mediaId}#t=0.5`} muted preload="metadata" className={`object-cover ${className ?? ""}`} />;
   return (

@@ -41,6 +41,10 @@ export type Reference = {
   hookStyle?: string;
   /** Thumbnail from the platform's official oEmbed, for link references. */
   thumbUrl?: string;
+  /** A small WebP card cover exists in R2 (server-side flag). */
+  smallCover?: boolean;
+  /** Signed link to that cover, added by list responses. */
+  coverUrl?: string;
   author?: string;
   likes?: number | null;
   comments?: number | null;

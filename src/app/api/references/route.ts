@@ -1,5 +1,6 @@
 import { listPage, pageResponse, listError } from "@/lib/server/list-pages";
-import { connection } from "next/server";
+import { after, connection } from "next/server";
+import { fillCovers } from "@/lib/server/covers";
 import { createReference, mediaAccess } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { HOOK_STYLES, NICHES } from "@/lib/taxonomy";
@@ -14,6 +15,7 @@ export async function GET(request: Request) {
   if (!who) return signInFirst();
   try {
   const page = await listPage("references", who, request);
+  if (page.missingCovers.length) after(() => fillCovers(page.missingCovers));
   const refs = page.items as import("@/lib/types").Reference[];
   const view = new URL(request.url).searchParams.get("view");
   const respond = (items: unknown[]) => {
@@ -28,7 +30,7 @@ export async function GET(request: Request) {
   if (view === "covers") return respond(refs.map((r) => ({ id: r.id, thumbUrl: r.analysis?.segments[0]?.thumb ?? r.thumbUrl })));
   if (view === "studio") {
     // Curation history and model explanations never appear in the studio.
-    const keys = ["id", "title", "platform", "sourceUrl", "views", "mediaId", "mime", "createdAt", "analysis", "owner", "niche", "hookStyle", "thumbUrl", "author", "likes", "comments", "caption", "summary", "recipe", "postedAt", "pending", "review", "followers"] as const;
+    const keys = ["id", "title", "platform", "sourceUrl", "views", "mediaId", "mime", "createdAt", "analysis", "owner", "niche", "hookStyle", "thumbUrl", "author", "likes", "comments", "caption", "summary", "recipe", "postedAt", "pending", "review", "followers", "coverUrl"] as const;
     return respond(refs.map((r) => ({ ...Object.fromEntries(keys.map((k) => [k, r[k]])), ai: r.ai ? { style: r.ai.style } : undefined })));
   }
   return respond(refs);

@@ -1,6 +1,7 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { cloud, listAssets, listReferences, listRuns } from "@/lib/server/store";
+import { coverLinks } from "@/lib/server/covers";
 import type { Asset, Reference, Run } from "@/lib/types";
 
 export const PAGE_SIZE = 24;
@@ -19,7 +20,7 @@ const token = (at: string, id: string) => Buffer.from(JSON.stringify({ at, id })
 export async function listPage(kind: Kind, who: string, request: Request) {
   const curatedOnly = kind === "references" && new URL(request.url).searchParams.get("scope") === "curated";
   const refSummary = kind === "references" && new URL(request.url).searchParams.get("view") === "studio";
-  const refKeys = ["title", "platform", "sourceUrl", "views", "mediaId", "mime", "analysis", "niche", "hookStyle", "thumbUrl", "author", "likes", "comments", "caption", "summary", "recipe", "postedAt", "pending", "review", "followers"];
+  const refKeys = ["title", "platform", "sourceUrl", "views", "mediaId", "mime", "analysis", "niche", "hookStyle", "thumbUrl", "author", "likes", "comments", "caption", "summary", "recipe", "postedAt", "pending", "review", "followers", "smallCover"];
   const summary = kind === "runs" && new URL(request.url).searchParams.get("view") === "summary";
   const after = cursor(new URL(request.url).searchParams.get("cursor"));
   const table = kind === "references" ? "library" : kind;
@@ -68,6 +69,14 @@ export async function listPage(kind: Kind, who: string, request: Request) {
     }
     items = items.map(value => ({ ...value, cover: covers.get((value as Run).sourceRefId ?? "") }));
   }
+  let missingCovers: Reference[] = [];
+  if (kind === "references" && cloud()) {
+    // Small WebP cards straight from R2; references without one yet keep their thumbnail and get one in the background.
+    const refs = items as Reference[];
+    const links = await coverLinks(refs);
+    items = refs.map(ref => links.has(ref.id) ? { ...ref, coverUrl: links.get(ref.id) } : ref);
+    missingCovers = refs.filter(ref => !ref.smallCover);
+  }
   if (kind === "references") {
   const imageURL = "/api/references/thumbnails?ids=" + items.map(value => (value as Reference).id).join(",");
   items = items.map((value, tile) => {
@@ -75,7 +84,7 @@ export async function listPage(kind: Kind, who: string, request: Request) {
     return { ...ref, thumbUrl: ref.thumbUrl?.startsWith("data:") ? `${imageURL}&segment=0#svgView(viewBox(0,${tile * 320},180,320))` : ref.thumbUrl, analysis: ref.analysis ? { ...ref.analysis, segments: ref.analysis.segments.map((seg, index) => ({ ...seg, thumb: seg.thumb?.startsWith("data:") ? `${imageURL}&segment=${index}#svgView(viewBox(0,${tile * 320},180,320))` : seg.thumb })) } : ref.analysis };
   });
   }
-  return { items, next };
+  return { items, next, missingCovers };
 }
 export function pageResponse(items: unknown[], next: string | null) {
   return Response.json(items, { headers: { "Cache-Control": "private, no-store", ...(next ? { "X-Next-Cursor": next } : {}) } });

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
 import { fetchPage } from "@/lib/list-client";
 import { patchRun } from "@/lib/client";
 import type { Reference, Run } from "@/lib/types";
@@ -46,8 +45,9 @@ export function LibraryView() {
       </header>
       <div className="mx-auto max-w-[1100px] p-6">
         {refs === null ? (
-          <div className="flex h-64 items-center justify-center text-soft">
-            <Loader2 className="h-5 w-5 animate-spin" />
+          // Card-shaped placeholders in the same grid as the hooks, so the page has its shape at once.
+          <div aria-busy="true" aria-label="Loading hooks" className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-3">
+            {Array.from({ length: 12 }, (_, i) => <div key={i} className="aspect-[9/16] animate-pulse rounded-xl bg-raised" />)}
           </div>
         ) : (
           <SourcePicker onLoadMore={cursor ? async () => { const page = await fetchPage<Reference>("/api/references?view=studio&scope=curated", cursor); setRefs(old => [...(old ?? []), ...page.items]); setCursor(page.next); } : undefined} refs={refs} source={null} onRefsChange={setRefs} onPick={(r) => void startWithHook(r)} onClear={() => undefined} />

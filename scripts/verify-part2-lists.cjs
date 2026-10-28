@@ -6,7 +6,7 @@ const runs=Array.from({length:1011},(_,i)=>({id:id(i),createdAt:at,updatedAt:at,
 const assets=Array.from({length:2011},(_,i)=>({mediaId:id(i)+'.mp4',createdAt:at,name:'fixture',kind:'video'}));
 let cloud=false, calls=[];
 const chain={select(v){calls.push(['select',v]);return this;},eq(k,v){calls.push(['eq',k,v]);return this;},or(v){calls.push(['or',v]);return this;},order(k,v){calls.push(['order',k,v]);return this;},limit(n){calls.push(['limit',n]);return Promise.resolve({data:[],error:null});}};
-const api=load('src/lib/server/list-pages.ts',{'@/lib/supabase/server':{createSupabaseAdminClient:()=>({from:()=>chain})},'@/lib/server/store':{cloud:()=>cloud,listReferences:async()=>refs,listRuns:async()=>runs,listAssets:async()=>assets}});
+const api=load('src/lib/server/list-pages.ts',{'@/lib/supabase/server':{createSupabaseAdminClient:()=>({from:()=>chain})},'@/lib/server/covers':{coverLinks:async()=>new Map()},'@/lib/server/store':{cloud:()=>cloud,listReferences:async()=>refs,listRuns:async()=>runs,listAssets:async()=>assets}});
 async function all(kind, values, key) {
  let cursor=null,seen=[];
  do {const page=await api.listPage(kind,'owner',new Request('http://fixture/api/'+kind+(cursor?'?cursor='+encodeURIComponent(cursor):'')));assert.ok(page.items.length<=24);seen.push(...page.items.map(v=>v[key]));cursor=page.next;}while(cursor);
