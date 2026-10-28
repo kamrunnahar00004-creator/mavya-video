@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { usePathname } from "next/navigation";
 import { RouteSkeleton } from "@/components/route-skeleton";
@@ -24,6 +24,14 @@ export function NavigationFeedback() {
     };
   }, [pathname]);
   useEffect(() => { queueMicrotask(() => setTarget(null)); }, [pathname]);
+  useLayoutEffect(() => {
+    if (!target || target.from !== pathname) return;
+    const content = document.querySelector<HTMLElement>("[data-route-content]");
+    if (!content) return;
+    const wasInert = content.inert;
+    content.inert = true;
+    return () => { content.inert = wasInert; };
+  }, [target, pathname]);
   useEffect(() => {
     if (!target) return;
     const timer = setTimeout(() => setExpired(target), 15_000);

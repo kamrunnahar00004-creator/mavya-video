@@ -11,7 +11,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <SidebarBody />
         </Suspense>
       </aside>
-      <main className="relative min-w-0 flex-1">{children}<Suspense fallback={null}><NavigationFeedback /></Suspense></main>
+      <main className="relative min-w-0 flex-1"><div data-route-content className="h-full">{children}</div><Suspense fallback={null}><NavigationFeedback /></Suspense></main>
     </div>
   );
 }
