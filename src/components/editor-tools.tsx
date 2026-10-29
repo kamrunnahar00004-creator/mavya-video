@@ -1809,9 +1809,8 @@ function VolumeButton({ value, onChange }: { value: number; onChange: (v: number
 /** Real songs (top chart by default, or search), each a 30-second clip of the song: ▶ to listen, Use to pick. */
 
 
-/** How to film one demo clip: camera setup, steps in order, and the text that goes on screen over it (added on upload). */
+/** How to film one demo clip: camera setup and steps in order. Its on-screen text is not shown: it goes on with the upload. */
 function ShotBrief({ clip }: { clip: DemoClip }) {
-  const captions = (clip.text ?? "").split(/\s+\/\s+/).map((t) => t.trim()).filter(Boolean);
   return (
     <div className="space-y-1.5 pb-4 pl-[62px] pr-4">
       {clip.camera && (
@@ -1830,14 +1829,6 @@ function ShotBrief({ clip }: { clip: DemoClip }) {
           ))}
         </ol>
       ) : null}
-      {captions.length > 0 && (
-        <div className="flex items-start gap-2 text-[13px] leading-snug">
-          <Type className="mt-0.5 h-3.5 w-3.5 shrink-0 text-soft" />
-          <span className="flex min-w-0 flex-wrap gap-x-3 italic text-muted">
-            {captions.map((t, i) => <span key={i}>&ldquo;{t}&rdquo;</span>)}
-          </span>
-        </div>
-      )}
     </div>
   );
 }
@@ -2042,7 +2033,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
               </button>
             </div>
             {/* Directions stay in view until the clip is filmed; after that they fold behind "How to film". */}
-            {!open && (!clipSrc(c) || briefId === c.id) && (c.camera || c.steps?.length || c.text) ? (
+            {!open && (!clipSrc(c) || briefId === c.id) && (c.camera || c.steps?.length) ? (
               <ShotBrief clip={c} />
             ) : null}
             {open && seg && (
