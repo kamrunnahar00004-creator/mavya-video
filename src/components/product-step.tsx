@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Globe, ListOrdered, Loader2, RefreshCw, Smartphone, Sparkles, Type } from "lucide-react";
+import { Check, Copy, Globe, Loader2, RefreshCw, Smartphone, Sparkles } from "lucide-react";
 import type { Run, VideoScript } from "@/lib/types";
 
 type AIResult = Pick<Run, "product" | "script">;
@@ -217,46 +217,28 @@ export function DemoScript({ shots }: { shots: VideoScript["shots"] }) {
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
+      {/* A storyboard: the frame shows the shot's on-screen text as it will look; beside it what to do and how to film. */}
       <ol className="px-4 pb-2">
         {lines.map((l, i) => (
-          <li key={i} className="border-t border-line py-4 first:border-t-0">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="rounded-md bg-accent-tint px-2 py-1 text-[13px] font-bold tabular-nums text-accent">{l.time}</span>
-              <h4 className="text-[15px] font-bold">{l.title}</h4>
+          <li key={i} className="flex gap-4 border-t border-line py-3.5 first:border-t-0">
+            <div aria-label={l.captions.length ? `On screen: ${l.captions.join(", ")}` : undefined} className="flex h-[136px] w-[77px] shrink-0 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl bg-ink px-2 text-center">
+              {l.captions.map((c, j) => (
+                <span key={j} className="text-[11px] font-bold leading-tight text-white [overflow-wrap:anywhere]">{c}</span>
+              ))}
             </div>
-            <dl className="mt-3 grid grid-cols-[84px_minmax(0,1fr)] gap-x-3 gap-y-2.5 text-[14px]">
+            <div className="min-w-0 pt-0.5">
+              <p className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-[12.5px] font-bold tabular-nums text-accent">{l.time}</span>
+                <span className="text-[15px] font-bold">{l.title}</span>
+              </p>
+              {l.steps.length > 0 && <p className="mt-1.5 text-[14px] leading-snug text-text">{l.steps.join(" → ")}</p>}
               {l.camera && (
-                <>
-                  <dt className="flex items-center gap-1.5 self-start pt-px text-[12.5px] font-semibold text-soft"><Smartphone className="h-3.5 w-3.5" />Camera</dt>
-                  <dd className="leading-snug text-text">{l.camera}</dd>
-                </>
+                <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-snug text-muted">
+                  <Smartphone className="mt-[3px] h-3.5 w-3.5 shrink-0" />
+                  {l.camera}
+                </p>
               )}
-              {l.steps.length > 0 && (
-                <>
-                  <dt className="flex items-center gap-1.5 self-start pt-px text-[12.5px] font-semibold text-soft"><ListOrdered className="h-3.5 w-3.5" />Steps</dt>
-                  <dd>
-                    <ol className="space-y-1.5">
-                      {l.steps.map((step, j) => (
-                        <li key={j} className="flex items-start gap-2 leading-snug text-text">
-                          <span className="mt-px flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-raised text-[11.5px] font-bold tabular-nums text-muted">{j + 1}</span>
-                          {step}
-                        </li>
-                      ))}
-                    </ol>
-                  </dd>
-                </>
-              )}
-              {l.captions.length > 0 && (
-                <>
-                  <dt className="flex items-center gap-1.5 self-start pt-1 text-[12.5px] font-semibold text-soft"><Type className="h-3.5 w-3.5" />On screen</dt>
-                  <dd className="flex flex-wrap gap-1.5">
-                    {l.captions.map((c, j) => (
-                      <span key={j} className="rounded-md bg-ink px-2 py-1.5 text-[13px] font-semibold leading-none text-white">{c}</span>
-                    ))}
-                  </dd>
-                </>
-              )}
-            </dl>
+            </div>
           </li>
         ))}
       </ol>
