@@ -181,7 +181,7 @@ export function DemoScript({ script }: { script: VideoScript }) {
                 {r.captions.length > 0 && (
                   <p className="mt-1.5 flex gap-2.5 text-[13.5px] leading-snug">
                     <span className="shrink-0 text-soft">On screen</span>
-                    <span className="flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 font-semibold text-accent">
+                    <span className="flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 italic text-muted">
                       {r.captions.map((c, j) => <span key={j}>&ldquo;{c}&rdquo;</span>)}
                     </span>
                   </p>
