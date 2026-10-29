@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronDown, Copy, Globe, Loader2, Sparkles } from "lucide-react";
+import { Check, Copy, Globe, Loader2, Sparkles } from "lucide-react";
 import type { Run, VideoScript } from "@/lib/types";
 
 
@@ -114,94 +114,75 @@ export function ProductStep({ product, reading, error, failedUrl, onAnalyze }: {
   );
 }
 
-const sec = (n: number) => String(Math.round(n * 10) / 10);
+const clock = (n: number) => {
+  const s = Math.round(n);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
 const sentence = (s: string) => {
   const t = s.trim().replace(/[.\s]+$/, "");
   return t ? `${t.charAt(0).toUpperCase()}${t.slice(1)}.` : "";
 };
-
-/** One collapsible row, same pattern as the step headers: label, a quiet summary when closed, a chevron. */
-function ScriptRow({ label, summary, open, onToggle, nested = false, children }: { label: string; summary?: string; open: boolean; onToggle: () => void; nested?: boolean; children: React.ReactNode }) {
-  return (
-    <div>
-      <button type="button" onClick={onToggle} aria-expanded={open} className={`flex w-full items-center gap-3 text-left ${nested ? "py-2.5" : "py-3"}`}>
-        <span className={`shrink-0 tabular-nums ${nested ? "text-[14px] font-semibold" : "text-[15px] font-bold"}`}>{label}</span>
-        {!open && summary && <span className="min-w-0 truncate text-[13.5px] text-muted">{summary}</span>}
-        <ChevronDown className={`ml-auto h-4 w-4 shrink-0 text-soft transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && children}
-    </div>
-  );
-}
-
-/** What happens and what is written on screen, the two things to know for a part of the video. */
-function Beat({ action, text }: { action: string; text?: string }) {
-  return (
-    <dl className="grid grid-cols-[112px_minmax(0,1fr)] gap-x-3 gap-y-1.5 pb-3 text-[14px] leading-snug">
-      <dt className="text-soft">Action</dt>
-      <dd>{action}</dd>
-      {text && (
-        <>
-          <dt className="text-soft">Text on screen</dt>
-          <dd className="font-semibold">{text}</dd>
-        </>
-      )}
-    </dl>
-  );
-}
+const captionsOf = (text: string) => text.split(/\s+\/\s+/).map((t) => t.trim()).filter(Boolean);
 
 /**
- * The script, folded like the steps: Hook (what the creator does, its text) and Demo (each action with its seconds
- * and its text, each one opening on its own). Copy gives the whole thing as plain text.
+ * The script as one flat timeline: start time, the hook or the action number, what to do, then the on-screen text
+ * (each caption its own quote). No nesting, no labels repeated per row; a long hook action folds to two lines.
  */
-export function DemoScript({ name, script }: { name: string; script: VideoScript }) {
+export function DemoScript({ script }: { script: VideoScript }) {
   const [copied, setCopied] = useState(false);
-  const [open, setOpen] = useState<{ hook: boolean; demo: boolean; action: number | null }>({ hook: false, demo: false, action: null });
+  const [hookOpen, setHookOpen] = useState(false);
   const hookEnd = Math.max(0, ...script.hookBeats.map((b) => b.end));
-  const hookDoes = script.hookBeats.map((b) => sentence(b.action)).filter(Boolean).join(" ");
-  const actions = script.shots.map((s, i) => {
-    const from = hookEnd + script.shots.slice(0, i).reduce((sum, x) => sum + x.seconds, 0);
-    return { label: `Action ${i + 1} (${sec(from)}-${sec(from + s.seconds)}s)`, title: s.label, does: sentence(s.hint || s.steps.map((x, j) => (j ? x.charAt(0).toLowerCase() + x.slice(1) : x)).join(", then ") || s.label), text: s.text };
-  });
-  const end = hookEnd + script.shots.reduce((sum, s) => sum + s.seconds, 0);
-  const title = `${name} (about ${Math.round(end)}s)`;
-  const hookLabel = `Hook (0-${sec(hookEnd)}s)`;
+  const rows = [
+    ...(hookEnd > 0 ? [{ at: 0, mark: "Hook", does: script.hookBeats.map((b) => sentence(b.action)).filter(Boolean).join(" "), captions: script.hookText ? [script.hookText] : [] }] : []),
+    ...script.shots.map((s, i) => ({
+      at: hookEnd + script.shots.slice(0, i).reduce((sum, x) => sum + x.seconds, 0),
+      mark: String(i + 1),
+      does: sentence(s.hint || s.steps.map((x, j) => (j ? x.charAt(0).toLowerCase() + x.slice(1) : x)).join(", then ") || s.label),
+      captions: captionsOf(s.text),
+    })),
+  ];
+  const total = Math.round(hookEnd + script.shots.reduce((sum, s) => sum + s.seconds, 0));
   const copy = () => {
-    const text = [
-      title,
-      hookEnd ? `${hookLabel}\nAction: ${hookDoes}${script.hookText ? `\nText on screen: ${script.hookText}` : ""}` : "",
-      `Demo (${sec(hookEnd)}-${sec(end)}s)`,
-      ...actions.map((a) => `${a.label}\nAction: ${a.does}${a.text ? `\nText on screen: ${a.text}` : ""}`),
-    ].filter(Boolean).join("\n\n");
+    const text = [`Script (${total}s)`, ...rows.map((r) => `${clock(r.at)}  ${r.mark === "Hook" ? "Hook" : `Action ${r.mark}`}: ${r.does}${r.captions.length ? `\n      On screen: ${r.captions.map((c) => `"${c}"`).join("  ")}` : ""}`)].join("\n");
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     }, () => undefined);
   };
   return (
-    <section aria-label="Script" className="rounded-2xl border border-line bg-panel px-4 pt-1.5">
-      <div className="flex items-center gap-2 py-2">
-        <h3 className="min-w-0 flex-1 text-[13px] font-semibold text-soft">{title}</h3>
+    <section aria-label="Script" className="pt-1">
+      <div className="flex items-center gap-2 pb-1">
+        <h3 className="min-w-0 flex-1 text-[13px] font-semibold text-soft">Script · {total}s</h3>
         <button type="button" onClick={copy} aria-label="Copy script" title="Copy script" className="rounded-lg p-1.5 text-muted hover:bg-raised hover:text-text">
           {copied ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4" />}
         </button>
       </div>
-      <div className="divide-y divide-line border-t border-line">
-        {hookEnd > 0 && (
-          <ScriptRow label={hookLabel} summary={script.hookText} open={open.hook} onToggle={() => setOpen((o) => ({ ...o, hook: !o.hook }))}>
-            <Beat action={hookDoes} text={script.hookText} />
-          </ScriptRow>
-        )}
-        <ScriptRow label={`Demo (${sec(hookEnd)}-${sec(end)}s)`} summary={`${actions.length} actions`} open={open.demo} onToggle={() => setOpen((o) => ({ ...o, demo: !o.demo }))}>
-          <div className="mb-2 divide-y divide-line rounded-xl bg-raised px-3">
-            {actions.map((a, i) => (
-              <ScriptRow key={i} nested label={a.label} summary={a.title} open={open.action === i} onToggle={() => setOpen((o) => ({ ...o, action: o.action === i ? null : i }))}>
-                <Beat action={a.does} text={a.text} />
-              </ScriptRow>
-            ))}
-          </div>
-        </ScriptRow>
-      </div>
+      <ol className="divide-y divide-line border-y border-line">
+        {rows.map((r, i) => {
+          const hook = r.mark === "Hook";
+          const long = hook && r.does.length > 120;
+          return (
+            <li key={i} className="grid grid-cols-[40px_44px_minmax(0,1fr)] items-baseline gap-x-2 py-3">
+              <span className="text-[13px] tabular-nums text-soft">{clock(r.at)}</span>
+              <span className={hook ? "w-fit rounded bg-accent-tint px-1.5 py-px text-[10.5px] font-bold uppercase tracking-wide text-accent" : "text-[13px] font-semibold tabular-nums text-soft"}>{r.mark}</span>
+              <div className="min-w-0">
+                {long ? (
+                  <button type="button" onClick={() => setHookOpen((o) => !o)} aria-expanded={hookOpen} className={`w-full text-left text-[14.5px] leading-snug text-text ${hookOpen ? "" : "line-clamp-2"}`}>
+                    {r.does}
+                  </button>
+                ) : (
+                  <p className="text-[14.5px] leading-snug text-text">{r.does}</p>
+                )}
+                {r.captions.length > 0 && (
+                  <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[14px] font-semibold leading-snug text-text">
+                    {r.captions.map((c, j) => <span key={j}>&ldquo;{c}&rdquo;</span>)}
+                  </p>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
     </section>
   );
 }

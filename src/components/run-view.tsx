@@ -672,12 +672,12 @@ export function RunView() {
               <ProductStep key={job?.error ? `failed:${job.url}` : "product"} product={run.product ?? null} reading={productReading} error={job?.error ?? null} failedUrl={job?.error ? job.url : undefined} onAnalyze={analyzeProduct} />
               {/* The script lives with the product it films (founder 2026-10-28), written once a clip is picked. */}
               {planningHere ? (
-                <div role="status" aria-label="Writing your script" className="space-y-2.5 rounded-xl bg-raised px-4 py-3.5">
+                <div role="status" aria-label="Writing your script" className="space-y-2.5 border-y border-line py-3.5">
                   <span className="shimmer block h-4 w-40 rounded" />
                   {[0, 1, 2, 3].map((i) => <span key={i} className="shimmer block h-4 rounded" style={{ width: `${88 - i * 9}%` }} />)}
                 </div>
               ) : run.product?.brief && !productReading && run.script?.shots.length && run.script.refId === (run.sourceRefId ?? null) ? (
-                <DemoScript name={run.product.brief.name} script={run.script} />
+                <DemoScript script={run.script} />
               ) : null}
             </Block>
 
