@@ -126,11 +126,10 @@ const captionsOf = (text: string) => text.split(/\s+\/\s+/).map((t) => t.trim())
 
 /**
  * The script as one flat timeline: start time, the hook or the action number, what to do, then the on-screen text
- * (each caption its own quote). No nesting, no labels repeated per row; a long hook action folds to two lines.
+ * (each caption its own quote). No nesting, no labels repeated per row, nothing cut off.
  */
 export function DemoScript({ script }: { script: VideoScript }) {
   const [copied, setCopied] = useState(false);
-  const [hookOpen, setHookOpen] = useState(false);
   const hookEnd = Math.max(0, ...script.hookBeats.map((b) => b.end));
   const rows = [
     ...(hookEnd > 0 ? [{ at: 0, mark: "Hook", does: script.hookBeats.map((b) => sentence(b.action)).filter(Boolean).join(" "), captions: script.hookText ? [script.hookText] : [] }] : []),
@@ -160,7 +159,6 @@ export function DemoScript({ script }: { script: VideoScript }) {
       <ol className="divide-y divide-line border-y border-line">
         {rows.map((r, i) => {
           const hook = r.mark === "Hook";
-          const long = hook && r.does.length > 120;
           return (
             <li key={i} className="grid grid-cols-[40px_44px_minmax(0,1fr)] items-baseline gap-x-2 py-3">
               <span className="text-[13px] tabular-nums text-soft">{clock(r.at)}</span>
@@ -171,13 +169,7 @@ export function DemoScript({ script }: { script: VideoScript }) {
                 <span aria-hidden />
               )}
               <div className="min-w-0">
-                {long ? (
-                  <button type="button" onClick={() => setHookOpen((o) => !o)} aria-expanded={hookOpen} className={`w-full text-left text-[14.5px] leading-snug text-text ${hookOpen ? "" : "line-clamp-2"}`}>
-                    {r.does}
-                  </button>
-                ) : (
-                  <p className="text-[14.5px] leading-snug text-text">{r.does}</p>
-                )}
+                <p className="text-[14.5px] leading-snug text-text">{r.does}</p>
                 {r.captions.length > 0 && (
                   <p className="mt-1.5 flex gap-2.5 text-[13.5px] leading-snug">
                     <span className="shrink-0 text-soft">On screen</span>
