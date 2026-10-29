@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Globe, Loader2, Sparkles } from "lucide-react";
+import { Check, ChevronDown, Copy, Globe, Loader2, Sparkles } from "lucide-react";
 import type { Run, VideoScript } from "@/lib/types";
 
 
@@ -120,54 +120,88 @@ const sentence = (s: string) => {
   return t ? `${t.charAt(0).toUpperCase()}${t.slice(1)}.` : "";
 };
 
+/** One collapsible row, same pattern as the step headers: label, a quiet summary when closed, a chevron. */
+function ScriptRow({ label, summary, open, onToggle, nested = false, children }: { label: string; summary?: string; open: boolean; onToggle: () => void; nested?: boolean; children: React.ReactNode }) {
+  return (
+    <div>
+      <button type="button" onClick={onToggle} aria-expanded={open} className={`flex w-full items-center gap-3 text-left ${nested ? "py-2.5" : "py-3"}`}>
+        <span className={`shrink-0 tabular-nums ${nested ? "text-[14px] font-semibold" : "text-[15px] font-bold"}`}>{label}</span>
+        {!open && summary && <span className="min-w-0 truncate text-[13.5px] text-muted">{summary}</span>}
+        <ChevronDown className={`ml-auto h-4 w-4 shrink-0 text-soft transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
+/** What happens and what is written on screen, the two things to know for a part of the video. */
+function Beat({ action, text }: { action: string; text?: string }) {
+  return (
+    <dl className="grid grid-cols-[112px_minmax(0,1fr)] gap-x-3 gap-y-1.5 pb-3 text-[14px] leading-snug">
+      <dt className="text-soft">Action</dt>
+      <dd>{action}</dd>
+      {text && (
+        <>
+          <dt className="text-soft">Text on screen</dt>
+          <dd className="font-semibold">{text}</dd>
+        </>
+      )}
+    </dl>
+  );
+}
+
 /**
- * The whole script in the format founders write by hand: a title, the hook (what the creator does, its text), then
- * each demo action with its seconds and its on-screen text. Copy gives the same as plain text.
+ * The script, folded like the steps: Hook (what the creator does, its text) and Demo (each action with its seconds
+ * and its text, each one opening on its own). Copy gives the whole thing as plain text.
  */
 export function DemoScript({ name, script }: { name: string; script: VideoScript }) {
   const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState<{ hook: boolean; demo: boolean; action: number | null }>({ hook: false, demo: false, action: null });
   const hookEnd = Math.max(0, ...script.hookBeats.map((b) => b.end));
   const hookDoes = script.hookBeats.map((b) => sentence(b.action)).filter(Boolean).join(" ");
   const actions = script.shots.map((s, i) => {
     const from = hookEnd + script.shots.slice(0, i).reduce((sum, x) => sum + x.seconds, 0);
-    return { label: `Action ${i + 1} (${sec(from)}-${sec(from + s.seconds)}s)`, does: sentence(s.hint || s.steps.map((x, j) => (j ? x.charAt(0).toLowerCase() + x.slice(1) : x)).join(", then ") || s.label), text: s.text };
+    return { label: `Action ${i + 1} (${sec(from)}-${sec(from + s.seconds)}s)`, title: s.label, does: sentence(s.hint || s.steps.map((x, j) => (j ? x.charAt(0).toLowerCase() + x.slice(1) : x)).join(", then ") || s.label), text: s.text };
   });
-  const total = Math.round(hookEnd + script.shots.reduce((sum, s) => sum + s.seconds, 0));
-  const title = `${name} (about ${total}s)`;
+  const end = hookEnd + script.shots.reduce((sum, s) => sum + s.seconds, 0);
+  const title = `${name} (about ${Math.round(end)}s)`;
   const hookLabel = `Hook (0-${sec(hookEnd)}s)`;
   const copy = () => {
     const text = [
       title,
-      hookEnd ? `${hookLabel}: ${hookDoes}${script.hookText ? ` Text: "${script.hookText}"` : ""}` : "",
-      ...actions.map((a) => `${a.label}: ${a.does}${a.text ? ` Text: "${a.text}"` : ""}`),
-    ].filter(Boolean).join("\n");
+      hookEnd ? `${hookLabel}\nAction: ${hookDoes}${script.hookText ? `\nText on screen: ${script.hookText}` : ""}` : "",
+      `Demo (${sec(hookEnd)}-${sec(end)}s)`,
+      ...actions.map((a) => `${a.label}\nAction: ${a.does}${a.text ? `\nText on screen: ${a.text}` : ""}`),
+    ].filter(Boolean).join("\n\n");
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     }, () => undefined);
   };
   return (
-    <section aria-label="Script" className="rounded-xl bg-raised px-4 py-3.5 text-[14px] leading-relaxed text-text">
-      <div className="flex items-center gap-2">
-        <h3 className="min-w-0 flex-1 text-[16px] font-bold">{title}</h3>
-        <button type="button" onClick={copy} aria-label="Copy script" title="Copy script" className="-my-1 rounded-lg p-1.5 text-muted hover:bg-panel hover:text-text">
+    <section aria-label="Script" className="rounded-2xl border border-line bg-panel px-4 pt-1.5">
+      <div className="flex items-center gap-2 py-2">
+        <h3 className="min-w-0 flex-1 text-[13px] font-semibold text-soft">{title}</h3>
+        <button type="button" onClick={copy} aria-label="Copy script" title="Copy script" className="rounded-lg p-1.5 text-muted hover:bg-raised hover:text-text">
           {copied ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4" />}
         </button>
       </div>
-      {hookEnd > 0 && (
-        <p className="mt-1.5">
-          <strong>{hookLabel}:</strong> {hookDoes}
-          {script.hookText && <> Text: &ldquo;{script.hookText}&rdquo;</>}
-        </p>
-      )}
-      <ul className="mt-1.5 list-disc space-y-1 pl-5 marker:text-soft">
-        {actions.map((a, i) => (
-          <li key={i}>
-            <strong>{a.label}:</strong> {a.does}
-            {a.text && <> Text: &ldquo;{a.text}&rdquo;</>}
-          </li>
-        ))}
-      </ul>
+      <div className="divide-y divide-line border-t border-line">
+        {hookEnd > 0 && (
+          <ScriptRow label={hookLabel} summary={script.hookText} open={open.hook} onToggle={() => setOpen((o) => ({ ...o, hook: !o.hook }))}>
+            <Beat action={hookDoes} text={script.hookText} />
+          </ScriptRow>
+        )}
+        <ScriptRow label={`Demo (${sec(hookEnd)}-${sec(end)}s)`} summary={`${actions.length} actions`} open={open.demo} onToggle={() => setOpen((o) => ({ ...o, demo: !o.demo }))}>
+          <div className="mb-2 divide-y divide-line rounded-xl bg-raised px-3">
+            {actions.map((a, i) => (
+              <ScriptRow key={i} nested label={a.label} summary={a.title} open={open.action === i} onToggle={() => setOpen((o) => ({ ...o, action: o.action === i ? null : i }))}>
+                <Beat action={a.does} text={a.text} />
+              </ScriptRow>
+            ))}
+          </div>
+        </ScriptRow>
+      </div>
     </section>
   );
 }
