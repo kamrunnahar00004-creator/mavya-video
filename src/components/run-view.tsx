@@ -528,33 +528,23 @@ export function RunView() {
       nextTexts = nextTexts.map((t) => (t.start >= now.offset - 0.05 ? { ...t, start: round1(t.start + by), end: round1(t.end + by) } : t.end > now.offset + 0.05 && !old ? { ...t, end: round1(t.end + by) } : t));
     }
     // First video for a copied shot: its captions go on screen over it (editable like any text), one after another
-    // ("1. ... / 2. ..." = two captions, each its share of the clip), in the viral video's own caption look.
+    // ("1. ... / 2. ..." = two captions, each its share of the clip). Always the demo look (founder 2026-10-29):
+    // TikTok Sans, white with a black outline; only the position follows the viral video.
     const suggested = list.find((x) => x.id === clipId)?.text;
     if (now && !old && suggested) {
       const captions = suggested.split(/\s+\/\s+/).map((t) => t.trim()).filter(Boolean);
-      const look = viralCaptionLook();
       const each = now.len / captions.length;
-      nextTexts = [...nextTexts, ...captions.map((t, k) => {
-        const base = textOver(nextTexts, t, now.offset + k * each, each);
-        return look ? { ...base, ...look } : base;
-      })];
+      nextTexts = [...nextTexts, ...captions.map((t, k): TextLayer => ({
+        id: uid(), text: t, start: round1(now.offset + k * each), end: round1(now.offset + (k + 1) * each),
+        x: 50, y: viralCaptionY(), size: 4.6, font: DEFAULT_FONT, color: "#ffffff", style: "outline", second: "#000000",
+      }))];
     }
     save({ demo: nextRun.demo, texts: nextTexts });
   };
-  /** How the stolen video writes its demo captions (its analysis: style and position), as a text look; null if unknown. */
-  const viralCaptionLook = (): Partial<TextLayer> | null => {
-    const items = ((source?.recipe?.onScreenText ?? []) as { style?: string; position?: string }[]).slice(1).filter((x) => x.style || x.position);
-    if (!items.length) return null;
-    const style = (items[0].style ?? "").toLowerCase();
-    const position = (items[0].position ?? "").toLowerCase();
-    return {
-      x: 50,
-      y: position.includes("bottom") ? TEXT_Y.bottom : position.includes("top") ? TEXT_Y.top : TEXT_Y.center,
-      size: 4.6,
-      font: DEFAULT_FONT,
-      color: "#ffffff",
-      style: /banner|box|background|highlight|label/.test(style) ? "box" : "outline",
-    };
+  /** Where the stolen video puts its demo captions (top, center or bottom), from its analysis; center when unknown. */
+  const viralCaptionY = (): number => {
+    const position = (((source?.recipe?.onScreenText ?? []) as { position?: string }[]).slice(1).find((x) => x.position)?.position ?? "").toLowerCase();
+    return position.includes("bottom") ? TEXT_Y.bottom : position.includes("top") ? TEXT_Y.top : TEXT_Y.center;
   };
   /** "Upload your demo" with one or more videos: one = a single demo, several = clips 1..N in file-name order (IMG_001, IMG_002...).
    *  `at` = insert before this demo clip (the editor's + Clips at the playhead); default at the end. Texts from there on move later. */

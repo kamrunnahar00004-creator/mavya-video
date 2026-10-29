@@ -26,8 +26,7 @@ export function TextRow({ t, placeholder, onPatch, onAdd, onRemove, onApplyAll, 
           maxLength={160}
           onChange={(e) => onPatch({ text: e.target.value })}
           placeholder={placeholder}
-          style={{ fontFamily: fontCss(t.font) }}
-          className="min-w-0 flex-1 bg-transparent py-2 text-[14px] outline-none placeholder:text-soft"
+          className="min-w-0 flex-1 bg-transparent py-2 text-[14px] font-normal outline-none placeholder:text-soft"
         />
         {onRegenerate && (
           <span className="group/regen relative">
