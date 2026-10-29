@@ -114,58 +114,60 @@ export function ProductStep({ product, reading, error, failedUrl, onAnalyze }: {
   );
 }
 
-const sec = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
-const sentence = (steps: string[]) => {
-  const s = steps.map((x, i) => (i ? x.charAt(0).toLowerCase() + x.slice(1) : x).replace(/[.\s]+$/, "")).join(", then ");
-  return s ? `${s}.` : "";
+const sec = (n: number) => String(Math.round(n * 10) / 10);
+const sentence = (s: string) => {
+  const t = s.trim().replace(/[.\s]+$/, "");
+  return t ? `${t.charAt(0).toUpperCase()}${t.slice(1)}.` : "";
 };
 
 /**
- * The demo script, said plainly like a chat message: shot by shot, when it plays, what to do and the text that goes on
- * screen. How to hold the phone lives in the demo step's "How to film". Copy gives the same as plain text.
+ * The whole script in the format founders write by hand: a title, the hook (what the creator does, its text), then
+ * each demo action with its seconds and its on-screen text. Copy gives the same as plain text.
  */
-export function DemoScript({ shots }: { shots: VideoScript["shots"] }) {
+export function DemoScript({ name, script }: { name: string; script: VideoScript }) {
   const [copied, setCopied] = useState(false);
-  const lines = shots.map((s, i) => {
-    const from = shots.slice(0, i).reduce((sum, x) => sum + x.seconds, 0);
-    return { time: `${sec(from)} - ${sec(from + s.seconds)}s`, what: sentence(s.steps.length ? s.steps : [s.hint || s.label]), captions: s.text.split(/\s+\/\s+/).map((t) => t.trim()).filter(Boolean) };
+  const hookEnd = Math.max(0, ...script.hookBeats.map((b) => b.end));
+  const hookDoes = script.hookBeats.map((b) => sentence(b.action)).filter(Boolean).join(" ");
+  const actions = script.shots.map((s, i) => {
+    const from = hookEnd + script.shots.slice(0, i).reduce((sum, x) => sum + x.seconds, 0);
+    return { label: `Action ${i + 1} (${sec(from)}-${sec(from + s.seconds)}s)`, does: sentence(s.hint || s.steps.map((x, j) => (j ? x.charAt(0).toLowerCase() + x.slice(1) : x)).join(", then ") || s.label), text: s.text };
   });
-  const total = Math.round(shots.reduce((sum, s) => sum + s.seconds, 0));
+  const total = Math.round(hookEnd + script.shots.reduce((sum, s) => sum + s.seconds, 0));
+  const title = `${name} (about ${total}s)`;
+  const hookLabel = `Hook (0-${sec(hookEnd)}s)`;
   const copy = () => {
-    const text = lines.map((l) => `${l.time}: ${l.what}${l.captions.length ? ` On screen: ${l.captions.map((c) => `"${c}"`).join(", ")}` : ""}`).join("\n");
+    const text = [
+      title,
+      hookEnd ? `${hookLabel}: ${hookDoes}${script.hookText ? ` Text: "${script.hookText}"` : ""}` : "",
+      ...actions.map((a) => `${a.label}: ${a.does}${a.text ? ` Text: "${a.text}"` : ""}`),
+    ].filter(Boolean).join("\n");
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     }, () => undefined);
   };
   return (
-    <div className="flex gap-3">
-      <span aria-hidden className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-white">
-        <Sparkles className="h-4 w-4" />
-      </span>
-      <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md bg-raised px-4 py-3.5 text-[14.5px] leading-relaxed text-text">
-        <p>Your demo is {lines.length} shots, about {total} seconds. Film them in this order:</p>
-        <ol className="mt-3 space-y-3">
-          {lines.map((l, i) => (
-            <li key={i}>
-              <span className="mr-1.5 font-bold tabular-nums">{l.time}</span>
-              {l.what}
-              {l.captions.length > 0 && (
-                <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] text-muted">
-                  On screen:
-                  {l.captions.map((c, j) => (
-                    <span key={j} className="rounded bg-ink px-1.5 py-0.5 font-semibold text-white">{c}</span>
-                  ))}
-                </span>
-              )}
-            </li>
-          ))}
-        </ol>
-        <button type="button" onClick={copy} className="mt-3 -ml-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-[13px] font-bold text-accent hover:bg-accent-tint">
-          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-          {copied ? "Copied" : "Copy script"}
+    <section aria-label="Script" className="rounded-xl bg-raised px-4 py-3.5 text-[14px] leading-relaxed text-text">
+      <div className="flex items-center gap-2">
+        <h3 className="min-w-0 flex-1 text-[16px] font-bold">{title}</h3>
+        <button type="button" onClick={copy} aria-label="Copy script" title="Copy script" className="-my-1 rounded-lg p-1.5 text-muted hover:bg-panel hover:text-text">
+          {copied ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4" />}
         </button>
       </div>
-    </div>
+      {hookEnd > 0 && (
+        <p className="mt-1.5">
+          <strong>{hookLabel}:</strong> {hookDoes}
+          {script.hookText && <> Text: &ldquo;{script.hookText}&rdquo;</>}
+        </p>
+      )}
+      <ul className="mt-1.5 list-disc space-y-1 pl-5 marker:text-soft">
+        {actions.map((a, i) => (
+          <li key={i}>
+            <strong>{a.label}:</strong> {a.does}
+            {a.text && <> Text: &ldquo;{a.text}&rdquo;</>}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

@@ -139,18 +139,42 @@ export function RunView() {
   /** The product brief and the script are written on the server (Gemini); take only those two sections back. */
   const takeAI = useCallback((u: Pick<Run, "product" | "script">) => setRun((r) => (r?.id === id ? { ...r, product: u.product ?? null, script: u.script ?? null } : r)), [id]);
 
-  /** The demo plan: shot by shot (seconds, what to film, text on screen), from the stolen hook, the script and the
-   * product brief. Step 5 shows it as a timed script; "Build it clip by clip" turns it into the shot list. */
+  /**
+   * The script (hook + demo, modelled on the stolen clip), written once the product brief and the clip are both in.
+   * It is the one source for everything after: step 1 shows it, "Build it clip by clip" turns its actions into clips,
+   * and its hook line replaces the stolen caption in the hook text (text the seller typed stays).
+   */
+  const planBusy = useRef(false);
+  const refsRef = useRef(refs);
+  useEffect(() => { refsRef.current = refs; }, [refs]);
   const writePlan = useCallback(async () => {
-    wantPlan.current = null;
-    setPlanning(id);
-    const saved = await waitRunSaves(id);
-    const { run: r, error } = saved ? await writeScript(id) : { run: undefined, error: "Couldn't save your changes. Try again." };
-    if (liveId.current !== id) return;
-    setPlanning(null);
-    if (!r?.script) return setToast(error ?? "Couldn't write the demo plan. Try again.");
-    takeAI(r);
-  }, [id, takeAI]);
+    // One at a time; a request that arrives meanwhile (another clip picked) runs right after, on the latest state.
+    if (planBusy.current) { wantPlan.current = id; return; }
+    planBusy.current = true;
+    try {
+      do {
+        wantPlan.current = null;
+        setPlanning(id);
+        const saved = await waitRunSaves(id);
+        const { run: r, error } = saved ? await writeScript(id) : { run: undefined, error: "Couldn't save your changes. Try again." };
+        if (liveId.current !== id) return;
+        setPlanning(null);
+        if (!r?.script) { setToast(error ?? "Couldn't write the script. Try again."); continue; }
+        takeAI(r);
+        const cur = runRef.current;
+        const source = refsRef.current?.find((x) => x.id === cur?.sourceRefId);
+        // Never the seller's words: the default, the stolen clip's caption and title, and the previous script's lines.
+        const placeholders = ["", DEFAULT_HOOK_TEXT, source?.recipe?.onScreenText?.[0]?.text, source?.title, ...(cur?.script ? [cur.script.hookText, ...cur.script.hookAlternatives] : [])];
+        const line = cur ? runTexts(cur).find((x) => x.id === "hook") : undefined;
+        const next = r.script.hookText;
+        if (cur && line && next && placeholders.includes(line.text)) {
+          save({ hook: { ...cur.hook, text: next }, texts: runTexts(cur).map((x) => (x.id === "hook" ? { ...x, text: next } : x)) });
+        }
+      } while (wantPlan.current === id);
+    } finally {
+      planBusy.current = false;
+    }
+  }, [id, takeAI, save]);
 
   /** Paste or Analyze: step 1 counts as done at once and the next step opens; the site is read in the background. */
   const analyzeProduct = useCallback((url: string) => {
@@ -161,7 +185,9 @@ export function RunView() {
       if (r?.product) {
         takeAI(r);
         setProductJob((job) => (job?.url === url ? null : job));
-        if (wantPlan.current === id) void writePlan();
+        // The clip may already be picked: write the script now. Otherwise picking it does.
+        const cur = runRef.current;
+        if (wantPlan.current === id || cur?.sourceRefId || (cur?.hook.source === "describe" && cur.hook.describeReady)) void writePlan();
       } else {
         setProductJob((job) => (job?.url === url ? { runId: id, url, error: error ?? "Couldn't read that site. Try again." } : job));
         setPicked([1]);
@@ -309,6 +335,12 @@ export function RunView() {
     });
     setPickerOpen(false);
     setPicked(undefined);
+    requestScript();
+  };
+  /** A clip was chosen (an explicit click): write the script now, or as soon as the site has been read. */
+  const requestScript = () => {
+    if (productReading) wantPlan.current = run.id;
+    else if (run.product?.brief) void writePlan();
   };
   /** An uploaded reference video: read its cuts in the browser, then use it as the hook source. */
   const takeUpload = async (ref: Reference) => {
@@ -638,14 +670,14 @@ export function RunView() {
           <div className="mx-auto max-w-[760px] divide-y divide-line px-8">
             <Block n={1} title="Your product" done={stepDone[0]} pending={stepPending[0]} open={openSteps.includes(1)} summary={stepSummary[0]} onToggle={() => toggleStep(1)}>
               <ProductStep key={job?.error ? `failed:${job.url}` : "product"} product={run.product ?? null} reading={productReading} error={job?.error ?? null} failedUrl={job?.error ? job.url : undefined} onAnalyze={analyzeProduct} />
-              {/* The demo script lives with the product it films (founder 2026-10-28). */}
+              {/* The script lives with the product it films (founder 2026-10-28), written once a clip is picked. */}
               {planningHere ? (
-                <div role="status" aria-label="Writing your demo script" className="space-y-3 rounded-2xl border border-line bg-panel p-4">
-                  <span className="shimmer block h-5 w-36 rounded" />
-                  {[0, 1, 2, 3].map((i) => <span key={i} className="shimmer block h-12 rounded-lg" />)}
+                <div role="status" aria-label="Writing your script" className="space-y-2.5 rounded-xl bg-raised px-4 py-3.5">
+                  <span className="shimmer block h-4 w-40 rounded" />
+                  {[0, 1, 2, 3].map((i) => <span key={i} className="shimmer block h-4 rounded" style={{ width: `${88 - i * 9}%` }} />)}
                 </div>
               ) : run.product?.brief && !productReading && run.script?.shots.length && run.script.refId === (run.sourceRefId ?? null) ? (
-                <DemoScript shots={run.script.shots} />
+                <DemoScript name={run.product.brief.name} script={run.script} />
               ) : null}
             </Block>
 
@@ -740,7 +772,10 @@ export function RunView() {
                         onSave={(describe) => save({ hook: { ...hook, describe } })}
                         chips={["Spit-take at the laptop, then point at the screen", "Jaw drop, cover mouth, look back at the laptop", "Slow turn to camera with a smug smile"]}
                         submitLabel="Use this hook"
-                        onSubmit={(describe) => save({ hook: { ...hook, source: "describe", describe, describeReady: true } })}
+                        onSubmit={(describe) => {
+                          save({ hook: { ...hook, source: "describe", describe, describeReady: true } });
+                          requestScript();
+                        }}
                       />
                     </div>
                   )}
