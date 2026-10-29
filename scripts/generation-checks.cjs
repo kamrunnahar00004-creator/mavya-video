@@ -27,6 +27,13 @@ assert.equal(patch.hook.generated.src, '/new.mp4');
 assert.equal(patch.texts[0].text, 'My edited text');
 assert.equal(patch.hook.versions.length, 1);
 assert.equal(generationPatch({ ...run, ...patch }, run, generated, '').hook.versions.length, 1);
+// The demo script lands during generation (same click): the clip still becomes the hook.
+const scripted = { ...run, script: { refId: 'ref', hookText: 'Product line', hookAlternatives: [], hookBeats: [{ start: 0, end: 1, action: 'x' }], shots: [] } };
+assert.equal(generationPatch(scripted, run, generated, 'Product line').hook.generated.src, '/new.mp4');
+// The stolen caption is a placeholder and gives way to the product line; text the seller typed stays.
+const stolenText = { ...run, texts: [{ ...run.texts[0], text: 'Stolen caption' }] };
+assert.equal(generationPatch(stolenText, run, generated, 'Product line', ['Stolen caption']).texts[0].text, 'Product line');
+assert.equal(generationPatch(run, run, generated, 'Product line', ['Stolen caption']).texts[0].text, 'My edited text');
 const changed = { ...run, hook: { ...run.hook, source: 'describe' } };
 assert.equal(generationPatch(changed, run, generated, '').hook.generated.src, '/old.mp4');
 assert.equal(generationPatch(changed, run, generated, '').hook.versions[0].src, '/new.mp4');

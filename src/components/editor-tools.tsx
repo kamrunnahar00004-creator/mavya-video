@@ -39,7 +39,9 @@ function magnet(points: number[], tol: number) {
 const optionBtn = (on: boolean) =>
   `flex items-center gap-1.5 rounded-lg border px-3.5 py-2.5 text-[14px] font-semibold ${on ? "border-accent bg-accent-tint text-accent" : "border-line-strong bg-panel text-text hover:border-accent hover:text-accent"}`;
 
-export function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder = "Text", onParts, onAdjust, onPatch, onAdd, onRemove, onApplyAll }: {
+export function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder = "Text", onRegenerateFirst, onParts, onAdjust, onPatch, onAdd, onRemove, onApplyAll }: {
+  /** The first text row gets a Regenerate icon (the hook's line); called with that text's id. */
+  onRegenerateFirst?: (id: string) => Promise<void>;
   seg: Seg;
   /** Changes when the clip's file is replaced (reloads the video). */
   version?: string;
@@ -336,7 +338,7 @@ export function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlace
       {mine.length > 0 ? (
         <div className="space-y-2">
           {mine.map((x, i) => (
-            <TextRow key={x.id} t={x} placeholder={i === 0 ? firstTextPlaceholder : "More text"} onPatch={(patch) => onPatch(x.id, patch)} onAdd={() => onAdd(x.id, span)} onRemove={() => onRemove(x.id)} onApplyAll={onApplyAll && texts.length > 1 ? () => onApplyAll(x.id) : undefined} />
+            <TextRow key={x.id} t={x} placeholder={i === 0 ? firstTextPlaceholder : "More text"} onRegenerate={i === 0 && onRegenerateFirst ? () => onRegenerateFirst(x.id) : undefined} onPatch={(patch) => onPatch(x.id, patch)} onAdd={() => onAdd(x.id, span)} onRemove={() => onRemove(x.id)} onApplyAll={onApplyAll && texts.length > 1 ? () => onApplyAll(x.id) : undefined} />
           ))}
         </div>
       ) : (

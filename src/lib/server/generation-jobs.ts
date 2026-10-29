@@ -88,10 +88,14 @@ export async function advanceGeneration(who: string, id: string): Promise<void> 
       catch (error) { if ((error as { code?: string }).code !== "23505") throw error; }
     }
     const generated = { src: `/api/media/${mediaId}`, seconds: task.seconds, at: job.created_at, ...(job.note ? { note: job.note } : {}) };
-    const suggested = job.input.hook.source === "describe" ? "" : (job.input.script?.refId === (job.reference?.id ?? null) ? job.input.script?.hookText : "") || job.reference?.recipe?.onScreenText?.[0]?.text || job.reference?.title || "";
+    // The stolen video's own words are placeholders: the product's hook line (written by the same Generate click,
+    // usually done before the clip) replaces them; text the seller typed stays.
+    const stolen = [job.reference?.recipe?.onScreenText?.[0]?.text, job.reference?.title].filter((x): x is string => Boolean(x));
     for (let i = 0; i < 5; i++) {
       const run = await getRun(job.run_id, who);
-      const patch = run ? generationPatch(run, job.input, generated, suggested) : {};
+      const script = run?.script?.refId === (job.reference?.id ?? null) ? run?.script : job.input.script?.refId === (job.reference?.id ?? null) ? job.input.script : null;
+      const suggested = job.input.hook.source === "describe" ? "" : script?.hookText || stolen[0] || "";
+      const patch = run ? generationPatch(run, job.input, generated, suggested, stolen) : {};
       const completed = await db().rpc("mavya_complete_generation", { p_user: who, p_job: job.id, p_token: job.lease_token, p_updated: run?.updatedAt ?? null, p_patch: patch, p_result: generated });
       if (completed.error) throw completed.error;
       if (completed.data && !completed.data.retry) return;

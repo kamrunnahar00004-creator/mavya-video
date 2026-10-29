@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Globe, Loader2, RefreshCw, Smartphone, Sparkles } from "lucide-react";
+import { Check, Copy, Globe, Loader2, Sparkles } from "lucide-react";
 import type { Run, VideoScript } from "@/lib/types";
 
-type AIResult = Pick<Run, "product" | "script">;
 
 async function post(url: string, body?: unknown): Promise<{ run?: Run; error?: string; status?: number }> {
   try {
@@ -21,6 +20,12 @@ async function post(url: string, body?: unknown): Promise<{ run?: Run; error?: s
 export async function readProduct(runId: string, url: string): Promise<{ run?: Run; error?: string }> {
   const first = await post(`/api/runs/${runId}/product`, { url });
   return first.status === 409 ? post(`/api/runs/${runId}/product`, { url }) : first;
+}
+
+/** Three new hook lines for this product (Regenerate on the hook text), avoiding the ones already seen. */
+export async function newHookLines(runId: string, avoid: string[]): Promise<{ run?: Run; error?: string }> {
+  const first = await post(`/api/runs/${runId}/hook-text`, { avoid });
+  return first.status === 409 ? post(`/api/runs/${runId}/hook-text`, { avoid }) : first;
 }
 
 /** Write the script and demo shot plan for this product and hook. Same single retry on 409. */
@@ -109,139 +114,58 @@ export function ProductStep({ product, reading, error, failedUrl, onAnalyze }: {
   );
 }
 
-/**
- * The script for this product and hook, written from the library's analyzed viral hooks (Write my script is an
- * explicit click). The hook lines are one click from the hook text; the demo shots fill "Film your demo".
- */
-export function ScriptCard({ runId, script, hookText, writing = false, onDone, onUseHookText }: { runId: string; script: VideoScript | null; hookText: string; /** The page is already writing it (started by Generate). */ writing?: boolean; onDone: (r: AIResult) => void; onUseHookText: (text: string) => void }) {
-  const [own, setOwn] = useState(false);
-  const busy = own || writing;
-  const [error, setError] = useState<string | null>(null);
-  const write = async () => {
-    if (busy) return;
-    setOwn(true);
-    setError(null);
-    const { run, error: e } = await writeScript(runId);
-    setOwn(false);
-    if (e || !run) return setError(e ?? "Something went wrong.");
-    onDone(run);
-  };
-
-  if (!script) {
-    return (
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel p-4">
-        <p className="min-w-0 flex-1 text-[14.5px] font-bold">Hook text</p>
-        <button type="button" onClick={() => void write()} disabled={busy} className="btn-primary px-4 py-2.5 text-[14px] disabled:opacity-60">
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          {busy ? "Writing..." : "Write my script"}
-        </button>
-        {error && <p role="alert" className="w-full text-[13px] font-semibold text-red-600">{error}</p>}
-      </div>
-    );
-  }
-
-  // Only the hook text options: the character's beats are copied from the original clip, nothing to act on here.
-  const lines = [script.hookText, ...script.hookAlternatives].filter(Boolean);
-  return (
-    <div className="rounded-2xl border border-line bg-panel p-4">
-      <div className="flex items-center gap-3">
-        <p className="min-w-0 flex-1 text-[14.5px] font-bold">Hook text</p>
-        <button type="button" onClick={() => void write()} disabled={busy} className="-my-1 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-bold text-accent hover:bg-accent-tint disabled:opacity-60">
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Rewrite
-        </button>
-      </div>
-      <div role="radiogroup" aria-label="Hook text" className="-mx-2 mt-2">
-        {lines.map((line) => {
-          const on = line === hookText;
-          return (
-            <button
-              key={line}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              onClick={() => onUseHookText(line)}
-              className={`flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-[14.5px] transition-colors ${on ? "bg-accent-tint font-semibold text-text" : "text-muted hover:bg-raised hover:text-text"}`}
-            >
-              <span className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] ${on ? "border-accent bg-accent text-white" : "border-line-strong"}`}>{on && <Check className="h-3 w-3" strokeWidth={3} />}</span>
-              {line}
-            </button>
-          );
-        })}
-      </div>
-      {error && <p role="alert" className="mt-2 text-[13px] font-semibold text-red-600">{error}</p>}
-    </div>
-  );
-}
-
 const sec = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
+const sentence = (steps: string[]) => {
+  const s = steps.map((x, i) => (i ? x.charAt(0).toLowerCase() + x.slice(1) : x).replace(/[.\s]+$/, "")).join(", then ");
+  return s ? `${s}.` : "";
+};
 
 /**
- * The demo, shot by shot, as clear as a shooting script: the time range, the shot, how to hold the phone (Camera), what
- * to do in order (Steps) and the text that appears (On screen, one dark chip per caption). Copy gives the same as text.
+ * The demo script, said plainly like a chat message: shot by shot, when it plays, what to do and the text that goes on
+ * screen. How to hold the phone lives in the demo step's "How to film". Copy gives the same as plain text.
  */
 export function DemoScript({ shots }: { shots: VideoScript["shots"] }) {
   const [copied, setCopied] = useState(false);
   const lines = shots.map((s, i) => {
     const from = shots.slice(0, i).reduce((sum, x) => sum + x.seconds, 0);
-    return {
-      time: `${sec(from)} - ${sec(from + s.seconds)}s`,
-      title: s.label || s.hint,
-      camera: s.camera,
-      steps: s.steps.length ? s.steps : s.hint ? [s.hint] : [],
-      captions: s.text.split(/\s+\/\s+/).map((t) => t.trim()).filter(Boolean),
-    };
+    return { time: `${sec(from)} - ${sec(from + s.seconds)}s`, what: sentence(s.steps.length ? s.steps : [s.hint || s.label]), captions: s.text.split(/\s+\/\s+/).map((t) => t.trim()).filter(Boolean) };
   });
-  const total = shots.reduce((sum, s) => sum + s.seconds, 0);
+  const total = Math.round(shots.reduce((sum, s) => sum + s.seconds, 0));
   const copy = () => {
-    const text = lines
-      .map((l) => [
-        `${l.time}  ${l.title}`,
-        l.camera && `Camera: ${l.camera}`,
-        l.steps.length && `Steps: ${l.steps.map((step, i) => `${i + 1}. ${step}`).join("  ")}`,
-        l.captions.length && `On screen: ${l.captions.map((c) => `"${c}"`).join(", ")}`,
-      ].filter(Boolean).join("\n"))
-      .join("\n\n");
+    const text = lines.map((l) => `${l.time}: ${l.what}${l.captions.length ? ` On screen: ${l.captions.map((c) => `"${c}"`).join(", ")}` : ""}`).join("\n");
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     }, () => undefined);
   };
   return (
-    <section aria-label="Demo script" className="rounded-2xl border border-line bg-panel">
-      <div className="flex items-center gap-3 px-4 pb-1 pt-3.5">
-        <h3 className="text-[15px] font-bold">Demo script</h3>
-        <span className="text-[13px] tabular-nums text-soft">{lines.length} shots · {sec(total)}s</span>
-        <button type="button" onClick={copy} className="ml-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-bold text-accent hover:bg-accent-tint">
+    <div className="flex gap-3">
+      <span aria-hidden className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-white">
+        <Sparkles className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md bg-raised px-4 py-3.5 text-[14.5px] leading-relaxed text-text">
+        <p>Your demo is {lines.length} shots, about {total} seconds. Film them in this order:</p>
+        <ol className="mt-3 space-y-3">
+          {lines.map((l, i) => (
+            <li key={i}>
+              <span className="mr-1.5 font-bold tabular-nums">{l.time}</span>
+              {l.what}
+              {l.captions.length > 0 && (
+                <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] text-muted">
+                  On screen:
+                  {l.captions.map((c, j) => (
+                    <span key={j} className="rounded bg-ink px-1.5 py-0.5 font-semibold text-white">{c}</span>
+                  ))}
+                </span>
+              )}
+            </li>
+          ))}
+        </ol>
+        <button type="button" onClick={copy} className="mt-3 -ml-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-[13px] font-bold text-accent hover:bg-accent-tint">
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-          {copied ? "Copied" : "Copy"}
+          {copied ? "Copied" : "Copy script"}
         </button>
       </div>
-      {/* A storyboard: the frame shows the shot's on-screen text as it will look; beside it what to do and how to film. */}
-      <ol className="px-4 pb-2">
-        {lines.map((l, i) => (
-          <li key={i} className="flex gap-4 border-t border-line py-3.5 first:border-t-0">
-            <div aria-label={l.captions.length ? `On screen: ${l.captions.join(", ")}` : undefined} className="flex h-[136px] w-[77px] shrink-0 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl bg-ink px-2 text-center">
-              {l.captions.map((c, j) => (
-                <span key={j} className="text-[11px] font-bold leading-tight text-white [overflow-wrap:anywhere]">{c}</span>
-              ))}
-            </div>
-            <div className="min-w-0 pt-0.5">
-              <p className="flex flex-wrap items-baseline gap-x-2">
-                <span className="text-[12.5px] font-bold tabular-nums text-accent">{l.time}</span>
-                <span className="text-[15px] font-bold">{l.title}</span>
-              </p>
-              {l.steps.length > 0 && <p className="mt-1.5 text-[14px] leading-snug text-text">{l.steps.join(" → ")}</p>}
-              {l.camera && (
-                <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-snug text-muted">
-                  <Smartphone className="mt-[3px] h-3.5 w-3.5 shrink-0" />
-                  {l.camera}
-                </p>
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
-    </section>
+    </div>
   );
 }

@@ -25,7 +25,7 @@ import dynamic from "next/dynamic";
 import { SourcePicker, UploadDrop, Thumb } from "@/components/source-picker";
 import { libraryMore, loadLibrary } from "@/lib/library-cache";
 const HistoryPanel = dynamic(() => import("@/components/history-panel").then(m => m.HistoryPanel));
-import { DemoScript, ProductStep, ScriptCard, readProduct, writeScript } from "@/components/product-step";
+import { DemoScript, ProductStep, newHookLines, readProduct, writeScript } from "@/components/product-step";
 import { RunPreview, claimPlayback } from "@/components/run-preview";
 
 const ClipEditor = dynamic(() => import("@/components/editor-tools").then(m => m.ClipEditor));
@@ -217,6 +217,30 @@ export function RunView() {
     [id]
   );
 
+  /** Regenerate on the hook text: the next unused line written for this product (free), else three new ones (one AI call). */
+  const seenHookText = useRef<Set<string>>(new Set());
+  const regenerateHookText = useCallback(async (textId: string) => {
+    const cur = runRef.current;
+    if (!cur || cur.id !== id) return;
+    if (!cur.product?.brief) return setToast("Add your product first (step 1).");
+    const seen = seenHookText.current;
+    const now = runTexts(cur).find((x) => x.id === textId)?.text;
+    if (now) seen.add(now);
+    const fits = cur.script && cur.script.refId === (cur.sourceRefId ?? null);
+    let next = fits ? [cur.script!.hookText, ...cur.script!.hookAlternatives].find((x) => x && !seen.has(x)) : undefined;
+    if (!next) {
+      if (!(await waitRunSaves(id))) return setToast("Couldn't save your changes. Try again.");
+      const { run: r, error } = await newHookLines(id, [...seen]);
+      if (liveId.current !== id) return;
+      if (!r?.script?.hookText) return setToast(error ?? "Couldn't write a new line. Try again.");
+      takeAI(r);
+      next = r.script.hookText;
+    }
+    seen.add(next);
+    liveTexts((t) => t.map((x) => (x.id === textId ? { ...x, text: next! } : x)));
+    commitTexts();
+  }, [id, takeAI, liveTexts, commitTexts]);
+
   const beforeExport = useCallback(async () => {
     const dirty=saveTimer.current||adjustTimer.current;
     if(saveTimer.current)clearTimeout(saveTimer.current);
@@ -318,7 +342,7 @@ export function RunView() {
     setPicked([5]);
     void gen.generate(note);
     // A link still being read replaces the script when it lands, so the plan is written after it.
-    if (!productReading && run.script && run.script.refId === (run.sourceRefId ?? null)) return;
+    if (!productReading && run.script?.shots.length && run.script.refId === (run.sourceRefId ?? null)) return;
     wantPlan.current = run.id;
     if (run.product?.brief && !productReading && !planningHere) void writePlan();
   };
@@ -722,16 +746,6 @@ export function RunView() {
                   )}
                 </div>
               )}
-              {run.product?.brief && (source || (hook.source === "describe" && hook.describeReady)) && (
-                <ScriptCard
-                  runId={run.id}
-                  script={run.script && run.script.refId === (source?.id ?? null) ? run.script : null}
-                  hookText={texts.find((x) => x.id === "hook")?.text ?? hook.text}
-                  writing={planningHere}
-                  onDone={takeAI}
-                  onUseHookText={(text) => save({ hook: { ...hook, text }, texts: withHookText({ text }) })}
-                />
-              )}
               {source?.analysis && <HookTiming duration={source.analysis.duration} start={hook.start ?? 0} end={hook.end ?? 3} onChange={(start, end) => save({ hook: { ...hook, start, end } })} />}
             </Block>
 
@@ -755,6 +769,7 @@ export function RunView() {
                 texts={texts}
                 gen={gen}
                 onGenerate={startGenerate}
+                onRegenerateText={run.product?.brief ? regenerateHookText : undefined}
                 onPatch={patchText}
                 onAdd={addText}
                 onAdjust={(a) => liveAdjust("hook", a)}
@@ -1325,7 +1340,8 @@ function useHookGeneration(runId: string, onGenerated: (updated: Run) => void, o
 
 /** Step 4: the hook clip, in the shared clip editor. Before generating, the video box shows the inputs and a Generate button.
  * The job itself lives on the page (`gen`), so this step can close as soon as Generate is clicked. */
-function GenerateStep({ run, source, seg, texts, gen, onGenerate, onPatch, onAdd, onRemove, onParts, onAdjust, onApplyAll }: {
+function GenerateStep({ run, source, seg, texts, gen, onGenerate, onRegenerateText, onPatch, onAdd, onRemove, onParts, onAdjust, onApplyAll }: {
+  onRegenerateText?: (textId: string) => Promise<void>;
   run: Run;
   source: Reference | null;
   seg: Seg;
@@ -1387,6 +1403,7 @@ function GenerateStep({ run, source, seg, texts, gen, onGenerate, onPatch, onAdd
       onRemove={onRemove}
       onApplyAll={onApplyAll}
       firstTextPlaceholder="Hook text"
+      onRegenerateFirst={onRegenerateText}
       overlay={
         <>
           {/* What goes in: the hook (step 1) and the character (step 2). */}

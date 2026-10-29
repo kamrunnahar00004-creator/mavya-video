@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, Copy, Plus, Smile, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Copy, Plus, RefreshCw, Smile, Trash2 } from "lucide-react";
 
 
 import { FONT_CHOICES, fontCss, fontLabel, loadFonts } from "@/lib/studio-data";
@@ -12,9 +12,10 @@ import { STYLE_GROUPS, STYLE_PRESETS, autoSecond, stylePreset } from "@/lib/text
 
 import { type TextLayer } from "@/lib/types";
 
-export function TextRow({ t, placeholder, onPatch, onAdd, onRemove, onApplyAll }: { t: TextLayer; placeholder: string; onPatch: (p: Partial<TextLayer>) => void; onAdd: () => void; onRemove: () => void; onApplyAll?: () => void }) {
+export function TextRow({ t, placeholder, onPatch, onAdd, onRemove, onApplyAll, onRegenerate }: { t: TextLayer; placeholder: string; onPatch: (p: Partial<TextLayer>) => void; onAdd: () => void; onRemove: () => void; onApplyAll?: () => void; /** The hook's line: a new one for this product. */ onRegenerate?: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const textInput = useRef<HTMLInputElement>(null);
   return (
     <div className="rounded-2xl border border-line bg-panel">
@@ -25,8 +26,28 @@ export function TextRow({ t, placeholder, onPatch, onAdd, onRemove, onApplyAll }
           maxLength={160}
           onChange={(e) => onPatch({ text: e.target.value })}
           placeholder={placeholder}
+          style={{ fontFamily: fontCss(t.font) }}
           className="min-w-0 flex-1 bg-transparent py-2 text-[14px] outline-none placeholder:text-soft"
         />
+        {onRegenerate && (
+          <span className="group/regen relative">
+            <button
+              type="button"
+              aria-label="Regenerate"
+              disabled={regenerating}
+              onClick={async () => {
+                setRegenerating(true);
+                try { await onRegenerate(); } finally { setRegenerating(false); }
+              }}
+              className="rounded-lg p-2 text-muted hover:bg-raised hover:text-text disabled:opacity-60"
+            >
+              <RefreshCw className={`h-4 w-4 ${regenerating ? "motion-safe:animate-spin" : ""}`} />
+            </button>
+            <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-ink px-2 py-1 text-[12px] font-semibold text-white opacity-0 transition-opacity group-hover/regen:opacity-100 group-focus-within/regen:opacity-100">
+              Regenerate
+            </span>
+          </span>
+        )}
         <EmojiMenu
           onPick={(emoji) => {
             const el = textInput.current;

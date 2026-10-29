@@ -219,7 +219,7 @@ export function buildProject(run: Run, ref: Reference | null): Project {
     slots,
     texts: [
       { id: uid(), text: run.hook.text || "How is this tool even legal?", start: 0, end: hookEnd, x: 50, y: TEXT_Y[run.hook.textPos ?? "top"], size: 5.2, font: DEFAULT_FONT, color: "#ffffff", style: "outline" },
-      ...(ctaStart !== null ? [{ id: uid(), text: "Link in bio", start: round1(ctaStart), end: round1(total), x: 50, y: 50, size: 4.6, font: "montserrat" as const, color: "#6c47ff", style: "box" as const }] : []),
+      ...(ctaStart !== null ? [{ id: uid(), text: "Link in bio", start: round1(ctaStart), end: round1(total), x: 50, y: 50, size: 4.6, font: DEFAULT_FONT, color: "#ffffff", style: "outline" }] : []),
     ],
   };
 }
@@ -241,7 +241,7 @@ export function runTexts(run: Run): TextLayer[] {
       x: h.textX ?? 50,
       y: h.textY ?? TEXT_Y[h.textPos ?? "top"],
       size: h.textSize ?? 4.6,
-      font: h.font ?? "Arial",
+      font: h.font ?? DEFAULT_FONT,
       color: h.color ?? "#ffffff",
       style: h.textStyle ?? "outline",
     },
