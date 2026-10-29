@@ -164,7 +164,12 @@ export function DemoScript({ script }: { script: VideoScript }) {
           return (
             <li key={i} className="grid grid-cols-[40px_44px_minmax(0,1fr)] items-baseline gap-x-2 py-3">
               <span className="text-[13px] tabular-nums text-soft">{clock(r.at)}</span>
-              <span className={hook ? "w-fit rounded bg-accent-tint px-1.5 py-px text-[10.5px] font-bold uppercase tracking-wide text-accent" : "text-[13px] font-semibold tabular-nums text-soft"}>{r.mark}</span>
+              {/* Only where a part starts: HOOK, then DEMO on its first action. No shot numbers (the captions are numbered). */}
+              {hook || r.mark === "1" ? (
+                <span className={`w-fit rounded px-1.5 py-px text-[10.5px] font-bold uppercase tracking-wide ${hook ? "bg-accent-tint text-accent" : "bg-raised text-muted"}`}>{hook ? "Hook" : "Demo"}</span>
+              ) : (
+                <span aria-hidden />
+              )}
               <div className="min-w-0">
                 {long ? (
                   <button type="button" onClick={() => setHookOpen((o) => !o)} aria-expanded={hookOpen} className={`w-full text-left text-[14.5px] leading-snug text-text ${hookOpen ? "" : "line-clamp-2"}`}>
