@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Globe, Loader2, Sparkles } from "lucide-react";
-import type { Run, VideoScript } from "@/lib/types";
+import { Globe, Loader2, Sparkles } from "lucide-react";
+import type { Run } from "@/lib/types";
 
 
 async function post(url: string, body?: unknown): Promise<{ run?: Run; error?: string; status?: number }> {
@@ -111,78 +111,5 @@ export function ProductStep({ product, reading, error, failedUrl, onAnalyze }: {
       </div>
       {error && <p role="alert" className="mt-2 text-[13px] font-semibold text-red-600">{error}</p>}
     </form>
-  );
-}
-
-const clock = (n: number) => {
-  const s = Math.round(n);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-};
-const sentence = (s: string) => {
-  const t = s.trim().replace(/[.\s]+$/, "");
-  return t ? `${t.charAt(0).toUpperCase()}${t.slice(1)}.` : "";
-};
-const captionsOf = (text: string) => text.split(/\s+\/\s+/).map((t) => t.trim()).filter(Boolean);
-
-/**
- * The script as one flat timeline: start time, the hook or the action number, what to do, then the on-screen text
- * (each caption its own quote). No nesting, no labels repeated per row, nothing cut off.
- */
-export function DemoScript({ script }: { script: VideoScript }) {
-  const [copied, setCopied] = useState(false);
-  const hookEnd = Math.max(0, ...script.hookBeats.map((b) => b.end));
-  const rows = [
-    ...(hookEnd > 0 ? [{ at: 0, mark: "Hook", does: script.hookBeats.map((b) => sentence(b.action)).filter(Boolean).join(" "), captions: script.hookText ? [script.hookText] : [] }] : []),
-    ...script.shots.map((s, i) => ({
-      at: hookEnd + script.shots.slice(0, i).reduce((sum, x) => sum + x.seconds, 0),
-      mark: String(i + 1),
-      does: sentence(s.hint || s.steps.map((x, j) => (j ? x.charAt(0).toLowerCase() + x.slice(1) : x)).join(", then ") || s.label),
-      captions: captionsOf(s.text),
-    })),
-  ];
-  const total = Math.round(hookEnd + script.shots.reduce((sum, s) => sum + s.seconds, 0));
-  const copy = () => {
-    const text = [`Script (${total}s)`, ...rows.map((r) => `${clock(r.at)}  ${r.mark === "Hook" ? "Hook" : `Action ${r.mark}`}: ${r.does}${r.captions.length ? `\n      On screen: ${r.captions.map((c) => `"${c}"`).join("  ")}` : ""}`)].join("\n");
-    void navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    }, () => undefined);
-  };
-  return (
-    <section aria-label="Script" className="pt-1">
-      <div className="flex items-center gap-2 pb-1">
-        <h3 className="min-w-0 flex-1 text-[13px] font-semibold text-soft">Script · {total}s</h3>
-        <button type="button" onClick={copy} aria-label="Copy script" title="Copy script" className="rounded-lg p-1.5 text-muted hover:bg-raised hover:text-text">
-          {copied ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4" />}
-        </button>
-      </div>
-      <ol className="divide-y divide-line border-y border-line">
-        {rows.map((r, i) => {
-          const hook = r.mark === "Hook";
-          return (
-            <li key={i} className="grid grid-cols-[40px_44px_minmax(0,1fr)] items-baseline gap-x-2 py-3">
-              <span className="text-[13px] tabular-nums text-soft">{clock(r.at)}</span>
-              {/* Only where a part starts: HOOK, then DEMO on its first action. No shot numbers (the captions are numbered). */}
-              {hook || r.mark === "1" ? (
-                <span className={`w-fit rounded px-1.5 py-px text-[10.5px] font-bold uppercase tracking-wide ${hook ? "bg-accent-tint text-accent" : "bg-raised text-muted"}`}>{hook ? "Hook" : "Demo"}</span>
-              ) : (
-                <span aria-hidden />
-              )}
-              <div className="min-w-0">
-                <p className="text-[14.5px] leading-snug text-text">{r.does}</p>
-                {r.captions.length > 0 && (
-                  <p className="mt-1.5 flex gap-2.5 text-[13.5px] leading-snug">
-                    <span className="shrink-0 text-soft">On screen</span>
-                    <span className="flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 italic text-muted">
-                      {r.captions.map((c, j) => <span key={j}>&ldquo;{c}&rdquo;</span>)}
-                    </span>
-                  </p>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-    </section>
   );
 }

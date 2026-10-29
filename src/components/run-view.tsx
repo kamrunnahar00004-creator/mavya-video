@@ -25,7 +25,7 @@ import dynamic from "next/dynamic";
 import { SourcePicker, UploadDrop, Thumb } from "@/components/source-picker";
 import { libraryMore, loadLibrary } from "@/lib/library-cache";
 const HistoryPanel = dynamic(() => import("@/components/history-panel").then(m => m.HistoryPanel));
-import { DemoScript, ProductStep, newHookLines, readProduct, writeScript } from "@/components/product-step";
+import { ProductStep, newHookLines, readProduct, writeScript } from "@/components/product-step";
 import { RunPreview, claimPlayback } from "@/components/run-preview";
 
 const ClipEditor = dynamic(() => import("@/components/editor-tools").then(m => m.ClipEditor));
@@ -141,10 +141,13 @@ export function RunView() {
 
   /**
    * The script (hook + demo, modelled on the stolen clip), written once the product brief and the clip are both in.
-   * It is the one source for everything after: step 1 shows it, "Build it clip by clip" turns its actions into clips,
-   * and its hook line replaces the stolen caption in the hook text (text the seller typed stays).
+   * It is the one source for everything after: "Copy the viral video" turns its shots into demo clips, and its hook
+   * line replaces the stolen caption in the hook text (text the seller typed stays).
    */
   const planBusy = useRef(false);
+  /** "Copy the viral video" was clicked while the script was still being written: build the clips when it lands. */
+  const copyPending = useRef<string | null>(null);
+  const [copyWaiting, setCopyWaiting] = useState(false);
   const refsRef = useRef(refs);
   useEffect(() => { refsRef.current = refs; }, [refs]);
   const writePlan = useCallback(async () => {
@@ -170,7 +173,20 @@ export function RunView() {
         if (cur && line && next && placeholders.includes(line.text)) {
           save({ hook: { ...cur.hook, text: next }, texts: runTexts(cur).map((x) => (x.id === "hook" ? { ...x, text: next } : x)) });
         }
+        if (copyPending.current === id && cur && r.script.shots.length && !demoClips(cur).some((c) => clipSrc(c))) {
+          copyPending.current = null;
+          setCopyWaiting(false);
+          save({ demo: { ...cur.demo, mode: "clips", clips: r.script.shots.map((s) => ({ id: uid(), label: s.label, hint: s.hint, target: s.seconds, camera: s.camera, steps: s.steps, text: s.text })) } });
+        }
       } while (wantPlan.current === id);
+      // No script came (failed): copy the stolen video's own shots rather than leave the click hanging.
+      const cur = runRef.current;
+      if (copyPending.current === id && cur && !demoClips(cur).some((c) => clipSrc(c))) {
+        copyPending.current = null;
+        setCopyWaiting(false);
+        const source = refsRef.current?.find((x) => x.id === cur.sourceRefId) ?? null;
+        save({ demo: { ...cur.demo, mode: "clips", clips: shotList(source, cur).map((x) => ({ ...x, id: uid() })) } });
+      }
     } finally {
       planBusy.current = false;
     }
@@ -511,10 +527,34 @@ export function RunView() {
       const by = now.len - (old?.len ?? 0);
       nextTexts = nextTexts.map((t) => (t.start >= now.offset - 0.05 ? { ...t, start: round1(t.start + by), end: round1(t.end + by) } : t.end > now.offset + 0.05 && !old ? { ...t, end: round1(t.end + by) } : t));
     }
-    // First video for a shot-list clip: its suggested text goes on screen over it, styled like the hook text (editable like any text).
+    // First video for a copied shot: its captions go on screen over it (editable like any text), one after another
+    // ("1. ... / 2. ..." = two captions, each its share of the clip), in the viral video's own caption look.
     const suggested = list.find((x) => x.id === clipId)?.text;
-    if (now && !old && suggested) nextTexts = [...nextTexts, textOver(nextTexts, suggested, now.offset, now.len)];
+    if (now && !old && suggested) {
+      const captions = suggested.split(/\s+\/\s+/).map((t) => t.trim()).filter(Boolean);
+      const look = viralCaptionLook();
+      const each = now.len / captions.length;
+      nextTexts = [...nextTexts, ...captions.map((t, k) => {
+        const base = textOver(nextTexts, t, now.offset + k * each, each);
+        return look ? { ...base, ...look } : base;
+      })];
+    }
     save({ demo: nextRun.demo, texts: nextTexts });
+  };
+  /** How the stolen video writes its demo captions (its analysis: style and position), as a text look; null if unknown. */
+  const viralCaptionLook = (): Partial<TextLayer> | null => {
+    const items = ((source?.recipe?.onScreenText ?? []) as { style?: string; position?: string }[]).slice(1).filter((x) => x.style || x.position);
+    if (!items.length) return null;
+    const style = (items[0].style ?? "").toLowerCase();
+    const position = (items[0].position ?? "").toLowerCase();
+    return {
+      x: 50,
+      y: position.includes("bottom") ? TEXT_Y.bottom : position.includes("top") ? TEXT_Y.top : TEXT_Y.center,
+      size: 4.6,
+      font: DEFAULT_FONT,
+      color: "#ffffff",
+      style: /banner|box|background|highlight|label/.test(style) ? "box" : "outline",
+    };
   };
   /** "Upload your demo" with one or more videos: one = a single demo, several = clips 1..N in file-name order (IMG_001, IMG_002...).
    *  `at` = insert before this demo clip (the editor's + Clips at the playhead); default at the end. Texts from there on move later. */
@@ -670,15 +710,6 @@ export function RunView() {
           <div className="mx-auto max-w-[760px] divide-y divide-line px-8">
             <Block n={1} title="Your product" done={stepDone[0]} pending={stepPending[0]} open={openSteps.includes(1)} summary={stepSummary[0]} onToggle={() => toggleStep(1)}>
               <ProductStep key={job?.error ? `failed:${job.url}` : "product"} product={run.product ?? null} reading={productReading} error={job?.error ?? null} failedUrl={job?.error ? job.url : undefined} onAnalyze={analyzeProduct} />
-              {/* The script lives with the product it films (founder 2026-10-28), written once a clip is picked. */}
-              {planningHere ? (
-                <div role="status" aria-label="Writing your script" className="space-y-2.5 border-y border-line py-3.5">
-                  <span className="shimmer block h-4 w-40 rounded" />
-                  {[0, 1, 2, 3].map((i) => <span key={i} className="shimmer block h-4 rounded" style={{ width: `${88 - i * 9}%` }} />)}
-                </div>
-              ) : run.product?.brief && !productReading && run.script?.shots.length && run.script.refId === (run.sourceRefId ?? null) ? (
-                <DemoScript script={run.script} />
-              ) : null}
             </Block>
 
             <Block n={2} title="Steal a hook that already works" done={stepDone[1]} open={openSteps.includes(2)} summary={stepSummary[1]} onToggle={() => toggleStep(2)}>
@@ -823,7 +854,17 @@ export function RunView() {
                   setPicked((p) => Array.from(new Set([...(p ?? openSteps), 5])));
                   await addVideos(files);
                 }}
-                onClips={() => save({ demo: { ...run.demo, mode: "clips", clips: shotList(source, run).map((x) => ({ ...x, id: uid() })) } })}
+                copying={copyWaiting}
+                onClips={() => {
+                  // The script is the copy of the stolen video for this product; while it is being written, wait for it.
+                  const coming = planningHere || (productReading && wantPlan.current === run.id);
+                  if (coming && !(run.script?.shots.length && run.script.refId === (run.sourceRefId ?? null))) {
+                    copyPending.current = run.id;
+                    setCopyWaiting(true);
+                    return;
+                  }
+                  save({ demo: { ...run.demo, mode: "clips", clips: shotList(source, run).map((x) => ({ ...x, id: uid() })) } });
+                }}
                 onUpload={async (cid, f) => {
                   setPicked((p) => Array.from(new Set([...(p ?? openSteps), 5])));
                   await fillClip(cid, f);

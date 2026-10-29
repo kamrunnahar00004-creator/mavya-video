@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { memo, useCallback, useEffect, useId, useRef, useState } from "react";
 
 
-import { ArrowLeftRight, Check, ChevronDown, ClipboardPaste, Copy, Diamond, Film, GripVertical, ListOrdered, Loader2, Magnet, Music, Pause, Play, Plus, Redo2, Scissors, SlidersHorizontal, Smartphone, Undo2, Volume1, Volume2, VolumeX, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeftRight, Check, ChevronDown, ClipboardPaste, Copy, Diamond, Film, GripVertical, Loader2, Magnet, Music, Pause, Play, Plus, Redo2, Scissors, SlidersHorizontal, Smartphone, Undo2, Volume1, Volume2, VolumeX, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
 import { frameAt } from "@/lib/filmstrip";
 import { waveform } from "@/lib/waveform";
 
@@ -1809,8 +1809,9 @@ function VolumeButton({ value, onChange }: { value: number; onChange: (v: number
 /** Real songs (top chart by default, or search), each a 30-second clip of the song: ▶ to listen, Use to pick. */
 
 
-/** How to film one demo clip (optional tips): camera setup and steps in order. */
+/** How to film one demo clip: camera setup, steps in order, and the text that goes on screen over it (added on upload). */
 function ShotBrief({ clip }: { clip: DemoClip }) {
+  const captions = (clip.text ?? "").split(/\s+\/\s+/).map((t) => t.trim()).filter(Boolean);
   return (
     <div className="space-y-1.5 pb-4 pl-[62px] pr-4">
       {clip.camera && (
@@ -1829,14 +1830,27 @@ function ShotBrief({ clip }: { clip: DemoClip }) {
           ))}
         </ol>
       ) : null}
+      {captions.length > 0 && (
+        <div className="flex items-start gap-2 text-[13px] leading-snug">
+          <Type className="mt-0.5 h-3.5 w-3.5 shrink-0 text-soft" />
+          <span className="flex min-w-0 flex-wrap gap-x-3 italic text-muted">
+            {captions.map((t, i) => <span key={i}>&ldquo;{t}&rdquo;</span>)}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
-/** Step 4: one finished demo video, or a shot list filmed clip by clip. Every clip opens in the same ClipEditor as the hook. */
-export function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, onRename, onDelete, onMove, onReset }: {
+/**
+ * Step 5: one finished demo video, or "Copy the viral video": the stolen clip's demo shot for shot, one card per shot
+ * with how to film it; its on-screen text goes on when the footage is uploaded. Every clip opens in the ClipEditor.
+ */
+export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, onClips, onUpload, onRename, onDelete, onMove, onReset }: {
   run: Run;
   segs: Seg[];
+  /** The shot list is still being written; the copy lands as soon as it is. */
+  copying?: boolean;
   renderEditor: (seg: Seg) => React.ReactNode;
   /** One video = one demo; several = clips in file-name order. */
   onFiles: (files: File[]) => Promise<void>;
@@ -1907,9 +1921,9 @@ export function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, 
             Upload your demo
             <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => void takeMany(e.target.files).then(() => (e.target.value = ""))} />
           </label>
-          <button type="button" onClick={onClips} className={optionBtn(false)}>
-            <ListOrdered className="h-4 w-4" />
-            Build it clip by clip
+          <button type="button" onClick={onClips} disabled={copying} className={`${optionBtn(false)} disabled:opacity-70`}>
+            {copying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+            Copy the viral video
           </button>
         </div>
         {error && <p role="alert" className="mt-2.5 text-[13px] font-semibold text-red-600">{error}</p>}
@@ -1992,14 +2006,14 @@ export function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, 
                   />
                   <span className="shrink-0 text-[13px] tabular-nums text-soft">{seg ? `${seg.len.toFixed(1)}s` : c.target ? `~${c.target}s` : ""}</span>
                 </div>
-                {!open && (c.camera || c.steps?.length) ? (
+                {!open && clipSrc(c) && (c.camera || c.steps?.length) ? (
                   <button
                     type="button"
                     onClick={() => setBriefId(briefId === c.id ? null : c.id)}
                     aria-expanded={briefId === c.id}
                     className="mt-0.5 flex items-center gap-1 text-[13px] leading-5 text-soft hover:text-accent"
                   >
-                    How to film (optional)
+                    How to film
                     <ChevronDown className={`h-3.5 w-3.5 transition-transform ${briefId === c.id ? "rotate-180" : ""}`} />
                   </button>
                 ) : !c.steps?.length && c.hint ? (
@@ -2027,9 +2041,10 @@ export function DemoStep({ run, segs, renderEditor, onFiles, onClips, onUpload, 
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
-            {!open && briefId === c.id && (
+            {/* Directions stay in view until the clip is filmed; after that they fold behind "How to film". */}
+            {!open && (!clipSrc(c) || briefId === c.id) && (c.camera || c.steps?.length || c.text) ? (
               <ShotBrief clip={c} />
-            )}
+            ) : null}
             {open && seg && (
               <div className="border-t border-line p-3">
                 {renderEditor(seg)}
