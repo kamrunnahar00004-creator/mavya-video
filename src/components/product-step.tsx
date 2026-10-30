@@ -143,7 +143,7 @@ export function ProductStep({ product, reading, host, error, failedUrl, onAnalyz
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && dirty) { e.preventDefault(); onSend(text); setDirty(false); }
             }}
             aria-label="About your product (optional)"
-            placeholder={"(Optional)\nDescribe your product in one sentence:\n\nWho's it for?\n\nWhich feature should the video show off?"}
+            placeholder={"(Optional)\nWho's it for?\n\nWhat problem does it fix for them?\n\nWhich feature should the video show off?"}
             // Inline: the global :focus-visible outline and textarea background would otherwise cut across the box's border.
             style={{ outline: "none", background: "transparent" }}
             className="block w-full resize-none rounded-t-2xl px-4 pt-3 text-[14.5px] leading-relaxed placeholder:text-soft"

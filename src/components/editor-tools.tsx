@@ -132,7 +132,8 @@ export function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlace
     if (vref.current && parts[i]) vref.current.currentTime = parts[i].start;
     setT(at);
   };
-  // Play the pieces back to back (skipping what was cut away), loop, and move the playhead smoothly.
+  // Play the pieces back to back (skipping what was cut away) and move the playhead smoothly. Plays once: after the
+  // last piece the playhead goes back to the start and stays paused.
   useEffect(() => {
     const v = vref.current;
     if (!v || !playing || !live) return;
@@ -144,7 +145,15 @@ export function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlace
       let i = Math.min(piece.current, s.parts.length - 1);
       const p = s.parts[i];
       if (v.ended || v.currentTime >= p.end - 0.02) {
-        i = (i + 1) % s.parts.length;
+        if (i === s.parts.length - 1) {
+          v.pause();
+          piece.current = 0;
+          v.currentTime = s.parts[0].start;
+          setT(0);
+          setPlaying(false);
+          return;
+        }
+        i += 1;
         v.currentTime = s.parts[i].start;
         void v.play().catch(() => undefined);
       } else if (v.currentTime < p.start - 0.05) v.currentTime = p.start;
@@ -432,6 +441,9 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  // Plays once: at the end the playhead goes back to 0 and stays paused (looping made the restart lag).
+  const tNow = useRef(t);
+  useEffect(() => { tNow.current = t; }, [t]);
   useEffect(() => {
     if (!playing) return;
     let raf = 0;
@@ -439,7 +451,15 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
     const tick = (now: number) => {
       const dt = last === null ? 0 : (now - last) / 1000;
       last = now;
-      setT((cur) => (cur + dt >= total ? 0 : cur + dt));
+      const next = tNow.current + dt;
+      if (next >= total) {
+        tNow.current = 0;
+        setT(0);
+        setPlaying(false);
+        return;
+      }
+      tNow.current = next;
+      setT(next);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);

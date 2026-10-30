@@ -27,7 +27,9 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
   const [playing, setPlaying] = useState(false);
   usePlaybackClaims("phone", setPlaying);
 
-  // One clock for the whole preview; loops.
+  // One clock for the whole preview. Plays once: at the end it goes back to 0 and stays paused.
+  const tNow = useRef(t);
+  useEffect(() => { tNow.current = t; }, [t]);
   useEffect(() => {
     if (!playing) return;
     let raf = 0;
@@ -35,7 +37,15 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
     const tick = (now: number) => {
       const dt = last === null ? 0 : (now - last) / 1000;
       last = now;
-      setT((cur) => (cur + dt >= total ? 0 : cur + dt));
+      const next = tNow.current + dt;
+      if (next >= total) {
+        tNow.current = 0;
+        setT(0);
+        setPlaying(false);
+        return;
+      }
+      tNow.current = next;
+      setT(next);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
