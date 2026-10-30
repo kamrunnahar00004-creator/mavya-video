@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { fetchPage } from "@/lib/list-client";
 import { speedOf } from "@/lib/adjust";
 import { claimPlayback, usePlaybackClaims } from "@/components/run-preview";
-import { Check, Download, Film, FolderOpen, Loader2, MoreVertical, Music, Pause, Pencil, Play, Trash2, X } from "lucide-react";
+import { Check, CirclePlus, Download, Film, FolderOpen, Loader2, MoreVertical, Music, Pause, Play, Trash2, X } from "lucide-react";
 import { characterById } from "@/lib/characters";
 import { clipSrc, demoClips, partsOf } from "@/lib/edit";
 import { AVATAR_TONES } from "@/lib/client";
@@ -378,8 +378,8 @@ function Grid({ children }: { children: React.ReactNode }) {
 
 type ItemActions = { name: string; onRename: (name: string) => void; onDelete: () => void; onUse?: () => void; inUse?: boolean; download?: string };
 
-/** The ⋮ menu on an item: Use (unless it is in use), Download (exports), Rename, Delete (removes it from My files). */
-function ItemMenu({ onUse, inUse, download, onRename, onDelete, dark = true }: Omit<ItemActions, "name" | "onRename"> & { onRename: () => void; dark?: boolean }) {
+/** The ⋮ menu on an item: Use (unless it is in use), Download (exports), Delete (removes it from My files). Renaming is a click on the name. */
+function ItemMenu({ onUse, inUse, download, onDelete, dark = true }: Omit<ItemActions, "name" | "onRename"> & { dark?: boolean }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -397,9 +397,8 @@ function ItemMenu({ onUse, inUse, download, onRename, onDelete, dark = true }: O
       </button>
       {open && (
         <div role="menu" className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-lg border border-line bg-panel py-1 shadow-[0_8px_24px_rgba(0,0,0,0.14)]">
-          {onUse && !inUse && <button type="button" role="menuitem" onClick={run(onUse)} className={item}>Use</button>}
+          {onUse && !inUse && <button type="button" role="menuitem" onClick={run(onUse)} className={item}><CirclePlus className="h-3.5 w-3.5" />Use</button>}
           {download && <a role="menuitem" href={download} download onClick={() => setOpen(false)} className={item}><Download className="h-3.5 w-3.5" />Download</a>}
-          <button type="button" role="menuitem" onClick={run(onRename)} className={item}><Pencil className="h-3.5 w-3.5" />Rename</button>
           <button type="button" role="menuitem" onClick={run(onDelete)} className={`${item} text-red-600`}><Trash2 className="h-3.5 w-3.5" />Delete</button>
         </div>
       )}
@@ -407,12 +406,17 @@ function ItemMenu({ onUse, inUse, download, onRename, onDelete, dark = true }: O
   );
 }
 
-/** The item's name; Rename turns it into a field (Enter or leaving it saves, Esc cancels, empty = back to the default). */
-function NameLine({ name, editing, onDone }: { name: string; editing: boolean; onDone: (name: string | null) => void }) {
+/** The item's name; a click turns it into a field (Enter or leaving it saves, Esc cancels, empty = back to the default). */
+function NameLine({ name, editing, onEdit, onDone }: { name: string; editing: boolean; onEdit: () => void; onDone: (name: string | null) => void }) {
   const [draft, setDraft] = useState(name);
   const done = useRef(false);
   const finish = (v: string | null) => { if (done.current) return; done.current = true; onDone(v); };
-  if (!editing) return <div className="truncate text-[12.5px] font-semibold" title={name}>{name}</div>;
+  if (!editing)
+    return (
+      <button type="button" onClick={onEdit} title="Rename" className="block w-full cursor-text truncate text-left text-[12.5px] font-semibold hover:underline hover:decoration-dotted hover:underline-offset-4">
+        {name}
+      </button>
+    );
   return (
     <input
       autoFocus
@@ -456,11 +460,11 @@ function Card({ children, meta, name, onRename, onDelete, onUse, inUse = false, 
           </span>
         )}
         <div className="absolute right-1 top-1">
-          <ItemMenu onUse={onUse} inUse={inUse} download={download} onRename={() => setRenaming(true)} onDelete={onDelete} />
+          <ItemMenu onUse={onUse} inUse={inUse} download={download} onDelete={onDelete} />
         </div>
       </div>
       <div className="mt-1.5 px-0.5">
-        <NameLine key={`${name}|${renaming}`} name={name} editing={renaming} onDone={(n) => { setRenaming(false); if (n !== null && n.trim() !== name) onRename(n); }} />
+        <NameLine key={`${name}|${renaming}`} name={name} editing={renaming} onEdit={() => setRenaming(true)} onDone={(n) => { setRenaming(false); if (n !== null && n.trim() !== name) onRename(n); }} />
         {meta}
       </div>
     </div>
@@ -565,12 +569,12 @@ function SoundRow({ p, meta, name, onUse, inUse = false, onRename, onDelete }: I
             <span title="In use" aria-label="In use" className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"><Check className="h-2.5 w-2.5" strokeWidth={3} /></span>
           ) : p.kind === "hook" ? <Film className="h-3.5 w-3.5 shrink-0 text-soft" /> : <Music className="h-3.5 w-3.5 shrink-0 text-soft" />}
           <div className="min-w-0 flex-1">
-            <NameLine key={`${name}|${renaming}`} name={name} editing={renaming} onDone={(n) => { setRenaming(false); if (n !== null && n.trim() !== name) onRename(n); }} />
+            <NameLine key={`${name}|${renaming}`} name={name} editing={renaming} onEdit={() => setRenaming(true)} onDone={(n) => { setRenaming(false); if (n !== null && n.trim() !== name) onRename(n); }} />
           </div>
         </div>
         {meta}
       </div>
-      <ItemMenu dark={false} onUse={onUse} inUse={inUse} onRename={() => setRenaming(true)} onDelete={onDelete} />
+      <ItemMenu dark={false} onUse={onUse} inUse={inUse} onDelete={onDelete} />
     </div>
   );
 }

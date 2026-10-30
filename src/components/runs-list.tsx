@@ -6,7 +6,7 @@ import { MediaVideo } from "@/components/media-video";
 import { useEffect, useRef, useState } from "react";
 import Link from "@/components/pending-link";
 import { useRouter } from "next/navigation";
-import { LayoutGrid, List, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { LayoutGrid, List, Loader2, Plus, Trash2 } from "lucide-react";
 import { loadLibrary } from "@/lib/library-cache";
 import { fetchPage } from "@/lib/list-client";
 import { runSteps } from "@/lib/edit";
@@ -33,14 +33,26 @@ function progress(r: Run) {
   return { ready: done === steps.length, label: done === steps.length ? "Ready" : `Step ${steps.findIndex((d) => !d) + 1} of ${steps.length}`, done, total: steps.length };
 }
 
-/** The title, renamed in place: click the pencil (or the title in list view), Enter saves, Esc cancels. */
+/** The title, renamed in place: click it (it does not open the video), Enter saves, Esc cancels. */
 function Title({ run, editing, onEdit, onRename, className }: { run: Run; editing: boolean; onEdit: (on: boolean) => void; onRename: (t: string) => void; className?: string }) {
   const [draft, setDraft] = useState(titleOf(run));
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (editing) input.current?.select();
   }, [editing]);
-  if (!editing) return <span className={`block truncate ${className ?? ""}`}>{titleOf(run)}</span>;
+  if (!editing)
+    return (
+      <span
+        role="button"
+        tabIndex={0}
+        title="Rename"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(true); }}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onEdit(true); } }}
+        className={`block cursor-text truncate rounded-sm hover:underline hover:decoration-dotted hover:underline-offset-4 ${className ?? ""}`}
+      >
+        {titleOf(run)}
+      </span>
+    );
   const done = (save: boolean) => {
     onEdit(false);
     const t = draft.trim();
@@ -146,21 +158,9 @@ export function RunsList() {
   }
 
   const iconBtn = "flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-raised hover:text-text";
-  /** Rename / delete, shown on hover (and always reachable by keyboard). */
+  /** Delete, shown on hover (and always reachable by keyboard). Renaming is a click on the title. */
   const actions = (r: Run, onDark = false) => (
     <div className="flex items-center gap-0.5">
-      <button
-        type="button"
-        aria-label="Rename"
-        title="Rename"
-        onClick={(e) => {
-          e.preventDefault();
-          setEditing(r.id);
-        }}
-        className={onDark ? "flex h-8 w-8 items-center justify-center rounded-md bg-black/55 text-white hover:bg-black/75" : iconBtn}
-      >
-        <Pencil className="h-4 w-4" />
-      </button>
       <button
         type="button"
         disabled={deleting === r.id}
