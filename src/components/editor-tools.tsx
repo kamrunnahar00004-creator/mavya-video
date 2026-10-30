@@ -1860,7 +1860,9 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
   const [dropAt, setDropAt] = useState<number | null>(null);
   const mode = run.demo.mode ?? (clips.length ? "single" : undefined);
   const [busy, setBusy] = useState<string | null>(null); // clip id (or "single") being uploaded
-  const [openId, setOpenId] = useState<string | null>(null);
+  // undefined = nothing chosen yet: the first filmed clip is open, so its preview shows straight away.
+  const [openPick, setOpenId] = useState<string | null | undefined>(undefined);
+  const openId = openPick === undefined ? (clips.find((c) => clipSrc(c))?.id ?? null) : openPick;
   const [error, setError] = useState<string | null>(null);
 
   async function take(id: string, f: File | undefined, upload: (f: File) => Promise<void>) {
@@ -1891,6 +1893,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
     setBusy("single");
     try {
       await onFiles(files);
+      setOpenId(undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
