@@ -107,7 +107,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
 
   const hooks: Entry<Reference>[] = [];
   const seenHook = new Set<string>();
-  for (const r of all) {
+  for (const r of [...all].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
     const ref = availableRefs.find((x) => x.id === r.sourceRefId);
     if (!ref || seenHook.has(ref.id)) continue;
     seenHook.add(ref.id);
@@ -118,7 +118,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
   const faces: Entry<Face>[] = [];
   const seenFace = new Set<string>();
   const faceKey = (f: Face) => (f.kind === "photo" ? `photo:${f.mediaId}` : f.kind === "ai" ? `ai:${f.index}` : f.kind === "character" ? `character:${f.id}` : `described:${f.text}`);
-  for (const r of all) {
+  for (const r of [...all].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
     const f = r.hook.face;
     if (!f || seenFace.has(faceKey(f))) continue;
     seenFace.add(faceKey(f));
@@ -130,27 +130,35 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     faces.push({ key: `photo:${a.mediaId}`, at: a.createdAt, kind: "photo", value: { kind: "photo", mediaId: a.mediaId } });
   }
 
+  // Reusing something in another video never lists it twice: each file once, under the video it was first made in.
+  const oldestFirst = [...all].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
   // Each generated hook once (picking one in another video does not make a copy).
   const generated: Entry<{ g: Generated; run: Run }>[] = [];
   const seenGen = new Set<string>();
-  for (const r of all) {
+  for (const r of oldestFirst) {
     for (const g of [...(r.hook.versions ?? []), ...(r.hook.generated ? [r.hook.generated] : [])]) {
-      if (seenGen.has(g.src + g.at)) continue;
-      seenGen.add(g.src + g.at);
+      if (seenGen.has(g.src)) continue;
+      seenGen.add(g.src);
       generated.push({ key: `${r.id}:${g.at}:${g.src}`, at: g.at, ...from(r), kind: "all", value: { g, run: r } });
     }
   }
 
-  // One demo per video: all its clips, as they were cut.
+  // One demo per set of clips (the same files in the same order = the same demo), as they were cut.
+  const demoKey = (clips: DemoClip[]) => clips.map((c) => clipSrc(c)).join("|");
   const demos: Entry<{ clips: DemoClip[]; run: Run }>[] = [];
-  for (const r of all) {
+  const seenDemo = new Set<string>();
+  for (const r of oldestFirst) {
     const clips = demoClips(r).filter((c) => clipSrc(c));
-    if (clips.length) demos.push({ key: r.id, at: r.updatedAt, ...from(r), kind: "all", value: { clips, run: r } });
+    if (!clips.length || seenDemo.has(demoKey(clips))) continue;
+    seenDemo.add(demoKey(clips));
+    demos.push({ key: r.id, at: r.updatedAt, ...from(r), kind: "all", value: { clips, run: r } });
   }
+  const demoNow = demoKey(demoClips(run).filter((c) => clipSrc(c)));
 
   const music: Entry<SoundPiece>[] = [];
   const seenSound = new Set<string>();
-  for (const r of all) {
+  for (const r of oldestFirst) {
     for (const p of r.sounds ?? (r.sound ? [{ id: "main", at: 0, row: 0, ...r.sound }] : [])) {
       if (seenSound.has(p.src)) continue;
       seenSound.add(p.src);
@@ -227,7 +235,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     body = list.length ? (
       <Grid>
         {list.map((x) => (
-          <Card key={x.key} onUse={run.hook.generated?.src === x.value.g.src && run.hook.generated.at === x.value.g.at ? undefined : () => onUseGenerated(x.value.g, x.value.run)} footer={<><div className="truncate text-[12.5px] font-semibold">Hook · {fmtTime(x.value.g.seconds)}</div>{meta(x)}</>}>
+          <Card key={x.key} onUse={run.hook.generated?.src === x.value.g.src ? undefined : () => onUseGenerated(x.value.g, x.value.run)} footer={<><div className="truncate text-[12.5px] font-semibold">Hook · {fmtTime(x.value.g.seconds)}</div>{meta(x)}</>}>
             <HoverVideo src={x.value.g.src} />
           </Card>
         ))}
@@ -242,7 +250,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           const first = partsOf({ start: clips[0].start ?? 0, end: clips[0].end ?? clips[0].seconds ?? 3, parts: clips[0].parts });
           const len = clips.reduce((t, c) => t + partsOf({ start: c.start ?? 0, end: c.end ?? c.seconds ?? 3, parts: c.parts }).reduce((a, p) => a + (p.end - p.start), 0) / speedOf(c.adjust), 0);
           return (
-            <Card key={x.key} onUse={x.runId === run.id ? undefined : () => onUseDemo(clips, x.value.run)} footer={<><div className="truncate text-[12.5px] font-semibold">{clips.length} {clips.length === 1 ? "clip" : "clips"} · {fmtTime(len)}</div>{meta(x)}</>}>
+            <Card key={x.key} onUse={demoKey(clips) === demoNow ? undefined : () => onUseDemo(clips, x.value.run)} footer={<><div className="truncate text-[12.5px] font-semibold">{clips.length} {clips.length === 1 ? "clip" : "clips"} · {fmtTime(len)}</div>{meta(x)}</>}>
               <HoverVideo src={clipSrc(clips[0]) ?? ""} at={first[0].start} />
             </Card>
           );
