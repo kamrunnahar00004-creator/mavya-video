@@ -1,6 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { r2Enabled, downloadTo, objectSize, putObject, signedGet, signedPut } from "@/lib/server/r2";
 import { authEnabled, createSupabaseAdminClient } from "@/lib/supabase/server";
@@ -409,6 +410,49 @@ async function deleteMediaFile(mediaId: string): Promise<void> {
 }
 
 
+
+/* ---------- My files: names and removals ---------- */
+
+/**
+ * What the seller changed in My files: a name per item, and items removed from the list. Removing only hides the
+ * item there; videos that use the file keep it. One small JSON per user (local: in .data; cloud: in R2).
+ */
+export type FilePrefs = { names: Record<string, string>; hidden: string[] };
+const prefsKey = (who: string) => `prefs/${who}/files.json`;
+const PREFS_FILE = path.join(DATA_DIR, "file-prefs.json");
+
+export async function getFilePrefs(who: string): Promise<FilePrefs> {
+  const empty: FilePrefs = { names: {}, hidden: [] };
+  let text: string | null = null;
+  if (!cloud()) {
+    text = await readFile(PREFS_FILE, "utf8").catch(() => null);
+  } else {
+    const dir = await mkdtemp(path.join(tmpdir(), "mavya-prefs-"));
+    try {
+      const file = path.join(dir, "files.json");
+      if (await downloadTo(prefsKey(who), file)) text = await readFile(file, "utf8");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+  try {
+    const v = text ? (JSON.parse(text) as Partial<FilePrefs>) : {};
+    return { names: v.names && typeof v.names === "object" ? v.names : {}, hidden: Array.isArray(v.hidden) ? v.hidden : [] };
+  } catch {
+    return empty;
+  }
+}
+
+export async function setFilePrefs(who: string, prefs: FilePrefs): Promise<void> {
+  const body = JSON.stringify(prefs);
+  if (!cloud()) {
+    await mkdir(DATA_DIR, { recursive: true });
+    await writeFile(`${PREFS_FILE}.tmp`, body);
+    await rename(`${PREFS_FILE}.tmp`, PREFS_FILE);
+    return;
+  }
+  await putObject(prefsKey(who), Buffer.from(body), "application/json");
+}
 
 /** Append under the database lock, never from a browser/read-modify-write array snapshot. */
 export async function appendExport(id: string, mediaId: string, result: {src: string; seconds: number; at: string}, who: string) {

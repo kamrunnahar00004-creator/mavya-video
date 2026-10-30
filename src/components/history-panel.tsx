@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { fetchPage } from "@/lib/list-client";
 import { speedOf } from "@/lib/adjust";
 import { claimPlayback, usePlaybackClaims } from "@/components/run-preview";
-import { Download, Film, FolderOpen, Loader2, Music, Pause, Play, X } from "lucide-react";
+import { Check, Download, Film, FolderOpen, Loader2, MoreVertical, Music, Pause, Pencil, Play, Trash2, X } from "lucide-react";
 import { characterById } from "@/lib/characters";
 import { clipSrc, demoClips, partsOf } from "@/lib/edit";
 import { AVATAR_TONES } from "@/lib/client";
@@ -77,6 +77,12 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
   const [hookView, setHookView] = useState<{ r: Reference; onUse?: () => void } | null>(null);
   const [filter, setFilter] = useState("all");
   const [sort, setSort] = useState<Sort>("new");
+  const [prefs, setPrefs] = useState<{ names: Record<string, string>; hidden: string[] }>({ names: {}, hidden: [] });
+  useEffect(() => {
+    let alive = true;
+    void fetch("/api/file-prefs").then((r) => (r.ok ? r.json() : null)).then((p) => { if (alive && p?.names) setPrefs(p); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -118,9 +124,9 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     const ref = availableRefs.find((x) => x.id === r.sourceRefId);
     if (!ref || seenHook.has(ref.id)) continue;
     seenHook.add(ref.id);
-    hooks.push({ key: ref.id, at: r.updatedAt, ...from(r), kind: ref.owner === "user" ? "upload" : "library", value: ref });
+    hooks.push({ key: `hook:${ref.id}`, at: r.updatedAt, ...from(r), kind: ref.owner === "user" ? "upload" : "library", value: ref });
   }
-  for (const ref of availableRefs) if (ref.owner === "user" && ref.mediaId && !seenHook.has(ref.id)) hooks.push({ key: ref.id, at: ref.createdAt, kind: "upload", value: ref });
+  for (const ref of availableRefs) if (ref.owner === "user" && ref.mediaId && !seenHook.has(ref.id)) hooks.push({ key: `hook:${ref.id}`, at: ref.createdAt, kind: "upload", value: ref });
 
   const faces: Entry<Face>[] = [];
   const seenFace = new Set<string>();
@@ -129,12 +135,12 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     const f = r.hook.face;
     if (!f || seenFace.has(faceKey(f))) continue;
     seenFace.add(faceKey(f));
-    faces.push({ key: faceKey(f), at: r.updatedAt, ...from(r), kind: f.kind === "photo" ? "photo" : "character", value: f });
+    faces.push({ key: `face:${faceKey(f)}`, at: r.updatedAt, ...from(r), kind: f.kind === "photo" ? "photo" : "character", value: f });
   }
   for (const a of assets) {
     if (a.kind !== "image" || seenFace.has(`photo:${a.mediaId}`)) continue;
     seenFace.add(`photo:${a.mediaId}`);
-    faces.push({ key: `photo:${a.mediaId}`, at: a.createdAt, kind: "photo", value: { kind: "photo", mediaId: a.mediaId } });
+    faces.push({ key: `face:photo:${a.mediaId}`, at: a.createdAt, kind: "photo", value: { kind: "photo", mediaId: a.mediaId } });
   }
 
   // Reusing something in another video never lists it twice: each file once, under the video it was first made in.
@@ -147,7 +153,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     for (const g of [...(r.hook.versions ?? []), ...(r.hook.generated ? [r.hook.generated] : [])]) {
       if (seenGen.has(g.src)) continue;
       seenGen.add(g.src);
-      generated.push({ key: `${r.id}:${g.at}:${g.src}`, at: g.at, ...from(r), kind: "all", value: { g, run: r } });
+      generated.push({ key: `generated:${g.src}`, at: g.at, ...from(r), kind: "all", value: { g, run: r } });
     }
   }
 
@@ -159,9 +165,10 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     const clips = demoClips(r).filter((c) => clipSrc(c));
     if (!clips.length || seenDemo.has(demoKey(clips))) continue;
     seenDemo.add(demoKey(clips));
-    demos.push({ key: r.id, at: r.updatedAt, ...from(r), kind: "all", value: { clips, run: r } });
+    demos.push({ key: `demo:${demoKey(clips)}`, at: r.updatedAt, ...from(r), kind: "all", value: { clips, run: r } });
   }
   const demoNow = demoKey(demoClips(run).filter((c) => clipSrc(c)));
+  const soundsNow = new Set((run.sounds ?? (run.sound ? [run.sound] : [])).map((p) => p.src));
 
   const music: Entry<SoundPiece>[] = [];
   const seenSound = new Set<string>();
@@ -169,18 +176,33 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     for (const p of r.sounds ?? (r.sound ? [{ id: "main", at: 0, row: 0, ...r.sound }] : [])) {
       if (seenSound.has(p.src)) continue;
       seenSound.add(p.src);
-      music.push({ key: p.src, at: r.updatedAt, ...from(r), kind: p.kind, value: p });
+      music.push({ key: `music:${p.src}`, at: r.updatedAt, ...from(r), kind: p.kind, value: p });
     }
   }
 
   const exports: Entry<NonNullable<Run["exports"]>[number]>[] = [];
-  for (const r of all) for (const x of r.exports ?? []) exports.push({ key: `${r.id}:${x.at}`, at: x.at, ...from(r), kind: "all", value: x });
+  for (const r of all) for (const x of r.exports ?? []) exports.push({ key: `export:${x.src}`, at: x.at, ...from(r), kind: "all", value: x });
 
+  // Removed from My files (Delete in the ⋮ menu) are left out everywhere here.
+  const shown = <T,>(list: Entry<T>[]) => list.filter((x) => !prefs.hidden.includes(x.key));
   const pick = <T,>(list: Entry<T>[]) =>
-    list
+    shown(list)
       .filter((x) => filter === "all" || (filter === "this" ? x.runId === run.id : x.kind === filter))
       .sort((a, b) => (sort === "new" ? b.at.localeCompare(a.at) : a.at.localeCompare(b.at)));
-  const counts: Record<Tab, number> = { hooks: hooks.length, characters: faces.length, generated: generated.length, demos: demos.length, music: music.length, exports: exports.length };
+  const counts: Record<Tab, number> = { hooks: shown(hooks).length, characters: shown(faces).length, generated: shown(generated).length, demos: shown(demos).length, music: shown(music).length, exports: shown(exports).length };
+  // The seller's name for an item, else its default; Rename / Delete save at once (the list updates first).
+  const nameOf = (key: string, fallback: string) => prefs.names[key] ?? fallback;
+  const changePref = (key: string, change: { name?: string; hidden?: boolean }) => {
+    setPrefs((p) => {
+      const names = { ...p.names };
+      if (change.name !== undefined) { if (change.name.trim()) names[key] = change.name.trim().slice(0, 80); else delete names[key]; }
+      return { names, hidden: change.hidden ? [...p.hidden, key] : p.hidden };
+    });
+    void fetch("/api/file-prefs", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ key, ...change }) })
+      .then((r) => { if (!r.ok) throw Error(); })
+      .catch(() => setListError("Couldn't save. Try again."));
+  };
+  const actions = (key: string, fallback: string) => ({ name: nameOf(key, fallback), onRename: (name: string) => changePref(key, { name }), onDelete: () => changePref(key, { hidden: true }) });
 
   const chip = (on: boolean) => `rounded-full border px-3 py-1 text-[12.5px] font-semibold ${on ? "border-ink bg-ink text-white" : "border-line text-muted hover:border-line-strong hover:text-text"}`;
   const meta = (x: Entry<unknown>) => (
@@ -203,12 +225,12 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           const use = run.sourceRefId === r.id ? undefined : () => onUseHook(r);
           const open = r.mediaId ? () => setPlaying({ clips: [{ src: `/api/media/${r.mediaId}`, start: 0 }], sound: true, onUse: use, useLabel: "Use this hook" }) : embedUrl(r) ? () => setHookView({ r, onUse: use }) : undefined;
           return (
-            <Card key={x.key} onOpen={open} onUse={use} footer={<><div className="truncate text-[12.5px] font-semibold">{r.author ? `@${r.author}` : r.title}</div>{meta(x)}</>}>
+            <Card key={x.key} onOpen={open} onUse={() => onUseHook(r)} inUse={!use} {...actions(x.key, r.author ? `@${r.author}` : r.title)} meta={meta(x)}>
               {thumb ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={thumb} alt="" loading="lazy" className="h-full w-full object-cover" />
               ) : r.mediaId ? <Still src={`/api/media/${r.mediaId}`} /> : null}
-              <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10.5px] font-bold text-white">{x.kind === "upload" ? "Uploaded" : "Library"}</span>
+              <span className="absolute bottom-1.5 left-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10.5px] font-bold text-white">{x.kind === "upload" ? "Uploaded" : "Library"}</span>
             </Card>
           );
         })}
@@ -222,7 +244,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           const f = x.value;
           const name = f.kind === "character" ? (characterById(f.id)?.name ?? "Character") : f.kind === "photo" ? "Your photo" : f.kind === "ai" ? `AI face ${f.index + 1}` : f.text;
           return (
-            <Card key={x.key} square onUse={run.hook.face && faceKey(run.hook.face) === x.key ? undefined : () => onUseFace(f)} footer={<><div className="truncate text-[12.5px] font-semibold">{name}</div>{meta(x)}</>}>
+            <Card key={x.key} square onUse={() => onUseFace(f)} inUse={Boolean(run.hook.face && `face:${faceKey(run.hook.face)}` === x.key)} {...actions(x.key, name)} meta={meta(x)}>
               {f.kind === "character" ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={characterById(f.id)?.thumb ?? `/characters/${f.id}.jpg`} alt="" className="h-full w-full object-cover" />
@@ -244,9 +266,10 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     body = list.length ? (
       <Grid>
         {list.map((x) => {
-          const use = run.hook.generated?.src === x.value.g.src ? undefined : () => onUseGenerated(x.value.g, x.value.run);
+          const inUse = run.hook.generated?.src === x.value.g.src;
+          const use = () => onUseGenerated(x.value.g, x.value.run);
           return (
-            <Card key={x.key} onOpen={() => setPlaying({ clips: [{ src: x.value.g.src, start: 0 }], sound: true, onUse: use })} onUse={use} footer={<><div className="truncate text-[12.5px] font-semibold">Hook · {fmtTime(x.value.g.seconds)}</div>{meta(x)}</>}>
+            <Card key={x.key} onOpen={() => setPlaying({ clips: [{ src: x.value.g.src, start: 0 }], sound: true, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, `Hook · ${fmtTime(x.value.g.seconds)}`)} meta={meta(x)}>
               <Still src={x.value.g.src} />
             </Card>
           );
@@ -261,11 +284,12 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           const clips = x.value.clips;
           const first = partsOf({ start: clips[0].start ?? 0, end: clips[0].end ?? clips[0].seconds ?? 3, parts: clips[0].parts });
           const len = clips.reduce((t, c) => t + partsOf({ start: c.start ?? 0, end: c.end ?? c.seconds ?? 3, parts: c.parts }).reduce((a, p) => a + (p.end - p.start), 0) / speedOf(c.adjust), 0);
-          const use = demoKey(clips) === demoNow ? undefined : () => onUseDemo(clips, x.value.run);
+          const inUse = demoKey(clips) === demoNow;
+          const use = () => onUseDemo(clips, x.value.run);
           // The popup plays the demo as it was cut: each clip's kept pieces, back to back.
           const pieces = clips.flatMap((c) => partsOf({ start: c.start ?? 0, end: c.end ?? c.seconds ?? 3, parts: c.parts }).map((p) => ({ src: clipSrc(c) ?? "", start: p.start, end: p.end })));
           return (
-            <Card key={x.key} onOpen={() => setPlaying({ clips: pieces, sound: true, onUse: use })} onUse={use} footer={<><div className="truncate text-[12.5px] font-semibold">{clips.length} {clips.length === 1 ? "clip" : "clips"} · {fmtTime(len)}</div>{meta(x)}</>}>
+            <Card key={x.key} onOpen={() => setPlaying({ clips: pieces, sound: true, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, `${clips.length} ${clips.length === 1 ? "clip" : "clips"} · ${fmtTime(len)}`)} meta={meta(x)}>
               {/* A frame just inside the kept part: at exactly 0s a metadata-only video often shows nothing. */}
               <Still src={clipSrc(clips[0]) ?? ""} at={Math.min(first[0].start + 0.5, (first[0].start + first[0].end) / 2)} />
             </Card>
@@ -278,7 +302,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     body = list.length ? (
       <div className="space-y-1">
         {list.map((x) => (
-          <SoundRow key={x.key} p={x.value} meta={meta(x)} onUse={() => onUseSound(x.value)} />
+          <SoundRow key={x.key} p={x.value} meta={meta(x)} onUse={() => onUseSound(x.value)} inUse={soundsNow.has(x.value.src)} {...actions(x.key, x.value.name)} />
         ))}
       </div>
     ) : empty("Songs and sounds you use show here");
@@ -290,13 +314,9 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           <Card
             key={x.key}
             onOpen={() => setPlaying({ clips: [{ src: x.value.src, start: 0 }], sound: true })}
-            footer={<><div className="truncate text-[12.5px] font-semibold">{x.runTitle} · {fmtTime(x.value.seconds)}</div>{meta(x)}</>}
-            action={
-              <a href={x.value.src} download className="flex items-center justify-center gap-1.5 rounded-lg border border-line py-1.5 text-[12.5px] font-bold text-text hover:border-accent hover:text-accent">
-                <Download className="h-3.5 w-3.5" />
-                Download
-              </a>
-            }
+            download={x.value.src}
+            {...actions(x.key, `${x.runTitle} · ${fmtTime(x.value.seconds)}`)}
+            meta={meta(x)}
           >
             <Still src={x.value.src} />
           </Card>
@@ -356,33 +376,92 @@ function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-3 gap-3">{children}</div>;
 }
 
-/** A history item: the picture (9:16, or square for faces), a short footer, and Use (or a custom action). `onOpen`: the picture opens it in a popup. */
-function Card({ children, footer, onUse, onOpen, useLabel = "Use", action, square = false }: { children: React.ReactNode; footer: React.ReactNode; onUse?: () => void; onOpen?: () => void; useLabel?: string; action?: React.ReactNode; square?: boolean }) {
-  const box = `relative block w-full overflow-hidden rounded-xl border border-line bg-raised ${square ? "aspect-square" : "aspect-[9/16]"}`;
+type ItemActions = { name: string; onRename: (name: string) => void; onDelete: () => void; onUse?: () => void; inUse?: boolean; download?: string };
+
+/** The ⋮ menu on an item: Use (unless it is in use), Download (exports), Rename, Delete (removes it from My files). */
+function ItemMenu({ onUse, inUse, download, onRename, onDelete, dark = true }: Omit<ItemActions, "name" | "onRename"> & { onRename: () => void; dark?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [open]);
+  const item = "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] font-semibold hover:bg-raised";
+  const run = (fn: () => void) => () => { setOpen(false); fn(); };
+  return (
+    <div ref={box} className="relative">
+      <button type="button" aria-label="More" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={`flex h-7 w-7 items-center justify-center rounded-full ${dark ? "bg-black/55 text-white hover:bg-black/70" : "text-muted hover:bg-raised hover:text-text"}`}>
+        <MoreVertical className="h-4 w-4" />
+      </button>
+      {open && (
+        <div role="menu" className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-lg border border-line bg-panel py-1 shadow-[0_8px_24px_rgba(0,0,0,0.14)]">
+          {onUse && !inUse && <button type="button" role="menuitem" onClick={run(onUse)} className={item}>Use</button>}
+          {download && <a role="menuitem" href={download} download onClick={() => setOpen(false)} className={item}><Download className="h-3.5 w-3.5" />Download</a>}
+          <button type="button" role="menuitem" onClick={run(onRename)} className={item}><Pencil className="h-3.5 w-3.5" />Rename</button>
+          <button type="button" role="menuitem" onClick={run(onDelete)} className={`${item} text-red-600`}><Trash2 className="h-3.5 w-3.5" />Delete</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The item's name; Rename turns it into a field (Enter or leaving it saves, Esc cancels, empty = back to the default). */
+function NameLine({ name, editing, onDone }: { name: string; editing: boolean; onDone: (name: string | null) => void }) {
+  const [draft, setDraft] = useState(name);
+  const done = useRef(false);
+  const finish = (v: string | null) => { if (done.current) return; done.current = true; onDone(v); };
+  if (!editing) return <div className="truncate text-[12.5px] font-semibold" title={name}>{name}</div>;
+  return (
+    <input
+      autoFocus
+      value={draft}
+      maxLength={80}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => finish(draft)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") finish(draft);
+        if (e.key === "Escape") { e.stopPropagation(); finish(null); }
+      }}
+      aria-label="Name"
+      className="w-full rounded-md border border-accent bg-panel px-1.5 py-0.5 text-[12.5px] font-semibold outline-none"
+    />
+  );
+}
+
+/** A history item: the picture (9:16, or square for faces; `onOpen` plays it in a popup), a green check when this video uses it, ⋮ for Use / Rename / Delete. */
+function Card({ children, meta, name, onRename, onDelete, onUse, inUse = false, download, onOpen, square = false }: ItemActions & { children: React.ReactNode; meta: React.ReactNode; onOpen?: () => void; square?: boolean }) {
+  const [renaming, setRenaming] = useState(false);
+  const box = `relative block w-full overflow-hidden rounded-xl border bg-raised ${inUse ? "border-emerald-500" : "border-line"} ${square ? "aspect-square" : "aspect-[9/16]"}`;
   return (
     <div className="min-w-0">
-      {onOpen ? (
-        <button type="button" onClick={onOpen} aria-label="Play" className={`${box} group`}>
-          {children}
-          <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/25">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100">
-              <Play className="ml-0.5 h-4 w-4" fill="currentColor" />
+      <div className="relative">
+        {onOpen ? (
+          <button type="button" onClick={onOpen} aria-label="Play" className={`${box} group`}>
+            {children}
+            <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/25">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                <Play className="ml-0.5 h-4 w-4" fill="currentColor" />
+              </span>
             </span>
+          </button>
+        ) : (
+          <div className={box}>{children}</div>
+        )}
+        {inUse && (
+          <span title="In use" aria-label="In use" className="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white">
+            <Check className="h-3 w-3" strokeWidth={3} />
           </span>
-        </button>
-      ) : (
-        <div className={box}>{children}</div>
-      )}
-      <div className="mt-1.5 px-0.5">{footer}</div>
-      <div className="mt-1.5">
-        {action ??
-          (onUse ? (
-            <button type="button" onClick={onUse} className="flex w-full items-center justify-center gap-1 rounded-lg border border-line py-1.5 text-[12.5px] font-bold text-text hover:border-accent hover:text-accent">
-              {useLabel}
-            </button>
-          ) : (
-            <div className="py-1.5 text-center text-[12px] font-semibold text-soft">In use</div>
-          ))}
+        )}
+        <div className="absolute right-1 top-1">
+          <ItemMenu onUse={onUse} inUse={inUse} download={download} onRename={() => setRenaming(true)} onDelete={onDelete} />
+        </div>
+      </div>
+      <div className="mt-1.5 px-0.5">
+        <NameLine key={`${name}|${renaming}`} name={name} editing={renaming} onDone={(n) => { setRenaming(false); if (n !== null && n.trim() !== name) onRename(n); }} />
+        {meta}
       </div>
     </div>
   );
@@ -456,10 +535,11 @@ function PlayPopup({ p, onClose }: { p: Playing; onClose: () => void }) {
   );
 }
 
-/** A sound in the history: play / pause, name, kind, and Add. */
-function SoundRow({ p, meta, onUse }: { p: SoundPiece; meta: React.ReactNode; onUse: () => void }) {
+/** A sound in the history: play / pause, name (green check when this video uses it), ⋮ for Use / Rename / Delete. */
+function SoundRow({ p, meta, name, onUse, inUse = false, onRename, onDelete }: ItemActions & { p: SoundPiece; meta: React.ReactNode }) {
   const audio = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
+  const [renaming, setRenaming] = useState(false);
   const who = useId();
   usePlaybackClaims(who, setPlaying);
   useEffect(() => { if (!playing) audio.current?.pause(); }, [playing]);
@@ -480,15 +560,17 @@ function SoundRow({ p, meta, onUse }: { p: SoundPiece; meta: React.ReactNode; on
       </button>
       <audio ref={audio} src={p.src} preload="none" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 truncate text-[13.5px] font-semibold">
-          {p.kind === "hook" ? <Film className="h-3.5 w-3.5 shrink-0 text-soft" /> : <Music className="h-3.5 w-3.5 shrink-0 text-soft" />}
-          <span className="truncate">{p.name}</span>
+        <div className="flex items-center gap-1.5 text-[13.5px] font-semibold">
+          {inUse ? (
+            <span title="In use" aria-label="In use" className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"><Check className="h-2.5 w-2.5" strokeWidth={3} /></span>
+          ) : p.kind === "hook" ? <Film className="h-3.5 w-3.5 shrink-0 text-soft" /> : <Music className="h-3.5 w-3.5 shrink-0 text-soft" />}
+          <div className="min-w-0 flex-1">
+            <NameLine key={`${name}|${renaming}`} name={name} editing={renaming} onDone={(n) => { setRenaming(false); if (n !== null && n.trim() !== name) onRename(n); }} />
+          </div>
         </div>
         {meta}
       </div>
-      <button type="button" onClick={onUse} className="flex shrink-0 items-center gap-1 rounded-lg border border-line px-3 py-1.5 text-[12.5px] font-bold text-text hover:border-accent hover:text-accent">
-        Use
-      </button>
+      <ItemMenu dark={false} onUse={onUse} inUse={inUse} onRename={() => setRenaming(true)} onDelete={onDelete} />
     </div>
   );
 }
