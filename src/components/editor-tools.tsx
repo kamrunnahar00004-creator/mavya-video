@@ -223,7 +223,8 @@ export function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlace
   // This clip's texts (anything overlapping its part of the timeline), in clip time.
   const mine = texts.filter((x) => x.end > offset + 0.05 && x.start < offset + len - 0.05);
   const local = mine.map((x) => ({ ...x, start: Math.max(0, x.start - offset), end: Math.min(len, x.end - offset) }));
-  const span: [number, number] = [round1(offset), round1(offset + len)];
+  // To the millisecond, like the clip itself: an added text covers exactly this clip.
+  const span: [number, number] = [Math.round(offset * 1000) / 1000, Math.round((offset + len) * 1000) / 1000];
 
   return (
     <div className="@container space-y-3">
@@ -246,7 +247,8 @@ export function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlace
                 >
                   <WarmthFilter adjust={seg.adjust} />
                   <MediaVideo ref={vref} key={`${seg.src}|${version ?? ""}`} src={seg.src} muted={!playing} playsInline onLoadedMetadata={() => seek(0)} className="absolute inset-0 h-full w-full object-cover" style={look} />
-                  {local.filter((x) => x.text.trim() && t >= x.start - 0.05 && t <= x.end + 0.05).map((x) => <TextOverlay key={x.id} x={x} onMove={(pos) => onPatch(x.id, pos)} />)}
+                  {/* One caption at a time at a boundary (end is exclusive), except the clip's very end shows its last caption. */}
+                  {local.filter((x) => x.text.trim() && t >= x.start && (t < x.end || (x.end >= len - 0.001 && t >= len - 0.001))).map((x) => <TextOverlay key={x.id} x={x} onMove={(pos) => onPatch(x.id, pos)} />)}
                 </div>
               ) : null)}
             {overlay}

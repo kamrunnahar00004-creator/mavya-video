@@ -237,7 +237,7 @@ export function runTexts(run: Run): TextLayer[] {
       id: "hook",
       text: h.text,
       start: 0,
-      end: round1(len),
+      end: Math.round(len * 1000) / 1000,
       x: h.textX ?? 50,
       y: h.textY ?? TEXT_Y[h.textPos ?? "top"],
       size: h.textSize ?? 4.6,

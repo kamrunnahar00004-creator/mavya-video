@@ -117,6 +117,26 @@ export function timeline(run: Run, source: Reference | null): Seg[] {
   });
 }
 
+/**
+ * Text edges that sit a hair off a clip's start or end (older texts were rounded to 0.1s while clips are placed to
+ * the millisecond) snap onto it, so a caption starts and ends exactly with its clip. Returns the same array when
+ * nothing moved.
+ */
+export function snapTexts(texts: TextLayer[], segs: Seg[], tol = 0.08): TextLayer[] {
+  const edges = segs.flatMap((s) => [s.offset, s.offset + s.len]).map(roundTime);
+  const snap = (x: number) => edges.find((e) => Math.abs(e - x) <= tol && Math.abs(e - x) > 0.0005) ?? x;
+  let moved = false;
+  const next = texts.map((t) => {
+    const start = snap(t.start);
+    const end = snap(t.end);
+    if (start === t.start && end === t.end) return t;
+    if (end - start < 0.3) return t;
+    moved = true;
+    return { ...t, start, end };
+  });
+  return moved ? next : texts;
+}
+
 type Window = { start: number; end: number; speed: number };
 
 /**

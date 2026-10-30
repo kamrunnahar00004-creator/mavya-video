@@ -14,7 +14,7 @@ import { DEFAULT_FONT } from "@/lib/studio-data";
 import { type Adjust, speedOf } from "@/lib/adjust";
 import { soundPieces } from "@/lib/sound";
 
-import { type Seg, clipSrc, demoClips, moveClipPiece, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, storeParts, timeline } from "@/lib/edit";
+import { type Seg, clipSrc, demoClips, moveClipPiece, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, snapTexts, storeParts, timeline } from "@/lib/edit";
 
 import { AVATAR_TONES, TEXT_Y, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { fmtTime, type DemoClip, type Frame, type Part, type Reference, type Run, type TextLayer, type TextPos } from "@/lib/types";
@@ -110,14 +110,23 @@ export function RunView() {
     }).catch(() => { if (alive) { setRefs(old => old ?? []); setToast("Library is unavailable. Try again."); } });
     void fetch(`/api/runs/${id}`).then(async response => {
       if (!response.ok) throw Error("missing");
-      const data = await response.json() as Run;
+      let data = await response.json() as Run;
       if (!alive) return;
+      let full: Reference | null = null;
       if (data.sourceRefId) {
         const selected = await fetch(`/api/references/${data.sourceRefId}`, { cache: "no-store" });
         if (!selected.ok) throw Error("source");
-        const full = await selected.json() as Reference;
-        if (alive) setRefs(old => [full, ...(old ?? []).filter(r => r.id !== full.id)]);
+        full = await selected.json() as Reference;
+        const got = full;
+        if (alive) setRefs(old => [got, ...(old ?? []).filter(r => r.id !== got.id)]);
       } else setRefs(old => old ?? []);
+      // Texts a hair off a clip's edge (older 0.1s rounding) snap onto it, so captions start and end with their clip.
+      const texts = runTexts(data);
+      const fixed = snapTexts(texts, timeline(data, full));
+      if (fixed !== texts) {
+        data = { ...data, texts: fixed };
+        void patchRun(id, { texts: fixed, project: null });
+      }
       if (alive) setRun(data);
     }).catch(() => alive && setMissing(id));
     return () => {
@@ -344,11 +353,16 @@ export function RunView() {
     const base = texts.find((x) => x.id === "hook");
     const stolen = ref.recipe?.onScreenText?.[0]?.text ?? (from === "library" ? ref.title : "");
     const keep = base && base.text && base.text !== DEFAULT_HOOK_TEXT;
-    const nextTexts = base && !keep && stolen ? texts.map((x) => (x.id === "hook" ? { ...x, text: stolen } : x)) : texts;
+    const named = base && !keep && stolen ? texts.map((x) => (x.id === "hook" ? { ...x, text: stolen } : x)) : texts;
+    const nextHook = { ...hook, source: from, start: seg?.start ?? 0, end: seg?.end ?? 3, clip: hook.face ? null : hook.clip, text: keep || !stolen ? hook.text : stolen };
+    // The hook's length changes with the clip: its text still covers the whole hook, later texts move with the demo.
+    const oldHook = timeline(run, source)[0];
+    const newHook = timeline({ ...run, sourceRefId: ref.id, hook: nextHook }, ref)[0];
+    const nextTexts = Math.abs(oldHook.len - newHook.len) > 0.0005 ? retimeTexts(named, 0, { start: 0, end: oldHook.len, speed: 1 }, { start: 0, end: newHook.len, speed: 1 }) : named;
     save({
       sourceRefId: ref.id,
       title: run.title === "Untitled run" || run.title === "Untitled video" ? (ref.author ? `Hook from @${ref.author}` : "Untitled video") : run.title,
-      hook: { ...hook, source: from, start: seg?.start ?? 0, end: seg?.end ?? 3, clip: hook.face ? null : hook.clip, text: keep || !stolen ? hook.text : stolen },
+      hook: nextHook,
       texts: nextTexts,
     });
     setPickerOpen(false);
@@ -483,7 +497,7 @@ export function RunView() {
     const old = segs[0];
     const moved = retimeTexts(texts, 0, { start: 0, end: old.len * sp, speed: sp }, { start: 0, end: generated.seconds, speed: nextSpeed });
     const base = moved.find((x) => x.id === "hook");
-    const end = round1(generated.seconds / nextSpeed);
+    const end = ms(generated.seconds / nextSpeed);
     const item: TextLayer = base
       ? { ...base, text: blankText ? "" : base.text && base.text !== DEFAULT_HOOK_TEXT ? base.text : text }
       : { id: "hook", text: blankText ? "" : text, start: 0, end, x: 50, y: TEXT_Y.top, size: 4.6, font: DEFAULT_FONT, color: "#ffffff", style: "outline" };
@@ -528,17 +542,19 @@ export function RunView() {
       nextTexts = retimeTexts(nextTexts, old.offset, { start: 0, end: old.len, speed: 1 }, { start: 0, end: now.len, speed: 1 });
     } else if (now) {
       const by = now.len - (old?.len ?? 0);
-      nextTexts = nextTexts.map((t) => (t.start >= now.offset - 0.05 ? { ...t, start: round1(t.start + by), end: round1(t.end + by) } : t.end > now.offset + 0.05 && !old ? { ...t, end: round1(t.end + by) } : t));
+      nextTexts = nextTexts.map((t) => (t.start >= now.offset - 0.05 ? { ...t, start: ms(t.start + by), end: ms(t.end + by) } : t.end > now.offset + 0.05 && !old ? { ...t, end: ms(t.end + by) } : t));
     }
     // First video for a copied shot: its captions go on screen over it (editable like any text), one after another
     // ("1. ... / 2. ..." = two captions, each its share of the clip). Always the demo look (founder 2026-10-29):
-    // TikTok Sans, white with a black outline; only the position follows the viral video.
+    // TikTok Sans, white with a black outline; only the position follows the viral video. To the millisecond: the first
+    // starts on the clip's first frame, the last ends on its last, no gap between them.
     const suggested = list.find((x) => x.id === clipId)?.text;
     if (now && !old && suggested) {
       const captions = suggested.split(/\s+\/\s+/).map((t) => t.trim()).filter(Boolean);
       const each = now.len / captions.length;
+      const edge = (k: number) => (k === captions.length ? ms(now.offset + now.len) : ms(now.offset + k * each));
       nextTexts = [...nextTexts, ...captions.map((t, k): TextLayer => ({
-        id: uid(), text: t, start: round1(now.offset + k * each), end: round1(now.offset + (k + 1) * each),
+        id: uid(), text: t, start: edge(k), end: edge(k + 1),
         x: 50, y: viralCaptionY(), size: 4.6, font: DEFAULT_FONT, color: "#ffffff", style: "outline", second: "#000000",
       }))];
     }
@@ -1328,6 +1344,8 @@ function CharacterBrowser({ current, onPick, onClose }: { current: Hook["face"] 
 const DEFAULT_HOOK_TEXT = "How is this tool even legal?";
 /** A clip's real length, to the millisecond and never past its end: rounding up would ask for frames that do not
  *  exist and freeze or blank the join to the next clip. */
+/** Timeline times to the millisecond, like clip offsets (0.1s rounding put captions a few frames off their clip). */
+const ms = (n: number) => Math.round(n * 1000) / 1000;
 const clipSeconds = (length: number | null | undefined) => (length && length > 0 ? Math.floor(length * 1000) / 1000 : 3);
 
 /**
