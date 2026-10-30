@@ -143,8 +143,10 @@ export function ProductStep({ product, reading, host, error, failedUrl, onAnalyz
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && dirty) { e.preventDefault(); onSend(text); setDirty(false); }
             }}
             aria-label="About your product (optional)"
-            placeholder={"(Optional)\nDescribe your product in one sentence:\n\nWho's it for?\n\nWhat feature do you want to highlight in the demo?"}
-            className="block w-full resize-none bg-transparent px-4 pt-3 text-[14.5px] leading-relaxed outline-none placeholder:text-soft"
+            placeholder={"(Optional)\nDescribe your product in one sentence:\n\nWho's it for?\n\nWhich feature should the video show off?"}
+            // Inline: the global :focus-visible outline and textarea background would otherwise cut across the box's border.
+            style={{ outline: "none", background: "transparent" }}
+            className="block w-full resize-none rounded-t-2xl px-4 pt-3 text-[14.5px] leading-relaxed placeholder:text-soft"
           />
           <div className="flex items-center justify-between px-2.5 pb-2.5">
             <span className="group/add relative">
