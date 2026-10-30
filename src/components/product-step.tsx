@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Globe, ImagePlus, Loader2, Sparkles, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowRight, ArrowUp, Globe, ImagePlus, Loader2, Plus, Sparkles, X } from "lucide-react";
 import type { Run } from "@/lib/types";
 
 
@@ -34,25 +34,47 @@ export async function writeScript(runId: string): Promise<{ run?: Run; error?: s
   return first.status === 409 ? post(`/api/runs/${runId}/script`) : first;
 }
 
+const FILE_TYPES = /^(image\/(png|jpeg|webp)|video\/(mp4|quicktime|webm))$/;
+const VIDEO_MAX = 12 * 1024 * 1024;
+/** Hints: each starts a line in the box (the last one opens the file picker). */
+const STARTERS = [
+  { label: "Who is it for?", text: "It's for " },
+  { label: "The one thing it does", text: "The one thing it does: " },
+  { label: "What to show in the video", text: "In the video, show " },
+];
+
 /**
- * Step 1 "Your product": the website goes in (paste or Analyze, both explicit; it runs Gemini). The page reads it in
- * the background and moves on at once; `reading` is that request, `error` its failure (the step reopens with it).
+ * Step 1 "Your product": the website goes in (paste or Analyze, both explicit; it runs Gemini) and is read in the
+ * background. Under it, an optional box for the seller's own words, photos and videos. The step stays open until
+ * "Steal a hook that already works". Send (an explicit click) saves the box and, when a clip is picked, rewrites the script.
  */
-export function ProductStep({ product, reading, error, failedUrl, onAnalyze, screens = [], onAddScreens, onRemoveScreen }: {
+export function ProductStep({ product, reading, host, error, failedUrl, onAnalyze, notes = "", files = [], writing = false, onAddFiles, onRemoveFile, onSend, onContinue }: {
   product: Run["product"] | null;
   reading: boolean;
+  /** The site being read (shown while there is no brief yet). */
+  host?: string;
   error: string | null;
   failedUrl?: string;
   onAnalyze: (url: string) => void;
-  /** Screenshots of the product (media ids), up to 5: the script names the real screens and buttons from them. */
-  screens?: string[];
-  onAddScreens?: (files: File[]) => Promise<void>;
-  onRemoveScreen?: (mediaId: string) => void;
+  /** The seller's own words about the product (saved). */
+  notes?: string;
+  /** Photos and short videos of the product (media ids), up to 5. */
+  files?: string[];
+  /** The script is being rewritten after Send. */
+  writing?: boolean;
+  onAddFiles: (files: File[]) => Promise<void>;
+  onRemoveFile: (mediaId: string) => void;
+  onSend: (notes: string) => void;
+  onContinue: (notes: string) => void;
 }) {
   const [url, setUrl] = useState(failedUrl ?? product?.url ?? "");
   const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(notes);
+  const [dirty, setDirty] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [screenError, setScreenError] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
 
   const analyze = (value = url) => {
     if (!value.trim() || reading) return;
@@ -60,61 +82,114 @@ export function ProductStep({ product, reading, error, failedUrl, onAnalyze, scr
     onAnalyze(value.trim());
   };
 
+  const addFiles = async (list: FileList | null) => {
+    const all = [...(list ?? [])];
+    const ok = all.filter((f) => FILE_TYPES.test(f.type) && (!f.type.startsWith("video/") || f.size <= VIDEO_MAX)).slice(0, 5 - files.length);
+    if (!ok.length) return setFileError(all.some((f) => f.type.startsWith("video/")) ? "Videos up to 12 MB." : "Use photos (PNG, JPG) or videos (MP4, MOV).");
+    setFileError(null);
+    setAdding(true);
+    try {
+      await onAddFiles(ok);
+      setDirty(true);
+    } catch {
+      setFileError("Couldn't upload. Try again.");
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const start = (line: string) => {
+    const next = text.trim() ? `${text.trimEnd()}\n${line}` : line;
+    setText(next);
+    setDirty(true);
+    requestAnimationFrame(() => {
+      const el = box.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(next.length, next.length);
+    });
+  };
+
   const brief = product?.brief;
-  if (brief && !editing && !reading && !error) {
+  if ((brief || reading) && !editing && !error) {
     return (
       // The rest of the brief (audience, wow moment, features) is kept for the script and demo plan, not shown.
-      <>
-      <div className="flex items-center gap-4 rounded-2xl border border-line bg-panel p-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-tint text-accent">
-          <Globe className="h-5 w-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-bold">{brief.name}</p>
-          <p className="truncate text-[13.5px] text-muted">{brief.oneLiner}</p>
+      <div className="space-y-3">
+        <div className="flex items-center gap-4 rounded-2xl border border-line bg-panel p-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-tint text-accent">
+            {reading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Globe className="h-5 w-5" />}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[15px] font-bold">{reading ? host : brief?.name}</p>
+            {!reading && <p className="truncate text-[13.5px] text-muted">{brief?.oneLiner}</p>}
+          </div>
+          {!reading && (
+            <button type="button" onClick={() => setEditing(true)} className="rounded-lg px-3 py-1.5 text-[13px] font-bold text-accent hover:bg-accent-tint">
+              Change
+            </button>
+          )}
         </div>
-        <button type="button" onClick={() => setEditing(true)} className="rounded-lg px-3 py-1.5 text-[13px] font-bold text-accent hover:bg-accent-tint">
-          Change
+
+        <div className="rounded-2xl border border-line-strong bg-panel focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20">
+          {files.length > 0 && (
+            <div className="flex flex-wrap gap-2 px-3 pt-3">
+              {files.map((id) => (
+                <span key={id} className="group relative h-14 w-14 overflow-hidden rounded-lg border border-line bg-raised">
+                  {/\.(mp4|mov|webm)$/i.test(id) ? (
+                    <video src={`/api/media/${id}#t=0.5`} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={`/api/media/${id}`} alt="" className="h-full w-full object-cover object-top" />
+                  )}
+                  <button type="button" onClick={() => { onRemoveFile(id); setDirty(true); }} aria-label="Remove file" className="absolute inset-0 flex items-center justify-center bg-black/55 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100">
+                    <X className="h-4 w-4" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <textarea
+            ref={box}
+            value={text}
+            rows={3}
+            maxLength={2000}
+            onChange={(e) => { setText(e.target.value); setDirty(true); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && dirty) { e.preventDefault(); onSend(text); setDirty(false); }
+            }}
+            aria-label="About your product (optional)"
+            placeholder={"Tell Mavya about your product (optional)\ne.g. It's for gym beginners. Snap a photo of your meal, get the calories in 2 seconds."}
+            className="block w-full resize-none bg-transparent px-4 pt-3 text-[14.5px] leading-relaxed outline-none placeholder:text-soft"
+          />
+          <div className="flex items-center justify-between px-2.5 pb-2.5">
+            <button type="button" onClick={() => picker.current?.click()} disabled={adding || files.length >= 5} aria-label="Add photos or videos" title="Add photos or videos" className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted hover:border-accent hover:text-accent disabled:opacity-50">
+              {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            </button>
+            <input ref={picker} type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/quicktime,video/webm" multiple className="hidden" onChange={(e) => void addFiles(e.target.files).then(() => (e.target.value = ""))} />
+            <button type="button" onClick={() => { onSend(text); setDirty(false); }} disabled={!dirty || writing || reading} aria-label="Send" title="Send" className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-white hover:opacity-90 disabled:opacity-35">
+              {writing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {STARTERS.map((s) => (
+            <button key={s.label} type="button" onClick={() => start(s.text)} className="rounded-lg border border-line px-3 py-1.5 text-[13px] font-semibold text-muted hover:border-accent hover:text-accent">
+              {s.label}
+            </button>
+          ))}
+          <button type="button" onClick={() => picker.current?.click()} disabled={adding || files.length >= 5} title="A screenshot or screen recording of exactly the feature you're selling" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-semibold text-muted hover:border-accent hover:text-accent disabled:opacity-50">
+            <ImagePlus className="h-3.5 w-3.5" />
+            Screenshot of your main feature
+          </button>
+        </div>
+        {fileError && <p role="alert" className="text-[13px] font-semibold text-red-600">{fileError}</p>}
+
+        <button type="button" onClick={() => { onContinue(text); setDirty(false); }} className="btn-primary px-4 py-2.5 text-[14px]">
+          Steal a hook that already works
+          <ArrowRight className="h-4 w-4" />
         </button>
       </div>
-      {onAddScreens && (
-        // Optional: the real app, so the script says "Tap Remix" instead of "Tap the button".
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {screens.map((id) => (
-            <span key={id} className="group relative h-[64px] w-[36px] overflow-hidden rounded-md border border-line bg-raised">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`/api/media/${id}`} alt="" className="h-full w-full object-cover object-top" />
-              {onRemoveScreen && (
-                <button type="button" onClick={() => onRemoveScreen(id)} aria-label="Remove screenshot" className="absolute inset-0 flex items-center justify-center bg-black/55 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100">
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </span>
-          ))}
-          {screens.length < 5 && (
-            <label title="Screenshots of your app: the script then names your real screens and buttons" className={`flex cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-[13px] font-semibold text-text hover:border-accent hover:text-accent ${adding ? "pointer-events-none opacity-60" : ""}`}>
-              {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
-              Add app screenshots
-              <input
-                type="file"
-                accept="image/png,image/jpeg"
-                multiple
-                className="hidden"
-                onChange={async (e) => {
-                  const files = [...(e.target.files ?? [])].filter((f) => /^image\/(png|jpeg)$/.test(f.type)).slice(0, 5 - screens.length);
-                  e.target.value = "";
-                  if (!files.length) return setScreenError("Use PNG or JPG screenshots.");
-                  setScreenError(null);
-                  setAdding(true);
-                  try { await onAddScreens(files); } catch { setScreenError("Couldn't upload the screenshots. Try again."); } finally { setAdding(false); }
-                }}
-              />
-            </label>
-          )}
-          {screenError && <p role="alert" className="w-full text-[13px] font-semibold text-red-600">{screenError}</p>}
-        </div>
-      )}
-      </>
     );
   }
 

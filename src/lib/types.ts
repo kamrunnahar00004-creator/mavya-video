@@ -295,8 +295,10 @@ export type Run = {
   exports?: { src: string; seconds: number; at: string }[];
   /** Step 1: the user's product, read from its website by Gemini (POST /api/runs/[id]/product, on an explicit click). */
   product?: { url: string; brief: ProductBrief; at: string } | null;
-  /** Up to 5 screenshots of the seller's own product (media ids): the script names real screens and buttons from them. */
+  /** Up to 5 photos or short videos of the seller's own product (media ids): the script names real screens and buttons from them. */
   productScreens?: string[];
+  /** Step 1's optional context box: the seller's own words about the product (who it's for, the main feature, what to show). */
+  productNotes?: string;
   /** The script for this product and hook (POST /api/runs/[id]/script), modelled on the library's analyzed hooks. */
   script?: VideoScript | null;
   /** On-screen texts with timing. The one with id "hook" mirrors hook.text. Absent on older runs. */

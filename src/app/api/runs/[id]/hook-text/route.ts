@@ -31,7 +31,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/h
   const prompt = `Write 3 new on-screen hook texts for a short-form video about this product. Never invent features or results the brief does not support.
 
 THE PRODUCT:
-${JSON.stringify({ name: brief.name, oneLiner: brief.oneLiner, audience: brief.audience, problem: brief.problem, wowMoment: brief.wowMoment })}
+${JSON.stringify({ name: brief.name, oneLiner: brief.oneLiner, audience: brief.audience, problem: brief.problem, wowMoment: brief.wowMoment, ...(run.productNotes?.trim() ? { foundersNotes: run.productNotes.trim().slice(0, 2000) } : {}) })}
 
 THE VIRAL HOOK IT RECREATES (copy its voice, length, casing, slang and emoji use exactly):
 ${JSON.stringify(voice)}

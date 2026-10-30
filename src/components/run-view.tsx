@@ -67,6 +67,8 @@ export function RunView() {
   const [pickerOpen, setPickerOpen] = useState(false);
   /** Steps the user opened or closed by hand (undefined = follow progress: just the current step). */
   const [picked, setPicked] = useState<number[] | undefined>(undefined);
+  /** The run whose step 1 the seller closed ("Steal a hook that already works"). */
+  const [productOk, setProductOk] = useState<string | null>(null);
   /** Upload: the video is in, waiting for "Use this hook". */
   const [staged, setStaged] = useState<Reference | null>(null);
   const [reading, setReading] = useState(false);
@@ -383,7 +385,9 @@ export function RunView() {
   if (job?.error) stepDone[0] = false;
   if (gen.busy) stepDone[3] = true;
   const stepPending = [productReading, false, false, gen.busy, false, false];
-  const current = stepDone.findIndex((d) => !d) + 1 || stepDone.length; // 1-based; all done = last step
+  // Step 1 stays open (for the optional context) until "Steal a hook that already works", unless a hook is already in.
+  const holdProduct = !stepDone[1] && productOk !== run.id && !job?.error && Boolean(run.product?.brief || productReading);
+  const current = holdProduct ? 1 : stepDone.findIndex((d) => !d) + 1 || stepDone.length; // 1-based; all done = last step
   /** Generate: the hook clip and the demo plan start together; step 5 opens while both run. */
   const startGenerate = (note?: string) => {
     if (gen.busy) return;
@@ -401,7 +405,11 @@ export function RunView() {
   const facePhoto = ch ? ch.view : hook.face?.kind === "photo" ? `/api/media/${hook.face.mediaId}` : null;
   // The open step: the user's choice, else the first unfinished one. Finishing a step clears the choice (moves on).
   const openSteps = picked ?? [current];
-  const toggleStep = (n: number) => setPicked(openSteps.includes(n) ? openSteps.filter((x) => x !== n) : [...openSteps, n]);
+  const toggleStep = (n: number) => {
+    // Opening step 2 by its title is the same as "Steal a hook that already works".
+    if (n === 2 && holdProduct) { setProductOk(run.id); return setPicked([2]); }
+    setPicked(openSteps.includes(n) ? openSteps.filter((x) => x !== n) : [...openSteps, n]);
+  };
   const faceName = hook.face?.kind === "character" ? characterById(hook.face.id)?.name : hook.face?.kind === "photo" ? "Your photo" : hook.face?.kind === "described" ? hook.face.text : undefined;
   const stepSummary = [
     productReading ? host : run.product?.brief.name,
@@ -712,18 +720,29 @@ export function RunView() {
                 key={job?.error ? `failed:${job.url}` : "product"}
                 product={run.product ?? null}
                 reading={productReading}
+                host={host}
                 error={job?.error ?? null}
                 failedUrl={job?.error ? job.url : undefined}
                 onAnalyze={analyzeProduct}
-                screens={run.productScreens ?? []}
-                onAddScreens={async (files) => {
+                notes={run.productNotes ?? ""}
+                files={run.productScreens ?? []}
+                writing={planningHere}
+                onAddFiles={async (files) => {
                   const ups = await Promise.all(files.map((f) => uploadFile(f, false)));
                   const cur = runRef.current ?? run;
                   save({ productScreens: [...(cur.productScreens ?? []), ...ups.map((u) => u.mediaId)].slice(0, 5) });
-                  // New screenshots (an explicit click): the script is rewritten with the real screens.
-                  if (cur.sourceRefId || (cur.hook.source === "describe" && cur.hook.describeReady)) requestScript();
                 }}
-                onRemoveScreen={(mediaId) => save({ productScreens: (run.productScreens ?? []).filter((x) => x !== mediaId) })}
+                onRemoveFile={(mediaId) => save({ productScreens: ((runRef.current ?? run).productScreens ?? []).filter((x) => x !== mediaId) })}
+                onSend={(notes) => {
+                  if (notes !== (run.productNotes ?? "")) save({ productNotes: notes });
+                  // Send is the explicit click: with a clip picked, the script is rewritten with the new context.
+                  if (run.sourceRefId || (hook.source === "describe" && hook.describeReady)) requestScript();
+                }}
+                onContinue={(notes) => {
+                  if (notes !== (run.productNotes ?? "")) save({ productNotes: notes });
+                  setProductOk(run.id);
+                  setPicked([2]);
+                }}
               />
             </Block>
 

@@ -180,9 +180,35 @@ export async function getRun(id: string, who: string): Promise<Run | null> {
   return data?.data ?? null;
 }
 
+/**
+ * The product the seller set most recently (link, brief, notes, photos), carried into every new video until they
+ * change it. "Most recently" = the newest product.at; a carried copy gets a fresh one, so later edits there win.
+ */
+async function lastProduct(who: string): Promise<Pick<Run, "product" | "productNotes" | "productScreens"> | null> {
+  type Carried = { product: Run["product"]; notes?: string | null; screens?: string[] | null };
+  let found: Carried | null = null;
+  if (!cloud()) {
+    const r = (await readDb()).runs.filter((x) => x.product?.brief).sort((a, b) => (b.product!.at > a.product!.at ? 1 : -1))[0];
+    found = r ? { product: r.product, notes: r.productNotes, screens: r.productScreens } : null;
+  } else {
+    const { data, error } = await db().from("runs").select("product:data->product, notes:data->productNotes, screens:data->productScreens")
+      .eq("user_id", who).not("data->product->>at", "is", null).order("data->product->>at", { ascending: false }).limit(1).maybeSingle<Carried>();
+    if (error) console.error("last product", error);
+    found = data ?? null;
+  }
+  if (!found?.product?.brief) return null;
+  return {
+    product: { ...found.product, at: new Date().toISOString() },
+    ...(typeof found.notes === "string" && found.notes ? { productNotes: found.notes } : {}),
+    ...(Array.isArray(found.screens) && found.screens.length ? { productScreens: found.screens } : {}),
+  };
+}
+
 export async function createRun(who: string, requestedId?: string, source?: Reference): Promise<Run> {
   const now = new Date().toISOString();
+  const carried = await lastProduct(who).catch(() => null);
   const run: Run = {
+    ...carried,
     id: requestedId ?? randomUUID(),
     title: source?.title ?? "Untitled run",
     createdAt: now,
