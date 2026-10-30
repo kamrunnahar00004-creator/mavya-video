@@ -44,7 +44,10 @@ function grab(src: string, t: number): Promise<string | null> {
     video.preload = "auto";
     entry = { video, busy: false };
     players.set(src, entry);
-    video.src = src;
+    // Its own link: storage sends no "Vary: Origin", so a copy the page's players cached without CORS would be
+    // reused for this CORS request and fail. A different URL gets a separate signed link and cache entry.
+    const [path, hash] = src.split("#");
+    video.src = `${path}${path.includes("?") ? "&" : "?"}frames=1${hash ? `#${hash}` : ""}`;
   }
   const current = entry;
   const video = current.video;
