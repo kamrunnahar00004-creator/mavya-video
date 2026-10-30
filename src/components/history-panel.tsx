@@ -11,6 +11,7 @@ import { clipSrc, demoClips, partsOf } from "@/lib/edit";
 import { AVATAR_TONES } from "@/lib/client";
 import { fmtDate, fmtTime, type Asset, type DemoClip, type Reference, type Run, type SoundPiece } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
+import { HookPreview, embedUrl } from "@/components/source-picker";
 
 type Face = NonNullable<Run["hook"]["face"]>;
 type Generated = NonNullable<Run["hook"]["generated"]>;
@@ -18,13 +19,16 @@ type Tab = "hooks" | "characters" | "generated" | "demos" | "music" | "exports";
 type Sort = "new" | "old";
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "hooks", label: "Hooks" },
+  { id: "generated", label: "Generated hooks" },
   { id: "characters", label: "Characters" },
-  { id: "generated", label: "Generated" },
   { id: "demos", label: "Demos" },
   { id: "music", label: "Music" },
-  { id: "exports", label: "Exports" },
+  { id: "hooks", label: "Hooks" },
+  { id: "exports", label: "Exported" },
 ];
+
+/** What the popup plays: clips back to back (a demo), each from `start` to `end` in its file. */
+type Playing = { clips: { src: string; start: number; end?: number }[]; sound?: boolean; onUse?: () => void; useLabel?: string };
 
 /** Filters per tab (the first one is "All"). */
 const FILTERS: Record<Tab, { id: string; label: string }[]> = {
@@ -67,7 +71,10 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
   const [listError, setListError] = useState<string | null>(null);
   const [runs, setRuns] = useState<Run[] | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [tab, setTab] = useState<Tab>(initialTab ?? "hooks");
+  const [tab, setTab] = useState<Tab>(initialTab ?? "generated");
+  // Nothing plays in the grid: a click opens it in a popup (a library hook opens its detail popup).
+  const [playing, setPlaying] = useState<Playing | null>(null);
+  const [hookView, setHookView] = useState<{ r: Reference; onUse?: () => void } | null>(null);
   const [filter, setFilter] = useState("all");
   const [sort, setSort] = useState<Sort>("new");
 
@@ -193,12 +200,14 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
         {list.map((x) => {
           const r = x.value;
           const thumb = r.analysis?.segments[0]?.thumb ?? r.thumbUrl;
+          const use = run.sourceRefId === r.id ? undefined : () => onUseHook(r);
+          const open = r.mediaId ? () => setPlaying({ clips: [{ src: `/api/media/${r.mediaId}`, start: 0 }], sound: true, onUse: use, useLabel: "Use this hook" }) : embedUrl(r) ? () => setHookView({ r, onUse: use }) : undefined;
           return (
-            <Card key={x.key} onUse={run.sourceRefId === r.id ? undefined : () => onUseHook(r)} footer={<><div className="truncate text-[12.5px] font-semibold">{r.author ? `@${r.author}` : r.title}</div>{meta(x)}</>}>
-              {r.mediaId ? <HoverVideo src={`/api/media/${r.mediaId}`} /> : thumb ? (
+            <Card key={x.key} onOpen={open} onUse={use} footer={<><div className="truncate text-[12.5px] font-semibold">{r.author ? `@${r.author}` : r.title}</div>{meta(x)}</>}>
+              {thumb ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={thumb} alt="" className="h-full w-full object-cover" />
-              ) : null}
+                <img src={thumb} alt="" loading="lazy" className="h-full w-full object-cover" />
+              ) : r.mediaId ? <Still src={`/api/media/${r.mediaId}`} /> : null}
               <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10.5px] font-bold text-white">{x.kind === "upload" ? "Uploaded" : "Library"}</span>
             </Card>
           );
@@ -234,11 +243,14 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     const list = pick(generated);
     body = list.length ? (
       <Grid>
-        {list.map((x) => (
-          <Card key={x.key} onUse={run.hook.generated?.src === x.value.g.src ? undefined : () => onUseGenerated(x.value.g, x.value.run)} footer={<><div className="truncate text-[12.5px] font-semibold">Hook · {fmtTime(x.value.g.seconds)}</div>{meta(x)}</>}>
-            <HoverVideo src={x.value.g.src} />
-          </Card>
-        ))}
+        {list.map((x) => {
+          const use = run.hook.generated?.src === x.value.g.src ? undefined : () => onUseGenerated(x.value.g, x.value.run);
+          return (
+            <Card key={x.key} onOpen={() => setPlaying({ clips: [{ src: x.value.g.src, start: 0 }], sound: true, onUse: use })} onUse={use} footer={<><div className="truncate text-[12.5px] font-semibold">Hook · {fmtTime(x.value.g.seconds)}</div>{meta(x)}</>}>
+              <Still src={x.value.g.src} />
+            </Card>
+          );
+        })}
       </Grid>
     ) : empty("Hooks you generate show here, every version");
   } else if (tab === "demos") {
@@ -249,9 +261,12 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           const clips = x.value.clips;
           const first = partsOf({ start: clips[0].start ?? 0, end: clips[0].end ?? clips[0].seconds ?? 3, parts: clips[0].parts });
           const len = clips.reduce((t, c) => t + partsOf({ start: c.start ?? 0, end: c.end ?? c.seconds ?? 3, parts: c.parts }).reduce((a, p) => a + (p.end - p.start), 0) / speedOf(c.adjust), 0);
+          const use = demoKey(clips) === demoNow ? undefined : () => onUseDemo(clips, x.value.run);
+          // The popup plays the demo as it was cut: each clip's kept pieces, back to back.
+          const pieces = clips.flatMap((c) => partsOf({ start: c.start ?? 0, end: c.end ?? c.seconds ?? 3, parts: c.parts }).map((p) => ({ src: clipSrc(c) ?? "", start: p.start, end: p.end })));
           return (
-            <Card key={x.key} onUse={demoKey(clips) === demoNow ? undefined : () => onUseDemo(clips, x.value.run)} footer={<><div className="truncate text-[12.5px] font-semibold">{clips.length} {clips.length === 1 ? "clip" : "clips"} · {fmtTime(len)}</div>{meta(x)}</>}>
-              <HoverVideo src={clipSrc(clips[0]) ?? ""} at={first[0].start} />
+            <Card key={x.key} onOpen={() => setPlaying({ clips: pieces, sound: true, onUse: use })} onUse={use} footer={<><div className="truncate text-[12.5px] font-semibold">{clips.length} {clips.length === 1 ? "clip" : "clips"} · {fmtTime(len)}</div>{meta(x)}</>}>
+              <Still src={clipSrc(clips[0]) ?? ""} at={first[0].start} />
             </Card>
           );
         })}
@@ -273,6 +288,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
         {list.map((x) => (
           <Card
             key={x.key}
+            onOpen={() => setPlaying({ clips: [{ src: x.value.src, start: 0 }], sound: true })}
             footer={<><div className="truncate text-[12.5px] font-semibold">{x.runTitle} · {fmtTime(x.value.seconds)}</div>{meta(x)}</>}
             action={
               <a href={x.value.src} download className="flex items-center justify-center gap-1.5 rounded-lg border border-line py-1.5 text-[12.5px] font-bold text-text hover:border-accent hover:text-accent">
@@ -281,7 +297,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
               </a>
             }
           >
-            <HoverVideo src={x.value.src} sound />
+            <Still src={x.value.src} />
           </Card>
         ))}
       </Grid>
@@ -329,6 +345,8 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
         </select>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">{body}</div>
+      {playing && <PlayPopup p={playing} onClose={() => setPlaying(null)} />}
+      {hookView && <HookPreview r={hookView.r} onClose={() => setHookView(null)} onUse={hookView.onUse ? () => { hookView.onUse?.(); setHookView(null); } : undefined} />}
     </div>
   );
 }
@@ -337,11 +355,23 @@ function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-3 gap-3">{children}</div>;
 }
 
-/** A history item: the picture (9:16, or square for faces), a short footer, and Use (or a custom action). */
-function Card({ children, footer, onUse, useLabel = "Use", action, square = false }: { children: React.ReactNode; footer: React.ReactNode; onUse?: () => void; useLabel?: string; action?: React.ReactNode; square?: boolean }) {
+/** A history item: the picture (9:16, or square for faces), a short footer, and Use (or a custom action). `onOpen`: the picture opens it in a popup. */
+function Card({ children, footer, onUse, onOpen, useLabel = "Use", action, square = false }: { children: React.ReactNode; footer: React.ReactNode; onUse?: () => void; onOpen?: () => void; useLabel?: string; action?: React.ReactNode; square?: boolean }) {
+  const box = `relative block w-full overflow-hidden rounded-xl border border-line bg-raised ${square ? "aspect-square" : "aspect-[9/16]"}`;
   return (
     <div className="min-w-0">
-      <div className={`relative overflow-hidden rounded-xl border border-line bg-raised ${square ? "aspect-square" : "aspect-[9/16]"}`}>{children}</div>
+      {onOpen ? (
+        <button type="button" onClick={onOpen} aria-label="Play" className={`${box} group`}>
+          {children}
+          <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/25">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100">
+              <Play className="ml-0.5 h-4 w-4" fill="currentColor" />
+            </span>
+          </span>
+        </button>
+      ) : (
+        <div className={box}>{children}</div>
+      )}
       <div className="mt-1.5 px-0.5">{footer}</div>
       <div className="mt-1.5">
         {action ??
@@ -357,31 +387,71 @@ function Card({ children, footer, onUse, useLabel = "Use", action, square = fals
   );
 }
 
-/** A still frame that plays (muted, unless `sound`) while the pointer is on it. */
-function HoverVideo({ src, at = 0.5, sound = false }: { src: string; at?: number; sound?: boolean }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  const who = useId();
-  const [playing, setPlaying] = useState(false);
-  usePlaybackClaims(who, setPlaying);
-  useEffect(() => { if (!playing) ref.current?.pause(); }, [playing]);
+/** A still frame, never playing; it loads only once scrolled into view (a long list stays light). */
+function Still({ src, at = 0.5 }: { src: string; at?: number }) {
+  const box = useRef<HTMLSpanElement>(null);
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const el = box.current;
+    if (!el || near) return;
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) setNear(true); }, { rootMargin: "200px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [near]);
   return (
-    <MediaVideo
-      ref={ref}
-      src={`${src}#t=${at}`}
-      muted={!sound}
-      playsInline
-      loop
-      preload="metadata"
-      onMouseEnter={() => { if (sound) claimPlayback(who); setPlaying(true); void ref.current?.play().catch(() => setPlaying(false)); }}
-      onMouseLeave={() => {
-        setPlaying(false);
-        const v = ref.current;
-        if (!v) return;
-        v.pause();
-        v.currentTime = at;
-      }}
-      className="h-full w-full object-cover"
-    />
+    <span ref={box} className="pointer-events-none absolute inset-0">
+      {near && <MediaVideo src={`${src}#t=${at}`} muted playsInline preload="metadata" className="h-full w-full object-cover" />}
+    </span>
+  );
+}
+
+/** The popup: plays the video (a demo: its pieces back to back) once, with Use under it. Esc or a click outside closes. */
+function PlayPopup({ p, onClose }: { p: Playing; onClose: () => void }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [i, setI] = useState(0);
+  const who = useId();
+  const [, setOn] = useState(true);
+  usePlaybackClaims(who, (on) => { setOn(on); if (!on) ref.current?.pause(); });
+  useEffect(() => { claimPlayback(who); }, [who]);
+  useEffect(() => {
+    // Esc closes only the popup, not My files under it.
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopImmediatePropagation(); onClose(); } };
+    window.addEventListener("keydown", key, true);
+    return () => window.removeEventListener("keydown", key, true);
+  }, [onClose]);
+  const clip = p.clips[i];
+  return (
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-6" onClick={(e) => { e.stopPropagation(); onClose(); }}>
+      <div className="fade-in flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+        <div className="relative aspect-[9/16] h-[min(80vh,820px)] overflow-hidden rounded-2xl bg-black shadow-[0_24px_64px_rgba(0,0,0,0.35)]">
+          {clip && (
+            <video
+              ref={ref}
+              key={`${i}|${clip.src}`}
+              src={clip.src}
+              autoPlay
+              playsInline
+              controls={p.clips.length === 1}
+              muted={!p.sound}
+              onLoadedMetadata={(e) => { e.currentTarget.currentTime = clip.start; }}
+              onTimeUpdate={(e) => { if (clip.end !== undefined && e.currentTarget.currentTime >= clip.end - 0.05) { if (i < p.clips.length - 1) setI(i + 1); else e.currentTarget.pause(); } }}
+              onEnded={() => { if (i < p.clips.length - 1) setI(i + 1); }}
+              className="h-full w-full object-cover"
+            />
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {p.onUse && (
+            <button type="button" onClick={() => { p.onUse?.(); onClose(); }} className="btn-primary px-5 py-2.5 text-[14px]">
+              {p.useLabel ?? "Use"}
+            </button>
+          )}
+          <button type="button" onClick={onClose} className="rounded-lg bg-white/90 px-4 py-2.5 text-[14px] font-bold text-ink hover:bg-white">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

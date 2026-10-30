@@ -24,6 +24,7 @@ import { pollDelay, waitForPoll } from "@/lib/polling";
 import dynamic from "next/dynamic";
 import { SourcePicker, UploadDrop, Thumb } from "@/components/source-picker";
 import { libraryMore, loadLibrary } from "@/lib/library-cache";
+import { fetchPage } from "@/lib/list-client";
 const HistoryPanel = dynamic(() => import("@/components/history-panel").then(m => m.HistoryPanel));
 import { ProductStep, newHookLines, readProduct, writeScript } from "@/components/product-step";
 import { RunPreview, claimPlayback } from "@/components/run-preview";
@@ -1248,7 +1249,7 @@ function CharacterStep({ face, mode, onMode, onFace }: { face: Hook["face"] | nu
         </div>
       )}
 
-      {browsing && <CharacterBrowser current={face} onPick={(id) => pick({ kind: "character", id })} onClose={() => setBrowsing(false)} />}
+      {browsing && <CharacterBrowser current={face} onPick={(id) => pick({ kind: "character", id })} onPickFace={pick} onClose={() => setBrowsing(false)} />}
     </div>
   );
 }
@@ -1262,10 +1263,34 @@ function SharpImage({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-/** Overlay with the whole cast; click a face for the large view, then "Use <name>". */
-function CharacterBrowser({ current, onPick, onClose }: { current: Hook["face"] | null; onPick: (id: string) => void; onClose: () => void }) {
+type Face = NonNullable<Hook["face"]>;
+const faceKeyOf = (f: Face) => (f.kind === "photo" ? `photo:${f.mediaId}` : f.kind === "ai" ? `ai:${f.index}` : f.kind === "character" ? `character:${f.id}` : `described:${f.text}`);
+
+/**
+ * Overlay with the whole cast; click a face for the large view, then "Use <name>". Above it, "Recently used": the
+ * characters, photos and described characters from the seller's videos (newest first), one click to use again.
+ */
+function CharacterBrowser({ current, onPick, onPickFace, onClose }: { current: Hook["face"] | null; onPick: (id: string) => void; onPickFace: (f: Face) => void; onClose: () => void }) {
   const [viewing, setViewing] = useState<number | null>(null);
   const shown = viewing === null ? null : CHARACTERS[viewing];
+  // A described character has no photo: the hook generated with it stands in for one.
+  const [recent, setRecent] = useState<{ face: Face; still: string | null }[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void fetchPage<Run>("/api/runs").then((page) => {
+      if (!alive) return;
+      const seen = new Set<string>();
+      const list: { face: Face; still: string | null }[] = [];
+      for (const r of [...page.items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))) {
+        const f = r.hook.face;
+        if (!f || f.kind === "ai" || seen.has(faceKeyOf(f))) continue;
+        seen.add(faceKeyOf(f));
+        list.push({ face: f, still: r.hook.generated?.src ?? null });
+      }
+      setRecent(list.slice(0, 12));
+    }).catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1291,6 +1316,43 @@ function CharacterBrowser({ current, onPick, onClose }: { current: Hook["face"] 
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-4">
+          {recent.length > 0 && (
+            <>
+              <h3 className="mb-3 text-[14px] font-bold">Recently used</h3>
+              <div className="mb-6 grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] gap-3">
+                {recent.map(({ face: f, still }) => {
+                  const on = current ? faceKeyOf(current) === faceKeyOf(f) : false;
+                  const c = f.kind === "character" ? characterById(f.id) : null;
+                  const name = c ? c.name : f.kind === "photo" ? "Your photo" : f.kind === "described" ? f.text : "";
+                  return (
+                    <button
+                      key={faceKeyOf(f)}
+                      type="button"
+                      onClick={() => onPickFace(f)}
+                      title={name}
+                      className={`group relative aspect-[3/4] overflow-hidden rounded-xl border-2 bg-raised transition-[border-color,box-shadow] ${on ? "border-accent" : "border-transparent hover:border-line-strong"}`}
+                    >
+                      {c || f.kind === "photo" ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c ? c.thumb : f.kind === "photo" ? `/api/media/${f.mediaId}` : ""} alt={name} loading="lazy" className="absolute inset-0 h-full w-full object-cover object-top" />
+                      ) : still ? (
+                        <MediaVideo src={`${still}#t=0.5`} muted playsInline preload="metadata" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+                      ) : (
+                        <span className="absolute inset-0 flex items-center justify-center text-[28px] font-black text-accent">&ldquo;</span>
+                      )}
+                      <span className="absolute inset-x-0 bottom-0 line-clamp-2 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-6 text-left text-[12.5px] font-bold leading-tight text-white">{name}</span>
+                      {on && (
+                        <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-white">
+                          <Check className="h-3 w-3" strokeWidth={3} />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <h3 className="mb-3 text-[14px] font-bold">Browse characters</h3>
+            </>
+          )}
           <div className="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] gap-3">
             {CHARACTERS.map((c, i) => {
               const on = current?.kind === "character" && current.id === c.id;

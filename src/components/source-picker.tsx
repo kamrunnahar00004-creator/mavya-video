@@ -254,7 +254,7 @@ function HookCard({ r, busy, disabled, onPick, index }: { index: number; r: Refe
 }
 
 /** The platform's own embed player for a link reference (no download, no storage). */
-function embedUrl(r: Reference): string | null {
+export function embedUrl(r: Reference): string | null {
   try {
     const u = new URL(r.sourceUrl);
     const parts = u.pathname.split("/").filter(Boolean);
@@ -289,7 +289,8 @@ function fmtDate(iso?: string): React.ReactNode {
   );
 }
 
-function HookPreview({ r, onClose, onUse }: { r: Reference; onClose: () => void; onUse: () => void }) {
+/** A library hook's detail popup (also opened from My files, where `onUse` is absent when the video already uses it). */
+export function HookPreview({ r, onClose, onUse }: { r: Reference; onClose: () => void; onUse?: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -371,9 +372,13 @@ function HookPreview({ r, onClose, onUse }: { r: Reference; onClose: () => void;
                 </p>
               </div>
             )}
-            <button type="button" onClick={onUse} className="btn-primary w-full py-3 text-[15px]">
-              Use this hook
-            </button>
+            {onUse ? (
+              <button type="button" onClick={onUse} className="btn-primary w-full py-3 text-[15px]">
+                Use this hook
+              </button>
+            ) : (
+              <div className="py-3 text-center text-[14px] font-semibold text-soft">In use</div>
+            )}
             <a href={r.sourceUrl} target="_blank" rel="noreferrer" className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2.5 text-[14px] font-bold text-accent hover:bg-accent-tint">
               Open on {PLATFORM_LABEL[r.platform]}
             </a>
