@@ -1,7 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { r2Enabled, downloadTo, objectSize, putObject, signedGet, signedPut } from "@/lib/server/r2";
 import { authEnabled, createSupabaseAdminClient } from "@/lib/supabase/server";
@@ -427,13 +426,10 @@ export async function getFilePrefs(who: string): Promise<FilePrefs> {
   if (!cloud()) {
     text = await readFile(PREFS_FILE, "utf8").catch(() => null);
   } else {
-    const dir = await mkdtemp(path.join(tmpdir(), "mavya-prefs-"));
-    try {
-      const file = path.join(dir, "files.json");
-      if (await downloadTo(prefsKey(who), file)) text = await readFile(file, "utf8");
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+    // A short-lived link, read straight into memory (no new file; a missing object is a 404 = nothing changed yet).
+    const res = await fetch(await signedGet(prefsKey(who), 60), { cache: "no-store" });
+    if (res.ok) text = await res.text();
+    else if (res.status !== 404) throw Error(`prefs ${res.status}`);
   }
   try {
     const v = text ? (JSON.parse(text) as Partial<FilePrefs>) : {};
