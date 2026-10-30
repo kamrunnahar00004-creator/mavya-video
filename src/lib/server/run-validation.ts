@@ -70,5 +70,6 @@ export function validAnalysis(v: unknown): boolean {
 export function validRunPatch(body: unknown): boolean {
   return object(body) && optional(body.hook, hook) && optional(body.demo, demo) && optional(body.texts, texts)
     && optional(body.sounds, (v) => Array.isArray(v) && v.every(object))
+    && optional(body.productScreens, (v) => Array.isArray(v) && v.length <= 5 && v.every((x) => typeof x === "string" && /^[0-9a-f-]{36}\.(png|jpe?g|webp)$/i.test(x)))
     && optional(body.project, (v) => nullable(v, (p) => object(p) && Array.isArray(p.texts) && (Array.isArray(p.clips) || Array.isArray(p.slots))));
 }

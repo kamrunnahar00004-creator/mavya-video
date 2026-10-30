@@ -41,6 +41,8 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/runs/[id]"
   if (body.demo && typeof body.demo === "object") patch.demo = body.demo;
   if (Array.isArray(body.texts)) patch.texts = body.texts;
   if (body.project === null || (body.project && typeof body.project === "object")) patch.project = body.project;
+  // Screenshots of the seller's own product (uploaded images); the script reads them through the owner's media access.
+  if (Array.isArray(body.productScreens)) patch.productScreens = body.productScreens;
   if (Array.isArray(body.sounds)) {
     const num = (v: unknown, lo: number, hi: number, d: number) => (typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
     patch.sounds = body.sounds

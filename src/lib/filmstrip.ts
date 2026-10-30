@@ -22,6 +22,17 @@ function release(src: string) {
   players.delete(src);
 }
 
+/** Every sampled pixel is (near) pure black: an undecoded frame, not a picture. */
+function blank(ctx: CanvasRenderingContext2D, w: number, h: number): boolean {
+  try {
+    const { data } = ctx.getImageData(0, 0, w, h);
+    for (let i = 0; i < data.length; i += 4 * 53) if (data[i] > 8 || data[i + 1] > 8 || data[i + 2] > 8) return false;
+    return true;
+  } catch {
+    return false; // Pixels cannot be read: keep the frame rather than retry blindly.
+  }
+}
+
 function grab(src: string, t: number): Promise<string | null> {
   if ((failed.get(src) ?? 0) > Date.now()) return Promise.resolve(null);
   let entry = players.get(src);
@@ -40,6 +51,7 @@ function grab(src: string, t: number): Promise<string | null> {
   current.busy = true;
   return new Promise((resolve) => {
     let done = false;
+    let retries = 0;
     const finish = (url: string | null) => {
       if (done) return;
       done = true;
@@ -72,6 +84,8 @@ function grab(src: string, t: number): Promise<string | null> {
         const scale = Math.max(canvas.width / video.videoWidth, canvas.height / video.videoHeight);
         const w = canvas.width / scale, h = canvas.height / scale;
         ctx.drawImage(video, (video.videoWidth - w) / 2, (video.videoHeight - h) / 2, w, h, 0, 0, canvas.width, canvas.height);
+        // "seeked"/"loadeddata" can fire before the frame is decoded, which draws pure black: try again shortly.
+        if (blank(ctx, canvas.width, canvas.height) && retries++ < 4) return void setTimeout(draw, 120);
         finish(canvas.toDataURL("image/jpeg", 0.6));
       } catch { finish(null); }
     };

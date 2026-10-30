@@ -4,7 +4,7 @@ import { MediaVideo } from "@/components/media-video";
 import { memo, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Adjust, fullAdjust, speedOf, videoStyle, warmthId, warmthMatrix } from "@/lib/adjust";
-import { fileAt, segAt, timeline, videoLength } from "@/lib/edit";
+import { type Seg, fileAt, segAt, timeline, videoLength } from "@/lib/edit";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 import { Pause, Play } from "lucide-react";
 import { AVATAR_TONES, round1 } from "@/lib/client";
@@ -45,7 +45,6 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
   const time = Math.min(t, total - 0.001);
   const hit = segAt(segs, time);
   const seg = hit ?? segs[segs.length - 1];
-  const speed = seg.editable ? speedOf(seg.adjust) : 1;
   const { file: at, i: piece } = fileAt(seg, time - seg.offset);
   const bar = useRef<HTMLDivElement>(null);
 
@@ -102,7 +101,7 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
             {!hit ? null : seg.src ? (
               <>
                 <WarmthFilter adjust={seg.editable ? seg.adjust : null} />
-                <SyncedVideo key={`${seg.id}|${seg.src}`} src={seg.src} at={at} piece={piece} playing={playing} rate={speed} volume={seg.editable ? fullAdjust(seg.adjust).volume / 100 : 0} style={seg.editable ? videoStyle(seg.adjust, at) : undefined} />
+                <SegmentVideos segs={segs} seg={seg} at={at} piece={piece} playing={playing} />
                 {seg.id === "hook" && hook.face && hook.face.kind !== "described" && !hook.clip && !hook.generated && (
                   <span className="pointer-events-none absolute left-2 top-8 flex items-center gap-1.5 rounded-lg bg-black/55 px-2 py-1 text-[10.5px] font-bold text-white">
                     <span className="relative h-4 w-4 overflow-hidden rounded-full">
@@ -186,6 +185,38 @@ export function WarmthFilter({ adjust }: { adjust?: Partial<Adjust> | null }) {
         <feColorMatrix type="matrix" values={warmthMatrix(w)} />
       </filter>
     </svg>
+  );
+}
+
+/**
+ * The clip playing now and, invisible and paused on its first frame, the clip after it, in one keyed list: when the
+ * clock reaches the next clip, that same element (already loaded) becomes the visible one and plays. No new player,
+ * no poster, no blank frame between clips (founder 2026-10-30: joins like CapCut).
+ */
+export function SegmentVideos({ segs, seg, at, piece, playing }: { segs: Seg[]; seg: Seg; at: number; piece: number; playing: boolean }) {
+  const next = segs[segs.indexOf(seg) + 1];
+  const list = [seg, ...(next?.src && next.src !== seg.src ? [next] : [])].filter((s) => s.src);
+  return (
+    <>
+      {list.map((s) => {
+        const now = s === seg;
+        const start = fileAt(s, 0);
+        const sAt = now ? at : start.file;
+        const look = s.editable ? videoStyle(s.adjust, sAt) : undefined;
+        return (
+          <SyncedVideo
+            key={`${s.id}|${s.src}`}
+            src={s.src!}
+            at={sAt}
+            piece={now ? piece : start.i}
+            playing={now && playing}
+            rate={s.editable ? speedOf(s.adjust) : 1}
+            volume={now && s.editable ? fullAdjust(s.adjust).volume / 100 : 0}
+            style={now ? look : { ...look, opacity: 0 }}
+          />
+        );
+      })}
+    </>
   );
 }
 

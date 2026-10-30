@@ -1,6 +1,9 @@
 import { beginAI, finishAI } from "@/lib/server/ai-budget";
 import { GeminiError, geminiJSON } from "@/lib/server/gemini";
-import { getRun, getReference, listReferences } from "@/lib/server/store";
+import { getRun, getReference, listReferences, mediaToFile } from "@/lib/server/store";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import type { Reference, VideoScript } from "@/lib/types";
 
@@ -45,9 +48,27 @@ function sample(r: Reference) {
   };
 }
 
+/** The seller's product screenshots as inline images (max 5, only their own media); unreadable ones are skipped. */
+async function productScreens(ids: string[], who: string) {
+  const dir = await mkdtemp(path.join(tmpdir(), "mavya-screens-"));
+  try {
+    const parts = await Promise.all(ids.slice(0, 5).map(async (id) => {
+      const media = await mediaToFile(id, who, dir).catch(() => null);
+      if (!media || !/^image\/(png|jpeg)$/.test(media.mime)) return null;
+      return { inline_data: { mime_type: media.mime, data: (await readFile(media.file)).toString("base64") } };
+    }));
+    return parts.filter((p): p is NonNullable<typeof p> => p !== null);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 const SCHEMA = {
   type: "OBJECT",
+  // payoff first: the model settles what the video pays off before it writes the shots that deliver it.
+  propertyOrdering: ["payoff", "hookText", "hookAlternatives", "hookBeats", "shots"],
   properties: {
+    payoff: { type: "STRING", description: "the stolen video's payoff and this product's equivalent concrete win" },
     hookText: { type: "STRING", description: "on-screen hook text for this product" },
     hookAlternatives: { type: "ARRAY", items: { type: "STRING" }, description: "exactly 2 other hook texts" },
     hookBeats: { type: "ARRAY", items: { type: "OBJECT", properties: { start: { type: "NUMBER" }, end: { type: "NUMBER" }, action: { type: "STRING" } }, required: ["start", "end", "action"] } },
@@ -67,7 +88,7 @@ const SCHEMA = {
       },
     },
   },
-  required: ["hookText", "hookAlternatives", "hookBeats", "shots"],
+  required: ["payoff", "hookText", "hookAlternatives", "hookBeats", "shots"],
 };
 
 export async function POST(_request: Request, ctx: RouteContext<"/api/runs/[id]/script">) {
@@ -90,12 +111,13 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/runs/[id]/
     .map(sample);
 
   const stolen = source && recipeOf(source) ? JSON.stringify(template(source)) : null;
+  const screens = await productScreens(run.productScreens ?? [], who);
   const prompt = `You write short-form marketing videos (HOOK + DEMO) for software founders. Quality comes from data:
 copy what already went viral, adapted to this product. Never invent features, numbers or results the brief does not support.
 
 THE PRODUCT (read from its website):
 ${JSON.stringify(brief)}
-
+${screens.length ? `\nSCREENSHOTS OF THE REAL PRODUCT follow this text (${screens.length}). Name the exact screens, buttons and labels you see in them in hint, steps and text ("Tap Remix", not "Tap the button").\n` : ""}
 ${stolen ? `THE VIDEO THE FOUNDER STOLE (an analyzed viral video; recreate it for THIS product: its hook structure, rhythm,
 tone and length, and its demo shot for shot):
 ${stolen}` : `THE HOOK THE FOUNDER DESCRIBED (turn it into beats, in the style of the examples):
@@ -108,7 +130,8 @@ Write:
 - hookText: the on-screen hook text for THIS product, in the same voice and length as the hook to recreate (lowercase, slang and emoji only if it uses them). It must make people curious about what is on the screen, without naming the product yet.
 - hookAlternatives: 2 other hook texts in the same voice.
 - hookBeats: what the person does in the hook, beat by beat with seconds, each action under 12 plain words.${stolen ? " Copy the stolen video's hook exactly: the same actions, expression, gestures and timing (it is recreated from that clip); only the words on screen change." : ""} Say "the creator", never describe a real person.
-- shots: the demo for THIS product, 3 to 6 shots, ending on the wow moment.${stolen ? ` Mirror the stolen video's demo shot for shot: the same number of shots where the product allows, the same order of beats, about the same seconds per shot, the same camera setups and the same on-screen text format (numbering, length, casing, emoji, and a closing call to action if it has one). Swap in THIS product's real screens and actions from its demoFlow; keep the form, change the content.` : ` Follow the strongest library demos' structure and pacing and the product's demoFlow.`} For each: label (2 to 4 plain words, no marketing jargon such as CTA), hint (one short imperative sentence, the action to record, e.g. "Open the Wingmates app."), steps (1 to 3 short on-screen actions in the real product), camera (how to hold the phone and what to point it at), text (the on-screen caption for that shot, same voice as the hook), seconds.
+- payoff (write it first): ${stolen ? "what the stolen video's hook promises and how its demo pays that off (e.g. \"gets paid $4k for a website the AI built in minutes\"), then THIS product's equivalent concrete win, taken only from the brief" : "the concrete win this product delivers, taken only from the brief"}. One sentence.
+- shots: the demo for THIS product, 3 to 6 shots.${stolen ? ` Copy the stolen demo's FORM, not its actions: its numbered caption style, its rhythm (quick steps, then the payoff), the caption length, casing and emoji, and its closing call to action if it has one. Every action happens in THIS product, from its demoFlow${screens.length ? " and the screenshots" : ""}; never copy the stolen video's gestures or props (yawning, thumbs up, leaning back) unless they are the payoff reaction.` : ` Follow the strongest library demos' structure and pacing and the product's demoFlow.`} Use as many shots as this product's real flow needs. Seconds follow each action: quick taps 1.5 to 3 seconds, the payoff shot the longest. The last shot and its caption deliver the payoff. For each: label (2 to 4 plain words, no marketing jargon such as CTA), hint (one short imperative sentence, the action to record, e.g. "Open the Wingmates app."), steps (1 to 3 short on-screen actions in the real product), camera (how to hold the phone and what to point it at), text (the on-screen caption for that shot, same voice as the hook), seconds.
 
 Write hint, steps and camera for someone who has never filmed before: simple everyday English a 10-year-old understands,
 short words, no film or marketing terms (no "screen capture", "B-roll", "angle", "framing", "CTA", "split screen").
@@ -119,7 +142,7 @@ step "Tap the big camera button".`;
   if (budget.response) return budget.response;
   let out: Omit<VideoScript, "refId" | "at">;
   try {
-    out = await geminiJSON(prompt, { schema: SCHEMA, temperature: 0.6 });
+    out = await geminiJSON(screens.length ? [{ text: prompt }, ...screens] : prompt, { schema: SCHEMA, temperature: 0.6 });
   } catch (e) {
     console.error("script", e);
     return Response.json({ error: e instanceof GeminiError ? "Couldn't write the script. Try again." : "Something went wrong." }, { status: 502 });

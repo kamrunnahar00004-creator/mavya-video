@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Globe, Loader2, Sparkles } from "lucide-react";
+import { Globe, ImagePlus, Loader2, Sparkles, X } from "lucide-react";
 import type { Run } from "@/lib/types";
 
 
@@ -38,9 +38,21 @@ export async function writeScript(runId: string): Promise<{ run?: Run; error?: s
  * Step 1 "Your product": the website goes in (paste or Analyze, both explicit; it runs Gemini). The page reads it in
  * the background and moves on at once; `reading` is that request, `error` its failure (the step reopens with it).
  */
-export function ProductStep({ product, reading, error, failedUrl, onAnalyze }: { product: Run["product"] | null; reading: boolean; error: string | null; failedUrl?: string; onAnalyze: (url: string) => void }) {
+export function ProductStep({ product, reading, error, failedUrl, onAnalyze, screens = [], onAddScreens, onRemoveScreen }: {
+  product: Run["product"] | null;
+  reading: boolean;
+  error: string | null;
+  failedUrl?: string;
+  onAnalyze: (url: string) => void;
+  /** Screenshots of the product (media ids), up to 5: the script names the real screens and buttons from them. */
+  screens?: string[];
+  onAddScreens?: (files: File[]) => Promise<void>;
+  onRemoveScreen?: (mediaId: string) => void;
+}) {
   const [url, setUrl] = useState(failedUrl ?? product?.url ?? "");
   const [editing, setEditing] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [screenError, setScreenError] = useState<string | null>(null);
 
   const analyze = (value = url) => {
     if (!value.trim() || reading) return;
@@ -52,6 +64,7 @@ export function ProductStep({ product, reading, error, failedUrl, onAnalyze }: {
   if (brief && !editing && !reading && !error) {
     return (
       // The rest of the brief (audience, wow moment, features) is kept for the script and demo plan, not shown.
+      <>
       <div className="flex items-center gap-4 rounded-2xl border border-line bg-panel p-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-tint text-accent">
           <Globe className="h-5 w-5" />
@@ -64,6 +77,44 @@ export function ProductStep({ product, reading, error, failedUrl, onAnalyze }: {
           Change
         </button>
       </div>
+      {onAddScreens && (
+        // Optional: the real app, so the script says "Tap Remix" instead of "Tap the button".
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {screens.map((id) => (
+            <span key={id} className="group relative h-[64px] w-[36px] overflow-hidden rounded-md border border-line bg-raised">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`/api/media/${id}`} alt="" className="h-full w-full object-cover object-top" />
+              {onRemoveScreen && (
+                <button type="button" onClick={() => onRemoveScreen(id)} aria-label="Remove screenshot" className="absolute inset-0 flex items-center justify-center bg-black/55 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </span>
+          ))}
+          {screens.length < 5 && (
+            <label title="Screenshots of your app: the script then names your real screens and buttons" className={`flex cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-[13px] font-semibold text-text hover:border-accent hover:text-accent ${adding ? "pointer-events-none opacity-60" : ""}`}>
+              {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
+              Add app screenshots
+              <input
+                type="file"
+                accept="image/png,image/jpeg"
+                multiple
+                className="hidden"
+                onChange={async (e) => {
+                  const files = [...(e.target.files ?? [])].filter((f) => /^image\/(png|jpeg)$/.test(f.type)).slice(0, 5 - screens.length);
+                  e.target.value = "";
+                  if (!files.length) return setScreenError("Use PNG or JPG screenshots.");
+                  setScreenError(null);
+                  setAdding(true);
+                  try { await onAddScreens(files); } catch { setScreenError("Couldn't upload the screenshots. Try again."); } finally { setAdding(false); }
+                }}
+              />
+            </label>
+          )}
+          {screenError && <p role="alert" className="w-full text-[13px] font-semibold text-red-600">{screenError}</p>}
+        </div>
+      )}
+      </>
     );
   }
 

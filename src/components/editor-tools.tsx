@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { memo, useCallback, useEffect, useId, useRef, useState } from "react";
 
 
-import { ArrowLeftRight, Check, ChevronDown, ClipboardPaste, Copy, Diamond, Film, GripVertical, Loader2, Magnet, Music, Pause, Play, Plus, Redo2, Scissors, SlidersHorizontal, Smartphone, Undo2, Volume1, Volume2, VolumeX, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeftRight, Check, ClipboardPaste, Copy, Diamond, Film, ListOrdered, Loader2, Magnet, Music, Pause, Play, Plus, Redo2, Scissors, SlidersHorizontal, Smartphone, Undo2, Volume1, Volume2, VolumeX, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
 import { frameAt } from "@/lib/filmstrip";
 import { waveform } from "@/lib/waveform";
 
@@ -22,7 +22,7 @@ import { fmtTime, type DemoClip, type Part, type Reference, type SoundPiece, typ
 
 
 
-import { SyncedAudio, SyncedVideo, TextOverlay, WarmthFilter, claimPlayback, soundAt, usePlaybackClaims } from "@/components/run-preview";
+import { SegmentVideos, SyncedAudio, TextOverlay, WarmthFilter, claimPlayback, soundAt, usePlaybackClaims } from "@/components/run-preview";
 
 
 
@@ -282,10 +282,10 @@ export function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlace
                 // Cut = two pieces side by side in this clip; nothing is removed or moved.
                 setPlaying(false);
                 const f = Math.round(fileT * 1000) / 1000;
-                // The new piece (after the playhead) is selected, like CapCut; the others show lighter.
+                // Only a split: both pieces stay as they were, nothing is selected or greyed out (founder 2026-10-30).
                 const second = { id: uid(), start: f, end: herePart.end };
                 change([...seg.parts.slice(0, here.i), { ...herePart, end: f }, second, ...seg.parts.slice(here.i + 1)]);
-                setPick(second.id);
+                setPick(null);
               }}
               texts={local}
               onTiming={(tid, patch) =>
@@ -448,7 +448,6 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   const time = Math.min(t, total - 0.001);
   const hit = segAt(segs, time);
   const seg = hit ?? segs[segs.length - 1];
-  const speed = seg.editable ? speedOf(seg.adjust) : 1;
   const { file: at, i: piece } = fileAt(seg, time - seg.offset);
 
   // Keyboard, like CapCut: Space play/pause, Delete removes the selected sound, S / Ctrl+B split, Ctrl+Z undo, Ctrl+Shift+Z redo, arrows move the playhead, Esc deselects.
@@ -512,7 +511,7 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
       {!hit ? null : seg.src ? (
         <>
           <WarmthFilter adjust={seg.editable ? seg.adjust : null} />
-          <SyncedVideo key={`${seg.id}|${seg.src}`} src={seg.src} at={at} piece={piece} playing={playing} rate={speed} volume={seg.editable ? fullAdjust(seg.adjust).volume / 100 : 0} style={seg.editable ? videoStyle(seg.adjust, at) : undefined} />
+          <SegmentVideos segs={segs} seg={seg} at={at} piece={piece} playing={playing} />
         </>
       ) : (
         <div className="absolute inset-0 flex items-center justify-center text-[12px] font-semibold text-white/40">{seg.id === "hook" ? "Your hook" : "Your demo"}</div>
@@ -1834,10 +1833,10 @@ function ShotBrief({ clip }: { clip: DemoClip }) {
 }
 
 /**
- * Step 5: one finished demo video, or "Copy the viral video": the stolen clip's demo shot for shot, one card per shot
+ * Step 5: one finished demo video, or "Plan it shot by shot": the stolen clip's demo shot for shot, one card per shot
  * with how to film it; its on-screen text goes on when the footage is uploaded. Every clip opens in the ClipEditor.
  */
-export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, onClips, onUpload, onRename, onDelete, onMove, onReset }: {
+export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, onClips, onUpload, onRename, onDelete, onMove, onSwap, onReset }: {
   run: Run;
   segs: Seg[];
   /** The shot list is still being written; the copy lands as soon as it is. */
@@ -1851,6 +1850,8 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
   onDelete: (id: string) => void;
   /** Move a clip to a new position (0-based). */
   onMove: (id: string, to: number) => void;
+  /** Swap two clips' places (a tile dropped on another). */
+  onSwap: (a: string, b: string) => void;
   onReset: () => void;
 }) {
   const clips = demoClips(run);
@@ -1860,7 +1861,6 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
   const mode = run.demo.mode ?? (clips.length ? "single" : undefined);
   const [busy, setBusy] = useState<string | null>(null); // clip id (or "single") being uploaded
   const [openId, setOpenId] = useState<string | null>(null);
-  const [briefId, setBriefId] = useState<string | null>(null); // which "How to film" is open
   const [error, setError] = useState<string | null>(null);
 
   async function take(id: string, f: File | undefined, upload: (f: File) => Promise<void>) {
@@ -1913,8 +1913,8 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
             <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => void takeMany(e.target.files).then(() => (e.target.value = ""))} />
           </label>
           <button type="button" onClick={onClips} disabled={copying} className={`${optionBtn(false)} disabled:opacity-70`}>
-            {copying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
-            Copy the viral video
+            {copying ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListOrdered className="h-4 w-4" />}
+            Plan it shot by shot
           </button>
         </div>
         {error && <p role="alert" className="mt-2.5 text-[13px] font-semibold text-red-600">{error}</p>}
@@ -1922,136 +1922,119 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
     );
   }
 
+  // One row of 9:16 tiles, like a phone editor's clip strip: filmed clips show a frame, shots still to film are
+  // dashed with their name. Click a tile to open it below; drop one tile on another to swap them.
+  const selected = clips.find((c) => c.id === openId) ?? null;
+  const selSeg = selected ? segs.find((s) => s.id === selected.id) : undefined;
+  const selIndex = selected ? clips.indexOf(selected) : -1;
   return (
-    <div className="space-y-3">
-      {clips.map((c, i) => {
-        const seg = segs.find((s) => s.id === c.id);
-        const open = openId === c.id && Boolean(seg);
-        return (
-          <div
-            key={c.id}
-            onDragOver={(e) => {
-              if (!dragId) return;
-              e.preventDefault();
-              const r = e.currentTarget.getBoundingClientRect();
-              setDropAt(e.clientY < r.top + r.height / 2 ? i : i + 1);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (dragId && dropAt !== null) {
-                const from = clips.findIndex((x) => x.id === dragId);
-                onMove(dragId, dropAt > from ? dropAt - 1 : dropAt);
-              }
-              setDragId(null);
-              setDropAt(null);
-            }}
-            className={`relative rounded-2xl border bg-panel ${open ? "border-line-strong" : "border-line"} ${dragId === c.id ? "opacity-40" : ""}`}
-          >
-            {/* where the dragged clip will land */}
-            {dragId && dropAt === i && <span className="pointer-events-none absolute -top-[7px] left-2 right-2 h-[3px] rounded-full bg-accent" />}
-            {dragId && dropAt === i + 1 && i === clips.length - 1 && <span className="pointer-events-none absolute -bottom-[7px] left-2 right-2 h-[3px] rounded-full bg-accent" />}
-            <div className="flex items-center gap-3 py-3.5 pl-1.5 pr-4">
-              {clips.length > 1 && (
-                <button
-                  type="button"
-                  draggable
-                  aria-label={`Move clip ${i + 1}`}
-                  title="Drag to reorder (or use the arrow keys)"
-                  onDragStart={(e) => {
-                    e.dataTransfer.effectAllowed = "move";
-                    e.dataTransfer.setData("text/plain", c.id);
-                    const row = e.currentTarget.closest("[class*='rounded-2xl']");
-                    if (row instanceof HTMLElement) e.dataTransfer.setDragImage(row, 24, 24);
-                    setDragId(c.id);
-                  }}
-                  onDragEnd={() => {
-                    setDragId(null);
-                    setDropAt(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "ArrowUp" && i > 0) { e.preventDefault(); onMove(c.id, i - 1); }
-                    if (e.key === "ArrowDown" && i < clips.length - 1) { e.preventDefault(); onMove(c.id, i + 1); }
-                  }}
-                  className="flex h-9 w-6 shrink-0 cursor-grab items-center justify-center rounded-md text-soft hover:bg-raised hover:text-text active:cursor-grabbing"
-                >
-                  <GripVertical className="h-4 w-4" />
-                </button>
-              )}
-              {clipSrc(c) ? (
-                <button type="button" onClick={() => setOpenId(open ? null : c.id)} aria-label={open ? "Close clip" : "Edit clip"} className="relative shrink-0">
-                  <MediaVideo src={`${clipSrc(c)}#t=0.5`} muted preload="metadata" className="h-[56px] w-[32px] rounded-md bg-ink object-cover" />
-                  <span className="absolute -left-1.5 -top-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-accent text-[10.5px] font-black text-white">{i + 1}</span>
-                </button>
-              ) : (
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-raised text-[13px] font-bold text-muted">{i + 1}</span>
-              )}
-              <div className="min-w-0 flex-1">
-                {/* Title, then its length right after it; the tips toggle starts under the title. */}
-                <div className="flex items-baseline gap-2">
-                  <input
-                    value={c.label}
-                    maxLength={60}
-                    onChange={(e) => onRename(c.id, e.target.value)}
-                    aria-label={`Clip ${i + 1} name`}
-                    className="min-w-0 bg-transparent text-[14px] font-semibold outline-none [field-sizing:content]"
-                  />
-                  <span className="shrink-0 text-[13px] tabular-nums text-soft">{seg ? `${seg.len.toFixed(1)}s` : c.target ? `~${c.target}s` : ""}</span>
-                </div>
-                {!open && clipSrc(c) && (c.camera || c.steps?.length) ? (
-                  <button
-                    type="button"
-                    onClick={() => setBriefId(briefId === c.id ? null : c.id)}
-                    aria-expanded={briefId === c.id}
-                    className="mt-0.5 flex items-center gap-1 text-[13px] leading-5 text-soft hover:text-accent"
-                  >
-                    How to film
-                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${briefId === c.id ? "rotate-180" : ""}`} />
-                  </button>
-                ) : !c.steps?.length && c.hint ? (
-                  <div className="mt-0.5 truncate text-[13px] leading-5 text-soft">{c.hint}</div>
-                ) : null}
-              </div>
-              {clipSrc(c) ? (
-                <>
-                  <label title="Replace video" aria-label="Replace video" className={`flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted hover:bg-raised hover:text-accent ${busy ? "pointer-events-none opacity-60" : ""}`}>
-                    {busy === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />}
-                    {fileInput(c.id, (f) => onUpload(c.id, f))}
-                  </label>
-                  <button type="button" onClick={() => setOpenId(open ? null : c.id)} className="rounded-lg px-3 py-1.5 text-[13px] font-bold text-accent hover:bg-accent-tint">
-                    {open ? "Done" : "Edit"}
-                  </button>
-                </>
-              ) : (
-                <label className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3.5 py-2 text-[13px] font-bold text-text hover:border-accent hover:text-accent ${busy ? "pointer-events-none opacity-60" : ""}`}>
-                  {busy === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                  Upload clip
-                  {fileInput(c.id, (f) => onUpload(c.id, f))}
-                </label>
-              )}
-              <button type="button" onClick={() => onDelete(c.id)} aria-label={`Delete clip ${i + 1}`} className="rounded-lg p-2 text-soft hover:bg-red-50 hover:text-red-600">
-                <Trash2 className="h-4 w-4" />
+    <div className="space-y-4">
+      <ol className="flex flex-wrap gap-3" aria-label="Demo clips">
+        {clips.map((c, i) => {
+          const seg = segs.find((s) => s.id === c.id);
+          const filmed = Boolean(clipSrc(c));
+          const on = openId === c.id;
+          const len = seg ? seg.len : c.target;
+          return (
+            <li key={c.id} className="w-[96px]">
+              <button
+                type="button"
+                draggable={clips.length > 1}
+                aria-label={`${c.label}${filmed ? "" : ", not filmed yet"}`}
+                aria-pressed={on}
+                title={clips.length > 1 ? "Click to open. Drag onto another clip to swap them." : undefined}
+                onClick={() => setOpenId(on ? null : c.id)}
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", c.id);
+                  setDragId(c.id);
+                }}
+                onDragEnd={() => { setDragId(null); setDropAt(null); }}
+                onDragOver={(e) => {
+                  // The drag data names the dragged clip even before React has stored dragId.
+                  if (dragId === c.id || !e.dataTransfer.types.includes("text/plain")) return;
+                  e.preventDefault();
+                  setDropAt(i);
+                }}
+                onDragLeave={() => setDropAt((d) => (d === i ? null : d))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const from = e.dataTransfer.getData("text/plain") || dragId;
+                  if (from && from !== c.id && clips.some((x) => x.id === from)) onSwap(from, c.id);
+                  setDragId(null);
+                  setDropAt(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowLeft" && i > 0) { e.preventDefault(); onMove(c.id, i - 1); }
+                  if (e.key === "ArrowRight" && i < clips.length - 1) { e.preventDefault(); onMove(c.id, i + 1); }
+                }}
+                className={`relative block aspect-[9/16] w-full overflow-hidden rounded-xl transition-[box-shadow,opacity] ${filmed ? "bg-ink" : "border-2 border-dashed border-line-strong bg-panel hover:border-accent"} ${on ? "ring-2 ring-accent ring-offset-2 ring-offset-panel" : ""} ${dropAt === i ? "ring-2 ring-accent" : ""} ${dragId === c.id ? "opacity-40" : ""} ${clips.length > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
+              >
+                {filmed ? (
+                  <MediaVideo src={`${clipSrc(c)}#t=0.5`} muted preload="metadata" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+                ) : (
+                  <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-soft">
+                    {busy === c.id ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
+                  </span>
+                )}
+                <span className={`absolute left-1.5 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold ${filmed ? "bg-black/60 text-white" : "bg-raised text-muted"}`}>{i + 1}</span>
+                {len ? <span className={`absolute bottom-1.5 right-1.5 rounded px-1 text-[11px] font-semibold tabular-nums ${filmed ? "bg-black/60 text-white" : "text-soft"}`}>{filmed ? `${len.toFixed(1)}s` : `~${len}s`}</span> : null}
               </button>
-            </div>
-            {/* Directions stay in view until the clip is filmed; after that they fold behind "How to film". */}
-            {!open && (!clipSrc(c) || briefId === c.id) && (c.camera || c.steps?.length) ? (
-              <ShotBrief clip={c} />
-            ) : null}
-            {open && seg && (
-              <div className="border-t border-line p-3">
-                {renderEditor(seg)}
-              </div>
+              <p className="mt-1.5 line-clamp-2 text-[12.5px] leading-tight text-muted">{c.label}</p>
+            </li>
+          );
+        })}
+        <li className="w-[96px]">
+          <label className={`flex aspect-[9/16] w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-line text-soft hover:border-accent hover:text-accent ${busy ? "pointer-events-none opacity-60" : ""}`}>
+            {busy === "single" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
+            <span className="text-[12.5px] font-semibold">Add clip</span>
+            <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => void takeMany(e.target.files).then(() => (e.target.value = ""))} />
+          </label>
+        </li>
+      </ol>
+      {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
+
+      {selected && (
+        <div className="rounded-2xl border border-line bg-panel">
+          <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
+            <span className="text-[13px] font-bold tabular-nums text-soft">{selIndex + 1}</span>
+            <input
+              value={selected.label}
+              maxLength={60}
+              onChange={(e) => onRename(selected.id, e.target.value)}
+              aria-label={`Clip ${selIndex + 1} name`}
+              className="min-w-0 flex-1 bg-transparent text-[14px] font-semibold outline-none"
+            />
+            {clipSrc(selected) ? (
+              <label title="Replace video" aria-label="Replace video" className={`flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted hover:bg-raised hover:text-accent ${busy ? "pointer-events-none opacity-60" : ""}`}>
+                {busy === selected.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />}
+                {fileInput(selected.id, (f) => onUpload(selected.id, f))}
+              </label>
+            ) : (
+              <label className={`btn-primary shrink-0 cursor-pointer px-3.5 py-2 text-[13px] ${busy ? "pointer-events-none opacity-60" : ""}`}>
+                {busy === selected.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                Upload clip
+                {fileInput(selected.id, (f) => onUpload(selected.id, f))}
+              </label>
             )}
+            <button type="button" onClick={() => { onDelete(selected.id); setOpenId(null); }} aria-label={`Delete clip ${selIndex + 1}`} title="Delete clip" className="rounded-lg p-2 text-soft hover:bg-red-50 hover:text-red-600">
+              <Trash2 className="h-4 w-4" />
+            </button>
+            <button type="button" onClick={() => setOpenId(null)} aria-label="Close" className="rounded-lg p-2 text-soft hover:bg-raised hover:text-text">
+              <X className="h-4 w-4" />
+            </button>
           </div>
-        );
-      })}
-      {error && <p className="text-[13px] font-semibold text-red-600">{error}</p>}
-      <div className="flex items-center justify-between pt-1">
-        {/* Picks one or more videos; each becomes a clip at the end. */}
-        <label className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-muted hover:bg-raised hover:text-accent ${busy ? "pointer-events-none opacity-60" : ""}`}>
-          {busy === "single" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          Add clip
-          <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => void takeMany(e.target.files).then(() => (e.target.value = ""))} />
-        </label>
+          {clipSrc(selected) && selSeg ? (
+            <div className="p-3">{renderEditor(selSeg)}</div>
+          ) : selected.camera || selected.steps?.length ? (
+            <div className="pt-3"><ShotBrief clip={selected} /></div>
+          ) : (
+            <p className="px-4 py-3 text-[13.5px] text-muted">{selected.hint}</p>
+          )}
+        </div>
+      )}
+
+      <div className="flex justify-end">
         <button type="button" onClick={onReset} className="rounded-lg px-2 py-1.5 text-[13px] font-semibold text-soft hover:text-text">
           Start over
         </button>

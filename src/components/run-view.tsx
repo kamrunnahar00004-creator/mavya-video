@@ -141,11 +141,11 @@ export function RunView() {
 
   /**
    * The script (hook + demo, modelled on the stolen clip), written once the product brief and the clip are both in.
-   * It is the one source for everything after: "Copy the viral video" turns its shots into demo clips, and its hook
+   * It is the one source for everything after: "Plan it shot by shot" turns its shots into demo clips, and its hook
    * line replaces the stolen caption in the hook text (text the seller typed stays).
    */
   const planBusy = useRef(false);
-  /** "Copy the viral video" was clicked while the script was still being written: build the clips when it lands. */
+  /** "Plan it shot by shot" was clicked while the script was still being written: build the clips when it lands. */
   const copyPending = useRef<string | null>(null);
   const [copyWaiting, setCopyWaiting] = useState(false);
   const refsRef = useRef(refs);
@@ -502,18 +502,13 @@ export function RunView() {
 
   /* ----- Step 4: demo clips ----- */
   /** A text over one clip in the same look and spot as the subtitle before it in the video, so the video keeps one text style. */
-  const textOver = (all: TextLayer[], text: string, at: number, len: number): TextLayer => {
-    const look = lookBefore(all, at);
-    const span = { start: round1(at), end: round1(at + len) };
-    return look ? { ...look, id: uid(), text, ...span } : { id: uid(), text, ...span, x: 50, y: TEXT_Y.top, size: 4.6, font: DEFAULT_FONT, color: "#ffffff", style: "outline" };
-  };
   /** Puts an uploaded video into a demo clip. Texts after it move later by its length (or by the change, when replacing). */
   const fillClip = async (clipId: string, file: File, startClips?: DemoClip[], mode?: "single" | "clips") => {
     const c = await clipFromFile(file);
     setLibraryKey((k) => k + 1);
     const cur = runRef.current ?? run;
     if (cur.id !== id) return;
-    const seconds = round1(c.length ?? 3);
+    const seconds = clipSeconds(c.length);
     const list = startClips ?? demoClips(cur);
     const clips = list.map((x) => (x.id === clipId ? { ...x, src: undefined, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds, parts: undefined, adjust: undefined } : x));
     const before = timeline(cur, null);
@@ -554,7 +549,7 @@ export function RunView() {
     setLibraryKey((k) => k + 1);
     const count = demoClips(runRef.current ?? run).length;
     const added: DemoClip[] = ups.map((c, i) => {
-      const seconds = round1(c.length ?? 3);
+      const seconds = clipSeconds(c.length);
       return { id: uid(), label: `Clip ${count + i + 1}`, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds };
     });
     insertClips(added, at);
@@ -584,6 +579,20 @@ export function RunView() {
     const next = [...clips];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
+    reorderClips(next);
+  };
+  /** A tile dropped on another: the two clips trade places, each with its texts. */
+  const swapClips = (a: string, b: string) => {
+    const clips = demoClips(run);
+    const i = clips.findIndex((c) => c.id === a);
+    const j = clips.findIndex((c) => c.id === b);
+    if (i < 0 || j < 0 || i === j) return;
+    const next = [...clips];
+    [next[i], next[j]] = [next[j], next[i]];
+    reorderClips(next);
+  };
+  /** Put the demo clips in this order. Texts that sit on one clip go with it; texts across several clips keep their time. */
+  const reorderClips = (next: DemoClip[]) => {
     const before = timeline(run, null);
     const after = timeline({ ...run, demo: { ...run.demo, clips: next } }, null);
     const nextTexts = texts.map((x) => {
@@ -699,7 +708,23 @@ export function RunView() {
         <div className="shrink-0 xl:min-h-0 xl:overflow-y-auto">
           <div className="mx-auto max-w-[760px] divide-y divide-line px-8">
             <Block n={1} title="Your product" done={stepDone[0]} pending={stepPending[0]} open={openSteps.includes(1)} summary={stepSummary[0]} onToggle={() => toggleStep(1)}>
-              <ProductStep key={job?.error ? `failed:${job.url}` : "product"} product={run.product ?? null} reading={productReading} error={job?.error ?? null} failedUrl={job?.error ? job.url : undefined} onAnalyze={analyzeProduct} />
+              <ProductStep
+                key={job?.error ? `failed:${job.url}` : "product"}
+                product={run.product ?? null}
+                reading={productReading}
+                error={job?.error ?? null}
+                failedUrl={job?.error ? job.url : undefined}
+                onAnalyze={analyzeProduct}
+                screens={run.productScreens ?? []}
+                onAddScreens={async (files) => {
+                  const ups = await Promise.all(files.map((f) => uploadFile(f, false)));
+                  const cur = runRef.current ?? run;
+                  save({ productScreens: [...(cur.productScreens ?? []), ...ups.map((u) => u.mediaId)].slice(0, 5) });
+                  // New screenshots (an explicit click): the script is rewritten with the real screens.
+                  if (cur.sourceRefId || (cur.hook.source === "describe" && cur.hook.describeReady)) requestScript();
+                }}
+                onRemoveScreen={(mediaId) => save({ productScreens: (run.productScreens ?? []).filter((x) => x !== mediaId) })}
+              />
             </Block>
 
             <Block n={2} title="Steal a hook that already works" done={stepDone[1]} open={openSteps.includes(2)} summary={stepSummary[1]} onToggle={() => toggleStep(2)}>
@@ -862,6 +887,7 @@ export function RunView() {
                 onRename={(cid, label) => save({ demo: { ...run.demo, clips: demoClips(run).map((c) => (c.id === cid ? { ...c, label } : c)) } })}
                 onDelete={deleteClip}
                 onMove={moveClip}
+                onSwap={swapClips}
                 onReset={resetDemo}
               />
             </Block>
@@ -1283,6 +1309,9 @@ function CharacterBrowser({ current, onPick, onClose }: { current: Hook["face"] 
 
 /** The run's starting hook text (see store.createRun); replaced by the stolen hook's text on generate. */
 const DEFAULT_HOOK_TEXT = "How is this tool even legal?";
+/** A clip's real length, to the millisecond and never past its end: rounding up would ask for frames that do not
+ *  exist and freeze or blank the join to the next clip. */
+const clipSeconds = (length: number | null | undefined) => (length && length > 0 ? Math.floor(length * 1000) / 1000 : 3);
 
 /**
  * A sticky magnet for timeline drags: an edge snaps to the nearest point within `tol`, and once it has snapped
