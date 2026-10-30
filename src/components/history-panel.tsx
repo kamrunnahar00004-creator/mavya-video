@@ -46,10 +46,12 @@ const title = (r: Run) => (r.title === "Untitled run" ? "Untitled video" : r.tit
  * uploaded), characters and photos, generated hooks (every version), demos as they were cut, music, exports.
  * Use replaces that part of the open video (an old generated hook also brings its hook and character).
  */
-export function HistoryPanel({ run, refs, refreshKey, onClose, onUseHook, onUseFace, onUseGenerated, onUseDemo, onUseSound }: {
+export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUseHook, onUseFace, onUseGenerated, onUseDemo, onUseSound }: {
   run: Run;
   refs: Reference[];
   refreshKey?: number;
+  /** The tab it opens on (default Hooks). */
+  initialTab?: Tab;
   onClose: () => void;
   onUseHook: (r: Reference) => void;
   onUseFace: (f: Face) => void;
@@ -65,7 +67,7 @@ export function HistoryPanel({ run, refs, refreshKey, onClose, onUseHook, onUseF
   const [listError, setListError] = useState<string | null>(null);
   const [runs, setRuns] = useState<Run[] | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [tab, setTab] = useState<Tab>("hooks");
+  const [tab, setTab] = useState<Tab>(initialTab ?? "hooks");
   const [filter, setFilter] = useState("all");
   const [sort, setSort] = useState<Sort>("new");
 

@@ -64,6 +64,8 @@ export function RunView() {
   const [refs, setRefs] = useState<Reference[] | null>(null);
   const [missing, setMissing] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  /** The My files tab to open on (step 4's "Check library" opens Generated). */
+  const [libraryTab, setLibraryTab] = useState<"generated" | undefined>(undefined);
   const [pickerOpen, setPickerOpen] = useState(false);
   /** Steps the user opened or closed by hand (undefined = follow progress: just the current step). */
   const [picked, setPicked] = useState<number[] | undefined>(undefined);
@@ -680,7 +682,7 @@ export function RunView() {
         </Link>
         <TitleInput value={run.title === "Untitled run" ? "Untitled video" : run.title} onSave={(title) => save({ title })} />
         <SaveStatus id={run.id} />
-        <button type="button" onClick={() => setLibraryOpen(true)} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-muted hover:bg-raised hover:text-text">
+        <button type="button" onClick={() => { setLibraryTab(undefined); setLibraryOpen(true); }} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-muted hover:bg-raised hover:text-text">
           <FolderOpen className="h-4 w-4" />
           My files
         </button>
@@ -883,6 +885,15 @@ export function RunView() {
                 texts={texts}
                 gen={gen}
                 onGenerate={startGenerate}
+                onUploadHook={async (f) => {
+                  const c = await clipFromFile(f);
+                  setLibraryKey((k) => k + 1);
+                  if (!c.mediaId) throw Error("upload");
+                  const cur = runRef.current ?? run;
+                  if (cur.id !== id) return;
+                  applyGenerated({ src: `/api/media/${c.mediaId}`, seconds: clipSeconds(c.length), at: new Date().toISOString() }, cur.script?.hookText || cur.hook.text);
+                }}
+                onCheckLibrary={() => { setLibraryTab("generated"); setLibraryOpen(true); }}
                 onRegenerateText={run.product?.brief ? regenerateHookText : undefined}
                 onPatch={patchText}
                 onAdd={addText}
@@ -997,6 +1008,7 @@ export function RunView() {
               run={run}
               refs={refs}
               refreshKey={libraryKey}
+              initialTab={libraryTab}
               onClose={() => setLibraryOpen(false)}
               onUseHook={(r) => {
                 void pickHook(r, r.owner === "user" ? "upload" : "library").catch(() => setToast("Could not load the hook. Try again."));
@@ -1470,7 +1482,11 @@ function useHookGeneration(runId: string, onGenerated: (updated: Run) => void, o
 
 /** Step 4: the hook clip, in the shared clip editor. Before generating, the video box shows the inputs and a Generate button.
  * The job itself lives on the page (`gen`), so this step can close as soon as Generate is clicked. */
-function GenerateStep({ run, source, seg, texts, gen, onGenerate, onRegenerateText, onPatch, onAdd, onRemove, onParts, onAdjust, onApplyAll }: {
+function GenerateStep({ run, source, seg, texts, gen, onGenerate, onUploadHook, onCheckLibrary, onRegenerateText, onPatch, onAdd, onRemove, onParts, onAdjust, onApplyAll }: {
+  /** A hook video of their own goes in as the hook (no generation). */
+  onUploadHook: (f: File) => Promise<void>;
+  /** My files, on its Generated tab: reuse a hook made before. */
+  onCheckLibrary: () => void;
   onRegenerateText?: (textId: string) => Promise<void>;
   run: Run;
   source: Reference | null;
@@ -1492,6 +1508,8 @@ function GenerateStep({ run, source, seg, texts, gen, onGenerate, onRegenerateTe
   const ch = face?.kind === "character" ? characterById(face.id) : null;
   const ready = (Boolean(source) || Boolean(described)) && Boolean(face);
 
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   // Regenerate: optional note on what went wrong, passed to the next generation.
   const [regen, setRegen] = useState(false);
   const [fix, setFix] = useState("");
@@ -1516,7 +1534,32 @@ function GenerateStep({ run, source, seg, texts, gen, onGenerate, onRegenerateTe
       <button type="button" disabled={!ready} title={ready ? undefined : "Pick a hook and a character first"} onClick={() => void generate()} className="btn-primary relative px-4 py-2.5 text-[14px] disabled:opacity-50">
         Generate hook
       </button>
-      {genError && <p role="alert" className="relative rounded-md bg-ink/80 px-2.5 py-1.5 text-center text-[12.5px] font-semibold text-white">{genError}</p>}
+      {/* Or a hook they already have: a video of their own, or one generated before (My files, Generated). */}
+      <div className="relative flex gap-2">
+        <label className={`${optionBtn(false)} cursor-pointer px-3 py-2 text-[13px] ${uploading ? "pointer-events-none opacity-70" : ""}`}>
+          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          Upload
+          <input
+            type="file"
+            accept="video/*"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (!f) return;
+              if (!f.type.startsWith("video/")) return setUploadError("Please choose a video file.");
+              setUploadError(null);
+              setUploading(true);
+              try { await onUploadHook(f); } catch { setUploadError("Upload failed. Try again."); } finally { setUploading(false); }
+            }}
+          />
+        </label>
+        <button type="button" onClick={onCheckLibrary} className={`${optionBtn(false)} px-3 py-2 text-[13px]`}>
+          <FolderOpen className="h-4 w-4" />
+          Check library
+        </button>
+      </div>
+      {(genError || uploadError) && <p role="alert" className="relative rounded-md bg-ink/80 px-2.5 py-1.5 text-center text-[12.5px] font-semibold text-white">{uploadError ?? genError}</p>}
     </div>
   ) : null;
 
