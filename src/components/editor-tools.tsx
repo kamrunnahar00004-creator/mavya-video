@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { memo, useCallback, useEffect, useId, useRef, useState } from "react";
 
 
-import { ArrowLeftRight, Check, ClipboardPaste, Copy, Diamond, Film, ListOrdered, Loader2, Magnet, Music, Pause, Play, Plus, Redo2, Scissors, SlidersHorizontal, Smartphone, Undo2, Volume1, Volume2, VolumeX, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeftRight, Check, ClipboardPaste, Copy, Diamond, Film, FolderOpen, ListOrdered, Loader2, Magnet, Music, Pause, Play, Plus, Redo2, Scissors, SlidersHorizontal, Smartphone, Undo2, Volume1, Volume2, VolumeX, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
 import { frameAt } from "@/lib/filmstrip";
 import { waveform } from "@/lib/waveform";
 
@@ -39,7 +39,9 @@ function magnet(points: number[], tol: number) {
 const optionBtn = (on: boolean) =>
   `flex items-center gap-1.5 rounded-lg border px-3.5 py-2.5 text-[14px] font-semibold ${on ? "border-accent bg-accent-tint text-accent" : "border-line-strong bg-panel text-text hover:border-accent hover:text-accent"}`;
 
-export function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlaceholder = "Text", onRegenerateFirst, onParts, onAdjust, onPatch, onAdd, onRemove, onApplyAll }: {
+export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTextPlaceholder = "Text", onRegenerateFirst, onParts, onAdjust, onPatch, onAdd, onRemove, onApplyAll }: {
+  /** Extra controls in the right column, under the settings. */
+  side?: React.ReactNode;
   /** The first text row gets a Regenerate icon (the hook's line); called with that text's id. */
   onRegenerateFirst?: (id: string) => Promise<void>;
   seg: Seg;
@@ -343,6 +345,7 @@ export function ClipEditor({ seg, version, texts, cover, overlay, firstTextPlace
               onAdjust(toggleKey(seg.adjust, fileT));
             }}
           />
+          {side}
         </div>
       </div>
 
@@ -1858,7 +1861,9 @@ function ShotBrief({ clip }: { clip: DemoClip }) {
  * Step 5: one finished demo video, or "Plan it shot by shot": the stolen clip's demo shot for shot, one card per shot
  * with how to film it; its on-screen text goes on when the footage is uploaded. Every clip opens in the ClipEditor.
  */
-export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, onClips, onUpload, onRename, onDelete, onMove, onSwap, onReset }: {
+export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, onClips, onCheckLibrary, onUpload, onRename, onDelete, onMove, onSwap, onReset }: {
+  /** My files, on its Demos tab: reuse a demo from another video. */
+  onCheckLibrary: () => void;
   run: Run;
   segs: Seg[];
   /** The shot list is still being written; the copy lands as soon as it is. */
@@ -1928,9 +1933,9 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
   );
 
   if (!mode) {
-    // No box of its own: it sits under the demo script as the step's actions.
+    // One box of choices, like step 2: upload, plan it shot by shot, or reuse a demo from My files.
     return (
-      <div>
+      <div className="rounded-2xl border border-line bg-panel p-4">
         <div className="flex flex-wrap items-center gap-2.5">
           <label className={`btn-primary cursor-pointer px-4 py-2.5 text-[14px] ${busy ? "pointer-events-none opacity-60" : ""}`}>
             {busy === "single" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
@@ -1940,6 +1945,10 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
           <button type="button" onClick={onClips} disabled={copying} className={`${optionBtn(false)} disabled:opacity-70`}>
             {copying ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListOrdered className="h-4 w-4" />}
             Plan it shot by shot
+          </button>
+          <button type="button" onClick={onCheckLibrary} className={optionBtn(false)}>
+            <FolderOpen className="h-4 w-4" />
+            Check library
           </button>
         </div>
         {error && <p role="alert" className="mt-2.5 text-[13px] font-semibold text-red-600">{error}</p>}

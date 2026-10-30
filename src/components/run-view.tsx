@@ -64,8 +64,8 @@ export function RunView() {
   const [refs, setRefs] = useState<Reference[] | null>(null);
   const [missing, setMissing] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  /** The My files tab to open on (step 4's "Check library" opens Generated). */
-  const [libraryTab, setLibraryTab] = useState<"generated" | undefined>(undefined);
+  /** The My files tab to open on ("Check library": step 4 opens Generated, step 5 Demos). */
+  const [libraryTab, setLibraryTab] = useState<"generated" | "demos" | undefined>(undefined);
   const [pickerOpen, setPickerOpen] = useState(false);
   /** Steps the user opened or closed by hand (undefined = follow progress: just the current step). */
   const [picked, setPicked] = useState<number[] | undefined>(undefined);
@@ -914,6 +914,7 @@ export function RunView() {
                   await addVideos(files);
                 }}
                 copying={copyWaiting}
+                onCheckLibrary={() => { setLibraryTab("demos"); setLibraryOpen(true); }}
                 onClips={() => {
                   // The script is the copy of the stolen video for this product; while it is being written, wait for it.
                   const coming = planningHere || (productReading && wantPlan.current === run.id);
@@ -1534,32 +1535,7 @@ function GenerateStep({ run, source, seg, texts, gen, onGenerate, onUploadHook, 
       <button type="button" disabled={!ready} title={ready ? undefined : "Pick a hook and a character first"} onClick={() => void generate()} className="btn-primary relative px-4 py-2.5 text-[14px] disabled:opacity-50">
         Generate hook
       </button>
-      {/* Or a hook they already have: a video of their own, or one generated before (My files, Generated). */}
-      <div className="relative flex gap-2">
-        <label className={`${optionBtn(false)} cursor-pointer px-3 py-2 text-[13px] ${uploading ? "pointer-events-none opacity-70" : ""}`}>
-          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-          Upload
-          <input
-            type="file"
-            accept="video/*"
-            className="hidden"
-            onChange={async (e) => {
-              const f = e.target.files?.[0];
-              e.target.value = "";
-              if (!f) return;
-              if (!f.type.startsWith("video/")) return setUploadError("Please choose a video file.");
-              setUploadError(null);
-              setUploading(true);
-              try { await onUploadHook(f); } catch { setUploadError("Upload failed. Try again."); } finally { setUploading(false); }
-            }}
-          />
-        </label>
-        <button type="button" onClick={onCheckLibrary} className={`${optionBtn(false)} px-3 py-2 text-[13px]`}>
-          <FolderOpen className="h-4 w-4" />
-          Check library
-        </button>
-      </div>
-      {(genError || uploadError) && <p role="alert" className="relative rounded-md bg-ink/80 px-2.5 py-1.5 text-center text-[12.5px] font-semibold text-white">{uploadError ?? genError}</p>}
+      {genError && <p role="alert" className="relative rounded-md bg-ink/80 px-2.5 py-1.5 text-center text-[12.5px] font-semibold text-white">{genError}</p>}
     </div>
   ) : null;
 
@@ -1577,6 +1553,38 @@ function GenerateStep({ run, source, seg, texts, gen, onGenerate, onUploadHook, 
       onApplyAll={onApplyAll}
       firstTextPlaceholder="Hook text"
       onRegenerateFirst={onRegenerateText}
+      side={
+        // Or a hook they already have: a video of their own, or one generated before (My files, Generated).
+        !hook.generated && !busy ? (
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <label className={`${optionBtn(false)} cursor-pointer ${uploading ? "pointer-events-none opacity-70" : ""}`}>
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                Upload
+                <input
+                  type="file"
+                  accept="video/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!f) return;
+                    if (!f.type.startsWith("video/")) return setUploadError("Please choose a video file.");
+                    setUploadError(null);
+                    setUploading(true);
+                    try { await onUploadHook(f); } catch { setUploadError("Upload failed. Try again."); } finally { setUploading(false); }
+                  }}
+                />
+              </label>
+              <button type="button" onClick={onCheckLibrary} className={optionBtn(false)}>
+                <FolderOpen className="h-4 w-4" />
+                Check library
+              </button>
+            </div>
+            {uploadError && <p role="alert" className="text-[13px] font-semibold text-red-600">{uploadError}</p>}
+          </div>
+        ) : undefined
+      }
       overlay={
         <>
           {/* What goes in: the hook (step 1) and the character (step 2). */}
