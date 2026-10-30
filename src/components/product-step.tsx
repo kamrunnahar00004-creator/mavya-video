@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ArrowRight, ArrowUp, Globe, ImagePlus, Loader2, Plus, Sparkles, X } from "lucide-react";
+import { ArrowUp, Globe, Loader2, Plus, Sparkles, X } from "lucide-react";
 import type { Run } from "@/lib/types";
 
 
@@ -36,19 +36,13 @@ export async function writeScript(runId: string): Promise<{ run?: Run; error?: s
 
 const FILE_TYPES = /^(image\/(png|jpeg|webp)|video\/(mp4|quicktime|webm))$/;
 const VIDEO_MAX = 12 * 1024 * 1024;
-/** Hints: each starts a line in the box (the last one opens the file picker). */
-const STARTERS = [
-  { label: "Who is it for?", text: "It's for " },
-  { label: "The one thing it does", text: "The one thing it does: " },
-  { label: "What to show in the video", text: "In the video, show " },
-];
 
 /**
  * Step 1 "Your product": the website goes in (paste or Analyze, both explicit; it runs Gemini) and is read in the
- * background. Under it, an optional box for the seller's own words, photos and videos. The step stays open until
- * "Steal a hook that already works". Send (an explicit click) saves the box and, when a clip is picked, rewrites the script.
+ * background. Under it, an optional box for the seller's own words, photos and videos; the step stays open until they
+ * open step 2. Send (an explicit click) saves the box and, when a clip is picked, rewrites the script.
  */
-export function ProductStep({ product, reading, host, error, failedUrl, onAnalyze, notes = "", files = [], writing = false, onAddFiles, onRemoveFile, onSend, onContinue }: {
+export function ProductStep({ product, reading, host, error, failedUrl, onAnalyze, notes = "", files = [], writing = false, onAddFiles, onRemoveFile, onSend, onSave }: {
   product: Run["product"] | null;
   reading: boolean;
   /** The site being read (shown while there is no brief yet). */
@@ -65,7 +59,8 @@ export function ProductStep({ product, reading, host, error, failedUrl, onAnalyz
   onAddFiles: (files: File[]) => Promise<void>;
   onRemoveFile: (mediaId: string) => void;
   onSend: (notes: string) => void;
-  onContinue: (notes: string) => void;
+  /** Keep the typed notes (no AI). */
+  onSave: (notes: string) => void;
 }) {
   const [url, setUrl] = useState(failedUrl ?? product?.url ?? "");
   const [editing, setEditing] = useState(false);
@@ -96,18 +91,6 @@ export function ProductStep({ product, reading, host, error, failedUrl, onAnalyz
     } finally {
       setAdding(false);
     }
-  };
-
-  const start = (line: string) => {
-    const next = text.trim() ? `${text.trimEnd()}\n${line}` : line;
-    setText(next);
-    setDirty(true);
-    requestAnimationFrame(() => {
-      const el = box.current;
-      if (!el) return;
-      el.focus();
-      el.setSelectionRange(next.length, next.length);
-    });
   };
 
   const brief = product?.brief;
@@ -151,20 +134,27 @@ export function ProductStep({ product, reading, host, error, failedUrl, onAnalyz
           <textarea
             ref={box}
             value={text}
-            rows={3}
+            rows={7}
             maxLength={2000}
             onChange={(e) => { setText(e.target.value); setDirty(true); }}
+            // Leaving the box keeps what was typed (no AI); Send is what rewrites the script.
+            onBlur={() => onSave(text)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && dirty) { e.preventDefault(); onSend(text); setDirty(false); }
             }}
             aria-label="About your product (optional)"
-            placeholder={"Tell Mavya about your product (optional)\ne.g. It's for gym beginners. Snap a photo of your meal, get the calories in 2 seconds."}
+            placeholder={"(Optional)\nDescribe your product in one sentence:\n\nWho's it for?\n\nWhat feature do you want to highlight in the demo?"}
             className="block w-full resize-none bg-transparent px-4 pt-3 text-[14.5px] leading-relaxed outline-none placeholder:text-soft"
           />
           <div className="flex items-center justify-between px-2.5 pb-2.5">
-            <button type="button" onClick={() => picker.current?.click()} disabled={adding || files.length >= 5} aria-label="Add photos or videos" title="Add photos or videos" className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted hover:border-accent hover:text-accent disabled:opacity-50">
-              {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            </button>
+            <span className="group/add relative">
+              <button type="button" onClick={() => picker.current?.click()} disabled={adding || files.length >= 5} aria-label="Add a screenshot or a screen recording" className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted hover:border-accent hover:text-accent disabled:opacity-50">
+                {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              </button>
+              <span role="tooltip" className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-ink px-2 py-1 text-[12px] font-semibold text-white opacity-0 transition-opacity group-hover/add:opacity-100 group-focus-within/add:opacity-100">
+                A screenshot or a screen recording of your product
+              </span>
+            </span>
             <input ref={picker} type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/quicktime,video/webm" multiple className="hidden" onChange={(e) => void addFiles(e.target.files).then(() => (e.target.value = ""))} />
             <button type="button" onClick={() => { onSend(text); setDirty(false); }} disabled={!dirty || writing || reading} aria-label="Send" title="Send" className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-white hover:opacity-90 disabled:opacity-35">
               {writing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
@@ -172,23 +162,7 @@ export function ProductStep({ product, reading, host, error, failedUrl, onAnalyz
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {STARTERS.map((s) => (
-            <button key={s.label} type="button" onClick={() => start(s.text)} className="rounded-lg border border-line px-3 py-1.5 text-[13px] font-semibold text-muted hover:border-accent hover:text-accent">
-              {s.label}
-            </button>
-          ))}
-          <button type="button" onClick={() => picker.current?.click()} disabled={adding || files.length >= 5} title="A screenshot or screen recording of exactly the feature you're selling" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-semibold text-muted hover:border-accent hover:text-accent disabled:opacity-50">
-            <ImagePlus className="h-3.5 w-3.5" />
-            Screenshot of your main feature
-          </button>
-        </div>
         {fileError && <p role="alert" className="text-[13px] font-semibold text-red-600">{fileError}</p>}
-
-        <button type="button" onClick={() => { onContinue(text); setDirty(false); }} className="btn-primary px-4 py-2.5 text-[14px]">
-          Steal a hook that already works
-          <ArrowRight className="h-4 w-4" />
-        </button>
       </div>
     );
   }

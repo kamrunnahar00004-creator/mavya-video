@@ -67,7 +67,7 @@ export function RunView() {
   const [pickerOpen, setPickerOpen] = useState(false);
   /** Steps the user opened or closed by hand (undefined = follow progress: just the current step). */
   const [picked, setPicked] = useState<number[] | undefined>(undefined);
-  /** The run whose step 1 the seller closed ("Steal a hook that already works"). */
+  /** The run whose step 1 the seller left (opened step 2). */
   const [productOk, setProductOk] = useState<string | null>(null);
   /** Upload: the video is in, waiting for "Use this hook". */
   const [staged, setStaged] = useState<Reference | null>(null);
@@ -385,7 +385,7 @@ export function RunView() {
   if (job?.error) stepDone[0] = false;
   if (gen.busy) stepDone[3] = true;
   const stepPending = [productReading, false, false, gen.busy, false, false];
-  // Step 1 stays open (for the optional context) until "Steal a hook that already works", unless a hook is already in.
+  // Step 1 stays open (for the optional context) until the seller opens step 2, unless a hook is already in.
   const holdProduct = !stepDone[1] && productOk !== run.id && !job?.error && Boolean(run.product?.brief || productReading);
   const current = holdProduct ? 1 : stepDone.findIndex((d) => !d) + 1 || stepDone.length; // 1-based; all done = last step
   /** Generate: the hook clip and the demo plan start together; step 5 opens while both run. */
@@ -406,7 +406,7 @@ export function RunView() {
   // The open step: the user's choice, else the first unfinished one. Finishing a step clears the choice (moves on).
   const openSteps = picked ?? [current];
   const toggleStep = (n: number) => {
-    // Opening step 2 by its title is the same as "Steal a hook that already works".
+    // Opening step 2 by its title moves on: step 1 closes.
     if (n === 2 && holdProduct) { setProductOk(run.id); return setPicked([2]); }
     setPicked(openSteps.includes(n) ? openSteps.filter((x) => x !== n) : [...openSteps, n]);
   };
@@ -738,10 +738,8 @@ export function RunView() {
                   // Send is the explicit click: with a clip picked, the script is rewritten with the new context.
                   if (run.sourceRefId || (hook.source === "describe" && hook.describeReady)) requestScript();
                 }}
-                onContinue={(notes) => {
-                  if (notes !== (run.productNotes ?? "")) save({ productNotes: notes });
-                  setProductOk(run.id);
-                  setPicked([2]);
+                onSave={(notes) => {
+                  if (notes !== ((runRef.current ?? run).productNotes ?? "")) save({ productNotes: notes });
                 }}
               />
             </Block>
