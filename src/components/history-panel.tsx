@@ -266,7 +266,8 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           const pieces = clips.flatMap((c) => partsOf({ start: c.start ?? 0, end: c.end ?? c.seconds ?? 3, parts: c.parts }).map((p) => ({ src: clipSrc(c) ?? "", start: p.start, end: p.end })));
           return (
             <Card key={x.key} onOpen={() => setPlaying({ clips: pieces, sound: true, onUse: use })} onUse={use} footer={<><div className="truncate text-[12.5px] font-semibold">{clips.length} {clips.length === 1 ? "clip" : "clips"} · {fmtTime(len)}</div>{meta(x)}</>}>
-              <Still src={clipSrc(clips[0]) ?? ""} at={first[0].start} />
+              {/* A frame just inside the kept part: at exactly 0s a metadata-only video often shows nothing. */}
+              <Still src={clipSrc(clips[0]) ?? ""} at={Math.min(first[0].start + 0.5, (first[0].start + first[0].end) / 2)} />
             </Card>
           );
         })}

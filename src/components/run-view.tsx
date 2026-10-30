@@ -99,7 +99,11 @@ export function RunView() {
   // Steps 4 to 6 and the editor share one code chunk; fetch it while the seller is on the early steps, so opening
   // one never shows an empty step while it downloads.
   useEffect(() => {
-    const timer = setTimeout(() => void import("@/components/editor-tools").catch(() => undefined), 300);
+    const timer = setTimeout(() => {
+      void import("@/components/editor-tools").catch(() => undefined);
+      // Character browser's "Recently used", ready before it opens.
+      void loadRecentFaces();
+    }, 300);
     return () => clearTimeout(timer);
   }, []);
 
@@ -1265,6 +1269,31 @@ function SharpImage({ src, alt }: { src: string; alt: string }) {
 
 type Face = NonNullable<Hook["face"]>;
 const faceKeyOf = (f: Face) => (f.kind === "photo" ? `photo:${f.mediaId}` : f.kind === "ai" ? `ai:${f.index}` : f.kind === "character" ? `character:${f.id}` : `described:${f.text}`);
+type Recent = { face: Face; still: string | null };
+
+/**
+ * The faces from the seller's videos, newest first, kept in memory: fetched in the background when a video opens,
+ * so "Recently used" is there the moment the character browser opens. `fresh` refetches (after a pick elsewhere).
+ */
+let recentFaces: Recent[] | null = null;
+let recentLoad: Promise<Recent[]> | null = null;
+function loadRecentFaces(fresh = false): Promise<Recent[]> {
+  if (recentLoad && !fresh) return recentLoad;
+  const load = fetchPage<Run>("/api/runs").then((page) => {
+    const seen = new Set<string>();
+    const list: Recent[] = [];
+    for (const r of [...page.items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))) {
+      const f = r.hook.face;
+      if (!f || f.kind === "ai" || seen.has(faceKeyOf(f))) continue;
+      seen.add(faceKeyOf(f));
+      list.push({ face: f, still: r.hook.generated?.src ?? null });
+    }
+    recentFaces = list.slice(0, 12);
+    return recentFaces;
+  });
+  recentLoad = load.catch(() => { recentLoad = null; return recentFaces ?? []; });
+  return recentLoad;
+}
 
 /**
  * Overlay with the whole cast; click a face for the large view, then "Use <name>". Above it, "Recently used": the
@@ -1273,24 +1302,17 @@ const faceKeyOf = (f: Face) => (f.kind === "photo" ? `photo:${f.mediaId}` : f.ki
 function CharacterBrowser({ current, onPick, onPickFace, onClose }: { current: Hook["face"] | null; onPick: (id: string) => void; onPickFace: (f: Face) => void; onClose: () => void }) {
   const [viewing, setViewing] = useState<number | null>(null);
   const shown = viewing === null ? null : CHARACTERS[viewing];
-  // A described character has no photo: the hook generated with it stands in for one.
-  const [recent, setRecent] = useState<{ face: Face; still: string | null }[]>([]);
+  // A described character has no photo: the hook generated with it stands in for one. From memory at once
+  // (prefetched when the video opened), then refreshed in the background; this video's own face is always first.
+  const [loaded, setLoaded] = useState<Recent[]>(recentFaces ?? []);
   useEffect(() => {
     let alive = true;
-    void fetchPage<Run>("/api/runs").then((page) => {
-      if (!alive) return;
-      const seen = new Set<string>();
-      const list: { face: Face; still: string | null }[] = [];
-      for (const r of [...page.items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))) {
-        const f = r.hook.face;
-        if (!f || f.kind === "ai" || seen.has(faceKeyOf(f))) continue;
-        seen.add(faceKeyOf(f));
-        list.push({ face: f, still: r.hook.generated?.src ?? null });
-      }
-      setRecent(list.slice(0, 12));
-    }).catch(() => undefined);
+    void loadRecentFaces(true).then((list) => { if (alive) setLoaded(list); });
     return () => { alive = false; };
   }, []);
+  const recent = current && current.kind !== "ai" && !loaded.some((x) => faceKeyOf(x.face) === faceKeyOf(current))
+    ? [{ face: current, still: null }, ...loaded]
+    : loaded;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
