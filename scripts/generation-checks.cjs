@@ -128,6 +128,24 @@ async function main() {
   await real('the earlier file is gone', { file: false });
   await real('a lookup failure falls back to generating', { fails: true });
 
+  // A hook save made before the clip landed cannot erase it: the clip and its timing stay, the words are taken.
+  const withClip = { ...fresh, updatedAt: 'now', hook: { ...fresh.hook, start: 0, end: 7.47, text: 'old', generated: { src: '/api/media/x.mp4', seconds: 7.47, at: 'a' }, versions: [] }, texts: [{ id: 'hook', text: 'old', start: 0, end: 7.47 }, { id: 'b', text: 'demo', start: 8, end: 9 }] };
+  let patched = null;
+  const runRoute = load('src/app/api/runs/[id]/route.ts', {
+    '@/lib/server/store': { deleteRun: async () => {}, getRun: async () => withClip, updateRun: async (id, p) => { patched = p; return { ...withClip, ...p }; } },
+    '@/lib/server/run-validation': { validRunPatch: () => true },
+    '@/lib/server/who': { currentUser: async () => 'owner', signInFirst: () => new Response(null, { status: 401 }) },
+    '@/lib/render-limits': { renderLimitError: () => null },
+    '@/lib/edit': { timeline: () => [], videoLength: () => 0 },
+  });
+  const put = body => runRoute.PATCH(new Request('https://fixture.invalid/api', { method: 'PATCH', body: JSON.stringify(body) }), { params: Promise.resolve({ id: 'run' }) });
+  assert.equal((await put({ hook: { ...fresh.hook, end: 3, text: 'new line' }, texts: [{ id: 'hook', text: 'new line', start: 0, end: 3 }] })).status, 200);
+  assert.equal(patched.hook.generated.src, '/api/media/x.mp4'); assert.equal(patched.hook.end, 7.47); assert.equal(patched.hook.text, 'new line');
+  assert.deepEqual(patched.texts.map(t => [t.id, t.text, t.end]), [['hook', 'new line', 7.47], ['b', 'demo', 9]]);
+  // A save that carries a clip is normal: another hook picked from My files still replaces it.
+  await put({ hook: { ...fresh.hook, generated: { src: '/api/media/y.mp4', seconds: 5, at: 'b' }, end: 5, text: 't' } });
+  assert.equal(patched.hook.generated.src, '/api/media/y.mp4'); assert.equal(patched.hook.end, 5);
+
   let scheduled = 0, reserved = 0;
   const route = load('src/app/api/runs/[id]/generate/route.ts', {
     '@/lib/server/temp-cleanup': { expireTemporaryObjects: async () => 0 },

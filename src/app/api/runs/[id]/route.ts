@@ -28,6 +28,14 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/runs/[id]"
   if (body?.hook || body?.demo) {
     const current = await getRun(id, who);
     if (!current) return Response.json({ error: "Not found" }, { status: 404 });
+    // The browser sends the whole hook section, and no action removes a generated clip. A save without one was made
+    // before the clip landed (the script's hook line can arrive seconds after a reused clip): the clip and its timing
+    // stay, only the words are taken.
+    if (body?.hook && !body.hook.generated && current.hook.generated) {
+      const words = body.hook.text;
+      body.hook = { ...current.hook, text: words };
+      if (Array.isArray(body.texts) && current.texts) body.texts = current.texts.map((t) => (t.id === "hook" ? { ...t, text: words } : t));
+    }
     const merged = { ...current, ...body };
     const segments = timeline(merged, null);
     const bounds = renderLimitError(segments, merged.texts?.length, merged.sounds?.length, videoLength(segments.filter(s => s.src)));
