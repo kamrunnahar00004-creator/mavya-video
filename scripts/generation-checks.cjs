@@ -80,6 +80,54 @@ async function main() {
   assert.equal(calls.at(-1)[1].p_action, 'release');
   assert.equal(calls.some(c => c[1]?.p_action === 'fallback' || c[1]?.p_action === 'failed'), false);
 
+  // Reuse: a library hook + built-in character + same cut made before is served from a copy, with no provider call.
+  const earlier = '40000000-0000-4000-8000-000000000001';
+  const fresh = { id: 'run', sourceRefId: 'ref', updatedAt: 'now', hook: { mode: 'avatar', source: 'library', face: { kind: 'character', id: 'olivia' }, start: 0, end: 4, text: '' }, demo: { clip: null, frame: 'none' }, texts: [] };
+  const reuseJob = { ...job, id: '40000000-0000-4000-8000-000000000002', input: fresh, note: null, created_at: '2020-01-01T00:00:00Z' };
+  async function reuse({ input = fresh, note = null, curated = true, rows, file = true, fails = false } = {}) {
+    const log = [], filters = [], states = [{ ...reuseJob, input, note }];
+    const list = rows ?? [{ id: earlier, start: 0, end: 4, result: { src: `/api/media/${earlier}.mp4`, seconds: 4.2 } }];
+    const chain = table => ({ select() { return this; }, eq(column, value) { filters.push([table, column, value]); return this; }, is(column, value) { filters.push([table, column, value]); return this; }, order() { return this; },
+      async limit() { if (fails) throw new Error('DB unavailable'); return { data: list, error: null }; },
+      async maybeSingle() { return table === 'library' ? { data: curated ? { id: 'ref' } : null, error: null } : { data: { result: list[0]?.result ?? null }, error: null }; } });
+    const client = { from: chain, async rpc(name, args) {
+      log.push([name, args]);
+      if (name === 'mavya_claim_generation') return { data: states.shift() ?? null, error: null };
+      if (name === 'mavya_generation_transition') { if (args.p_action === 'started') states.push({ ...reuseJob, input, note, state: 'running', task_id: args.p_value }); return { data: true, error: null }; }
+      if (name === 'mavya_complete_generation') return { data: {}, error: null };
+      throw new Error(name);
+    } };
+    const api = load('src/lib/server/generation-jobs.ts', {
+      '@/lib/server/account-state': { accountClosing: async () => false },
+      '@/lib/supabase/server': { createSupabaseAdminClient: () => client },
+      '@/lib/server/usage': { adminUser: async () => false },
+      '@/lib/server/store': { cloud: () => true, getRun: async () => input, mediaAccess: async () => null, registerMedia: async (...args) => log.push(['register', args]) },
+      '@/lib/server/r2': { putObject: async (...args) => log.push(['put', args]), objectInfo: async () => (file ? { size: 9, mime: 'video/mp4', etag: 'etag' } : null), copyObject: async (...args) => log.push(['copy', args]) },
+      '@/lib/server/hookgen': { HookStartUncertain, startHook: async () => { log.push(['start']); return 'model|task'; }, checkHook: async () => { log.push(['poll']); return { state: 'running' }; } },
+      '@/lib/generation-edit': { generationPatch },
+    });
+    await api.advanceGeneration('owner', reuseJob.id);
+    return { log, filters, did: name => log.some(c => c[0] === name) };
+  }
+  const hit = await reuse();
+  assert.deepEqual(hit.log.find(c => c[0] === 'copy')[1], [`media/${earlier}.mp4`, `media/${reuseJob.id}.mp4`, 'etag']);
+  assert.equal(hit.log.find(c => c[0] === 'register')[1][0], `${reuseJob.id}.mp4`, 'the new seller owns their own copy');
+  assert.equal(hit.log.find(c => c[1]?.p_action === 'started')[1].p_value, `cache|${earlier}`);
+  const done = hit.log.find(c => c[0] === 'mavya_complete_generation')[1];
+  assert.equal(done.p_result.src, `/api/media/${reuseJob.id}.mp4`); assert.equal(done.p_result.seconds, 4.2);
+  assert.equal(hit.did('start') || hit.did('poll') || hit.did('put'), false, 'no provider call and no upload');
+  assert.ok(hit.filters.some(f => f[0] === 'library' && f[1] === 'owner' && f[2] === 'curated'), 'only library hooks');
+  const real = async (label, options) => { const r = await reuse(options); assert.equal(r.did('start'), true, label); assert.equal(r.did('copy'), false, label); };
+  await real('Regenerate with a hook in the video', { input: { ...fresh, hook: { ...fresh.hook, generated: { src: '/old.mp4', seconds: 4, at: 'old' } } } });
+  await real('Regenerate with a note', { note: 'smile less' });
+  await real('an uploaded hook is never shared', { curated: false });
+  await real('a photo is never shared', { input: { ...fresh, hook: { ...fresh.hook, face: { kind: 'photo', mediaId: 'x.jpg' } } } });
+  await real('a described character is never shared', { input: { ...fresh, hook: { ...fresh.hook, face: { kind: 'described', text: 'x' } } } });
+  await real('a different cut of the hook', { rows: [{ id: earlier, start: 0, end: 7, result: { src: `/api/media/${earlier}.mp4`, seconds: 7 } }] });
+  await real('nothing made yet', { rows: [] });
+  await real('the earlier file is gone', { file: false });
+  await real('a lookup failure falls back to generating', { fails: true });
+
   let scheduled = 0, reserved = 0;
   const route = load('src/app/api/runs/[id]/generate/route.ts', {
     '@/lib/server/temp-cleanup': { expireTemporaryObjects: async () => 0 },
