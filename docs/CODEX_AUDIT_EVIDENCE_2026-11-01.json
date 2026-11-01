@@ -1,0 +1,6463 @@
+{
+  "date": "2026-11-01",
+  "branch": "codex/full-audit-2026-11-01",
+  "base": "094d25e",
+  "before": {
+    "setup": "Actual Next production build, proxy bypassed only in isolated copy; synthetic 24 runs and 60 curated refs, API stubs 120ms, Chrome muted, CPU 2x, desktop 1440x1000. FCP is paint timing, usable is control readiness, not formal TTI. Two rAF is a conservative click-to-paint proxy.",
+    "rows": [
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 414,
+        "fcp": 64,
+        "usableMs": 410.40000000596046,
+        "jsTransferBytes": 243219,
+        "jsEncodedBytes": 239919,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 135.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 135,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 129.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 129.09999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": [
+          56
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 367,
+        "fcp": 64,
+        "usableMs": 363.5,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 239919,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 122.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 122.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 131,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 130.90000000596046,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 399,
+        "fcp": 80,
+        "usableMs": 395.39999997615814,
+        "jsTransferBytes": 310523,
+        "jsEncodedBytes": 305423,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 125.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 125.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 125.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 125.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 124.90000000596046,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          56
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 343,
+        "fcp": 60,
+        "usableMs": 338.09999999403954,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 305423,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 131.59999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 131.39999997615814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 129.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 129.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 129.40000000596046,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      },
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 430,
+        "fcp": 136,
+        "usableMs": 427,
+        "jsTransferBytes": 243219,
+        "jsEncodedBytes": 239919,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 126.7000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 126.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 121.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 121.30000001192093,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": [
+          55,
+          54
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 342,
+        "fcp": 84,
+        "usableMs": 338,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 239919,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 127.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 127.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 122.19999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 121.7999999821186,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 453,
+        "fcp": 76,
+        "usableMs": 450.5,
+        "jsTransferBytes": 310523,
+        "jsEncodedBytes": 305423,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 121.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 121.60000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 122.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 122.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 121.89999997615814,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          58
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 343,
+        "fcp": 64,
+        "usableMs": 340.30000001192093,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 305423,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 129.7000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 129.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 126.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 126.10000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 125.59999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      },
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 494,
+        "fcp": 68,
+        "usableMs": 491,
+        "jsTransferBytes": 243219,
+        "jsEncodedBytes": 239919,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 121.60000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 129.60000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 122.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 122.09999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": [
+          53
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 357,
+        "fcp": 64,
+        "usableMs": 354,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 239919,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 120.60000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 121,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 129.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 129.19999998807907,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 457,
+        "fcp": 64,
+        "usableMs": 453.7000000178814,
+        "jsTransferBytes": 310523,
+        "jsEncodedBytes": 305423,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 127.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 127.59999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 133.7000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 133.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 132.7999999821186,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 361,
+        "fcp": 64,
+        "usableMs": 358.30000001192093,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 305423,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 126.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 126.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 125.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 125.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 125.09999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      }
+    ],
+    "actions": [
+      {
+        "name": "New video",
+        "ms": 33.39999997615814,
+        "videos": 0
+      },
+      {
+        "name": "Step 1",
+        "ms": 22.599999994039536,
+        "videos": 2
+      },
+      {
+        "name": "Step 2",
+        "ms": 22.900000005960464,
+        "videos": 2
+      },
+      {
+        "name": "Step 3",
+        "ms": 19.900000005960464,
+        "videos": 2
+      },
+      {
+        "name": "Step 4",
+        "ms": 20.19999998807907,
+        "videos": 2
+      },
+      {
+        "name": "Step 5",
+        "ms": 34.400000005960464,
+        "videos": 3
+      },
+      {
+        "name": "Step 6",
+        "ms": 33.20000001788139,
+        "videos": 5
+      },
+      {
+        "name": "Choose your character",
+        "ms": 19.600000023841858,
+        "videos": 5
+      },
+      {
+        "name": "Phone play",
+        "ms": 31.69999998807907,
+        "videos": 5
+      },
+      {
+        "name": "Phone frame renders",
+        "RunView": 0,
+        "timeline": 76,
+        "soundPieces": 76,
+        "RunPreview": 76,
+        "TextOverlay": 0,
+        "WholePlayer": 0,
+        "WholeControls": 0,
+        "ClipEditor": 0,
+        "Filmstrip": 0
+      },
+      {
+        "name": "My files",
+        "ms": 33.5,
+        "videos": 5
+      },
+      {
+        "name": "My files Generated hooks",
+        "ms": 23.80000001192093,
+        "videos": 6
+      },
+      {
+        "name": "My files Characters",
+        "ms": 21.30000001192093,
+        "videos": 5
+      },
+      {
+        "name": "My files Demos",
+        "ms": 20.30000001192093,
+        "videos": 6
+      },
+      {
+        "name": "My files Uploaded",
+        "ms": 32.5,
+        "videos": 5
+      },
+      {
+        "name": "My files Music",
+        "ms": 34.20000001788139,
+        "videos": 5
+      },
+      {
+        "name": "My files Hooks",
+        "ms": 34.19999998807907,
+        "videos": 5
+      },
+      {
+        "name": "My files Exported",
+        "ms": 33.400000005960464,
+        "videos": 5
+      },
+      {
+        "name": "Edit video",
+        "ms": 32.5,
+        "videos": 5
+      },
+      {
+        "name": "Editor play",
+        "ms": 21.5,
+        "videos": 6
+      },
+      {
+        "name": "Editor frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 0,
+        "TextOverlay": 75,
+        "WholePlayer": 76,
+        "WholeControls": 75,
+        "ClipEditor": 0,
+        "Filmstrip": 0
+      },
+      {
+        "name": "Select clip",
+        "ms": 32,
+        "videos": 6
+      },
+      {
+        "name": "Drag timeline handle",
+        "ms": 6.699999988079071
+      },
+      {
+        "name": "Select text",
+        "ms": 34,
+        "videos": 6
+      },
+      {
+        "name": "Type text",
+        "ms": 9.5
+      },
+      {
+        "name": "Seek",
+        "ms": 26.900000005960464
+      },
+      {
+        "name": "Editor inspection",
+        "videos": 6,
+        "created": 28,
+        "seeks": 13,
+        "decodedBytes": [
+          12388,
+          26740,
+          12388,
+          12388,
+          119665,
+          146304
+        ],
+        "sliders": [
+          "Trim start",
+          "Trim end",
+          "Trim start",
+          "Trim end",
+          "Preview time"
+        ],
+        "buttons": [
+          "Done",
+          "Emoji",
+          "Text style",
+          "Add text",
+          "Delete text",
+          "Play",
+          "Undo",
+          "Redo",
+          "Cut",
+          "Delete",
+          "Copy",
+          "Paste",
+          "Text",
+          "Sound",
+          "Magnet",
+          "Zoom out",
+          "Zoom in"
+        ]
+      },
+      {
+        "name": "Viral library",
+        "ms": 34.400000005960464,
+        "videos": 0
+      },
+      {
+        "name": "New video",
+        "ms": 31.799999982118607,
+        "videos": 0
+      },
+      {
+        "name": "Step 1",
+        "ms": 32.80000001192093,
+        "videos": 2
+      },
+      {
+        "name": "Step 2",
+        "ms": 29.900000005960464,
+        "videos": 2
+      },
+      {
+        "name": "Step 3",
+        "ms": 27.400000005960464,
+        "videos": 2
+      },
+      {
+        "name": "Step 4",
+        "ms": 24.900000005960464,
+        "videos": 2
+      },
+      {
+        "name": "Step 5",
+        "ms": 37.19999998807907,
+        "videos": 3
+      },
+      {
+        "name": "Step 6",
+        "ms": 32.70000001788139,
+        "videos": 5
+      },
+      {
+        "name": "Choose your character",
+        "ms": 23,
+        "videos": 5
+      },
+      {
+        "name": "Phone play",
+        "ms": 35.80000001192093,
+        "videos": 5
+      },
+      {
+        "name": "Phone frame renders",
+        "RunView": 0,
+        "timeline": 76,
+        "soundPieces": 76,
+        "RunPreview": 76,
+        "TextOverlay": 0,
+        "WholePlayer": 0,
+        "WholeControls": 0,
+        "ClipEditor": 0,
+        "Filmstrip": 0
+      },
+      {
+        "name": "My files",
+        "ms": 33.900000005960464,
+        "videos": 5
+      },
+      {
+        "name": "My files Generated hooks",
+        "ms": 20,
+        "videos": 6
+      },
+      {
+        "name": "My files Characters",
+        "ms": 17.899999976158142,
+        "videos": 5
+      },
+      {
+        "name": "My files Demos",
+        "ms": 18,
+        "videos": 6
+      },
+      {
+        "name": "My files Uploaded",
+        "ms": 32.5,
+        "videos": 5
+      },
+      {
+        "name": "My files Music",
+        "ms": 34,
+        "videos": 5
+      },
+      {
+        "name": "My files Hooks",
+        "ms": 27.80000001192093,
+        "videos": 5
+      },
+      {
+        "name": "My files Exported",
+        "ms": 24.900000005960464,
+        "videos": 5
+      },
+      {
+        "name": "Edit video",
+        "ms": 33.30000001192093,
+        "videos": 5
+      },
+      {
+        "name": "Editor play",
+        "ms": 31.200000017881393,
+        "videos": 6
+      },
+      {
+        "name": "Editor frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 0,
+        "TextOverlay": 74,
+        "WholePlayer": 75,
+        "WholeControls": 74,
+        "ClipEditor": 0,
+        "Filmstrip": 0
+      },
+      {
+        "name": "Select clip",
+        "ms": 33.400000005960464,
+        "videos": 6
+      },
+      {
+        "name": "Drag timeline handle",
+        "ms": 6.4000000059604645
+      },
+      {
+        "name": "Select text",
+        "ms": 33.19999998807907,
+        "videos": 6
+      },
+      {
+        "name": "Type text",
+        "ms": 11.800000011920929
+      },
+      {
+        "name": "Seek",
+        "ms": 28.599999994039536
+      },
+      {
+        "name": "Editor inspection",
+        "videos": 6,
+        "created": 28,
+        "seeks": 13,
+        "decodedBytes": [
+          12388,
+          26740,
+          12388,
+          12388,
+          120572,
+          146304
+        ],
+        "sliders": [
+          "Trim start",
+          "Trim end",
+          "Trim start",
+          "Trim end",
+          "Preview time"
+        ],
+        "buttons": [
+          "Done",
+          "Emoji",
+          "Text style",
+          "Add text",
+          "Delete text",
+          "Play",
+          "Undo",
+          "Redo",
+          "Cut",
+          "Delete",
+          "Copy",
+          "Paste",
+          "Text",
+          "Sound",
+          "Magnet",
+          "Zoom out",
+          "Zoom in"
+        ]
+      },
+      {
+        "name": "Viral library",
+        "ms": 42.30000001192093,
+        "videos": 5
+      },
+      {
+        "name": "New video",
+        "ms": 28.400000005960464,
+        "videos": 0
+      },
+      {
+        "name": "Step 1",
+        "ms": 17.799999982118607,
+        "videos": 2
+      },
+      {
+        "name": "Step 2",
+        "ms": 20,
+        "videos": 2
+      },
+      {
+        "name": "Step 3",
+        "ms": 34,
+        "videos": 2
+      },
+      {
+        "name": "Step 4",
+        "ms": 32.099999994039536,
+        "videos": 2
+      },
+      {
+        "name": "Step 5",
+        "ms": 36.30000001192093,
+        "videos": 3
+      },
+      {
+        "name": "Step 6",
+        "ms": 33.099999994039536,
+        "videos": 5
+      },
+      {
+        "name": "Choose your character",
+        "ms": 27.599999994039536,
+        "videos": 5
+      },
+      {
+        "name": "Phone play",
+        "ms": 28.700000017881393,
+        "videos": 5
+      },
+      {
+        "name": "Phone frame renders",
+        "RunView": 0,
+        "timeline": 75,
+        "soundPieces": 75,
+        "RunPreview": 75,
+        "TextOverlay": 0,
+        "WholePlayer": 0,
+        "WholeControls": 0,
+        "ClipEditor": 0,
+        "Filmstrip": 0
+      },
+      {
+        "name": "My files",
+        "ms": 33.39999997615814,
+        "videos": 5
+      },
+      {
+        "name": "My files Generated hooks",
+        "ms": 23.599999994039536,
+        "videos": 6
+      },
+      {
+        "name": "My files Characters",
+        "ms": 22.200000017881393,
+        "videos": 5
+      },
+      {
+        "name": "My files Demos",
+        "ms": 20.799999982118607,
+        "videos": 6
+      },
+      {
+        "name": "My files Uploaded",
+        "ms": 34.5,
+        "videos": 5
+      },
+      {
+        "name": "My files Music",
+        "ms": 33.19999998807907,
+        "videos": 5
+      },
+      {
+        "name": "My files Hooks",
+        "ms": 30.799999982118607,
+        "videos": 5
+      },
+      {
+        "name": "My files Exported",
+        "ms": 29.099999994039536,
+        "videos": 5
+      },
+      {
+        "name": "Edit video",
+        "ms": 31.700000017881393,
+        "videos": 5
+      },
+      {
+        "name": "Editor play",
+        "ms": 34.5,
+        "videos": 6
+      },
+      {
+        "name": "Editor frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 0,
+        "TextOverlay": 75,
+        "WholePlayer": 76,
+        "WholeControls": 75,
+        "ClipEditor": 0,
+        "Filmstrip": 0
+      },
+      {
+        "name": "Select clip",
+        "ms": 34.900000005960464,
+        "videos": 6
+      },
+      {
+        "name": "Drag timeline handle",
+        "ms": 17.700000017881393
+      },
+      {
+        "name": "Select text",
+        "ms": 31.5,
+        "videos": 6
+      },
+      {
+        "name": "Type text",
+        "ms": 12.800000011920929
+      },
+      {
+        "name": "Seek",
+        "ms": 19.19999998807907
+      },
+      {
+        "name": "Editor inspection",
+        "videos": 6,
+        "created": 28,
+        "seeks": 13,
+        "decodedBytes": [
+          12388,
+          26740,
+          12388,
+          12388,
+          119809,
+          147948
+        ],
+        "sliders": [
+          "Trim start",
+          "Trim end",
+          "Trim start",
+          "Trim end",
+          "Preview time"
+        ],
+        "buttons": [
+          "Done",
+          "Emoji",
+          "Text style",
+          "Add text",
+          "Delete text",
+          "Play",
+          "Undo",
+          "Redo",
+          "Cut",
+          "Delete",
+          "Copy",
+          "Paste",
+          "Text",
+          "Sound",
+          "Magnet",
+          "Zoom out",
+          "Zoom in"
+        ]
+      },
+      {
+        "name": "Viral library",
+        "ms": 40.80000001192093,
+        "videos": 5
+      }
+    ],
+    "requests": [
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "POST",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/6e8c0520-8c5a-471d-b944-637c7a82bf8e",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/6e8c0520-8c5a-471d-b944-637c7a82bf8e/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET",
+        "bytes": 2662167,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/file-prefs",
+        "method": "GET",
+        "bytes": 24,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET",
+        "bytes": 2662167,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/assets",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=studio",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "PATCH",
+        "bytes": 894,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "PATCH",
+        "bytes": 908,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "POST",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/3c4bb2ef-0980-4046-8f76-586b4eec9584",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/3c4bb2ef-0980-4046-8f76-586b4eec9584/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET",
+        "bytes": 2662167,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/file-prefs",
+        "method": "GET",
+        "bytes": 24,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET",
+        "bytes": 2662167,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/assets",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=studio",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "PATCH",
+        "bytes": 894,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "PATCH",
+        "bytes": 908,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "POST",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/310bcb3f-3ebf-4e75-a610-db5d4eb13c9c",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/310bcb3f-3ebf-4e75-a610-db5d4eb13c9c/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET",
+        "bytes": 2662167,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/file-prefs",
+        "method": "GET",
+        "bytes": 24,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET",
+        "bytes": 2662167,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/assets",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=studio",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "PATCH",
+        "bytes": 894,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "PATCH",
+        "bytes": 908,
+        "fixtureDelayMs": 120
+      }
+    ],
+    "errors": []
+  },
+  "after": {
+    "setup": "Actual Next production build, proxy bypassed only in isolated copy; synthetic 24 runs and 60 curated refs, API stubs 120ms, Chrome muted, CPU 2x, desktop 1440x1000. FCP is paint timing, usable is control readiness, not formal TTI. Two rAF is a conservative click-to-paint proxy.",
+    "rows": [
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 438,
+        "fp": 112,
+        "fcp": 112,
+        "usableMs": 435.09999999403954,
+        "jsTransferBytes": 243437,
+        "jsEncodedBytes": 240137,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 123.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 123.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 124.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 124.60000002384186,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": [
+          52
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 362,
+        "fp": 92,
+        "fcp": 92,
+        "usableMs": 357.5,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 240137,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 132.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 132.59999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 130,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 129.89999997615814,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 376,
+        "fp": 60,
+        "fcp": 60,
+        "usableMs": 373.5,
+        "jsTransferBytes": 310950,
+        "jsEncodedBytes": 305850,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 126.39999997615814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 126.59999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 130.39999997615814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 130.2000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 129.69999998807907,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          54
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 362,
+        "fp": 72,
+        "fcp": 72,
+        "usableMs": 358.2000000178814,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 305850,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 132.7000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 132.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 134.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 133.7000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 133.30000001192093,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      },
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 397,
+        "fp": 128,
+        "fcp": 128,
+        "usableMs": 392.09999999403954,
+        "jsTransferBytes": 243437,
+        "jsEncodedBytes": 240137,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 130.10000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 129.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 124.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 124.19999998807907,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": [
+          52
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 329,
+        "fp": 96,
+        "fcp": 96,
+        "usableMs": 325.7000000178814,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 240137,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 123.7000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 123.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 133.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 133.80000001192093,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 372,
+        "fp": 60,
+        "fcp": 60,
+        "usableMs": 368.59999999403954,
+        "jsTransferBytes": 310950,
+        "jsEncodedBytes": 305850,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 122.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 122.19999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 126.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 126.19999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 125.7999999821186,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          53
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 346,
+        "fp": 60,
+        "fcp": 60,
+        "usableMs": 341.7999999821186,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 305850,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 131.7000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 131.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 132.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 132.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 132.09999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      },
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 388,
+        "fp": 132,
+        "fcp": 132,
+        "usableMs": 385.89999997615814,
+        "jsTransferBytes": 243437,
+        "jsEncodedBytes": 240137,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 126.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 125.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 121,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 121,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": [
+          56
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 367,
+        "fp": 80,
+        "fcp": 80,
+        "usableMs": 363.40000000596046,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 240137,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 121.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 121.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 133.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 133.40000000596046,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 457,
+        "fp": 64,
+        "fcp": 64,
+        "usableMs": 453.30000001192093,
+        "jsTransferBytes": 310950,
+        "jsEncodedBytes": 305850,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 131.2000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 131.19999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 135.10000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 134.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 134.5,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          57
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 344,
+        "fp": 64,
+        "fcp": 64,
+        "usableMs": 340.40000000596046,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 305850,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 134.10000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 134,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 132.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 132.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 132,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      }
+    ],
+    "actions": [
+      {
+        "name": "New video",
+        "ms": 33.400000005960464,
+        "videos": 0
+      },
+      {
+        "name": "Step 1",
+        "ms": 27.099999994039536,
+        "videos": 2
+      },
+      {
+        "name": "Step 2",
+        "ms": 26.599999994039536,
+        "videos": 2
+      },
+      {
+        "name": "Step 3",
+        "ms": 26.700000017881393,
+        "videos": 2
+      },
+      {
+        "name": "Step 4",
+        "ms": 26.099999994039536,
+        "videos": 2
+      },
+      {
+        "name": "Step 5",
+        "ms": 34,
+        "videos": 3
+      },
+      {
+        "name": "Step 6",
+        "ms": 33.099999994039536,
+        "videos": 5
+      },
+      {
+        "name": "Choose your character",
+        "ms": 23.700000017881393,
+        "videos": 5
+      },
+      {
+        "name": "Phone play",
+        "ms": 23.599999994039536,
+        "videos": 5
+      },
+      {
+        "name": "Phone frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 76,
+        "TextOverlay": 0,
+        "WholePlayer": 0,
+        "WholeControls": 0,
+        "ClipEditor": 0,
+        "Filmstrip": 0
+      },
+      {
+        "name": "My files",
+        "ms": 34.400000005960464,
+        "videos": 5
+      },
+      {
+        "name": "My files Generated hooks",
+        "ms": 22.799999982118607,
+        "videos": 6
+      },
+      {
+        "name": "My files Characters",
+        "ms": 21.19999998807907,
+        "videos": 5
+      },
+      {
+        "name": "My files Demos",
+        "ms": 20.200000017881393,
+        "videos": 6
+      },
+      {
+        "name": "My files Uploaded",
+        "ms": 33.10000002384186,
+        "videos": 5
+      },
+      {
+        "name": "My files Music",
+        "ms": 18.900000005960464,
+        "videos": 5
+      },
+      {
+        "name": "My files Hooks",
+        "ms": 33.79999998211861,
+        "videos": 5
+      },
+      {
+        "name": "My files Exported",
+        "ms": 19.299999982118607,
+        "videos": 5
+      },
+      {
+        "name": "Edit video",
+        "ms": 33.29999998211861,
+        "videos": 5
+      },
+      {
+        "name": "Editor play",
+        "ms": 27.900000005960464,
+        "videos": 6
+      },
+      {
+        "name": "Editor frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 0,
+        "TextOverlay": 0,
+        "WholePlayer": 76,
+        "WholeControls": 75,
+        "ClipEditor": 0,
+        "Filmstrip": 0
+      },
+      {
+        "name": "Select clip",
+        "ms": 32.69999998807907,
+        "videos": 6
+      },
+      {
+        "name": "Drag timeline handle",
+        "ms": 15
+      },
+      {
+        "name": "Select text",
+        "ms": 33.400000005960464,
+        "videos": 6
+      },
+      {
+        "name": "Type text",
+        "ms": 13.799999982118607
+      },
+      {
+        "name": "Seek",
+        "ms": 31.900000005960464
+      },
+      {
+        "name": "Editor inspection",
+        "videos": 6,
+        "created": 28,
+        "seeks": 13,
+        "decodedBytes": [
+          12388,
+          26740,
+          12388,
+          12388,
+          119809,
+          147948
+        ],
+        "sliders": [
+          "Trim start",
+          "Trim end",
+          "Trim start",
+          "Trim end",
+          "Preview time"
+        ],
+        "buttons": [
+          "Done",
+          "Emoji",
+          "Text style",
+          "Add text",
+          "Delete text",
+          "Play",
+          "Undo",
+          "Redo",
+          "Cut",
+          "Delete",
+          "Copy",
+          "Paste",
+          "Text",
+          "Sound",
+          "Magnet",
+          "Zoom out",
+          "Zoom in"
+        ]
+      },
+      {
+        "name": "Viral library",
+        "ms": 35.80000001192093,
+        "videos": 0
+      },
+      {
+        "name": "New video",
+        "ms": 25.599999994039536,
+        "videos": 0
+      },
+      {
+        "name": "Step 1",
+        "ms": 29.799999982118607,
+        "videos": 2
+      },
+      {
+        "name": "Step 2",
+        "ms": 30.5,
+        "videos": 2
+      },
+      {
+        "name": "Step 3",
+        "ms": 29.400000005960464,
+        "videos": 2
+      },
+      {
+        "name": "Step 4",
+        "ms": 29.099999994039536,
+        "videos": 2
+      },
+      {
+        "name": "Step 5",
+        "ms": 36.099999994039536,
+        "videos": 3
+      },
+      {
+        "name": "Step 6",
+        "ms": 31.69999998807907,
+        "videos": 5
+      },
+      {
+        "name": "Choose your character",
+        "ms": 30.599999994039536,
+        "videos": 5
+      },
+      {
+        "name": "Phone play",
+        "ms": 33.599999994039536,
+        "videos": 5
+      },
+      {
+        "name": "Phone frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 75,
+        "TextOverlay": 0,
+        "WholePlayer": 0,
+        "WholeControls": 0,
+        "ClipEditor": 0,
+        "Filmstrip": 0
+      },
+      {
+        "name": "My files",
+        "ms": 33.19999998807907,
+        "videos": 5
+      },
+      {
+        "name": "My files Generated hooks",
+        "ms": 20.099999994039536,
+        "videos": 6
+      },
+      {
+        "name": "My files Characters",
+        "ms": 20.5,
+        "videos": 5
+      },
+      {
+        "name": "My files Demos",
+        "ms": 18,
+        "videos": 6
+      },
+      {
+        "name": "My files Uploaded",
+        "ms": 33.19999998807907,
+        "videos": 5
+      },
+      {
+        "name": "My files Music",
+        "ms": 33.30000001192093,
+        "videos": 5
+      },
+      {
+        "name": "My files Hooks",
+        "ms": 33,
+        "videos": 5
+      },
+      {
+        "name": "My files Exported",
+        "ms": 19,
+        "videos": 5
+      },
+      {
+        "name": "Edit video",
+        "ms": 34.900000005960464,
+        "videos": 5
+      },
+      {
+        "name": "Editor play",
+        "ms": 23.299999982118607,
+        "videos": 6
+      },
+      {
+        "name": "Editor frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 0,
+        "TextOverlay": 0,
+        "WholePlayer": 75,
+        "WholeControls": 74,
+        "ClipEditor": 0,
+        "Filmstrip": 0
+      },
+      {
+        "name": "Select clip",
+        "ms": 33.5,
+        "videos": 6
+      },
+      {
+        "name": "Drag timeline handle",
+        "ms": 5.9000000059604645
+      },
+      {
+        "name": "Select text",
+        "ms": 33.20000001788139,
+        "videos": 6
+      },
+      {
+        "name": "Type text",
+        "ms": 13.300000011920929
+      },
+      {
+        "name": "Seek",
+        "ms": 23.299999982118607
+      },
+      {
+        "name": "Editor inspection",
+        "videos": 6,
+        "created": 28,
+        "seeks": 13,
+        "decodedBytes": [
+          12388,
+          26740,
+          12388,
+          12388,
+          120572,
+          146304
+        ],
+        "sliders": [
+          "Trim start",
+          "Trim end",
+          "Trim start",
+          "Trim end",
+          "Preview time"
+        ],
+        "buttons": [
+          "Done",
+          "Emoji",
+          "Text style",
+          "Add text",
+          "Delete text",
+          "Play",
+          "Undo",
+          "Redo",
+          "Cut",
+          "Delete",
+          "Copy",
+          "Paste",
+          "Text",
+          "Sound",
+          "Magnet",
+          "Zoom out",
+          "Zoom in"
+        ]
+      },
+      {
+        "name": "Viral library",
+        "ms": 37.70000001788139,
+        "videos": 5
+      },
+      {
+        "name": "New video",
+        "ms": 33.400000005960464,
+        "videos": 0
+      },
+      {
+        "name": "Step 1",
+        "ms": 25.400000005960464,
+        "videos": 2
+      },
+      {
+        "name": "Step 2",
+        "ms": 28.599999994039536,
+        "videos": 2
+      },
+      {
+        "name": "Step 3",
+        "ms": 27.399999976158142,
+        "videos": 2
+      },
+      {
+        "name": "Step 4",
+        "ms": 26.900000005960464,
+        "videos": 2
+      },
+      {
+        "name": "Step 5",
+        "ms": 34.30000001192093,
+        "videos": 3
+      },
+      {
+        "name": "Step 6",
+        "ms": 32.900000005960464,
+        "videos": 5
+      },
+      {
+        "name": "Choose your character",
+        "ms": 21.600000023841858,
+        "videos": 5
+      },
+      {
+        "name": "Phone play",
+        "ms": 33.19999998807907,
+        "videos": 5
+      },
+      {
+        "name": "Phone frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 76,
+        "TextOverlay": 0,
+        "WholePlayer": 0,
+        "WholeControls": 0,
+        "ClipEditor": 0,
+        "Filmstrip": 0
+      },
+      {
+        "name": "My files",
+        "ms": 32.30000001192093,
+        "videos": 5
+      },
+      {
+        "name": "My files Generated hooks",
+        "ms": 30.799999982118607,
+        "videos": 6
+      },
+      {
+        "name": "My files Characters",
+        "ms": 35.5,
+        "videos": 5
+      },
+      {
+        "name": "My files Demos",
+        "ms": 20.799999982118607,
+        "videos": 6
+      },
+      {
+        "name": "My files Uploaded",
+        "ms": 23.19999998807907,
+        "videos": 5
+      },
+      {
+        "name": "My files Music",
+        "ms": 23.19999998807907,
+        "videos": 5
+      },
+      {
+        "name": "My files Hooks",
+        "ms": 28.900000005960464,
+        "videos": 5
+      },
+      {
+        "name": "My files Exported",
+        "ms": 31,
+        "videos": 5
+      },
+      {
+        "name": "Edit video",
+        "ms": 33,
+        "videos": 5
+      },
+      {
+        "name": "Editor play",
+        "ms": 25.900000005960464,
+        "videos": 6
+      },
+      {
+        "name": "Editor frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 0,
+        "TextOverlay": 0,
+        "WholePlayer": 76,
+        "WholeControls": 75,
+        "ClipEditor": 0,
+        "Filmstrip": 0
+      },
+      {
+        "name": "Select clip",
+        "ms": 33.400000005960464,
+        "videos": 6
+      },
+      {
+        "name": "Drag timeline handle",
+        "ms": 14.800000011920929
+      },
+      {
+        "name": "Select text",
+        "ms": 33.400000005960464,
+        "videos": 6
+      },
+      {
+        "name": "Type text",
+        "ms": 13.400000005960464
+      },
+      {
+        "name": "Seek",
+        "ms": 30.600000023841858
+      },
+      {
+        "name": "Editor inspection",
+        "videos": 6,
+        "created": 28,
+        "seeks": 13,
+        "decodedBytes": [
+          12388,
+          26740,
+          12388,
+          12388,
+          120572,
+          146304
+        ],
+        "sliders": [
+          "Trim start",
+          "Trim end",
+          "Trim start",
+          "Trim end",
+          "Preview time"
+        ],
+        "buttons": [
+          "Done",
+          "Emoji",
+          "Text style",
+          "Add text",
+          "Delete text",
+          "Play",
+          "Undo",
+          "Redo",
+          "Cut",
+          "Delete",
+          "Copy",
+          "Paste",
+          "Text",
+          "Sound",
+          "Magnet",
+          "Zoom out",
+          "Zoom in"
+        ]
+      },
+      {
+        "name": "Viral library",
+        "ms": 35.79999998211861,
+        "videos": 0
+      }
+    ],
+    "requests": [
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "POST",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/e47de534-f513-40f7-acf8-54a43947c105",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/e47de534-f513-40f7-acf8-54a43947c105/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=faces",
+        "method": "GET",
+        "bytes": 6241,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/file-prefs",
+        "method": "GET",
+        "bytes": 24,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=history",
+        "method": "GET",
+        "bytes": 17199,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/assets",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=cards",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "PATCH",
+        "bytes": 894,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "PATCH",
+        "bytes": 908,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "POST",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/d128beea-7bdf-4606-9663-c72f7dae8632",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/d128beea-7bdf-4606-9663-c72f7dae8632/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=faces",
+        "method": "GET",
+        "bytes": 6241,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/file-prefs",
+        "method": "GET",
+        "bytes": 24,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=history",
+        "method": "GET",
+        "bytes": 17199,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/assets",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=cards",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "PATCH",
+        "bytes": 894,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "PATCH",
+        "bytes": 908,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "POST",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/8582c592-b490-4b7f-bc7d-4c563f091dab",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/8582c592-b490-4b7f-bc7d-4c563f091dab/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=faces",
+        "method": "GET",
+        "bytes": 6241,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/file-prefs",
+        "method": "GET",
+        "bytes": 24,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=history",
+        "method": "GET",
+        "bytes": 17199,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/assets",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=cards",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "PATCH",
+        "bytes": 894,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "PATCH",
+        "bytes": 908,
+        "fixtureDelayMs": 120
+      }
+    ],
+    "errors": []
+  },
+  "paintLoadsBefore": {
+    "setup": "Actual Next production build, proxy bypassed only in isolated copy; synthetic 24 runs and 60 curated refs, API stubs 120ms, Chrome muted, CPU 2x, desktop 1440x1000. FCP is paint timing, usable is control readiness, not formal TTI. Two rAF is a conservative click-to-paint proxy.",
+    "rows": [
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 463,
+        "fp": 100,
+        "fcp": 100,
+        "usableMs": 459.7999999821186,
+        "jsTransferBytes": 243219,
+        "jsEncodedBytes": 239919,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 122,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 121.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 132.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 132.59999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": [
+          57
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 301,
+        "fp": 88,
+        "fcp": 88,
+        "usableMs": 297.59999999403954,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 239919,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 125.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 124.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 120.59999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 120.5,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 368,
+        "fp": 68,
+        "fcp": 68,
+        "usableMs": 364.7000000178814,
+        "jsTransferBytes": 310523,
+        "jsEncodedBytes": 305423,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 124,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 121.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 127.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 127,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 126.19999998807907,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          51
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 340,
+        "fp": 116,
+        "fcp": 116,
+        "usableMs": 336.09999999403954,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 305423,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 122.19999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 122,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 137,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 136.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 136.40000000596046,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      },
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 402,
+        "fp": 128,
+        "fcp": 128,
+        "usableMs": 398.30000001192093,
+        "jsTransferBytes": 243219,
+        "jsEncodedBytes": 239919,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 136.2999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 136.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 130.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 130.80000001192093,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": [
+          51
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 348,
+        "fp": 80,
+        "fcp": 80,
+        "usableMs": 345.40000000596046,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 239919,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 125,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 124.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 122,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 121.7999999821186,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 440,
+        "fp": 64,
+        "fcp": 64,
+        "usableMs": 435.90000000596046,
+        "jsTransferBytes": 310523,
+        "jsEncodedBytes": 305423,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 126.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 126.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 131.59999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 131.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 130.90000000596046,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          52
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 345,
+        "fp": 68,
+        "fcp": 68,
+        "usableMs": 340.7999999821186,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 305423,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 123.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 123.2999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 127.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 127.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 126.69999998807907,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      },
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 385,
+        "fp": 128,
+        "fcp": 128,
+        "usableMs": 381.90000000596046,
+        "jsTransferBytes": 243219,
+        "jsEncodedBytes": 239919,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 122.7000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 122.59999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 131.19999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 131.2999999821186,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": [
+          52
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 352,
+        "fp": 92,
+        "fcp": 92,
+        "usableMs": 348.59999999403954,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 239919,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 122.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 122.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 132.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 132.59999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 375,
+        "fp": 72,
+        "fcp": 72,
+        "usableMs": 372.19999998807907,
+        "jsTransferBytes": 310523,
+        "jsEncodedBytes": 305423,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 125.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 125.2000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 131.2000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 131,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 130.39999997615814,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          53
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 343,
+        "fp": 64,
+        "fcp": 64,
+        "usableMs": 339.40000000596046,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 305423,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 122.19999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 122.10000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 122.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 122.59999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 122.09999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      }
+    ],
+    "actions": [],
+    "requests": [
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET",
+        "bytes": 2662167,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET",
+        "bytes": 2662167,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "GET",
+        "bytes": 2662167,
+        "fixtureDelayMs": 120
+      }
+    ],
+    "errors": []
+  },
+  "paintLoadsAfter": {
+    "setup": "Actual Next production build, proxy bypassed only in isolated copy; synthetic 24 runs and 60 curated refs, API stubs 120ms, Chrome muted, CPU 2x, desktop 1440x1000. FCP is paint timing, usable is control readiness, not formal TTI. Two rAF is a conservative click-to-paint proxy.",
+    "rows": [
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 402,
+        "fp": 136,
+        "fcp": 136,
+        "usableMs": 398.80000001192093,
+        "jsTransferBytes": 243437,
+        "jsEncodedBytes": 240137,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 124.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 124.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 120.7000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 120.90000000596046,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": [
+          52
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 350,
+        "fp": 80,
+        "fcp": 80,
+        "usableMs": 347.80000001192093,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 240137,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 122.10000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 122.19999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 131.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 131,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 365,
+        "fp": 60,
+        "fcp": 60,
+        "usableMs": 361.40000000596046,
+        "jsTransferBytes": 310950,
+        "jsEncodedBytes": 305850,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 130,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 129.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 133.2999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 133,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 132.59999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          51
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 348,
+        "fp": 60,
+        "fcp": 60,
+        "usableMs": 345.19999998807907,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 305850,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 131.2000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 131.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 133.2000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 132.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 132.40000000596046,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      },
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 395,
+        "fp": 128,
+        "fcp": 128,
+        "usableMs": 392.69999998807907,
+        "jsTransferBytes": 243437,
+        "jsEncodedBytes": 240137,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 133.19999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 133.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 127.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 127.60000002384186,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": [
+          51
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 364,
+        "fp": 92,
+        "fcp": 92,
+        "usableMs": 360.69999998807907,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 240137,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 135.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 135.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 129.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 129.7000000178814,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 375,
+        "fp": 60,
+        "fcp": 60,
+        "usableMs": 372.39999997615814,
+        "jsTransferBytes": 310950,
+        "jsEncodedBytes": 305850,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 127.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 127,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 127,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 126.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 126.40000000596046,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 345,
+        "fp": 60,
+        "fcp": 60,
+        "usableMs": 341.80000001192093,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 305850,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 126.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 126.7000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 124.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 123.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 123.5,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      },
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 395,
+        "fp": 136,
+        "fcp": 136,
+        "usableMs": 389.5,
+        "jsTransferBytes": 243437,
+        "jsEncodedBytes": 240137,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 132.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 132.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 127.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 126.90000000596046,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": [
+          51
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 353,
+        "fp": 72,
+        "fcp": 72,
+        "usableMs": 350.7000000178814,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 263635,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 134.19999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 134.2000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 131.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 131.30000001192093,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 377,
+        "fp": 52,
+        "fcp": 52,
+        "usableMs": 374.2999999821186,
+        "jsTransferBytes": 310950,
+        "jsEncodedBytes": 305850,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 121.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 121.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 135.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 135.59999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 134.90000000596046,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          56
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 342,
+        "fp": 60,
+        "fcp": 60,
+        "usableMs": 338.90000000596046,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 305850,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 128.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 128.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 128,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 127.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 127.10000002384186,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      }
+    ],
+    "actions": [],
+    "requests": [
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=faces",
+        "method": "GET",
+        "bytes": 6241,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=faces",
+        "method": "GET",
+        "bytes": 6241,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 14919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "GET",
+        "bytes": 868,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=faces",
+        "method": "GET",
+        "bytes": 6241,
+        "fixtureDelayMs": 120
+      }
+    ],
+    "errors": []
+  },
+  "webkit": [
+    {
+      "engine": "Playwright WebKit, not branded Safari or a physical iPhone",
+      "mobile": false,
+      "pathname": "/studio",
+      "clientWidth": 1440,
+      "scrollWidth": 1440,
+      "mainWidth": 1192,
+      "videos": 24,
+      "buttons": 27,
+      "errors": []
+    },
+    {
+      "engine": "Playwright WebKit, not branded Safari or a physical iPhone",
+      "mobile": false,
+      "pathname": "/studio/10000000-0000-4000-8000-000000000000",
+      "clientWidth": 1440,
+      "scrollWidth": 1440,
+      "mainWidth": 1192,
+      "videos": 2,
+      "buttons": 15,
+      "editor": {
+        "width": 1440,
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      },
+      "errors": []
+    },
+    {
+      "engine": "Playwright WebKit, not branded Safari or a physical iPhone",
+      "mobile": true,
+      "pathname": "/studio",
+      "clientWidth": 390,
+      "scrollWidth": 390,
+      "mainWidth": 142,
+      "videos": 24,
+      "buttons": 27,
+      "errors": []
+    },
+    {
+      "engine": "Playwright WebKit, not branded Safari or a physical iPhone",
+      "mobile": true,
+      "pathname": "/studio/10000000-0000-4000-8000-000000000000",
+      "clientWidth": 390,
+      "scrollWidth": 390,
+      "mainWidth": 142,
+      "videos": 2,
+      "buttons": 15,
+      "editor": {
+        "width": 390,
+        "scrollWidth": 390,
+        "clientWidth": 390
+      },
+      "errors": []
+    }
+  ],
+  "filmstrip": {
+    "setup": "Actual filmstrip module, six 32px tile samples across a synthetic 3s/720p clip, shared decoder, no R2/auth test",
+    "frames": 6,
+    "uniqueFrames": 6,
+    "decoderElements": 1,
+    "decodedWidths": [
+      720
+    ],
+    "decodedHeights": [
+      1280
+    ],
+    "firstMs": 234.90000000596046,
+    "cachedMs": 0,
+    "cacheSame": true,
+    "decodedByteCounter": [
+      9676602
+    ],
+    "decodedMemoryBytes": null
+  },
+  "liveReads": {
+    "setup": "Live deployed mavya.app, disposable confirmed audit account, cookie authentication. Reads only after temporary Auth/profile creation. No billing, upload, generation or export request. No asserted physical test location.",
+    "rows": [
+      {
+        "round": 0,
+        "path": "/api/profile",
+        "status": 200,
+        "milliseconds": 1805.048824,
+        "bytes": 115,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 0,
+        "path": "/api/usage",
+        "status": 200,
+        "milliseconds": 570.842521,
+        "bytes": 162,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 0,
+        "path": "/api/runs?view=summary",
+        "status": 200,
+        "milliseconds": 410.2688170000001,
+        "bytes": 2,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 0,
+        "path": "/api/runs",
+        "status": 200,
+        "milliseconds": 553.5212750000001,
+        "bytes": 2,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 0,
+        "path": "/api/assets",
+        "status": 200,
+        "milliseconds": 349.4415309999995,
+        "bytes": 2,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 0,
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "status": 200,
+        "milliseconds": 1584.46097,
+        "bytes": 431669,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 0,
+        "path": "/api/file-prefs",
+        "status": 200,
+        "milliseconds": 659.7290929999999,
+        "bytes": 24,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 1,
+        "path": "/api/profile",
+        "status": 200,
+        "milliseconds": 301.5856339999991,
+        "bytes": 115,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 1,
+        "path": "/api/usage",
+        "status": 200,
+        "milliseconds": 332.4338029999999,
+        "bytes": 162,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 1,
+        "path": "/api/runs?view=summary",
+        "status": 200,
+        "milliseconds": 321.0320730000003,
+        "bytes": 2,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 1,
+        "path": "/api/runs",
+        "status": 200,
+        "milliseconds": 311.0427350000009,
+        "bytes": 2,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 1,
+        "path": "/api/assets",
+        "status": 200,
+        "milliseconds": 288.83151499999985,
+        "bytes": 2,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 1,
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "status": 200,
+        "milliseconds": 971.0962230000005,
+        "bytes": 431669,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 1,
+        "path": "/api/file-prefs",
+        "status": 200,
+        "milliseconds": 495.0519210000002,
+        "bytes": 24,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 2,
+        "path": "/api/profile",
+        "status": 200,
+        "milliseconds": 291.3646399999998,
+        "bytes": 115,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 2,
+        "path": "/api/usage",
+        "status": 200,
+        "milliseconds": 353.16718800000126,
+        "bytes": 162,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 2,
+        "path": "/api/runs?view=summary",
+        "status": 200,
+        "milliseconds": 348.16937400000097,
+        "bytes": 2,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 2,
+        "path": "/api/runs",
+        "status": 200,
+        "milliseconds": 480.94658999999956,
+        "bytes": 2,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 2,
+        "path": "/api/assets",
+        "status": 200,
+        "milliseconds": 307.66703300000154,
+        "bytes": 2,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 2,
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "status": 200,
+        "milliseconds": 978.4721470000004,
+        "bytes": 431669,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      },
+      {
+        "round": 2,
+        "path": "/api/file-prefs",
+        "status": 200,
+        "milliseconds": 515.266837000001,
+        "bytes": 24,
+        "serverTiming": null,
+        "vercelRegion": "kix1:"
+      }
+    ],
+    "cleanupDeleted": true
+  },
+  "exportBefore": {
+    "setup": "Actual offline 720p ffmpeg; 120fps source, ten contiguous 50ms pieces, final30fps/500ms. Source turns red for final50ms.",
+    "sourceFinalPixel": [
+      253,
+      0,
+      0
+    ],
+    "outputFinalPixel": [
+      0,
+      0,
+      0
+    ],
+    "intermediateFrames": [
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4
+    ],
+    "finalFrames": 15,
+    "expectedFinalRed": true,
+    "actualFinalRed": false
+  },
+  "exportAfter": {
+    "setup": "Actual offline 720p ffmpeg; 120fps source, ten contiguous 50ms pieces, final30fps/500ms. Source turns red for final50ms.",
+    "sourceFinalPixel": [
+      253,
+      0,
+      0
+    ],
+    "outputFinalPixel": [
+      253,
+      0,
+      0
+    ],
+    "intermediateFrames": [
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1
+    ],
+    "finalFrames": 15,
+    "expectedFinalRed": true,
+    "actualFinalRed": true
+  },
+  "projectionFixture": {
+    "fullBytes": 120377,
+    "facesBytes": 161,
+    "historyBytes": 290
+  },
+  "checks": {
+    "suites": [
+      "ai-checks.cjs",
+      "auth-next-checks.cjs",
+      "billing-change-checks.cjs",
+      "billing-checks.cjs",
+      "billing-sql-checks.cjs",
+      "budget-checks.cjs",
+      "config-checks.cjs",
+      "deletion-checks.cjs",
+      "export-checks.cjs",
+      "generation-checks.cjs",
+      "generation-sql-checks.cjs",
+      "media-retention-checks.cjs",
+      "network-checks.cjs",
+      "provider-safety-checks.cjs",
+      "r2-signing-checks.cjs",
+      "render-admission-checks.cjs",
+      "render-checks.cjs",
+      "review-checks.cjs",
+      "settings-checks.cjs",
+      "text-checks.cjs",
+      "upload-checks.cjs",
+      "verify-auth-flow.cjs",
+      "verify-brutal-review.cjs",
+      "verify-checkout-return.cjs",
+      "verify-claude-fixes.cjs",
+      "verify-export-media.cjs",
+      "verify-full-audit.cjs",
+      "verify-library-speed.cjs",
+      "verify-part2-lists.cjs",
+      "verify-part2.cjs",
+      "verify-route-gates.cjs"
+    ],
+    "allPassed": true,
+    "typecheck": true,
+    "eslint": true,
+    "productionBuild": true,
+    "generatedPages": 36
+  },
+  "sourceInventory": [
+    {
+      "path": "render/constraints.json",
+      "bytes": 158,
+      "sha256": "805a2137411e0515deabbb81ccae6e11a2ec122940d16ce425c139f1e4fee73e"
+    },
+    {
+      "path": "render/limits.mjs",
+      "bytes": 2482,
+      "sha256": "bb11b711941074f93fe9a1a74a31433c46c5e9f6e52f122754e3d2b36587f250"
+    },
+    {
+      "path": "render/package-lock.json",
+      "bytes": 8051,
+      "sha256": "39be0d76848eec5072f4cf949399ed90dc46b932127d68e2be5c5120d76d8278"
+    },
+    {
+      "path": "render/package.json",
+      "bytes": 195,
+      "sha256": "5c56f4d5f1b02b016b04f00574c78965f54c531492e2c16a8845aa56b410ce51"
+    },
+    {
+      "path": "render/render.mjs",
+      "bytes": 10449,
+      "sha256": "1889fd0c098487a6ca7d9d2d9ac67d19ce62bac837ac329c74b743450ed2d32b"
+    },
+    {
+      "path": "render/server.mjs",
+      "bytes": 9873,
+      "sha256": "a4724f375458791a5d20f282eb123254fc3b3f10168b3a9d9e0d1ddd86578345"
+    },
+    {
+      "path": "scripts/ai-checks.cjs",
+      "bytes": 994,
+      "sha256": "bfa5744e3ff2200b80fad27f0176fb0ef2c5ae1e66f937b9d11578d9255f10e3"
+    },
+    {
+      "path": "scripts/auth-next-checks.cjs",
+      "bytes": 3764,
+      "sha256": "74c678c0acb3affafb3c49653f38552a7abefb56649145fbb51d7353e157c9cf"
+    },
+    {
+      "path": "scripts/backfill-covers.mjs",
+      "bytes": 3507,
+      "sha256": "adc309497f72c5c710a734abc04ae821f4deecc2417121ca1249d4bf91c066d3"
+    },
+    {
+      "path": "scripts/billing-change-checks.cjs",
+      "bytes": 2749,
+      "sha256": "64be89b87f4aac26cd82d5daea88530abb1004a90108894367947bdea140c53f"
+    },
+    {
+      "path": "scripts/billing-checks.cjs",
+      "bytes": 7599,
+      "sha256": "840c84e5d7705a1b864e37db7cd205cb19e62783c5c82d12249f0b52f2c837e6"
+    },
+    {
+      "path": "scripts/billing-sql-checks.cjs",
+      "bytes": 18927,
+      "sha256": "b820408e1b7b8900996bc09dd5e40b6ab2895e2f172dc08692aee7f63af630ce"
+    },
+    {
+      "path": "scripts/budget-checks.cjs",
+      "bytes": 1836,
+      "sha256": "a16205f4db4119998a7a35fe78226d81dfb95aa2336e36f5c7a200099e8f5a82"
+    },
+    {
+      "path": "scripts/cast50.py",
+      "bytes": 11858,
+      "sha256": "034cd9c48fe4efe48081e014b3837e7524766305b964c246b75ae98aa71211b7"
+    },
+    {
+      "path": "scripts/cast_more.py",
+      "bytes": 11580,
+      "sha256": "e9488a120c92565600226a0f71c409e75374ee51f32ab2d6d2de1e53fac18183"
+    },
+    {
+      "path": "scripts/characters.py",
+      "bytes": 2079,
+      "sha256": "d61a4722556811be56b7110eb5e712dd955937611b9a07e897083878a55f7136"
+    },
+    {
+      "path": "scripts/check-module.cjs",
+      "bytes": 909,
+      "sha256": "01740e347487b213648d81d83609337ce0c43aa05203c631abc762b36f93a7e9"
+    },
+    {
+      "path": "scripts/config-checks.cjs",
+      "bytes": 1309,
+      "sha256": "22b50cdfc859b9b2b1a23e1494ef52d4473646921bb5a0a24eef9754ce6934f6"
+    },
+    {
+      "path": "scripts/curation/__pycache__/add.cpython-312.pyc",
+      "bytes": 6938,
+      "sha256": "32f4dd8ab557458514524ca1f083b08e43799f448a4f45ea60234ec09a65ba78"
+    },
+    {
+      "path": "scripts/curation/__pycache__/finalize.cpython-312.pyc",
+      "bytes": 5175,
+      "sha256": "fe602afdbe49980eb198459cffa2c04b3205b324ee918f7c31c8cb2bf0716dc0"
+    },
+    {
+      "path": "scripts/curation/__pycache__/fitcheck.cpython-312.pyc",
+      "bytes": 10449,
+      "sha256": "b0f23cf5d9b1086348d561e30b0efb1d35f4d6b14e7c601907b3b3fab8fd60e7"
+    },
+    {
+      "path": "scripts/curation/__pycache__/import_picks.cpython-312.pyc",
+      "bytes": 5046,
+      "sha256": "fc46039d8649e89de5505edfd7d3b29bf0a691fcd0fbcb57cc0539e20da005a6"
+    },
+    {
+      "path": "scripts/curation/__pycache__/polish.cpython-312.pyc",
+      "bytes": 5918,
+      "sha256": "fcb9e79b5d77871715b8ca1513795bdafb015b9ed5a926673cefeaf7af55a732"
+    },
+    {
+      "path": "scripts/curation/__pycache__/summarize.cpython-312.pyc",
+      "bytes": 7902,
+      "sha256": "fcc7ec5acd75da3ec0ea08612d1682aa195b0cef7b70c734465231d271a96c28"
+    },
+    {
+      "path": "scripts/curation/__pycache__/tighten.cpython-312.pyc",
+      "bytes": 4593,
+      "sha256": "395228c55ceabd1af675db0cbdb5e7506b2cc736cdf817438ac547a2214298b3"
+    },
+    {
+      "path": "scripts/curation/add.py",
+      "bytes": 4422,
+      "sha256": "d600223f77be242aac99d4c1f2423f9b633e4ef34122fa414acb402d5bcf50bd"
+    },
+    {
+      "path": "scripts/curation/drop.py",
+      "bytes": 1516,
+      "sha256": "761f289f9484bddd7a6d24312c282170aeeda4964858a3c4516e565f44880754"
+    },
+    {
+      "path": "scripts/curation/files.py",
+      "bytes": 6252,
+      "sha256": "b878b95dc96679add2e21198280cd63b9d9fef535fb5542bbf6aeff269a249e5"
+    },
+    {
+      "path": "scripts/curation/finalize.py",
+      "bytes": 2388,
+      "sha256": "414d80eaf60296cb01567e9ae324e64444684589f120baff3a496e17863e469b"
+    },
+    {
+      "path": "scripts/curation/fitcheck.py",
+      "bytes": 6637,
+      "sha256": "4b64225e5846a80f6c82e73a0d70508346c371669d4bf49f34a86be0f1bc1934"
+    },
+    {
+      "path": "scripts/curation/hookcut.py",
+      "bytes": 3535,
+      "sha256": "e92f3686e2bb5ed6a37248d736b93a51e13334783832e00fc42fafbcba7227a1"
+    },
+    {
+      "path": "scripts/curation/import_picks.py",
+      "bytes": 3174,
+      "sha256": "e47f8bcada667db5ed412a02ed08f84d81a79505e0437c37cc9065c5e130d1c6"
+    },
+    {
+      "path": "scripts/curation/pipeline.sh",
+      "bytes": 417,
+      "sha256": "ea084b3a4a5712b51d73fc0b1ea47578b5d0649429b72be72867edb13b99cf31"
+    },
+    {
+      "path": "scripts/curation/polish.py",
+      "bytes": 3211,
+      "sha256": "aea860e55aef56c2773c789c16650593825e05c571449dce03b9129929934620"
+    },
+    {
+      "path": "scripts/curation/recipe.py",
+      "bytes": 8861,
+      "sha256": "dc0716c88df447bb001fba4b597c2c0972b8121051938b7064af81b59a27f043"
+    },
+    {
+      "path": "scripts/curation/redownload.py",
+      "bytes": 2583,
+      "sha256": "5625b65d627f1c5fb355410031bb988174ee4ebe8255264457c02e654abbb4b4"
+    },
+    {
+      "path": "scripts/curation/retry.sh",
+      "bytes": 1383,
+      "sha256": "24a78caceb2e6592ff8575171abf9a0efdc73e068bfcf7ea77fe070ac50ed255"
+    },
+    {
+      "path": "scripts/curation/runqueue.py",
+      "bytes": 780,
+      "sha256": "7a1a2a24ae57bed567e78913fa7f1d279fb92a7a07f80d2c0371678e2e662769"
+    },
+    {
+      "path": "scripts/curation/split.py",
+      "bytes": 3061,
+      "sha256": "ab720656e69b3f9329d290f2e2430d5466c8f6b8be3db099b8fb6f72fc72440d"
+    },
+    {
+      "path": "scripts/curation/summarize.py",
+      "bytes": 4275,
+      "sha256": "9c51a06058b0327cccd6ea7938ed0cad2c1227afe56dc993add7bf07a401c63a"
+    },
+    {
+      "path": "scripts/curation/thumbs.py",
+      "bytes": 2921,
+      "sha256": "3973264e19c00addd304c05aaa81e70e1dc0990c55e6bd8d5fc123e2b9b62fd1"
+    },
+    {
+      "path": "scripts/curation/tighten.py",
+      "bytes": 2175,
+      "sha256": "e1a2776dc46312b25af3a7492c5cbd4f72bba18010365b1d09de023f9503c6b6"
+    },
+    {
+      "path": "scripts/deletion-checks.cjs",
+      "bytes": 2589,
+      "sha256": "5c076d3597e9a687ca6ed59be2b79ae71bad1b6f16766f0884ab345a7d8e2d85"
+    },
+    {
+      "path": "scripts/export-checks.cjs",
+      "bytes": 2729,
+      "sha256": "84ebeb6c180f032f02473205a0540a20e64725676fc99d4ce94cba9cdab7d6c5"
+    },
+    {
+      "path": "scripts/fal-erase-test.mjs",
+      "bytes": 3820,
+      "sha256": "ada3c91c26d7e83dc878e19deddab132a1977effa5fe2747a01ea7500deaccd8"
+    },
+    {
+      "path": "scripts/fal-test.mjs",
+      "bytes": 4065,
+      "sha256": "5cf4cc47a306a71166e5b4e509e6c0809b654b4cd81a3961ec0c2b38d76be66a"
+    },
+    {
+      "path": "scripts/fixtures/library-before-list-pages.ts.fixture",
+      "bytes": 9288,
+      "sha256": "9dfda0947a7745feb2a2506d9e746ae827a745791264f60addd43f6cdb1db517"
+    },
+    {
+      "path": "scripts/fixtures/library-before-route.ts.fixture",
+      "bytes": 3947,
+      "sha256": "54871f7dfc8e1af76430b5a8d9b45e98f907ce788bd8a084fd441f0b94d37343"
+    },
+    {
+      "path": "scripts/generation-checks.cjs",
+      "bytes": 18326,
+      "sha256": "07188a16d49b0be977b7694bf2f7b1945f7a36a03fb00a298e21ba30e89c2ee5"
+    },
+    {
+      "path": "scripts/generation-sql-checks.cjs",
+      "bytes": 12121,
+      "sha256": "a185410277d69feacac2f09a5919c3cf6d692e972d64230087a0a656dfed0c7a"
+    },
+    {
+      "path": "scripts/instrument-audit-build.cjs",
+      "bytes": 1343,
+      "sha256": "1603241612b76cd3601d04ce75f3513c32dfce0b9c3f275277592708521a4640"
+    },
+    {
+      "path": "scripts/measure-app-speed.cjs",
+      "bytes": 6727,
+      "sha256": "c2948a0a6c6b1ef25ae86227b150a2ac9ca12518b285a4f850345bd286057e8e"
+    },
+    {
+      "path": "scripts/measure-audit-filmstrip.cjs",
+      "bytes": 2861,
+      "sha256": "d4dd41a7432ac7250b0dd6793f9c490bbfc9302bd4aa306da59dea3379b0ac63"
+    },
+    {
+      "path": "scripts/measure-audit-webkit.cjs",
+      "bytes": 3121,
+      "sha256": "ea1b0cffc66348714ced8347ce0e2b8b76a3c143f8ea92e2082573863b3b8d3d"
+    },
+    {
+      "path": "scripts/measure-brutal-speed.cjs",
+      "bytes": 17134,
+      "sha256": "5eb99abd04fa14ab82536a7489742aab1a8eef27d329ec6925387e824152f07b"
+    },
+    {
+      "path": "scripts/measure-editor-speed.cjs",
+      "bytes": 5494,
+      "sha256": "86ea441f85dc94e081d7faf4abcc3dfca9a8bbc2a3ef61b54c7b0065a0771901"
+    },
+    {
+      "path": "scripts/measure-export-quantization.cjs",
+      "bytes": 2266,
+      "sha256": "182ecffcd8545d4fb34906bd3bde9abf0bd6aa60b1f11b6131d76052ee644dd4"
+    },
+    {
+      "path": "scripts/measure-full-audit.cjs",
+      "bytes": 13761,
+      "sha256": "844941d66bed1a8bb2d39239860e10137b969850c16f2796e22c879e422a90cc"
+    },
+    {
+      "path": "scripts/measure-library-browser.cjs",
+      "bytes": 6508,
+      "sha256": "b6869b9e2f15fb8e466528ff97a0499b66741d7c7b4847e4f1152ca4dd7715ed"
+    },
+    {
+      "path": "scripts/measure-library-speed.cjs",
+      "bytes": 18790,
+      "sha256": "bcdf4510feabb5a478912bdb90145bd9e1031d70fbf9bb75384d4566ba183cd4"
+    },
+    {
+      "path": "scripts/measure-proxy-speed.cjs",
+      "bytes": 2189,
+      "sha256": "d4fb874ab9118ea75943232af6bd281efbc99fdf5401c42ad1dae7f432e5fc4d"
+    },
+    {
+      "path": "scripts/measure-server-speed.cjs",
+      "bytes": 2122,
+      "sha256": "38382aea535656ac01c6adea599e384835c80902b3e663947235ea6ea1f53d26"
+    },
+    {
+      "path": "scripts/measure-speed.cjs",
+      "bytes": 4079,
+      "sha256": "1baccaa9b90096a2356399ebc50cbb8b31221e6a8c078fb5558c24a5bfb3f239"
+    },
+    {
+      "path": "scripts/media-retention-checks.cjs",
+      "bytes": 2068,
+      "sha256": "99480ac795cab5edbf10ed1e57531196f77025ea0cd1c4a7c95bd505d0bc71b4"
+    },
+    {
+      "path": "scripts/network-checks.cjs",
+      "bytes": 2704,
+      "sha256": "6dd304201174896d919c452ca7ceeac3f4720bdbd6c7ae46ff603a2fa3fcdb63"
+    },
+    {
+      "path": "scripts/provider-safety-checks.cjs",
+      "bytes": 5236,
+      "sha256": "36b1a465119ea5587f4cf8ba969a898bd8a507ae54a099cde76fc3b6f4e929c0"
+    },
+    {
+      "path": "scripts/r2-signing-checks.cjs",
+      "bytes": 2629,
+      "sha256": "3906964daae4b7a1d1fbd48a1da21002191567cbdb3ee1d504190a7804fb12a8"
+    },
+    {
+      "path": "scripts/render-admission-checks.cjs",
+      "bytes": 3085,
+      "sha256": "bbc5eb1bfb8cfc80a85ca5b04af4089315c816e8652002434b33de8c77eed9d7"
+    },
+    {
+      "path": "scripts/render-checks.cjs",
+      "bytes": 1351,
+      "sha256": "b021d3a676bd056efe01301a28c4be36d8619baee75c57ba12e410609ca7f8ba"
+    },
+    {
+      "path": "scripts/review-checks.cjs",
+      "bytes": 11034,
+      "sha256": "f5326d66dfae3e413c6bc70a172325d40686a5119799ce56bf49940b0de94da0"
+    },
+    {
+      "path": "scripts/runway-frames.mjs",
+      "bytes": 2945,
+      "sha256": "533ecf2f555f5ec54b61e770a0230bc636321f190f04589078ad7686fe8e46e2"
+    },
+    {
+      "path": "scripts/runway-gemini.mjs",
+      "bytes": 1962,
+      "sha256": "bd5c2ffb72be9f3e2a6feec4cff8361da0be7d52a66e7cb528fd82df7cf8fe63"
+    },
+    {
+      "path": "scripts/runway-hybrid.mjs",
+      "bytes": 6000,
+      "sha256": "d0a0362b77a40985e1b345c2d793a075b180fded5bfd186f71be284470bc6254"
+    },
+    {
+      "path": "scripts/runway-hybrid2.mjs",
+      "bytes": 7376,
+      "sha256": "3a4236cc10f41155b4560a45ae3f28403602cba3a2d86a19e51e5dbb7ae9a665"
+    },
+    {
+      "path": "scripts/runway-replace.mjs",
+      "bytes": 3832,
+      "sha256": "0ee64935f9401d03c5b55e5b1f700e57770665d66cbcd9c35f61ca4b9d57a9db"
+    },
+    {
+      "path": "scripts/runway-test.mjs",
+      "bytes": 5642,
+      "sha256": "900ba81639a740701a871ae42ac2fc7618b5c416d6b320cbd6b3dd3181224c74"
+    },
+    {
+      "path": "scripts/runway-test2.mjs",
+      "bytes": 5665,
+      "sha256": "ac352c06ba2637622ece6c87c40f1612796541bb83483c4b29f40e657313cd0a"
+    },
+    {
+      "path": "scripts/runway-veo.mjs",
+      "bytes": 2466,
+      "sha256": "16959e6b2221085b037baaa0223decdbfcdd7efa7e08e3f9875c756b193d6030"
+    },
+    {
+      "path": "scripts/settings-checks.cjs",
+      "bytes": 1403,
+      "sha256": "a0226fb17bf17b6b725c185f0b9070b5b5ef6b35d03f88e40fa08d5f3be8f28a"
+    },
+    {
+      "path": "scripts/text-checks.cjs",
+      "bytes": 1751,
+      "sha256": "3d75d76422cfb62a48cf53d74c603544b9e96d7d96e3178639fdbd739a8408a5"
+    },
+    {
+      "path": "scripts/upload-checks.cjs",
+      "bytes": 1521,
+      "sha256": "376365b23820e30b88de2f20821707502d8a48541d725c7dd034aa491cb5759f"
+    },
+    {
+      "path": "scripts/upload-library.mjs",
+      "bytes": 7358,
+      "sha256": "66a284ba05c657b32440eba3e9949a1cdc8cc71f9f1578d1de5c27a04ea5605a"
+    },
+    {
+      "path": "scripts/verify-auth-flow.cjs",
+      "bytes": 16103,
+      "sha256": "cd1a6c2936fa300eaaedbe4e43a45f4fdc14975bbf93dfe7f1391ea158c85997"
+    },
+    {
+      "path": "scripts/verify-brutal-review.cjs",
+      "bytes": 10856,
+      "sha256": "dc5f5d1c852f17ed35a2f29f51195a75100f2ffcc9cd14728f3cdd660267d6f3"
+    },
+    {
+      "path": "scripts/verify-checkout-return.cjs",
+      "bytes": 5965,
+      "sha256": "7ed18cbe8678b349fd59fa127d5a7614b6919d1d18b82c69e1c8cb53cff15f5b"
+    },
+    {
+      "path": "scripts/verify-claude-fixes.cjs",
+      "bytes": 5806,
+      "sha256": "f7af30eac327892936cbfbc456e529e71edfd80c65987f9370da248a8d81528c"
+    },
+    {
+      "path": "scripts/verify-export-media.cjs",
+      "bytes": 4851,
+      "sha256": "f44b7639bbd568421900b34bc6ff84fc616e60b5d00fd7da8cb54371c1b583dc"
+    },
+    {
+      "path": "scripts/verify-full-audit.cjs",
+      "bytes": 7479,
+      "sha256": "25bf1e92738b96e8030dfdee2bdedc362caf53fba3f4c14b9a2e21e5131421cf"
+    },
+    {
+      "path": "scripts/verify-library-speed.cjs",
+      "bytes": 8136,
+      "sha256": "06884bac6fe67219e918fa06a292b0a75fad7f1045f8c205e18f7963135e4983"
+    },
+    {
+      "path": "scripts/verify-part2-lists.cjs",
+      "bytes": 5998,
+      "sha256": "722923fd5d7c4a1ca3fb2148ac0ab913933e404a0e3619694de9578cca66297c"
+    },
+    {
+      "path": "scripts/verify-part2.cjs",
+      "bytes": 6016,
+      "sha256": "438c4175d284e1462e3d2af14c3388ec21dbe18baea3031fdf6add7e53bb6ba2"
+    },
+    {
+      "path": "scripts/verify-route-gates.cjs",
+      "bytes": 2295,
+      "sha256": "8825cfecc1cfd8681f0db1d8f87e4ed79062dc225216fdddd3724f1e218c1fc6"
+    },
+    {
+      "path": "src/app/(app)/billing/page.tsx",
+      "bytes": 156,
+      "sha256": "67e52022b865043996e495b448d0654a6918c3de15fa47cf2db688bfcf1a2b27"
+    },
+    {
+      "path": "src/app/(app)/layout.tsx",
+      "bytes": 283,
+      "sha256": "ecc8c0427e6d2c3d351faddfd65c0c638d64a54a5fbca8a6dbfff5feaf9f82db"
+    },
+    {
+      "path": "src/app/(app)/library/[id]/loading.tsx",
+      "bytes": 149,
+      "sha256": "04d9082230a24d0ffdbda6f4ca3608f9cda46f061f8297c8a3ceb3c441714823"
+    },
+    {
+      "path": "src/app/(app)/library/[id]/page.tsx",
+      "bytes": 325,
+      "sha256": "c5c12e17cadcb49db694f2298f14aad3af2d34d8ca71ec9df1a55a51233f5503"
+    },
+    {
+      "path": "src/app/(app)/library/loading.tsx",
+      "bytes": 141,
+      "sha256": "e32997c322726b4a580f262b77c4d9e6990d12c51bf5b92e7a93346e1cdc60d1"
+    },
+    {
+      "path": "src/app/(app)/library/page.tsx",
+      "bytes": 126,
+      "sha256": "fe18126f4d53124f7c6cbdb3bd8565de46033c3529071fd673df6f667cb1611c"
+    },
+    {
+      "path": "src/app/(app)/settings/billing/loading.tsx",
+      "bytes": 150,
+      "sha256": "7a2618140e678c7c3eb262bf22ff214a3eac9eaafebbd8263dc032296f820b01"
+    },
+    {
+      "path": "src/app/(app)/settings/billing/page.tsx",
+      "bytes": 429,
+      "sha256": "6af284a724f5f95fef8776c57e3fe1e48f05dd9d229ef933b2cb5094d7460436"
+    },
+    {
+      "path": "src/app/(app)/settings/loading.tsx",
+      "bytes": 142,
+      "sha256": "5072a13d91c6a23fa88929077d08ecda45c8457d5bcc2ae17c96ca572fd4ab9d"
+    },
+    {
+      "path": "src/app/(app)/settings/page.tsx",
+      "bytes": 452,
+      "sha256": "629e3790d90c2ee50bef9a8140c4ff6b441acb1e2d368b7ab097b3b83d6aeae0"
+    },
+    {
+      "path": "src/app/(app)/settings/plans/loading.tsx",
+      "bytes": 148,
+      "sha256": "54e6411a4a733755abc61c5c1ba434db04e5e68e8533aac9736ca0b28c8bdae9"
+    },
+    {
+      "path": "src/app/(app)/settings/plans/page.tsx",
+      "bytes": 335,
+      "sha256": "0f67099f88a77eec70b79af26c8e11590d83bc1314e653a2b93ea00db7b9395a"
+    },
+    {
+      "path": "src/app/(app)/settings/usage/loading.tsx",
+      "bytes": 148,
+      "sha256": "f811e09805dc6b1e5a0d530f10a1ae7305592d844f14985fb9a73e86ffa99b26"
+    },
+    {
+      "path": "src/app/(app)/settings/usage/page.tsx",
+      "bytes": 335,
+      "sha256": "93d758e1eb0238f930231ef3a0ebedb4e9e2f0d4a77fb942cb89f8bbc4dc164a"
+    },
+    {
+      "path": "src/app/(app)/studio/[id]/edit/loading.tsx",
+      "bytes": 153,
+      "sha256": "0f1bc517dcd2ef40b90f0cb064be3feb3cd84df51e3c389970e49e3f3d682aa0"
+    },
+    {
+      "path": "src/app/(app)/studio/[id]/edit/page.tsx",
+      "bytes": 584,
+      "sha256": "2a918be47ba0403ee96d8cd190f0b0b5872a4265f18bde4cc72463483d773189"
+    },
+    {
+      "path": "src/app/(app)/studio/[id]/layout.tsx",
+      "bytes": 1016,
+      "sha256": "4a25b6ac5e5d62b1cf60b9176c0c437304c59e5c47d4d963fca8243083000db1"
+    },
+    {
+      "path": "src/app/(app)/studio/[id]/loading.tsx",
+      "bytes": 148,
+      "sha256": "684cc9255f0ea478bc5986198e5ba534b03fbf5ba7ed93c0beda1cbd807b9c0c"
+    },
+    {
+      "path": "src/app/(app)/studio/[id]/page.tsx",
+      "bytes": 300,
+      "sha256": "e360fea7d9a3601cd94b8ed125dca8a59c4b34726f6b88adf854ff24b4b96413"
+    },
+    {
+      "path": "src/app/(app)/studio/loading.tsx",
+      "bytes": 140,
+      "sha256": "06be1ef883e0a6b15ed776fd49890d3ba8603e736dc385cf0dda588227db288d"
+    },
+    {
+      "path": "src/app/(app)/studio/page.tsx",
+      "bytes": 116,
+      "sha256": "db9db13668b1a983153ff0c1304dea2f5d49d95f299251bbb22672b9dca6023f"
+    },
+    {
+      "path": "src/app/api/account/route.ts",
+      "bytes": 775,
+      "sha256": "a70971ff943c378c99cec1bc61fd1547dd4d5fc19f4ca881690b7250bdbaf524"
+    },
+    {
+      "path": "src/app/api/assets/[id]/route.ts",
+      "bytes": 589,
+      "sha256": "94a2cc0c7f8be7da79c89b2bacd05fc22cfe9428528926eca171f70553e988cc"
+    },
+    {
+      "path": "src/app/api/assets/route.ts",
+      "bytes": 470,
+      "sha256": "5dce2ce9dedc3145eca6085ff66f2a29e869d5361c70a7c9097e0d165850b3a3"
+    },
+    {
+      "path": "src/app/api/billing/route.ts",
+      "bytes": 7509,
+      "sha256": "af634027ea623c59e325bdf87df152eeda957d98e656c81332136f416c023dc7"
+    },
+    {
+      "path": "src/app/api/contact/route.ts",
+      "bytes": 4346,
+      "sha256": "6ab9c66a5471c2e238cecceb7bc47b9f5016638e33942b5c7171230794fd5f21"
+    },
+    {
+      "path": "src/app/api/file-prefs/route.ts",
+      "bytes": 1674,
+      "sha256": "34ea04b3d7eb1470bdb4e5a2305969a0549844da7af3834398ddbaf6cbc75206"
+    },
+    {
+      "path": "src/app/api/internal/generations/route.ts",
+      "bytes": 3588,
+      "sha256": "38ebe98e5f144bb3f141ab65ca468e5976e7c4e93b7c307c03da66d01de16170"
+    },
+    {
+      "path": "src/app/api/media/[id]/route.ts",
+      "bytes": 1823,
+      "sha256": "4f771abd97feda8e08745b6f603c9c7ce87f0fa816d5fdc85f3464468d3c0909"
+    },
+    {
+      "path": "src/app/api/media/route.ts",
+      "bytes": 1181,
+      "sha256": "f7aa57489c228f77e9746a4d3310f9bcad6aa80ce945608ff8d1ba028b9a537d"
+    },
+    {
+      "path": "src/app/api/profile/route.ts",
+      "bytes": 3792,
+      "sha256": "d225a715cbfc711120ad9c843b7004a02f8d84afb9bfde62113248213fde2f73"
+    },
+    {
+      "path": "src/app/api/references/[id]/route.ts",
+      "bytes": 3419,
+      "sha256": "7992199a591c865a5aa511ba2e4287a0d751a802419f6359c0c117399ff11a90"
+    },
+    {
+      "path": "src/app/api/references/route.ts",
+      "bytes": 4176,
+      "sha256": "10c9b406a9955dc5f39604a1e593e8e61227d88c128fe539af36eba882dddf85"
+    },
+    {
+      "path": "src/app/api/references/thumbnails/route.ts",
+      "bytes": 1813,
+      "sha256": "eeaac217c68ddf5d0f8284c9cf7430eb59e626cc5f4d65d06a2f8047397a3305"
+    },
+    {
+      "path": "src/app/api/runs/[id]/export/route.ts",
+      "bytes": 7541,
+      "sha256": "a72e61c2451755a15060b2d0e10ee7fe14a8d2f679968dae81389d0709bae7a6"
+    },
+    {
+      "path": "src/app/api/runs/[id]/generate/route.ts",
+      "bytes": 3601,
+      "sha256": "d323bdae23aa8daf520abb4a0dddac8bf9ab9f1a745b2549b78592b67460e695"
+    },
+    {
+      "path": "src/app/api/runs/[id]/hook-text/route.ts",
+      "bytes": 3841,
+      "sha256": "11b483a72b31deb71c27011c84d6549f453c4d48343fce3286743c10e4867055"
+    },
+    {
+      "path": "src/app/api/runs/[id]/product/route.ts",
+      "bytes": 4257,
+      "sha256": "1aa12283c20acfda087558490dfbea3d5c12c4f46544873ecdf662ca308776fc"
+    },
+    {
+      "path": "src/app/api/runs/[id]/route.ts",
+      "bytes": 6187,
+      "sha256": "5e952bb56f8c871936bf9aceeabdeb398cf51331cb938f3d7b7c89c5b15a4dfe"
+    },
+    {
+      "path": "src/app/api/runs/[id]/script/route.ts",
+      "bytes": 13574,
+      "sha256": "c914d763de5f56c4c7b956121c1b961677935c3c212370e8ed19131d8e5db46e"
+    },
+    {
+      "path": "src/app/api/runs/route.ts",
+      "bytes": 1653,
+      "sha256": "04d8933a29a1ce68bc0c5f73137dd783d49407fc252746ae1d91e23a686f0799"
+    },
+    {
+      "path": "src/app/api/songs/[id]/route.ts",
+      "bytes": 1504,
+      "sha256": "3f97b825a8cf6b640c20841f9b3a0331afc792ab9cf328b979394987ba4668f3"
+    },
+    {
+      "path": "src/app/api/songs/route.ts",
+      "bytes": 2843,
+      "sha256": "57ffb71b756a4f7cc0873a76a119024d3e78eeccaea2fda413c54810fb0c54ec"
+    },
+    {
+      "path": "src/app/api/sounds/[code]/route.ts",
+      "bytes": 1693,
+      "sha256": "e0e0956b72f15e9165b4b63a9fb2843835d33c209767474ffbdcd926e17cf91f"
+    },
+    {
+      "path": "src/app/api/stripe/webhook/route.ts",
+      "bytes": 6145,
+      "sha256": "04df8b2677cd618f658b9f94062ffd0ab27b00d33ab0ae5231ab063cc6d95d81"
+    },
+    {
+      "path": "src/app/api/uploads/route.ts",
+      "bytes": 1854,
+      "sha256": "6e355ed4fc2fe94ee4429fcf75862ec299cebfb08269946531973b7edc4a077a"
+    },
+    {
+      "path": "src/app/api/usage/route.ts",
+      "bytes": 789,
+      "sha256": "6add95e7d7f10135430d1db5d55dadf341624ebd0414763c6c4b13bbc5d49d28"
+    },
+    {
+      "path": "src/app/auth/callback/route.ts",
+      "bytes": 1497,
+      "sha256": "eb9aed49995015c73d732966c2ac34ae5f27e412ed9fdeb7ae2977544ac5e807"
+    },
+    {
+      "path": "src/app/auth/continue/route.ts",
+      "bytes": 1293,
+      "sha256": "00390661477e12c15736b6f8e22a9d4b4fa2f0438de702f84482aeb3ec3a458b"
+    },
+    {
+      "path": "src/app/checkout/return/route.ts",
+      "bytes": 4003,
+      "sha256": "f7b6278b2bae6d1eb0e6db1a85558e617f6f8ea3b9746c3c73bc4937fce8dc0e"
+    },
+    {
+      "path": "src/app/globals.css",
+      "bytes": 6828,
+      "sha256": "b2f43d59692c894703fb282e26b422db4e1e689ae457df702c04225b0998add9"
+    },
+    {
+      "path": "src/app/icon.svg",
+      "bytes": 1510,
+      "sha256": "fcf2be63f37de1252bf120559a89c4c0cbfaa4c1d6754d22f705369bffe39041"
+    },
+    {
+      "path": "src/app/layout.tsx",
+      "bytes": 1386,
+      "sha256": "28159fcccb471dfeec9be8a9b30cd02f0bc0d2c48556ac6a988f64b9e431ab9a"
+    },
+    {
+      "path": "src/app/page.tsx",
+      "bytes": 359,
+      "sha256": "7b6801f5fbb41713463f5cd335f3b85885e3df35776bd62de5a9882d7dcf448c"
+    },
+    {
+      "path": "src/app/pricing/page.tsx",
+      "bytes": 364,
+      "sha256": "de9d0e54f534c894a0f325b1ecd6d25d3398c1152d54b9a2c45c70b1606251bc"
+    },
+    {
+      "path": "src/app/privacy/page.tsx",
+      "bytes": 2187,
+      "sha256": "930035ec2566c3c6805ee557d03d1568fcba84aa10af5343f4c130906fbff5cb"
+    },
+    {
+      "path": "src/app/reset-password/page.tsx",
+      "bytes": 777,
+      "sha256": "58247934c7ffd4f93910cca7c0b30c88e998786955e36232e6bf4671f287d25c"
+    },
+    {
+      "path": "src/app/terms/page.tsx",
+      "bytes": 2984,
+      "sha256": "8b91e1fcd1e9aed37787ef5217a9cbc7b25ad915f17a2f1061e16a06d8a0a183"
+    },
+    {
+      "path": "src/components/account-chip.tsx",
+      "bytes": 1699,
+      "sha256": "37e33e564a9ee660d3c909760639681465a29f4cd378aacb3239da9a7b194772"
+    },
+    {
+      "path": "src/components/app-shell.tsx",
+      "bytes": 772,
+      "sha256": "44c93525d2ad8b5ed04c3ebba13afe1137b66e6d7962e244cf0e2d8628db2971"
+    },
+    {
+      "path": "src/components/auth-modal.tsx",
+      "bytes": 16790,
+      "sha256": "4a3088657911d5bb600797630cc3ce0194321d3d47d2f198b38944b4abe06437"
+    },
+    {
+      "path": "src/components/billing-view.tsx",
+      "bytes": 11673,
+      "sha256": "e792f2f888746b111637d792b8cfb0afbd4af4781392e8c41620d354cf5c7926"
+    },
+    {
+      "path": "src/components/contact-dialog.tsx",
+      "bytes": 4149,
+      "sha256": "93d0b7a8fc3adbcdfb514d9fe14b9b356d881cacb0de249da2ff6e16313896b0"
+    },
+    {
+      "path": "src/components/editor-tools.tsx",
+      "bytes": 135369,
+      "sha256": "5ec5042f189961cb4e4e1d897b2780fdfe00ebee523b693f2a48ec90e1e4ab87"
+    },
+    {
+      "path": "src/components/export-button.tsx",
+      "bytes": 6975,
+      "sha256": "0e5d57cba5d5c1a0bbeeb89e21938a593b2ebf608df6cfb48b4335a9b06be600"
+    },
+    {
+      "path": "src/components/frames.tsx",
+      "bytes": 2041,
+      "sha256": "8d2bc376621efa29faa0c9b2e973ece4c8243e7e3d929eac1888bebedf48433a"
+    },
+    {
+      "path": "src/components/history-panel.tsx",
+      "bytes": 32547,
+      "sha256": "b8b5d95f26df0bb4b4f81d766794c84365f1ecbd20f6c0cfd30fe21c4e4e78a7"
+    },
+    {
+      "path": "src/components/hook-demo-explainer.tsx",
+      "bytes": 8040,
+      "sha256": "e3183abc532e789d33f7d8a453071034ec1ac7eb44e392b721162c43c82d2a90"
+    },
+    {
+      "path": "src/components/how-it-works.tsx",
+      "bytes": 27471,
+      "sha256": "31dd4f78c485f7913dd05f94ffc2b1e8b1f1d7d0399d3492207acb2ffc1f817e"
+    },
+    {
+      "path": "src/components/landing.tsx",
+      "bytes": 7176,
+      "sha256": "725177b338a02a2baec7db4b75f358092b8ddec3938238b4e519b3fb6851e5ea"
+    },
+    {
+      "path": "src/components/legal-page.tsx",
+      "bytes": 1108,
+      "sha256": "4ec3fef5b39024a9a489b582ba5946469aeff4bfcb3482aefd3a8a7fabd498e7"
+    },
+    {
+      "path": "src/components/library-view.tsx",
+      "bytes": 3682,
+      "sha256": "d271e945959343b3791cecf2da79fa70809e83c8aba7120871e45e62b1067a92"
+    },
+    {
+      "path": "src/components/loop-video.tsx",
+      "bytes": 2042,
+      "sha256": "2a1491ea38c2771eb3dcf1a372e083d593863c009b2c74f4a8daa9c783cc72d5"
+    },
+    {
+      "path": "src/components/marketing-chrome.tsx",
+      "bytes": 4288,
+      "sha256": "7e81a4251882b58a6d7267d66772f84eb686c031526a6da1fd967e4f0ebf53e5"
+    },
+    {
+      "path": "src/components/media-video.tsx",
+      "bytes": 3514,
+      "sha256": "b0aa5afa03ac2030185f69ac5b21a0227645ec9f38f9dab2adc44ab6cbb90f5e"
+    },
+    {
+      "path": "src/components/nav-links.tsx",
+      "bytes": 1203,
+      "sha256": "f07da50e4d4ef751d7cb4fd02e8834ee75cd94313a7974188206175dd9db2d18"
+    },
+    {
+      "path": "src/components/navigation-feedback.tsx",
+      "bytes": 2423,
+      "sha256": "766d7befe86bf734a63372bbe46f6c2bf9e11b72ca739068bedd3b116e1449c0"
+    },
+    {
+      "path": "src/components/pending-link.tsx",
+      "bytes": 1876,
+      "sha256": "adfdb61c09c2de998dc6d67ab34987242b5e37af4d3cbc4538451326dbd5b21d"
+    },
+    {
+      "path": "src/components/plan-cards.tsx",
+      "bytes": 2372,
+      "sha256": "5ee706b4a69327b6b057f4c32e6e09078f118cd21adcbc4307d2928240dcacc8"
+    },
+    {
+      "path": "src/components/plans-view.tsx",
+      "bytes": 7310,
+      "sha256": "8e7438fdb1d9a1c40f6cf45c79af290f17ddcd367ac813863242c02d4d4bfbbe"
+    },
+    {
+      "path": "src/components/pricing-page.tsx",
+      "bytes": 21726,
+      "sha256": "31412da5b171b8afab7ee85c2fe25534e83309ec09a5f530b3948c5babfcc3dc"
+    },
+    {
+      "path": "src/components/product-step.tsx",
+      "bytes": 10844,
+      "sha256": "52958b599d421dc22f7e07a1756660cce5a0d2ef20fc836e871e9142b0c69479"
+    },
+    {
+      "path": "src/components/profile-view.tsx",
+      "bytes": 9500,
+      "sha256": "1c8caf83cb9dd31931612076c6000258e09ddf702cd7b1c5b6bd7f6e18c50734"
+    },
+    {
+      "path": "src/components/reference-view.tsx",
+      "bytes": 13214,
+      "sha256": "00605976b7da18c185ae386d0cc3ccff50d394404b0e98df17c01ac180d2ac6d"
+    },
+    {
+      "path": "src/components/reset-password-form.tsx",
+      "bytes": 4836,
+      "sha256": "f36289fc08a7a61afcae79ba09fe0f990e75f64f290075290edbd80e961bdf90"
+    },
+    {
+      "path": "src/components/route-skeleton.tsx",
+      "bytes": 1666,
+      "sha256": "c8bc35d36e1996b8cb0bbda3b3147fe0149559ec7026adf26e8c2285d038ada5"
+    },
+    {
+      "path": "src/components/run-preview.tsx",
+      "bytes": 22944,
+      "sha256": "613b72af076a5f1d274e6458b49bea80d7b599728db887b12b4b68b8191d86d5"
+    },
+    {
+      "path": "src/components/run-view.tsx",
+      "bytes": 114285,
+      "sha256": "871b128385d66548bd4ba3b0f329fb7205b5e708e683b0a4e3b2681396f0f9d0"
+    },
+    {
+      "path": "src/components/runs-list.tsx",
+      "bytes": 13891,
+      "sha256": "7b7e81859fe9df13070c59a793f58e88aae93ade3ad72bd67db42c1e5372a9ea"
+    },
+    {
+      "path": "src/components/settings-shell.tsx",
+      "bytes": 7700,
+      "sha256": "d64ea97afc0d90c48afbafb327f7944c3f93a633132eaecd024d6ffdbc00a432"
+    },
+    {
+      "path": "src/components/sidebar-body.tsx",
+      "bytes": 1017,
+      "sha256": "7a980f785d60d6184b8f02ad9ae28f9edb95617d0561ae612b2f21544105c531"
+    },
+    {
+      "path": "src/components/song-browser.tsx",
+      "bytes": 6307,
+      "sha256": "84bd83dbbd8b7fe5a12b6f2c094f342f8730676ff2421b923d690823c8cca0a2"
+    },
+    {
+      "path": "src/components/source-picker.tsx",
+      "bytes": 22294,
+      "sha256": "ba638fb4f781b903f6e4562da5474eab63b736fafcecdba5f940ba035a7109f5"
+    },
+    {
+      "path": "src/components/text-controls.tsx",
+      "bytes": 13679,
+      "sha256": "bee50c17bbc60fb0cedd46866900db8920bd15601766542bcb3835cda694bbb1"
+    },
+    {
+      "path": "src/components/usage-view.tsx",
+      "bytes": 1865,
+      "sha256": "ff0fd9cd9e3fb5b2bef2e86b2856d4088a6c3944f55ea3a865e0d7a441bb1ca6"
+    },
+    {
+      "path": "src/fonts/Satoshi-400.woff2",
+      "bytes": 25516,
+      "sha256": "50dca57f0b77918e0fb7dac998c3f5ef6b0c2a29657da97658a04f98ac532fc5"
+    },
+    {
+      "path": "src/fonts/Satoshi-500.woff2",
+      "bytes": 25596,
+      "sha256": "af02a72246f53ad49c44a591921edbd39ec8258a03d8cc2e0532aa1e497e85b4"
+    },
+    {
+      "path": "src/fonts/Satoshi-700.woff2",
+      "bytes": 25328,
+      "sha256": "353a7fbfb4475f0c31470a7449226006cb64211c71055ca9db860a8acdaa9f68"
+    },
+    {
+      "path": "src/fonts/Satoshi-900.woff2",
+      "bytes": 23484,
+      "sha256": "bd11b5820231420e78046c611aebdd628dc17ad67788258ffe3fe902253efd3b"
+    },
+    {
+      "path": "src/lib/adjust.ts",
+      "bytes": 10004,
+      "sha256": "b3767ab70e13bc9a290b7eaef90c5145b7408f9a4b5bf742e82136acfa88cffb"
+    },
+    {
+      "path": "src/lib/analyze.ts",
+      "bytes": 5292,
+      "sha256": "47199bdd052707cfbb238089a70d59fea09f5e0ac9a892cb07ffc99339769a26"
+    },
+    {
+      "path": "src/lib/auth-error.ts",
+      "bytes": 857,
+      "sha256": "ba227cfec7868feede194a4d9a464e320a1359da9c1f18d4d3042744d4506fb9"
+    },
+    {
+      "path": "src/lib/auth-next.ts",
+      "bytes": 482,
+      "sha256": "2b3700efd55d042151fc05f0aa7a60a27728c38a4e14a7e4bf72daf7d6387a02"
+    },
+    {
+      "path": "src/lib/characters.ts",
+      "bytes": 1338,
+      "sha256": "1b7461ac02ddfab67c59e24e20470f4ca3453d495a807b9978a2b7ac8fcf9428"
+    },
+    {
+      "path": "src/lib/client.ts",
+      "bytes": 13333,
+      "sha256": "9c926463ddc898d207df0547bcab7f9109f61114b25bdb34d603fad1d16e36a4"
+    },
+    {
+      "path": "src/lib/edit.ts",
+      "bytes": 16948,
+      "sha256": "5997326818e021a14308df89286e33911079a1189aa71eb87fc2a6ce25b81941"
+    },
+    {
+      "path": "src/lib/export-layers.ts",
+      "bytes": 413,
+      "sha256": "9b54b22d99aed514048611014d5f1655446c9a9d4d7b7468ca8c897e7a677853"
+    },
+    {
+      "path": "src/lib/filmstrip.ts",
+      "bytes": 5358,
+      "sha256": "488d67c680275f1d760ca5a8a9bb4487c50751a4eccdd14027439aa129f62baa"
+    },
+    {
+      "path": "src/lib/generation-edit.ts",
+      "bytes": 2296,
+      "sha256": "9a2614b00400cc6286f349a94071cbe6419f66f564f34728286b3471e4e81fdc"
+    },
+    {
+      "path": "src/lib/library-cache.ts",
+      "bytes": 1868,
+      "sha256": "8f4289e4e87766d372daf3a12c70d31632e7bbe882975d546d0a77aa160574c9"
+    },
+    {
+      "path": "src/lib/list-client.ts",
+      "bytes": 994,
+      "sha256": "492739ae38baa598434a012ff8a111aadfd46180d41617c4b6784e7defa7c9cb"
+    },
+    {
+      "path": "src/lib/maintenance.ts",
+      "bytes": 410,
+      "sha256": "f983e071ea90312140ce1e74e8445772c73eebcf9e416a4831d2eaed8ac6614b"
+    },
+    {
+      "path": "src/lib/plans.ts",
+      "bytes": 2540,
+      "sha256": "b067e928d06b29b4216ac9068b3278a433a8e3a3e7d221b3944e10218173669d"
+    },
+    {
+      "path": "src/lib/polling.ts",
+      "bytes": 930,
+      "sha256": "44cc28816531467e8548fef9fdbbf46e4130d2937740ef775298730aba80c844"
+    },
+    {
+      "path": "src/lib/production-config.ts",
+      "bytes": 736,
+      "sha256": "01932cea4eeabf1dec2b26e570b2d244ae9296bbebe64691f88b3e4755f7d78c"
+    },
+    {
+      "path": "src/lib/profile.ts",
+      "bytes": 1440,
+      "sha256": "e32aa58bbd55ba179d5b2a367eaf2179531a101b098dc2c521ab535d872a9512"
+    },
+    {
+      "path": "src/lib/render-limits.ts",
+      "bytes": 1112,
+      "sha256": "98c6b8a4ff7d21d97b3473d63c7b23527dbbd794a0d7467501be46f43f83ddf3"
+    },
+    {
+      "path": "src/lib/server/account-deletion.ts",
+      "bytes": 4223,
+      "sha256": "9ded489c5e798526bfaccedabd534b92f652f347cb14259c9c061f1e21eb4aa2"
+    },
+    {
+      "path": "src/lib/server/account-state.ts",
+      "bytes": 348,
+      "sha256": "650b261359821a53ad829e36470a5d7d23296c38db8fa0dc580d1171477a9a6a"
+    },
+    {
+      "path": "src/lib/server/ai-budget.ts",
+      "bytes": 1180,
+      "sha256": "20575048d9d16fcf4f5977bb64d9fb7a8e3eda575886f90821210249fffb9c5d"
+    },
+    {
+      "path": "src/lib/server/billing-change.ts",
+      "bytes": 4422,
+      "sha256": "cc391438271b996b2d2c62115b3a059e630e39dd07aec2851a3fcad154e76c02"
+    },
+    {
+      "path": "src/lib/server/billing-state.ts",
+      "bytes": 5432,
+      "sha256": "2bcfaca355665973b852529d7600dc064e4437d33b6879c684c59b178d2ba3e3"
+    },
+    {
+      "path": "src/lib/server/bounded-fetch.ts",
+      "bytes": 1029,
+      "sha256": "e9b7da34f68348d4ec41f8d1eb2b5bc5948f896432beab7f2983736271412cd3"
+    },
+    {
+      "path": "src/lib/server/covers.ts",
+      "bytes": 961,
+      "sha256": "9ba0955d36f8ce50808fafaf7bf0e1fbb8632678f9befa5c54e881182c076cfd"
+    },
+    {
+      "path": "src/lib/server/export-jobs.ts",
+      "bytes": 5014,
+      "sha256": "192e69d3b57998efe97cefeaae26b18a676798a2d8f97ad18dcbf252e538fe5f"
+    },
+    {
+      "path": "src/lib/server/ffmpeg.ts",
+      "bytes": 1168,
+      "sha256": "e48a26a2f8a8483e4d19a8598fadb9d35fed9fa5a5cfd2d97e9a98e346e5320b"
+    },
+    {
+      "path": "src/lib/server/file-response.ts",
+      "bytes": 1348,
+      "sha256": "9862deca78b4c1655a395b3b1fa13eb4385a108edcd1a7ce9bcc5acb603bad72"
+    },
+    {
+      "path": "src/lib/server/gemini.ts",
+      "bytes": 2079,
+      "sha256": "c0f166561e35e3667ac71c910f511dd1571e3755a25967b0a829afd20f7dfe50"
+    },
+    {
+      "path": "src/lib/server/generation-jobs.ts",
+      "bytes": 11870,
+      "sha256": "b0a0059ce0c8c3aeecac264f9eda32eb4979b91e6740ff54306881277379dd15"
+    },
+    {
+      "path": "src/lib/server/hookgen.ts",
+      "bytes": 19537,
+      "sha256": "85a03fe4fc3fa65213b6688bba0d2a6806b0467ea959aca187ca6dee7366583b"
+    },
+    {
+      "path": "src/lib/server/list-pages.ts",
+      "bytes": 12184,
+      "sha256": "974e1d60fc81fa9589ab23b71060af59ffae7c85d713f45f159021314eb56091"
+    },
+    {
+      "path": "src/lib/server/r2.ts",
+      "bytes": 6072,
+      "sha256": "1dfe769d112a6b817a90aecc09a6bb535bc8fac82eb5efaadebad7700345996a"
+    },
+    {
+      "path": "src/lib/server/run-validation.ts",
+      "bytes": 6864,
+      "sha256": "bff77272faa9425d24cb12395668d0e85982937bf292dc9a4e78fdafdce92e12"
+    },
+    {
+      "path": "src/lib/server/source-audio.ts",
+      "bytes": 1370,
+      "sha256": "9537fff62fdf6a45d4a093bd3d9999ff1da53adb5b2969c3e4ee50e1f2fd85b5"
+    },
+    {
+      "path": "src/lib/server/store.ts",
+      "bytes": 24339,
+      "sha256": "87ebf4c8e552a0d1cddf0d7687e6a2021c93a923e89e6cb5418eb4cc5606e1c8"
+    },
+    {
+      "path": "src/lib/server/stripe.ts",
+      "bytes": 4052,
+      "sha256": "76de42ff093a2ac3b95ad3a4985a564d5d0f42f08851599b9dca9215f447f186"
+    },
+    {
+      "path": "src/lib/server/temp-cleanup.ts",
+      "bytes": 614,
+      "sha256": "800537538ad6b8c1cc2b23d3a6f4b2b6d5364cdabd4cec00a35a9a6feeb444f1"
+    },
+    {
+      "path": "src/lib/server/uploads.ts",
+      "bytes": 2504,
+      "sha256": "107f6ea7c68062bd08c3a699c5498bc849eb9221c3f099a64f3646d0a59efdf8"
+    },
+    {
+      "path": "src/lib/server/usage.ts",
+      "bytes": 2114,
+      "sha256": "92d429a7752e50c547f28c8e1ac92dc40b48962416ebd99bb1449d399478efe9"
+    },
+    {
+      "path": "src/lib/server/who.ts",
+      "bytes": 560,
+      "sha256": "9ba2578e613f8cff6b07d4efbda7a65b3d9be51c368d9ff0d1e1d9bc27a9d7ea"
+    },
+    {
+      "path": "src/lib/server/work-budget.ts",
+      "bytes": 475,
+      "sha256": "6bfcbe5aab99949a4ff57819dffbdccff082694018b60744fa2b9cd2802a34f2"
+    },
+    {
+      "path": "src/lib/sound.ts",
+      "bytes": 3394,
+      "sha256": "24b80e4248f71a4a25b5ed2a06e2d870313a25aef2265ab29febe9b68db42b4c"
+    },
+    {
+      "path": "src/lib/studio-data.ts",
+      "bytes": 5849,
+      "sha256": "8fca55ddaf57d7ab5fc17d1d61c4b708d73252fafe5ea7fd352859edce1e0d63"
+    },
+    {
+      "path": "src/lib/supabase/client.ts",
+      "bytes": 531,
+      "sha256": "56cccb6a92b36d326df00d85fc0ebecd8baf93af4ce9233e0c7cdac223a21388"
+    },
+    {
+      "path": "src/lib/supabase/server.ts",
+      "bytes": 2681,
+      "sha256": "239067641d893aa5e8ee415c8ba04ca26386d0c6ef7c371b6fbac21793027e9c"
+    },
+    {
+      "path": "src/lib/supabase/session.ts",
+      "bytes": 4823,
+      "sha256": "ecbfdfb1830137bba705eac6b340014ac92b1c513c12c394a3e0cb4a98c34002"
+    },
+    {
+      "path": "src/lib/taxonomy.ts",
+      "bytes": 388,
+      "sha256": "87611f8af6d16ce7e080cad96c2ea7a26683f523be113362464d06e64a83f0e1"
+    },
+    {
+      "path": "src/lib/text-png.ts",
+      "bytes": 5569,
+      "sha256": "0a20f626488e629180adc00ec243327ff06beb85cf48c21df8a842545aed863f"
+    },
+    {
+      "path": "src/lib/text-styles.ts",
+      "bytes": 11035,
+      "sha256": "797c19a8493f2939694d00fa55f41ca164e7252ea9dfce1a37d77035a4c4c2b9"
+    },
+    {
+      "path": "src/lib/types.ts",
+      "bytes": 14644,
+      "sha256": "18af5fb08666ee4472ef67446c8ba8f7a26f0bc60f9a25fac27a652d64957953"
+    },
+    {
+      "path": "src/lib/waveform.ts",
+      "bytes": 1279,
+      "sha256": "95534f0fb4ea886129be17191d4caa7a4fc0cf9223dfe48fa6d5c2ab28046d14"
+    },
+    {
+      "path": "src/proxy.ts",
+      "bytes": 1435,
+      "sha256": "8db6cf570dccb9e80abe9528c13f294ae24393df0e94038ecd542e6288961ffd"
+    },
+    {
+      "path": "supabase/migrations/0001_profiles.sql",
+      "bytes": 2000,
+      "sha256": "867a7623727a2ffa9eb6d6be47c101a9ec3019f5e0871e4dfbaddd50801f3f3f"
+    },
+    {
+      "path": "supabase/migrations/0002_storage.sql",
+      "bytes": 4070,
+      "sha256": "26331b19b88166940b8a997f419f25ffeae820331a0fd40cd79e3517f1a2ac0a"
+    },
+    {
+      "path": "supabase/migrations/0003_generation_jobs.sql",
+      "bytes": 10369,
+      "sha256": "0069a287aadecae1707ff66419927f61602ad8ee4a646293b9b641ade3702105"
+    },
+    {
+      "path": "supabase/migrations/0004_billing_state.sql",
+      "bytes": 10527,
+      "sha256": "b9e951b9bd43fbd6acad4adfebc7b5b1794f991d595c4fc7e89e152bab330513"
+    },
+    {
+      "path": "supabase/migrations/0005_generation_provider_ids.sql",
+      "bytes": 2213,
+      "sha256": "0551bf73f7318d8affd7f8b55eee80b3399117d1462a261e0bb0495f40889430"
+    },
+    {
+      "path": "supabase/migrations/0006_account_deletion.sql",
+      "bytes": 3723,
+      "sha256": "fdb80a8876d65e67e304b20dfa012e0a7925e5ea1e0b39af2ec8c237363d3759"
+    },
+    {
+      "path": "supabase/migrations/0007_upload_reservations.sql",
+      "bytes": 3957,
+      "sha256": "4cef18165126fceb8f80d889fe22eda513e51d5340ce595ae0c654093a6632df"
+    },
+    {
+      "path": "supabase/migrations/0008_atomic_runs_ai.sql",
+      "bytes": 5124,
+      "sha256": "57d31d2e8898b5290d6d9b43c02bdbe749a21c1e342a3c07eda82c73bb3e77a4"
+    },
+    {
+      "path": "supabase/migrations/0009_export_jobs.sql",
+      "bytes": 4408,
+      "sha256": "881dffb7ab06f0327a3297816c59e739a212113fd74cd7ead87b541f7b03b5b3"
+    },
+    {
+      "path": "supabase/migrations/0010_contact_inquiries.sql",
+      "bytes": 1272,
+      "sha256": "d9867b32089a4ad30d0666fea41eba9d81cd8c20a5422419a63a4d8fbf2adc82"
+    },
+    {
+      "path": "supabase/migrations/0011_script_source_cas.sql",
+      "bytes": 1433,
+      "sha256": "4f137385374eabd7f436662a4ff1b678edf4f94f3bab33c878fcc3209d5c9729"
+    },
+    {
+      "path": "supabase/migrations/0012_generation_temp_ownership.sql",
+      "bytes": 1302,
+      "sha256": "78d66741a177d281b38a8840f79e709c1d2c57641922c39658a8be2a1c68fcb2"
+    },
+    {
+      "path": "supabase/migrations/0013_deletion_billing_events.sql",
+      "bytes": 2065,
+      "sha256": "17c7f85fe36c0b879fd0d31b5d7f4ad592183b8ba7089146725743e45c9a9330"
+    },
+    {
+      "path": "supabase/migrations/0014_deletion_grant_grace.sql",
+      "bytes": 343,
+      "sha256": "0ec2538dd21e0682758bc2cfd61079475e02d6b1340d5d8f99c067d31280703a"
+    },
+    {
+      "path": "supabase/migrations/0015_atomic_refund_admission.sql",
+      "bytes": 4451,
+      "sha256": "47608bfa22e1f51a9b4f2cbed603acd0e4dd5c11a2e56037b8a72237b2b2cc4b"
+    },
+    {
+      "path": "supabase/migrations/0016_list_and_recovery_indexes.sql",
+      "bytes": 1106,
+      "sha256": "31f0188fbccb3d08784312dba4720c8178f131e852328ec9e91b3479bf9b7d11"
+    },
+    {
+      "path": "supabase/migrations/0017_ai_input_cas.sql",
+      "bytes": 2728,
+      "sha256": "261a835677b7fba8c4a0a081e10a520eeed09ea1822a18dbaa88c151b0ed3b33"
+    },
+    {
+      "path": "supabase/migrations/0018_preserve_generated_hook.sql",
+      "bytes": 1792,
+      "sha256": "be1d71a36ef3a819b89bef65ca8bf78d86a533275c95e2c2eb834323126a3548"
+    }
+  ]
+}

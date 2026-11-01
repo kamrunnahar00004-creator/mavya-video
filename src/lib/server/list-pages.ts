@@ -21,13 +21,18 @@ const token = (at: string, id: string) => Buffer.from(JSON.stringify({ at, id })
 /** Keyset continuation, including equal timestamps; each response and database read is bounded. */
 export async function listPage(kind: Kind, who: string, request: Request) {
   const catalog = kind === "references" && new URL(request.url).searchParams.get("view") === "catalog";
-  const compact = catalog || kind === "references" && new URL(request.url).searchParams.get("view") === "studio" && new URL(request.url).searchParams.get("all") === "1";
+  const compact = kind === "references" && new URL(request.url).searchParams.get("view") === "cards" || catalog || kind === "references" && new URL(request.url).searchParams.get("view") === "studio" && new URL(request.url).searchParams.get("all") === "1";
   const curatedOnly = catalog || kind === "references" && new URL(request.url).searchParams.get("scope") === "curated";
   const refSummary = compact || kind === "references" && new URL(request.url).searchParams.get("view") === "studio";
   const refKeys = ["title", "platform", "sourceUrl", "views", "mediaId", "mime", "analysis", "niche", "hookStyle", "thumbUrl", "author", "likes", "comments", "caption", "summary", "recipe", "postedAt", "pending", "review", "followers", "smallCover"];
   const compactKeys = ["title", "platform", "sourceUrl", "views", "mediaId", "mime", "author", "likes", "comments", "caption", "summary", "postedAt", "pending", "followers", "smallCover"];
   const compactSelect = "id,owner,created_at,refStyle:data->ai->>style,thumb:data->analysis->segments->0->>thumb,thumbFallback:data->>thumbUrl,reviewVerdict:data->review->>verdict," + compactKeys.map(k => k + ":data->" + k).join(",");
   const summary = kind === "runs" && new URL(request.url).searchParams.get("view") === "summary";
+  const runView = kind === "runs" ? new URL(request.url).searchParams.get("view") : null;
+  const runFields = runView === "faces" ? ["updatedAt", "hook"] : runView === "history" ? ["title", "updatedAt", "sourceRefId", "hook", "demo", "texts", "sounds", "sound", "exports"] : null;
+  const runSelect = runView === "faces"
+    ? "id,created_at,updatedAt:data->>updatedAt,face:data->hook->face,generated:data->hook->generated"
+    : runFields ? "id,created_at," + runFields.map(k => k + ":data->" + k).join(",") : null;
   const after = cursor(new URL(request.url).searchParams.get("cursor"));
   // The hook library loads whole (`all=1`) so its sort and style tabs cover every hook; still bounded.
   const size = kind === "references" && new URL(request.url).searchParams.get("all") === "1" ? ALL_REFERENCES : PAGE_SIZE;
@@ -43,7 +48,7 @@ export async function listPage(kind: Kind, who: string, request: Request) {
     let batchAfter = after;
     let continuation = false;
     for (let batch = 0; batch < (size === ALL_REFERENCES ? 8 : 1) && rows.length < size; batch++) {
-      let query = createSupabaseAdminClient().from(table).select(kind === "assets" ? "media_id,name,kind,created_at" : kind === "references" ? (compact ? compactSelect : refSummary ? "id,owner,created_at,refStyle:data->ai->style," + refKeys.map(k => k + ":data->" + k).join(",") : "id,owner,data,created_at") : summary ? "id,created_at,title:data->>title,updatedAt:data->>updatedAt,sourceRefId:data->>sourceRefId,hook:data->hook,demo:data->demo,product:data->product,sounds:data->sounds,sound:data->sound" : "id,data,created_at");
+      let query = createSupabaseAdminClient().from(table).select(kind === "assets" ? "media_id,name,kind,created_at" : kind === "references" ? (compact ? compactSelect : refSummary ? "id,owner,created_at,refStyle:data->ai->style," + refKeys.map(k => k + ":data->" + k).join(",") : "id,owner,data,created_at") : runSelect ?? (summary ? "id,created_at,title:data->>title,updatedAt:data->>updatedAt,sourceRefId:data->>sourceRefId,hook:data->hook,demo:data->demo,product:data->product,sounds:data->sounds,sound:data->sound" : "id,data,created_at"));
       query = kind === "references" ? curatedOnly ? query.eq("owner", "curated") : query.or(`owner.eq.curated,user_id.eq.${who}`) : query.eq("user_id", who);
       if (batchAfter) query = query.or(`created_at.lt.${batchAfter.at},and(created_at.eq.${batchAfter.at},${idKey}.lt.${batchAfter.id})`);
       const { data, error } = await query.order("created_at", { ascending: false }).order(idKey, { ascending: false }).limit(Math.min(size - rows.length, DATABASE_BATCH));
@@ -55,7 +60,7 @@ export async function listPage(kind: Kind, who: string, request: Request) {
       batchAfter = { at: last.created_at, id: kind === "assets" ? last.media_id : last.id };
       continuation = size === ALL_REFERENCES || rows.length === size;
     }
-    items = rows.map(r => kind === "assets" ? { mediaId: r.media_id, name: r.name, kind: r.kind, createdAt: r.created_at } : kind === "references" ? refSummary ? { ...r, id: r.id, owner: r.owner, createdAt: r.created_at, ai: (r as unknown as {refStyle?: string}).refStyle ? {style: (r as unknown as {refStyle: string}).refStyle} : undefined } as unknown as Reference : { ...r.data, id: r.id, owner: r.owner } as Reference : summary ? { ...(r as unknown as Run), createdAt: r.created_at } : r.data);
+    items = rows.map(r => kind === "assets" ? { mediaId: r.media_id, name: r.name, kind: r.kind, createdAt: r.created_at } : kind === "references" ? refSummary ? { ...r, id: r.id, owner: r.owner, createdAt: r.created_at, ai: (r as unknown as {refStyle?: string}).refStyle ? {style: (r as unknown as {refStyle: string}).refStyle} : undefined } as unknown as Reference : { ...r.data, id: r.id, owner: r.owner } as Reference : runFields || summary ? { ...(r as unknown as Run), createdAt: r.created_at } : r.data);
     if (continuation && rows.length) { const last = rows.at(-1)!; next = token(last.created_at, kind === "assets" ? last.media_id : last.id); }
   } else {
     const values = kind === "assets" ? await listAssets(who) : kind === "references" ? await listReferences(who) : await listRuns(who);
@@ -63,6 +68,14 @@ export async function listPage(kind: Kind, who: string, request: Request) {
     items = [...values].filter(v => !curatedOnly || ((v as Reference).owner ?? "curated") === "curated").sort((a,b) => b.createdAt.localeCompare(a.createdAt) || idOf(b).localeCompare(idOf(a))).filter(v => !after || v.createdAt < after.at || v.createdAt === after.at && idOf(v) < after.id).slice(0,size);
     if (items.length === size) { const last = items.at(-1)!; next = token(last.createdAt,idOf(last)); }
   }
+  if (runFields) items = items.map(value => {
+    const run = value as Run & {face?: Run["hook"]["face"]; generated?: Run["hook"]["generated"]};
+    if (runView === "faces") return {
+      id: run.id, createdAt: run.createdAt, updatedAt: run.updatedAt,
+      hook: { face: cloud() ? run.face : run.hook.face, generated: (cloud() ? run.generated : run.hook.generated) ? { src: (cloud() ? run.generated : run.hook.generated)!.src } : undefined },
+    } as Run;
+    return { id: run.id, createdAt: run.createdAt, ...Object.fromEntries(runFields.map(k => [k, run[k as keyof Run]])) } as Run;
+  });
   if (summary) items = items.map(value => {
     const run = value as Run;
     return { id: run.id, title: run.title, createdAt: run.createdAt, updatedAt: run.updatedAt, sourceRefId: run.sourceRefId,

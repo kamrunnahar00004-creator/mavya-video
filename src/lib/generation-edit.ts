@@ -24,7 +24,7 @@ export function generationPatch(run: Run, input: Run, generated: Generated, sugg
   const base = texts.find((t) => t.id === "hook");
   const item: TextLayer = base
     ? { ...base, text: suggested && (!base.text || base.text === "How is this tool even legal?" || placeholders.includes(base.text)) ? suggested : base.text || suggested }
-    : { id: "hook", text: suggested, start: 0, end: Math.round(generated.seconds / speed * 10) / 10, x: 50, y: TEXT_Y.top, size: 4.6, font: DEFAULT_FONT, color: "#ffffff", style: "outline" };
+    : { id: "hook", text: suggested, start: 0, end: Math.round(generated.seconds / speed * 1000) / 1000, x: 50, y: TEXT_Y.top, size: 4.6, font: DEFAULT_FONT, color: "#ffffff", style: "outline" };
   if (hook.generated) versions.push(hook.generated);
   return { hook: { ...hook, generated, versions: versions.slice(-50), start: 0, end: generated.seconds, parts: undefined, text: item.text }, texts: [item, ...texts.filter((t) => t.id !== "hook")] };
 }

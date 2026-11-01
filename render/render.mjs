@@ -85,9 +85,19 @@ function look(a, p0, W, H, fps) {
 /** The pieces to render, in order: black gaps and clip pieces, each with its on-screen length. */
 export function plan(spec) {
   const steps = [];
+  let seconds = 0, frames = 0;
+  // Quantize the cumulative timeline, not each cut independently. Otherwise every fractional-frame cut rounds up
+  // in its intermediate file and the final -t silently removes later clips. Sub-frame pieces may have no output frame.
+  const add = (step, len) => {
+    seconds += len;
+    const end = Math.round(seconds * spec.fps);
+    const count = end - frames;
+    frames = end;
+    if (count > 0) steps.push({ ...step, frames: count, len: count / spec.fps });
+  };
   spec.segments.forEach((seg, si) => {
-    if (seg.gap > 0.01) steps.push({ kind: "gap", len: r(seg.gap) });
-    seg.pieces.forEach((p) => steps.push({ kind: "piece", si, start: p.start, end: p.end, len: r(Math.max(0.05, p.end - p.start) / seg.speed) }));
+    if (seg.gap > 0) add({ kind: "gap" }, seg.gap);
+    seg.pieces.forEach((p) => add({ kind: "piece", si, start: p.start, end: p.end }, Math.max(0.05, p.end - p.start) / seg.speed));
   });
   return steps;
 }
@@ -95,8 +105,9 @@ export function plan(spec) {
 /** One step of the plan to an intermediate file. */
 export function stepArgs(spec, step, src, out) {
   const { width: W, height: H, fps } = spec;
+  const frameOut = ["-r", String(fps), "-fps_mode", "cfr"];
   if (step.kind === "gap") {
-    return [...BASE, "-f", "lavfi", "-i", `color=c=black:s=${W}x${H}:r=${fps}:d=${step.len}`, "-f", "lavfi", "-i", `anullsrc=r=48000:cl=stereo`, "-t", String(step.len), "-vf", "format=yuv420p,setsar=1", ...PIECE_OUT, out];
+    return [...BASE, "-f", "lavfi", "-i", `color=c=black:s=${W}x${H}:r=${fps}:d=${step.len}`, "-f", "lavfi", "-i", `anullsrc=r=48000:cl=stereo`, "-t", String(step.len), "-vf", "format=yuv420p,setsar=1", ...PIECE_OUT, ...frameOut, out];
   }
   const seg = spec.segments[step.si];
   const len = step.len;
@@ -120,7 +131,7 @@ export function stepArgs(spec, step, src, out) {
   const a = src.hasAudio && seg.volume > 0
     ? `[0:a]${[`atrim=start=${r(step.start)}:end=${r(step.end)}`, "asetpts=PTS-STARTPTS", ...(seg.speed !== 1 ? [`atempo=${seg.speed}`] : []), `volume=${r(seg.volume)}`, AF, "apad", `atrim=duration=${len}`, "asetpts=PTS-STARTPTS"].join(",")}[a]`
     : `anullsrc=r=48000:cl=stereo,atrim=duration=${len},${AF}[a]`;
-  return [...BASE, "-threads", "1", "-i", src.file, "-filter_complex", `[0:v]${v.join(",")}[v];${a}`, "-map", "[v]", "-map", "[a]", "-t", String(len), ...PIECE_OUT, out];
+  return [...BASE, "-threads", "1", "-i", src.file, "-filter_complex", `[0:v]${v.join(",")}[v];${a}`, "-map", "[v]", "-map", "[a]", "-t", String(len), ...PIECE_OUT, ...frameOut, out];
 }
 
 /**
@@ -134,7 +145,10 @@ export function finalArgs(spec, list, local, out) {
   const args = [...BASE, "-progress", "pipe:1", "-threads", "1", "-f", "concat", "-safe", "0", "-i", list];
   const graph = [];
   let n = 1;
-  let v = "0:v";
+  // Matroska timestamps have millisecond precision. Normalize the joined stream before overlay's shortest check,
+  // so timestamp jitter cannot drop the final frame or end a later overlay one frame early.
+  graph.push(`[0:v]fps=${fps},tpad=stop_mode=clone:stop_duration=1,trim=duration=${r(total)},setpts=PTS-STARTPTS[joined]`);
+  let v = "joined";
   spec.overlays.forEach((o, oi) => {
     // A text image is one frame. As a plain input, overlay dropped later-starting texts on real clips (2026-10-24:
     // the second text never appeared); looped at the video's frame rate it is a steady stream that ends with it.

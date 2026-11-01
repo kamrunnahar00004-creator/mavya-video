@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { getFilePrefs, setFilePrefs } from "@/lib/server/store";
+import { getFilePrefs, changeFilePrefs } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 
 /** My files: the seller's names for items and the items removed from the list (see FilePrefs). */
@@ -21,17 +21,10 @@ export async function PATCH(request: Request) {
   if (body?.name !== undefined && typeof body.name !== "string") return Response.json({ error: "Bad request" }, { status: 400 });
   if (body?.hidden !== undefined && typeof body.hidden !== "boolean") return Response.json({ error: "Bad request" }, { status: 400 });
   try {
-    const prefs = await getFilePrefs(who);
-    if (typeof body?.name === "string") {
-      const name = body.name.trim().slice(0, 80);
-      if (name) prefs.names[key] = name;
-      else delete prefs.names[key];
-    }
-    if (body?.hidden === true && !prefs.hidden.includes(key)) prefs.hidden = [...prefs.hidden, key].slice(-5000);
-    if (body?.hidden === false) prefs.hidden = prefs.hidden.filter((k) => k !== key);
-    const names = Object.entries(prefs.names);
-    if (names.length > 5000) prefs.names = Object.fromEntries(names.slice(-5000));
-    await setFilePrefs(who, prefs);
+    const prefs = await changeFilePrefs(who, key, {
+      ...(typeof body?.name === "string" ? { name: body.name } : {}),
+      ...(typeof body?.hidden === "boolean" ? { hidden: body.hidden } : {}),
+    });
     return Response.json(prefs);
   } catch {
     return Response.json({ error: "Couldn't save. Try again." }, { status: 503 });

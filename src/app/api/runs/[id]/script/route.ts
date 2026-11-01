@@ -1,6 +1,6 @@
 import { beginAI, finishAI } from "@/lib/server/ai-budget";
 import { GeminiError, geminiJSON } from "@/lib/server/gemini";
-import { getRun, getReference, listReferences, mediaToFile } from "@/lib/server/store";
+import { getRun, getReference, listReferences, mediaAccess, mediaToFile } from "@/lib/server/store";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -56,6 +56,10 @@ async function productScreens(ids: string[], who: string) {
   const dir = await mkdtemp(path.join(tmpdir(), "mavya-screens-"));
   try {
     const files = await Promise.all(ids.slice(0, 5).map(async (id) => {
+      // Such a file cannot fit in the existing 12 MB inline budget. Reject it before downloading and buffering
+      // up to five 300 MB uploads in a function that will discard them anyway.
+      const access = await mediaAccess(id, who).catch(() => null);
+      if (!access || access.size > 12 * 1024 * 1024) return null;
       const media = await mediaToFile(id, who, dir).catch(() => null);
       if (!media || !/^(image\/(png|jpeg|webp)|video\/(mp4|quicktime|webm))$/.test(media.mime)) return null;
       return { mime: media.mime, bytes: await readFile(media.file) };

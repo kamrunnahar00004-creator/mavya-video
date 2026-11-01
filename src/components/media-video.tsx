@@ -1,16 +1,22 @@
 "use client";
-import { useState, type ComponentProps } from "react";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
 const posters = new Map<string, string>();
 const empty = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='720' height='1280'/%3E";
 /** Reuse an already decoded frame as a poster; never fetch a second video or post-process a hook. */
 export function MediaVideo({ src, poster, preload = "metadata", onLoadedData, ...props }: ComponentProps<"video">) {
   const [captured, setCaptured] = useState<{src: string; url: string} | null>(null);
+  const cleanup = useRef<(() => void) | null>(null);
+  useEffect(() => () => { cleanup.current?.(); cleanup.current = null; }, [src]);
   const key = typeof src === "string" ? src : null;
   const cached = key ? posters.get(key) : undefined;
   return <video {...props} src={src} preload={preload} poster={poster ?? (captured?.src === src ? captured?.url : cached) ?? empty} onLoadedData={event => {
     onLoadedData?.(event);
     if (poster || !key || posters.has(key)) return;
     const video = event.currentTarget;
+    // A normal storage player has no canvas permission. Do not taint a canvas on every load, or fetch a second
+    // video just for a poster. The decoded frame still displays; existing supplied posters remain preferred.
+    if (!video.crossOrigin && !/^(blob:|data:)/.test(video.currentSrc || key)) return;
+    cleanup.current?.();
     if (!video.videoWidth || !video.videoHeight) return;
     const grab = () => {
       try {
@@ -31,9 +37,15 @@ export function MediaVideo({ src, poster, preload = "metadata", onLoadedData, ..
     const rvfc = (video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number }).requestVideoFrameCallback;
     if (rvfc) {
       let done = false;
-      const once = () => { if (!done) { done = true; grab(); } };
-      rvfc.call(video, once);
-      setTimeout(once, 400);
+      const once = () => {
+        if (done) return;
+        done = true; clearTimeout(timer);
+        video.cancelVideoFrameCallback?.(frame);
+        grab();
+      };
+      const frame = rvfc.call(video, once);
+      const timer = setTimeout(once, 400);
+      cleanup.current = () => { done = true; clearTimeout(timer); video.cancelVideoFrameCallback?.(frame); };
     } else grab();
   }} />;
 }

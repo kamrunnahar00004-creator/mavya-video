@@ -14,7 +14,9 @@ function waitFor(video: HTMLVideoElement, event: "loadedmetadata" | "seeked"): P
       cleanup();
       reject(new Error("Could not read this video"));
     };
+    const timer = setTimeout(fail, 15000);
     const cleanup = () => {
+      clearTimeout(timer);
       video.removeEventListener(event, ok);
       video.removeEventListener("error", fail);
     };
@@ -24,6 +26,7 @@ function waitFor(video: HTMLVideoElement, event: "loadedmetadata" | "seeked"): P
 }
 
 async function seek(video: HTMLVideoElement, t: number) {
+  if (!video.seeking && video.readyState >= 2 && Math.abs(video.currentTime - t) < 0.001) return;
   const done = waitFor(video, "seeked");
   video.currentTime = t;
   await done;
@@ -42,6 +45,7 @@ export async function analyzeVideo(src: string, onProgress?: (p: number) => void
   video.muted = true;
   video.preload = "auto";
   video.playsInline = true;
+  try {
   video.src = await pixelLink(src);
   await waitFor(video, "loadedmetadata");
 
@@ -108,9 +112,12 @@ export async function analyzeVideo(src: string, onProgress?: (p: number) => void
     onProgress?.(Math.min(1, (times.length + i + 1) / (times.length + segments.length)));
   }
 
-  video.removeAttribute("src");
-  video.load();
   return { duration, width, height, cuts, segments, analyzedAt: new Date().toISOString() };
+  } finally {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+  }
 }
 
 export function buildSegments(duration: number, cuts: number[]): Segment[] {

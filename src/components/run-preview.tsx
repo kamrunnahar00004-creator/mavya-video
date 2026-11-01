@@ -1,7 +1,7 @@
 "use client";
 import { MediaVideo } from "@/components/media-video";
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Adjust, contrastId, contrastTable, fullAdjust, speedOf, videoStyle, warmthId, warmthMatrix } from "@/lib/adjust";
 import { type Seg, fileAt, segAt, timeline, videoLength } from "@/lib/edit";
@@ -19,8 +19,9 @@ import { AvatarPlaceholder } from "@/components/frames";
  */
 export function RunPreview({ run, source, texts, hookCover }: { run: Run; source: Reference | null; texts: TextLayer[]; /** Shown over the hook part while it is generated. */ hookCover?: React.ReactNode }) {
   const hook = run.hook;
-  const segs = timeline(run, source);
+  const segs = useMemo(() => timeline(run, source), [run, source]);
   const total = videoLength(segs);
+  const pieces = useMemo(() => soundPieces(run, total), [run, total]);
 
   const [t, setT] = useState(0);
   // Starts paused: the preview plays only when the seller presses play.
@@ -142,7 +143,7 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
         </div>
       </div>
 
-      {soundPieces(run, total).map((p, i, all) => (
+      {pieces.map((p, i, all) => (
         <SyncedAudio key={p.id} src={p.src} at={soundAt({ ...p, end: pieceEnd(all, i, total) }, time)} playing={playing} volume={p.volume / 100} />
       ))}
 
@@ -390,7 +391,8 @@ export function usePlaybackClaims(who: string, setPlaying: (v: boolean) => void)
 export const sizeLabel = (size: number) => Math.round(size * 10);
 
 /** Text layer positioned like on the phone. With `onMove`: drag to move, corner handle to resize. The parent needs `[container-type:size]` (text sizes are in cqh). */
-export const TextOverlay = memo(function TextOverlay({ x, onMove }: { x: TextLayer; onMove?: (p: { x?: number; y?: number; size?: number }) => void }) {
+export const TextOverlay = memo(function TextOverlay({ x, onMove: onMoveProp, onPatch }: { x: TextLayer; onMove?: (p: { x?: number; y?: number; size?: number }) => void; onPatch?: (id: string, p: { x?: number; y?: number; size?: number }) => void }) {
+  const onMove = onMoveProp ?? (onPatch ? (p: { x?: number; y?: number; size?: number }) => onPatch(x.id, p) : undefined);
   // While resizing: the size, shown next to the cursor.
   const [badge, setBadge] = useState<{ left: number; top: number; size: number } | null>(null);
   function drag(e: React.PointerEvent<HTMLElement>, mode: "move" | "resize") {

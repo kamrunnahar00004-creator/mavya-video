@@ -49,6 +49,9 @@ export async function advanceDeletion(user: string) {
    await save({ cursor: d.cursor, state: d.cursor < keys.length ? "storage" : "auth", error: null });
    if (d.cursor < keys.length) return;
   }
+  // Preferences contain seller-provided names and hidden-file identities outside the media ledger.
+  // Delete the deterministic object after the grant grace period and before removing the account.
+  await deleteObjectStrict(`prefs/${user}/files.json`);
   const { error } = await db.auth.admin.deleteUser(user);
   if (error && error.code !== "user_not_found" && error.status !== 404) throw error;
   await save({ state: "done", media_ids: [], checkout: null, error: null });

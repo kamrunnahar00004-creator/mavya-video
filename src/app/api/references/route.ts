@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     }
     return response;
   };
-  if (view === "catalog") return respond(refs);
+  if (view === "catalog" || view === "cards") return respond(refs);
   if (view === "covers") return respond(refs.map((r) => ({ id: r.id, thumbUrl: r.analysis?.segments[0]?.thumb ?? r.thumbUrl })));
   if (view === "studio") {
     // Curation history and model explanations never appear in the studio.

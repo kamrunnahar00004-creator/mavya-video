@@ -56,7 +56,7 @@ async function main() {
     assert.equal(transition(j.id, key, 'fallback'), 'f');
     assert.throws(() => transition(j.id, lease.lease_token, 'started', 'https://attacker.invalid/task'));
     assert.throws(() => transition(j.id, lease.lease_token, 'started', 'model|id|extra'));
-    assert.equal(transition(j.id, lease.lease_token, 'started', key), 't');
+    assert.equal(transition(j.id, lease.lease_token, 'started', `cache/4.737|${key}`), 't');
     const polling = claim(j.id);
     assert.equal(transition(j.id, polling.lease_token, 'fallback'), 't');
     assert.equal(transition(j.id, polling.lease_token, 'fallback'), 'f');

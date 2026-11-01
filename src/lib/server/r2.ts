@@ -30,6 +30,19 @@ export async function putObject(key: string, body: Buffer | Uint8Array, contentT
   await r2().send(new PutObjectCommand({ Bucket: Bucket(), Key: key, Body: body, ContentType: contentType }), { abortSignal: workSignal(20_000) });
 }
 
+/** Optimistic object update across all server instances. A missing ETag means create only. */
+export async function putObjectIfUnchanged(key: string, body: Buffer, contentType: string, etag: string | null): Promise<boolean> {
+  try {
+    await r2().send(new PutObjectCommand({ Bucket: Bucket(), Key: key, Body: body, ContentType: contentType,
+      ...(etag ? { IfMatch: etag } : { IfNoneMatch: "*" }) }), { abortSignal: workSignal(20_000) });
+    return true;
+  } catch (error) {
+    const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+    if (status === 412 || status === 409) return false;
+    throw error;
+  }
+}
+
 export async function objectSize(key: string): Promise<number | null> {
   try {
     const head = await r2().send(new HeadObjectCommand({ Bucket: Bucket(), Key: key }));

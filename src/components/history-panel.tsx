@@ -90,7 +90,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
 
   useEffect(() => {
     let alive = true;
-    Promise.all([fetchPage<Run>("/api/runs"), fetchPage<Asset>("/api/assets"), fetchPage<Reference>("/api/references?view=studio")])
+    Promise.all([fetchPage<Run>("/api/runs?view=history"), fetchPage<Asset>("/api/assets"), fetchPage<Reference>("/api/references?view=cards")])
       .then(([rs, as, hs]) => {
         if (!alive) return;
         setRuns(rs.items); setAssets(as.items); setHistoryRefs(hs.items);
@@ -106,9 +106,9 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     setLoadingMore(true);
     try {
       const [rs, as, hs] = await Promise.all([
-        cursors[0] ? fetchPage<Run>("/api/runs", cursors[0]) : null,
+        cursors[0] ? fetchPage<Run>("/api/runs?view=history", cursors[0]) : null,
         cursors[1] ? fetchPage<Asset>("/api/assets", cursors[1]) : null,
-        cursors[2] ? fetchPage<Reference>("/api/references?view=studio", cursors[2]) : null
+        cursors[2] ? fetchPage<Reference>("/api/references?view=cards", cursors[2]) : null
       ]);
       if (rs) setRuns(old => [...(old ?? []), ...rs.items]);
       if (as) setAssets(old => [...old, ...as.items]);

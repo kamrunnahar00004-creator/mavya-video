@@ -40,6 +40,10 @@ async function main(){
   const resolved=await binary.ffmpegPath();assert.ok(/node_modules[\\/]ffmpeg-static[\\/]ffmpeg(\.exe)?$/.test(resolved),resolved);
   assert.match(execFileSync(resolved,['-version']).toString(),/^ffmpeg version/);
   for(const file of ['src/lib/server/hookgen.ts','src/lib/server/source-audio.ts'])assert.ok(!fs.readFileSync(file,'utf8').includes('ffmpeg-static'),`${file} must use lib/server/ffmpeg`);
+  const shortCuts = await require('./measure-export-quantization.cjs').measure();
+  assert.equal(shortCuts.actualFinalRed,true,'short cuts retain the final source frames');
+  assert.equal(shortCuts.finalFrames,15);
+  assert.equal(shortCuts.intermediateFrames.reduce((a,b)=>a+b,0),15,'cumulative cuts share one frame budget');
   console.log('PASS: real silent offline 720p ffmpeg export, 30.30fps piece boundary, start/end overlays, inactive intervals and two-second audio');
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 }

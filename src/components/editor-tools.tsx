@@ -250,7 +250,7 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
                   <WarmthFilter adjust={seg.adjust} />
                   <MediaVideo ref={vref} key={`${seg.src}|${version ?? ""}`} src={seg.src} muted={!playing} playsInline onLoadedMetadata={() => seek(0)} className="absolute inset-0 h-full w-full object-cover" style={look} />
                   {/* One caption at a time at a boundary (end is exclusive), except the clip's very end shows its last caption. */}
-                  {local.filter((x) => x.text.trim() && t >= x.start && (t < x.end || (x.end >= len - 0.001 && t >= len - 0.001))).map((x) => <TextOverlay key={x.id} x={x} onMove={(pos) => onPatch(x.id, pos)} />)}
+                  {local.filter((x) => x.text.trim() && t >= x.start && (t < x.end || (x.end >= len - 0.001 && t >= len - 0.001))).map((x) => <TextOverlay key={x.id} x={x} onPatch={onPatch} />)}
                 </div>
               ) : null)}
             {overlay}
@@ -367,7 +367,7 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
           <div className="fade-in relative aspect-[9/16] h-[min(86vh,900px)] overflow-hidden rounded-2xl bg-black shadow-[0_24px_64px_rgba(0,0,0,0.35)] [container-type:size]" onClick={(e) => e.stopPropagation()}>
             <WarmthFilter adjust={seg.adjust} />
             <TrimmedVideo src={seg.src} parts={seg.parts} rate={speed} adjust={seg.adjust} onTime={setFullT} />
-            {local.filter((x) => x.text.trim() && fullT >= x.start && fullT < x.end).map((x) => <TextOverlay key={x.id} x={x} onMove={(pos) => onPatch(x.id, pos)} />)}
+            {local.filter((x) => x.text.trim() && fullT >= x.start && fullT < x.end).map((x) => <TextOverlay key={x.id} x={x} onPatch={onPatch} />)}
           </div>
           <button type="button" aria-label="Close" onClick={() => setFull(false)} className="absolute right-6 top-6 rounded-full bg-white/90 p-2 text-ink hover:bg-white">
             <X className="h-5 w-5" />
@@ -541,7 +541,7 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
       ) : (
         <div className="absolute inset-0 flex items-center justify-center text-[12px] font-semibold text-white/40">{seg.id === "hook" ? "Your hook" : "Your demo"}</div>
       )}
-      {texts.filter((x) => x.text.trim() && time >= x.start && time < x.end).map((x) => <TextOverlay key={x.id} x={x} onMove={edit ? (pos) => edit.onTextMove(x.id, pos) : undefined} />)}
+      {texts.filter((x) => x.text.trim() && time >= x.start && time < x.end).map((x) => <TextOverlay key={x.id} x={x} onPatch={edit?.onTextMove} />)}
     </div>
   );
   const sideNode = typeof side === "function" ? side(time) : side;
@@ -1889,6 +1889,15 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
   /** Videos on their way up: shown right away from the file on this computer. */
   const [pending, setPending] = useState<{ url: string; name: string }[]>([]);
   const uploads = useRef<AbortController | null>(null);
+  const pendingUrls = useRef(new Set<string>());
+  useEffect(() => {
+    const urls = pendingUrls.current;
+    return () => {
+      uploads.current?.abort();
+      for (const url of urls) URL.revokeObjectURL(url);
+      urls.clear();
+    };
+  }, []);
   const mode = run.demo.mode ?? (clips.length ? "single" : undefined);
   const [busy, setBusy] = useState<string | null>(null); // clip id (or "single") being uploaded
   // undefined = nothing chosen yet: the first filmed clip is open, so its preview shows straight away.
@@ -1925,10 +1934,11 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
     // File-name order (IMG_2 before IMG_10). Each shows at once from the file on this computer, spinning until it lands.
     const sorted = [...files].sort((x, y) => x.name.localeCompare(y.name, undefined, { numeric: true }));
     const items = sorted.map((f) => ({ url: URL.createObjectURL(f), name: f.name }));
+    items.forEach((item) => pendingUrls.current.add(item.url));
     setPending((p) => [...p, ...items]);
     const clear = (gone: typeof items) => {
       setPending((p) => p.filter((x) => !gone.includes(x)));
-      gone.forEach((x) => URL.revokeObjectURL(x.url));
+      gone.forEach((x) => { if (pendingUrls.current.delete(x.url)) URL.revokeObjectURL(x.url); });
     };
     let next = 0;
     const control = new AbortController();
@@ -1937,7 +1947,10 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
       await onFiles(sorted, from, (i) => { clear([items[i]]); next = i + 1; }, control.signal);
       if (!control.signal.aborted) setOpenId(undefined);
     } catch (e) {
-      if (!control.signal.aborted) setError(e instanceof Error ? e.message : "Upload failed");
+      const canceled = control.signal.aborted;
+      // An earlier file failed: stop the remaining transfers instead of hiding their tiles while they keep uploading.
+      control.abort();
+      if (!canceled) setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
       clear(items.slice(next));
       if (uploads.current === control) {
@@ -1951,6 +1964,8 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
   function stopUploads() {
     uploads.current?.abort();
     uploads.current = null;
+    for (const url of pendingUrls.current) URL.revokeObjectURL(url);
+    pendingUrls.current.clear();
     setPending([]);
     setBusy(null);
   }

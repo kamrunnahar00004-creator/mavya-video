@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { r2Enabled, downloadTo, objectSize, putObject, signedGet, signedPut } from "@/lib/server/r2";
+import { r2Enabled, downloadTo, objectSize, putObject, putObjectIfUnchanged, signedGet, signedPut } from "@/lib/server/r2";
 import { authEnabled, createSupabaseAdminClient } from "@/lib/supabase/server";
 import type { Asset, Reference, Run } from "@/lib/types";
 
@@ -448,6 +448,42 @@ export async function setFilePrefs(who: string, prefs: FilePrefs): Promise<void>
     return;
   }
   await putObject(prefsKey(who), Buffer.from(body), "application/json");
+}
+
+/** Apply one preference change against the latest object, retrying storage CAS conflicts. */
+let prefsWriting: Promise<void> = Promise.resolve();
+export async function changeFilePrefs(who: string, key: string, change: { name?: string; hidden?: boolean }): Promise<FilePrefs> {
+  const apply = (prefs: FilePrefs): FilePrefs => {
+    const names = { ...prefs.names };
+    if (change.name !== undefined) {
+      const name = change.name.trim().slice(0, 80);
+      if (name) names[key] = name; else delete names[key];
+    }
+    const hidden = new Set(prefs.hidden);
+    if (change.hidden === true) hidden.add(key);
+    if (change.hidden === false) hidden.delete(key);
+    return { names: Object.fromEntries(Object.entries(names).slice(-5000)), hidden: [...hidden].slice(-5000) };
+  };
+  if (!cloud()) {
+    const operation = prefsWriting.then(async () => {
+      const next = apply(await getFilePrefs(who));
+      await setFilePrefs(who, next);
+      return next;
+    });
+    prefsWriting = operation.then(() => undefined, () => undefined);
+    return operation;
+  }
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const res = await fetch(await signedGet(prefsKey(who), 60), { cache: "no-store", signal: AbortSignal.timeout(10_000) });
+    if (!res.ok && res.status !== 404) throw Error("Preferences unavailable");
+    const etag = res.ok ? res.headers.get("etag") : null;
+    if (res.ok && !etag) throw Error("Preferences version unavailable");
+    const value = res.ok ? await res.json() as FilePrefs : { names: {}, hidden: [] };
+    if (!value || typeof value.names !== "object" || !value.names || Array.isArray(value.names) || !Array.isArray(value.hidden)) throw Error("Invalid preferences");
+    const next = apply(value);
+    if (await putObjectIfUnchanged(prefsKey(who), Buffer.from(JSON.stringify(next)), "application/json", etag)) return next;
+  }
+  throw Error("Preferences changed too often");
 }
 
 /** Append under the database lock, never from a browser/read-modify-write array snapshot. */

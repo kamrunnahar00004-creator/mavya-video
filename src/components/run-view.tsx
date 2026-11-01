@@ -353,7 +353,7 @@ export function RunView() {
       if (!response.ok) throw Error("Couldn't load the hook. Try again.");
       const full = await response.json() as Reference;
       ref = { ...full, coverUrl: ref.coverUrl, partial: false };
-      setRefs(old => old?.map(r => r.id === full.id ? ref : r) ?? old);
+      setRefs(old => [ref, ...(old ?? []).filter(r => r.id !== full.id)]);
     }
     const seg = ref.analysis?.segments.find((s) => s.role === "hook");
     // Prefill the hook text with the stolen hook's on-screen text, unless the user already wrote their own.
@@ -1331,7 +1331,7 @@ let recentFaces: Recent[] | null = null;
 let recentLoad: Promise<Recent[]> | null = null;
 function loadRecentFaces(fresh = false): Promise<Recent[]> {
   if (recentLoad && !fresh) return recentLoad;
-  const load = fetchPage<Run>("/api/runs").then((page) => {
+  const load = fetchPage<Run>("/api/runs?view=faces").then((page) => {
     const seen = new Set<string>();
     const list: Recent[] = [];
     for (const r of [...page.items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))) {

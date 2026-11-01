@@ -136,9 +136,9 @@ async function deletion() {
     '@/lib/server/r2': { deleteObjectStrict: async key => deleted.push(key) },
     '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from: () => ({ update(p) { patches.push(p); return this; }, eq() { return this; }, select: async () => ({ data: [{ user_id: id(1) }], error: null }) }), auth: { admin: { deleteUser: async () => ({ error: null }) } } }) }
   });
-  await route.advanceDeletion(id(1)); assert.deepEqual(deleted, ['covers/' + id(5) + '.jpg.webp']);
+  await route.advanceDeletion(id(1)); assert.deepEqual(deleted, ['covers/' + id(5) + '.jpg.webp', 'prefs/' + id(1) + '/files.json']);
   deleted.length = 0; phase = 'auth'; cursor = 1;
-  await route.advanceDeletion(id(1)); assert.deepEqual(deleted, ['covers/' + id(5) + '.jpg.webp'], 'old auth-phase deletions also finish derivatives before auth removal');
+  await route.advanceDeletion(id(1)); assert.deepEqual(deleted, ['covers/' + id(5) + '.jpg.webp', 'prefs/' + id(1) + '/files.json'], 'old auth-phase deletions also finish derivatives before auth removal');
 }
 
 (async () => { await covers(); await auth(); await backgroundPlayback(); await library(); await creation(); await deletion(); console.log('PASS: curated-only grants, fresh authorization, bounded background playback, account-safe catalog, 2301-row continuation, valid image batches, atomic retry creation and derivative deletion'); })().catch(error => { console.error(error); process.exitCode = 1; });

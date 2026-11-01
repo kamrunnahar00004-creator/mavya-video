@@ -58,7 +58,7 @@ async function transition(job: GenerationJob, action: string, value?: string) {
  * seller's quota counts it like any hook. Uploaded hooks, photos and described characters are never shared.
  * The file is copied, so each seller owns theirs (media access and account deletion stay per owner).
  */
-const REUSE_TASK = /^cache\|([0-9a-f-]{36})$/i;
+const REUSE_TASK = /^cache(?:\/([0-9]+(?:\.[0-9]+)?))?\|([0-9a-f-]{36})$/i;
 const REUSE_POOL = 5;
 /** The usual Generate screen runs this long from the click, then the clip appears. */
 const REUSE_SHOW_MS = 3500;
@@ -82,13 +82,15 @@ async function reuseHook(job: GenerationJob, who: string): Promise<string | null
     for (const row of same.map((x) => ({ x, order: Math.random() })).sort((a, b) => a.order - b.order).map((y) => y.x)) {
       const file = row.result?.src.match(/^\/api\/media\/([0-9a-f-]{36}\.mp4)$/)?.[1];
       const info = file ? await objectInfo(`media/${file}`) : null;
-      if (!file || !info) continue;
+      const seconds = row.result?.seconds;
+      if (!file || !info || typeof seconds !== "number" || !Number.isFinite(seconds) || seconds <= 0 || seconds > 3600) continue;
       const mediaId = `${job.id}.mp4`;
       if (await accountClosing(who)) return null;
       await copyObject(`media/${file}`, `media/${mediaId}`, info.etag);
       try { await registerMedia(mediaId, "video/mp4", info.size, who, null); }
       catch (error) { if ((error as { code?: string }).code !== "23505") throw error; }
-      return `cache|${row.id}`;
+      // Carry duration in the durable task identity. The donor's account may disappear after the owned copy succeeds.
+      return `cache/${seconds}|${row.id}`;
     }
     return null;
   } catch (error) {
@@ -99,9 +101,12 @@ async function reuseHook(job: GenerationJob, who: string): Promise<string | null
 }
 
 /** The reused clip's length, once the Generate screen has had its moment. */
-async function reusedSeconds(job: GenerationJob, from: string): Promise<number> {
+async function reusedSeconds(job: GenerationJob, from: string, duration?: string): Promise<number> {
   const wait = Date.parse(job.created_at) + REUSE_SHOW_MS - Date.now();
   if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+  const seconds = duration === undefined ? null : Number(duration);
+  if (seconds !== null && Number.isFinite(seconds) && seconds > 0 && seconds <= 3600) return seconds;
+  // Compatibility for jobs accepted before durations were embedded.
   const { data, error } = await db().from("generations").select("result").eq("id", from).maybeSingle<{ result: GenerationJob["result"] }>();
   if (error) throw error;
   if (!data?.result) throw new Error("Reused hook is gone");
@@ -121,6 +126,7 @@ export async function advanceGeneration(who: string, id: string): Promise<void> 
       await transition(job, "started", reused);
       return advanceGeneration(who, job.id);
     }
+    if (await accountClosing(who)) return;
     let task: string;
     try {
       task = await startHook(job.input, job.reference, who, job.note ?? undefined, job.fallback_used);
@@ -143,7 +149,7 @@ export async function advanceGeneration(who: string, id: string): Promise<void> 
     let seconds: number;
     if (reused) {
       // The file was copied and registered before the task was stored.
-      seconds = await reusedSeconds(job, reused[1]);
+      seconds = await reusedSeconds(job, reused[2], reused[1]);
       if (await accountClosing(who)) return;
     } else {
       const task = await checkHook(taskId);

@@ -34,6 +34,8 @@ assert.equal(generationPatch(scripted, run, generated, 'Product line').hook.gene
 const stolenText = { ...run, texts: [{ ...run.texts[0], text: 'Stolen caption' }] };
 assert.equal(generationPatch(stolenText, run, generated, 'Product line', ['Stolen caption']).texts[0].text, 'Product line');
 assert.equal(generationPatch(run, run, generated, 'Product line', ['Stolen caption']).texts[0].text, 'My edited text');
+const withoutText = { ...run, hook: { ...run.hook, text: "" }, texts: [] };
+assert.equal(generationPatch(withoutText, withoutText, { ...generated, seconds: 4.737 }, "Line").texts[0].end, 4.737, "new generated captions keep millisecond boundaries");
 const changed = { ...run, hook: { ...run.hook, source: 'describe' } };
 assert.equal(generationPatch(changed, run, generated, '').hook.generated.src, '/old.mp4');
 assert.equal(generationPatch(changed, run, generated, '').hook.versions[0].src, '/new.mp4');
@@ -95,16 +97,16 @@ async function main() {
   const earlier = '40000000-0000-4000-8000-000000000001';
   const fresh = { id: 'run', sourceRefId: 'ref', updatedAt: 'now', hook: { mode: 'avatar', source: 'library', face: { kind: 'character', id: 'olivia' }, start: 0, end: 4, text: '' }, demo: { clip: null, frame: 'none' }, texts: [] };
   const reuseJob = { ...job, id: '40000000-0000-4000-8000-000000000002', input: fresh, note: null, created_at: '2020-01-01T00:00:00Z' };
-  async function reuse({ input = fresh, note = null, curated = true, rows, file = true, fails = false } = {}) {
+  async function reuse({ input = fresh, note = null, curated = true, rows, file = true, fails = false, donorGone = false, legacy = false } = {}) {
     const log = [], filters = [], states = [{ ...reuseJob, input, note }];
     const list = rows ?? [{ id: earlier, start: 0, end: 4, result: { src: `/api/media/${earlier}.mp4`, seconds: 4.2 } }];
     const chain = table => ({ select() { return this; }, eq(column, value) { filters.push([table, column, value]); return this; }, is(column, value) { filters.push([table, column, value]); return this; }, order() { return this; },
       async limit() { if (fails) throw new Error('DB unavailable'); return { data: list, error: null }; },
-      async maybeSingle() { return table === 'library' ? { data: curated ? { id: 'ref' } : null, error: null } : { data: { result: list[0]?.result ?? null }, error: null }; } });
+      async maybeSingle() { if(table==='generations'&&donorGone)throw Error('Donor deleted'); return table === 'library' ? { data: curated ? { id: 'ref' } : null, error: null } : { data: { result: list[0]?.result ?? null }, error: null }; } });
     const client = { from: chain, async rpc(name, args) {
       log.push([name, args]);
       if (name === 'mavya_claim_generation') return { data: states.shift() ?? null, error: null };
-      if (name === 'mavya_generation_transition') { if (args.p_action === 'started') states.push({ ...reuseJob, input, note, state: 'running', task_id: args.p_value }); return { data: true, error: null }; }
+      if (name === 'mavya_generation_transition') { if (args.p_action === 'started') states.push({ ...reuseJob, input, note, state: 'running', task_id: legacy ? args.p_value.replace(/^cache\/[^|]+/, 'cache') : args.p_value }); return { data: true, error: null }; }
       if (name === 'mavya_complete_generation') return { data: {}, error: null };
       throw new Error(name);
     } };
@@ -123,11 +125,15 @@ async function main() {
   const hit = await reuse();
   assert.deepEqual(hit.log.find(c => c[0] === 'copy')[1], [`media/${earlier}.mp4`, `media/${reuseJob.id}.mp4`, 'etag']);
   assert.equal(hit.log.find(c => c[0] === 'register')[1][0], `${reuseJob.id}.mp4`, 'the new seller owns their own copy');
-  assert.equal(hit.log.find(c => c[1]?.p_action === 'started')[1].p_value, `cache|${earlier}`);
+  assert.equal(hit.log.find(c => c[1]?.p_action === 'started')[1].p_value, `cache/4.2|${earlier}`);
   const done = hit.log.find(c => c[0] === 'mavya_complete_generation')[1];
   assert.equal(done.p_result.src, `/api/media/${reuseJob.id}.mp4`); assert.equal(done.p_result.seconds, 4.2);
   assert.equal(hit.did('start') || hit.did('poll') || hit.did('put'), false, 'no provider call and no upload');
   assert.ok(hit.filters.some(f => f[0] === 'library' && f[1] === 'owner' && f[2] === 'curated'), 'only library hooks');
+  const gone = await reuse({donorGone:true});
+  assert.equal(gone.did('mavya_complete_generation'),true,'owned copied result finalizes after donor deletion');
+  assert.equal(gone.did('start')||gone.did('poll'),false);
+  assert.equal((await reuse({legacy:true})).did('mavya_complete_generation'),true,'older cache task identities still recover');
   const real = async (label, options) => { const r = await reuse(options); assert.equal(r.did('start'), true, label); assert.equal(r.did('copy'), false, label); };
   await real('Regenerate with a hook in the video', { input: { ...fresh, hook: { ...fresh.hook, generated: { src: '/old.mp4', seconds: 4, at: 'old' } } } });
   await real('Regenerate with a note', { note: 'smile less' });

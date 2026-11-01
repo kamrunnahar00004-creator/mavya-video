@@ -18,7 +18,7 @@ async function main(){
  record.cleanup_after=new Date(0).toISOString();storageFails=true;
  await assert.rejects(api.advanceDeletion('owner'));assert.equal(events.includes('auth'),false);
  storageFails=false;events=[];await api.advanceDeletion('owner');
- assert.equal(record.state,'done');assert.equal(events.at(-1),'auth');assert.ok(events.includes('media/one.mp4'));
+ assert.equal(record.state,'done');assert.equal(events.at(-1),'auth');assert.ok(events.includes('media/one.mp4'));assert.ok(events.indexOf('prefs/owner/files.json') < events.indexOf('auth'));
  events=[];await api.advanceDeletion('owner');assert.equal(events.length,0);
  console.log('PASS: deletion cancellation/expiry ordering, no refund/proration, Stripe failure blocks auth deletion, grant wait, strict R2 retry, auth last, terminal replay');
 }

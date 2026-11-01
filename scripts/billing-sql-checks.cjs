@@ -165,6 +165,14 @@ async function main() {
     assert.ok(JSON.parse(finish('script',aiToken,{script:{shots:[]}})).script);
     aiToken=begin('script',{product:product(),source:null,described:'spit-take'});patch({hook:{source:'describe',describe:'other'}});
     assert.equal(finish('script',aiToken,{script:{}}),'');
+    for(let i=0;i<2;i++)sql(fs.readFileSync(path.join(root,'supabase/migrations/0018_preserve_generated_hook.sql'),'utf8'));
+    // Reproduce completion between the route's getRun and its subsequent patch RPC.
+    patch({hook:{text:'Generated words',generated:{src:'/paid.mp4',seconds:4.737},start:0,end:4.737},texts:[{id:'hook',text:'Generated words',start:0,end:4.737},{id:'later',text:'Later',start:4.737,end:7}]});
+    const stale = JSON.parse(patch({hook:{text:'New words',start:0,end:3},texts:[{id:'hook',text:'New words',start:0,end:3}]}));
+    assert.equal(stale.hook.generated.src,'/paid.mp4');
+    assert.equal(stale.hook.end,4.737);assert.equal(stale.texts[0].end,4.737);
+    assert.equal(stale.texts[0].text,'New words');assert.equal(stale.texts[1].id,'later');
+    assert.equal(sql(`select mavya_patch_run('${user}','${project}','{"title":"foreign"}')`),'');
     for(let i=0;i<2;i++)sql(fs.readFileSync(path.join(root,'supabase/migrations/0012_generation_temp_ownership.sql'),'utf8'));
     sql(`insert into temporary_objects(key,user_id) values('tmp/gen/fixture.jpg','${other}')`);
     const generation=sql(`insert into generations(user_id) values('${other}') returning id` ).split('\n')[0];
