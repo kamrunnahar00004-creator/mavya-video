@@ -33,10 +33,28 @@ function blank(ctx: CanvasRenderingContext2D, w: number, h: number): boolean {
   }
 }
 
-function grab(src: string, t: number): Promise<string | null> {
-  if ((failed.get(src) ?? 0) > Date.now()) return Promise.resolve(null);
+/**
+ * The address to read a file's pixels from. /api/media redirects to storage, and a crossOrigin video fails through
+ * that redirect ("Format error"), so it asks for the storage link and loads it directly. The link is signed afresh,
+ * so it also never collides with a copy the page's players cached without CORS.
+ */
+export async function pixelLink(src: string): Promise<string> {
+  const [path] = src.split("#");
+  if (!path.startsWith("/api/media/")) return src;
+  try {
+    const res = await fetch(`${path}?link=1`);
+    const data = (await res.json()) as { url?: string };
+    return res.ok && data.url ? data.url : src;
+  } catch {
+    return src;
+  }
+}
+
+async function grab(src: string, t: number): Promise<string | null> {
+  if ((failed.get(src) ?? 0) > Date.now()) return null;
   let entry = players.get(src);
   if (!entry) {
+    const link = await pixelLink(src);
     const video = document.createElement("video");
     // Files come from storage on another origin; reading pixels needs a CORS request.
     video.crossOrigin = "anonymous";
@@ -44,10 +62,7 @@ function grab(src: string, t: number): Promise<string | null> {
     video.preload = "auto";
     entry = { video, busy: false };
     players.set(src, entry);
-    // Its own link: storage sends no "Vary: Origin", so a copy the page's players cached without CORS would be
-    // reused for this CORS request and fail. A different URL gets a separate signed link and cache entry.
-    const [path, hash] = src.split("#");
-    video.src = `${path}${path.includes("?") ? "&" : "?"}frames=1${hash ? `#${hash}` : ""}`;
+    video.src = link;
   }
   const current = entry;
   const video = current.video;

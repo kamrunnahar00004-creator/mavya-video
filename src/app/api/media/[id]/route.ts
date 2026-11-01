@@ -14,9 +14,12 @@ export async function GET(request: Request, ctx: RouteContext<"/api/media/[id]">
   const info = await mediaAccess(id, who);
   if (!info) return new Response("Not found", { status: 404 });
   const file = localMediaPath(id);
+  const params = new URL(request.url).searchParams;
+  // ?link=1: the storage link itself. A video read with crossOrigin (to draw its frames) fails through the redirect.
+  if (params.has("link")) return Response.json({ url: file ? `/api/media/${id}` : await mediaLink(id) }, { headers: { "Cache-Control": "no-store" } });
   if (file) return fileResponse(request, file, info.size, info.mime);
   // ?download=<name>: the link saves the file (the export's Download button).
-  const download = new URL(request.url).searchParams.get("download");
+  const download = params.get("download");
   const res = NextResponse.redirect(await mediaLink(id, undefined, download ? `${download.slice(0, 80)}.${id.split(".").pop()}` : undefined), 302);
   // The link is good for an hour; let the browser reuse the redirect for a while.
   res.headers.set("Cache-Control", download ? "no-store" : "private, max-age=1800");

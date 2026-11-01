@@ -1,3 +1,4 @@
+import { pixelLink } from "@/lib/filmstrip";
 import type { Analysis, Role, Segment } from "@/lib/types";
 
 /** The hook is the first 3 seconds, or up to the first cut if one lands just after. */
@@ -41,7 +42,7 @@ export async function analyzeVideo(src: string, onProgress?: (p: number) => void
   video.muted = true;
   video.preload = "auto";
   video.playsInline = true;
-  video.src = src;
+  video.src = await pixelLink(src);
   await waitFor(video, "loadedmetadata");
 
   // Some recorded WebM files report an unknown duration until you seek to the end.
