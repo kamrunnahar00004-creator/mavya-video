@@ -1869,8 +1869,8 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
   /** The shot list is still being written; the copy lands as soon as it is. */
   copying?: boolean;
   renderEditor: (seg: Seg) => React.ReactNode;
-  /** One video = one demo; several = clips in file-name order. */
-  onFiles: (files: File[]) => Promise<void>;
+  /** One video = one demo; several = clips in file-name order, filling shots still to film (from shot `from`) first. */
+  onFiles: (files: File[], from?: string, landed?: (i: number) => void) => Promise<void>;
   onClips: () => void;
   onUpload: (id: string, f: File) => Promise<void>;
   onRename: (id: string, label: string) => void;
@@ -1885,6 +1885,9 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
   // Reordering: the clip being dragged, and where it would land (index to insert before).
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropAt, setDropAt] = useState<number | null>(null);
+  const [fileOver, setFileOver] = useState(false);
+  /** Videos on their way up: shown right away from the file on this computer. */
+  const [pending, setPending] = useState<{ url: string; name: string }[]>([]);
   const mode = run.demo.mode ?? (clips.length ? "single" : undefined);
   const [busy, setBusy] = useState<string | null>(null); // clip id (or "single") being uploaded
   // undefined = nothing chosen yet: the first filmed clip is open, so its preview shows straight away.
@@ -1910,20 +1913,30 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
     }
   }
 
-  async function takeMany(list: FileList | null) {
+  async function takeMany(list: FileList | null, from?: string) {
     const files = [...(list ?? [])].filter((f) => f.type.startsWith("video/"));
     if (!files.length) {
       if (list?.length) setError("Please choose video files.");
       return;
     }
     setError(null);
-    setBusy("single");
+    setBusy(from ?? "single");
+    // File-name order (IMG_2 before IMG_10). Each shows at once from the file on this computer, spinning until it lands.
+    const sorted = [...files].sort((x, y) => x.name.localeCompare(y.name, undefined, { numeric: true }));
+    const items = sorted.map((f) => ({ url: URL.createObjectURL(f), name: f.name }));
+    setPending((p) => [...p, ...items]);
+    const clear = (gone: typeof items) => {
+      setPending((p) => p.filter((x) => !gone.includes(x)));
+      gone.forEach((x) => URL.revokeObjectURL(x.url));
+    };
+    let next = 0;
     try {
-      await onFiles(files);
+      await onFiles(sorted, from, (i) => { clear([items[i]]); next = i + 1; });
       setOpenId(undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
+      clear(items.slice(next));
       setBusy(null);
     }
   }
@@ -1932,10 +1945,35 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
     <input type="file" accept="video/*" className="hidden" onChange={(e) => void take(id, e.target.files?.[0], onFile).then(() => (e.target.value = ""))} />
   );
 
+  // Videos dragged in from the computer, anywhere on this step (tiles dragged between each other carry no files).
+  const hasFiles = (e: React.DragEvent) => e.dataTransfer.types.includes("Files");
+  const dropZone = {
+    onDragOver: (e: React.DragEvent) => { if (hasFiles(e)) { e.preventDefault(); setFileOver(true); } },
+    onDragLeave: (e: React.DragEvent) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFileOver(false); },
+    onDrop: (e: React.DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      setFileOver(false);
+      if (!busy) void takeMany(e.dataTransfer.files);
+    },
+  };
+  const dropRing = fileOver ? "ring-2 ring-accent ring-offset-4 ring-offset-panel" : "";
+  const uploadingTiles = pending.map((p) => (
+    <li key={p.url} className="w-[96px]">
+      <div className="relative aspect-[9/16] w-full overflow-hidden rounded-xl bg-ink">
+        <video src={`${p.url}#t=0.5`} muted playsInline preload="metadata" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+        <span className="absolute inset-0 flex items-center justify-center bg-black/35 text-white">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </span>
+      </div>
+      <p className="mt-1.5 truncate text-[12.5px] leading-tight text-muted">{p.name}</p>
+    </li>
+  ));
+
   if (!mode) {
     // One box of choices, like step 2: upload, plan it shot by shot, or reuse a demo from My files.
     return (
-      <div className="rounded-2xl border border-line bg-panel p-4">
+      <div {...dropZone} className={`rounded-2xl border border-line bg-panel p-4 ${dropRing}`}>
         <div className="flex flex-wrap items-center gap-2.5">
           <label className={`btn-primary cursor-pointer px-4 py-2.5 text-[14px] ${busy ? "pointer-events-none opacity-60" : ""}`}>
             {busy === "single" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
@@ -1951,6 +1989,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
             Check library
           </button>
         </div>
+        {pending.length > 0 && <ol className="mt-3 flex flex-wrap gap-3" aria-label="Uploading clips">{uploadingTiles}</ol>}
         {error && <p role="alert" className="mt-2.5 text-[13px] font-semibold text-red-600">{error}</p>}
       </div>
     );
@@ -1962,7 +2001,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
   const selSeg = selected ? segs.find((s) => s.id === selected.id) : undefined;
   const selIndex = selected ? clips.indexOf(selected) : -1;
   return (
-    <div className="space-y-4">
+    <div {...dropZone} className={`space-y-4 rounded-xl ${dropRing}`}>
       <ol className="flex flex-wrap gap-3" aria-label="Demo clips">
         {clips.map((c, i) => {
           const seg = segs.find((s) => s.id === c.id);
@@ -1993,6 +2032,15 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
                 onDragLeave={() => setDropAt((d) => (d === i ? null : d))}
                 onDrop={(e) => {
                   e.preventDefault();
+                  // Videos dropped on a shot still to film start from that shot; on a filmed clip, the step's drop handles them.
+                  if (hasFiles(e)) {
+                    setDropAt(null);
+                    if (filmed) return;
+                    e.stopPropagation();
+                    setFileOver(false);
+                    if (!busy) void takeMany(e.dataTransfer.files, c.id);
+                    return;
+                  }
                   const from = e.dataTransfer.getData("text/plain") || dragId;
                   if (from && from !== c.id && clips.some((x) => x.id === from)) onSwap(from, c.id);
                   setDragId(null);
@@ -2018,6 +2066,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
             </li>
           );
         })}
+        {uploadingTiles}
         <li className="w-[96px]">
           <label className={`flex aspect-[9/16] w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-line text-soft hover:border-accent hover:text-accent ${busy ? "pointer-events-none opacity-60" : ""}`}>
             {busy === "single" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
@@ -2048,7 +2097,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
               <label className={`btn-primary shrink-0 cursor-pointer px-3.5 py-2 text-[13px] ${busy ? "pointer-events-none opacity-60" : ""}`}>
                 {busy === selected.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                 Upload clip
-                {fileInput(selected.id, (f) => onUpload(selected.id, f))}
+                <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => void takeMany(e.target.files, selected.id).then(() => (e.target.value = ""))} />
               </label>
             )}
             <button type="button" onClick={() => { onDelete(selected.id); setOpenId(null); }} aria-label={`Delete clip ${selIndex + 1}`} title="Delete clip" className="rounded-lg p-2 text-soft hover:bg-red-50 hover:text-red-600">

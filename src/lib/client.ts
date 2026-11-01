@@ -60,11 +60,32 @@ export function videoLength(mediaId: string): Promise<number | null> {
   });
 }
 
+/** A video's length from the file on this computer: instant, nothing fetched. Null when the browser can't read it. */
+function fileLength(file: File): Promise<number | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    const finish = (value: number | null) => {
+      clearTimeout(timer);
+      v.onloadedmetadata = v.onerror = null;
+      v.removeAttribute("src");
+      v.load();
+      URL.revokeObjectURL(url);
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), 5000);
+    v.onloadedmetadata = () => finish(Number.isFinite(v.duration) ? v.duration : null);
+    v.onerror = () => finish(null);
+    v.src = url;
+  });
+}
+
 /** Turns an uploaded file into a clip ready for a slot. */
 export async function clipFromFile(file: File): Promise<Clip> {
-  const { mediaId } = await uploadFile(file, true);
   const kind = file.type.startsWith("image/") ? "image" : "video";
-  return { mediaId, name: file.name, kind, offset: 0, length: kind === "video" ? await videoLength(mediaId) : null };
+  const [{ mediaId }, local] = await Promise.all([uploadFile(file, true), kind === "video" ? fileLength(file) : null]);
+  return { mediaId, name: file.name, kind, offset: 0, length: kind === "video" ? (local ?? (await videoLength(mediaId))) : null };
 }
 
 export async function clipFromAsset(asset: { mediaId: string; name: string; kind: "video" | "image" }): Promise<Clip> {

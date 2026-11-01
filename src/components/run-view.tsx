@@ -532,8 +532,8 @@ export function RunView() {
   /* ----- Step 4: demo clips ----- */
   /** A text over one clip in the same look and spot as the subtitle before it in the video, so the video keeps one text style. */
   /** Puts an uploaded video into a demo clip. Texts after it move later by its length (or by the change, when replacing). */
-  const fillClip = async (clipId: string, file: File, startClips?: DemoClip[], mode?: "single" | "clips") => {
-    const c = await clipFromFile(file);
+  const fillClip = async (clipId: string, file: File, startClips?: DemoClip[], mode?: "single" | "clips") => placeClip(clipId, await clipFromFile(file), startClips, mode);
+  const placeClip = (clipId: string, c: Awaited<ReturnType<typeof clipFromFile>>, startClips?: DemoClip[], mode?: "single" | "clips") => {
     setLibraryKey((k) => k + 1);
     const cur = runRef.current ?? run;
     if (cur.id !== id) return;
@@ -566,6 +566,8 @@ export function RunView() {
       }))];
     }
     save({ demo: nextRun.demo, texts: nextTexts });
+    // Now, not after the next render: clips landing right behind this one build on it.
+    runRef.current = { ...cur, demo: nextRun.demo, texts: nextTexts };
   };
   /** Where the stolen video puts its demo captions (top, center or bottom), from its analysis; center when unknown. */
   const viralCaptionY = (): number => {
@@ -585,6 +587,38 @@ export function RunView() {
     });
     insertClips(added, at);
   };
+  /**
+   * Several videos at once: the shots still to film take them first (from shot `from`, then wrapping round), extras
+   * become new clips. Up to 3 upload together; each lands as soon as those before it have, so the order holds and
+   * the seller sees them arrive. `landed(i)`: file i is in.
+   */
+  const fillShots = async (files: File[], from?: string, landed?: (i: number) => void) => {
+    const empty = demoClips(runRef.current ?? run).filter((c) => !clipSrc(c));
+    const at = Math.max(0, empty.findIndex((c) => c.id === from));
+    const slots = [...empty.slice(at), ...empty.slice(0, at)];
+    let active = 0;
+    const waiting: (() => void)[] = [];
+    const uploads = files.map((f) => new Promise<Awaited<ReturnType<typeof clipFromFile>>>((resolve, reject) => {
+      const go = () => {
+        active++;
+        clipFromFile(f).then(resolve, reject).finally(() => { active--; waiting.shift()?.(); });
+      };
+      if (active < 3) go(); else waiting.push(go);
+    }));
+    // A failure surfaces when its turn comes; the ones after it must not count as unhandled meanwhile.
+    uploads.forEach((u) => u.catch(() => undefined));
+    for (let i = 0; i < files.length; i++) {
+      const c = await uploads[i];
+      if (i < slots.length) placeClip(slots[i].id, c);
+      else {
+        setLibraryKey((k) => k + 1);
+        const seconds = clipSeconds(c.length);
+        const count = demoClips(runRef.current ?? run).length;
+        insertClips([{ id: uid(), label: `Clip ${count + 1}`, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds }]);
+      }
+      landed?.(i);
+    }
+  };
   /** Puts demo clips in before demo clip `at` (default: the end). Texts from there on move later by their length. */
   const insertClips = (added: DemoClip[], at?: number) => {
     const cur = runRef.current ?? run;
@@ -600,7 +634,9 @@ export function RunView() {
     const from = next ? next.offset : Infinity;
     const by = timeline(nextRun, null).filter((g) => added.some((c) => c.id === g.id)).reduce((t, g) => t + g.gap + g.len, 0);
     const r = (x: number) => Math.round(x * 1000) / 1000;
-    save({ demo: nextRun.demo, texts: runTexts(cur).map((x) => (x.start >= from - 0.05 ? { ...x, start: r(x.start + by), end: r(x.end + by) } : x)) });
+    const texts = runTexts(cur).map((x) => (x.start >= from - 0.05 ? { ...x, start: r(x.start + by), end: r(x.end + by) } : x));
+    save({ demo: nextRun.demo, texts });
+    runRef.current = { ...cur, demo: nextRun.demo, texts };
   };
   /** Move a demo clip to position `to`. Texts that sit on that clip (or any moved clip) go with it; texts across several clips keep their time. */
   const moveClip = (clipId: string, to: number) => {
@@ -917,9 +953,9 @@ export function RunView() {
                 run={run}
                 segs={segs}
                 renderEditor={clipEditor}
-                onFiles={async (files) => {
+                onFiles={async (files, from, landed) => {
                   setPicked((p) => Array.from(new Set([...(p ?? openSteps), 5])));
-                  await addVideos(files);
+                  await fillShots(files, from, landed);
                 }}
                 copying={copyWaiting}
                 onCheckLibrary={() => { setLibraryTab("demos"); setLibraryOpen(true); }}
