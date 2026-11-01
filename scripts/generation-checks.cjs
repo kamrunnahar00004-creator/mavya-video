@@ -44,12 +44,20 @@ assert.equal(generationPatch(changed, run, generated, '').hook.versions[0].src, 
 const level = (input, v) => adjust.contrastCurve(input / 255, v) * 255;
 for (const [input, v, out] of [[200, 50, 246.7], [72, 50, 37.4], [136, 20, 144.2], [72, 20, 61.3], [200, 10, 210.9]]) assert.ok(Math.abs(level(input, v) - out) < 10, `contrast ${v} at ${input}`);
 assert.ok(Math.abs(level(120, 0) - 120) < 0.01, 'contrast 0 changes nothing');
-assert.ok(Math.abs(level(level(200, 30), -30) - 200) < 0.01, 'negative contrast undoes positive');
+assert.ok(Math.abs(level(111.5, -50) - 111.5) < 0.01, 'negative contrast pivots at 111.5');
+assert.ok(Math.abs(level(255, -50) - 197.6) < 0.01, 'negative contrast is a straight line');
+assert.ok(Math.abs(level(0, -25) - 22.3) < 0.01, 'negative contrast lifts blacks');
+const lit = (input, v) => adjust.exposureCurve(input / 255, v) * 255;
+assert.ok(Math.abs(lit(120, 0) - 120) < 0.01, 'exposure 0 changes nothing');
+for (const v of [-50, -25, 20, 50]) assert.ok(Math.abs(lit(255, v) - 255) < 0.01 && Math.abs(lit(0, v)) < 0.01, `exposure ${v} keeps black and white`);
+assert.ok(lit(120, 50) > 200 && lit(120, -50) < 50, 'exposure moves the mids');
+assert.equal(adjust.ADJUST_ROWS.find(x => x.key === 'brightness').label, 'Exposure');
+assert.ok(adjust.videoStyle({ brightness: 20 }).filter.includes('url(#mavya-exposure-20)'), 'preview uses the measured exposure curve');
 assert.deepEqual([...adjust.tempGains(50)].map(x => +x.toFixed(2)), [1.7, 0.82, 0.21]);
 assert.deepEqual([...adjust.tempGains(-50)].map(x => +x.toFixed(2)), [0.81, 1.01, 1.52]);
 assert.deepEqual([...adjust.tempGains(0)], [1, 1, 1]);
 const worker = fs.readFileSync(path.join(root, 'render/render.mjs'), 'utf8');
-for (const number of ['[1.7, 0.82, 0.21]', '[0.81, 1.01, 1.52]', '[[0, 1], [10, 1.22], [20, 1.46], [35, 1.94], [50, 3.1]]', '0.44']) assert.ok(worker.includes(number), `export has ${number}`);
+for (const number of ['[1.7, 0.82, 0.21]', '[0.81, 1.01, 1.52]', '[[0, 1], [10, 1.22], [20, 1.46], [35, 1.94], [50, 3.1]]', '[[-50, 0.28], [-25, 0.44], [0, 1], [20, 1.57], [40, 2.33], [50, 2.95]]', '0.44', '111.5']) assert.ok(worker.includes(number), `export has ${number}`);
 
 async function main() {
   let calls = [], claimed = null, providerError = null, poll = { state: 'running' }, completeError = null;

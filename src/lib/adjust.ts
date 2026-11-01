@@ -29,7 +29,7 @@ export type AdjustRow = { key: "brightness" | "contrast" | "saturation" | "warmt
 export const ADJUST_ROWS: AdjustRow[] = [
   { key: "volume", label: "Volume", min: 0, max: 100, step: 1 },
   { key: "speed", label: "Speed", min: 0.5, max: 2, step: 0.05 },
-  { key: "brightness", label: "Brightness", min: -50, max: 50, step: 1 },
+  { key: "brightness", label: "Exposure", min: -50, max: 50, step: 1 },
   { key: "contrast", label: "Contrast", min: -50, max: 50, step: 1 },
   { key: "saturation", label: "Saturation", min: -50, max: 50, step: 1 },
   { key: "warmth", label: "Temp", min: -50, max: 50, step: 1 },
@@ -97,7 +97,7 @@ export function moveKey(a: Partial<Adjust> | null | undefined, i: number, t: num
 }
 
 /*
- * Contrast and Temp are measured from CapCut desktop screenshots of one photo (2026-11-01), so a slider value looks
+ * Exposure, Contrast and Temp are measured from CapCut desktop screenshots of one photo (2026-11-01), so a slider value looks
  * like the same value there. render/render.mjs repeats these numbers for the export: change both together.
  */
 
@@ -119,23 +119,43 @@ export function warmthMatrix(w: number) {
   return `${r} 0 0 0 0  0 ${g} 0 0 0  0 0 ${b} 0 0  0 0 0 1 0`;
 }
 
-/** Contrast is an S-curve around this level (0..1): darks fall and lights rise, rolling off softly at both ends. */
+/** Straight-line lookup in a measured [slider, value] table. */
+function measured(points: number[][], v: number) {
+  const a = Math.max(points[0][0], Math.min(points[points.length - 1][0], v));
+  const i = Math.max(0, points.findIndex(([x]) => x >= a) - 1);
+  const [x0, y0] = points[i];
+  const [x1, y1] = points[i + 1];
+  return y0 + ((a - x0) / (x1 - x0)) * (y1 - y0);
+}
+
+/** Exposure lifts or lowers a channel as 1 - (1 - x)^k: whites stay white, and the top rolls off softly. */
+const EXPOSURE_POINTS = [[-50, 0.28], [-25, 0.44], [0, 1], [20, 1.57], [40, 2.33], [50, 2.95]];
+export const exposurePower = (v: number) => measured(EXPOSURE_POINTS, v);
+
+/** One channel value (0..1) through the exposure curve. */
+export const exposureCurve = (x: number, v: number) => 1 - Math.pow(1 - x, exposurePower(v));
+
+export const exposureId = (v: number) => `mavya-exposure-${v < 0 ? "m" : ""}${Math.abs(v)}`;
+
+/** The curve as tableValues for an feFuncR/G/B. Low Exposure is steep near white, so it takes a fine table. */
+export const exposureTable = (v: number) => Array.from({ length: 257 }, (_, i) => exposureCurve(i / 256, v).toFixed(4)).join(" ");
+
+/** Above 0, contrast is an S-curve around this level (0..1): darks fall and lights rise, rolling off softly at both ends. */
 export const CONTRAST_PIVOT = 0.44;
+/** Below 0, contrast is a straight line through this level (0..1) that flattens the picture. */
+export const CONTRAST_FLAT_PIVOT = 111.5 / 255;
 /** Slider value to curve strength, measured at 10, 20, 35 and 50. */
 const CONTRAST_POINTS = [[0, 1], [10, 1.22], [20, 1.46], [35, 1.94], [50, 3.1]];
 
-/** Curve strength for a contrast value. Negative values are the same curve undone (1 / strength). */
-export function contrastGamma(v: number) {
-  const a = Math.min(50, Math.abs(v));
-  const i = Math.max(0, CONTRAST_POINTS.findIndex(([x]) => x >= a) - 1);
-  const [x0, y0] = CONTRAST_POINTS[i];
-  const [x1, y1] = CONTRAST_POINTS[i + 1];
-  const g = y0 + ((a - x0) / (x1 - x0)) * (y1 - y0);
-  return v < 0 ? 1 / g : g;
-}
+/** Curve strength for a positive contrast value. */
+export const contrastGamma = (v: number) => measured(CONTRAST_POINTS, v);
+
+/** Line slope for a negative contrast value. */
+export const contrastSlope = (v: number) => 1 + Math.max(-50, v) / 125;
 
 /** One channel value (0..1) through the contrast curve. */
 export function contrastCurve(x: number, v: number) {
+  if (v < 0) return CONTRAST_FLAT_PIVOT + (x - CONTRAST_FLAT_PIVOT) * contrastSlope(v);
   const p = CONTRAST_PIVOT;
   const g = contrastGamma(v);
   return x < p ? p * Math.pow(x / p, g) : 1 - (1 - p) * Math.pow((1 - x) / (1 - p), g);
@@ -154,7 +174,7 @@ export function videoStyle(a?: Partial<Adjust> | null, t?: number): CSSPropertie
   if (!isAdjusted(a)) return undefined;
   const v = { ...fullAdjust(a), ...motionAt(a, t) };
   const parts = [];
-  if (v.brightness) parts.push(`brightness(${1 + v.brightness / 100})`);
+  if (v.brightness) parts.push(`url(#${exposureId(v.brightness)})`);
   if (v.contrast) parts.push(`url(#${contrastId(v.contrast)})`);
   if (v.saturation) parts.push(`saturate(${1 + v.saturation / 50})`);
   if (v.warmth) parts.push(`url(#${warmthId(v.warmth)})`);
@@ -189,12 +209,17 @@ export function ffmpegAdjust(a: Partial<Adjust> | null | undefined, w: number, h
     // Picture moves with pan, so the crop window moves the other way.
     out.push(`scale=iw*${s}:ih*${s}`, `crop=${w}:${h}:(iw-${w})/2*(1-${v.panX / 100}):(ih-${h})/2*(1-${v.panY / 100})`);
   }
-  const b = 1 + v.brightness / 100;
-  if (v.brightness) out.push(`colorchannelmixer=rr=${b}:gg=${b}:bb=${b}`);
+  if (v.brightness) {
+    const curve = `'255-255*pow(max(255-val,0)/255,${exposurePower(v.brightness)})'`;
+    out.push(`lutrgb=r=${curve}:g=${curve}:b=${curve}`);
+  }
   if (v.contrast) {
     const g = contrastGamma(v.contrast);
     const p = CONTRAST_PIVOT * 255;
-    const curve = `'if(lt(val,${p}),${p}*pow(val/${p},${g}),255-${255 - p}*pow(max(255-val,0)/${255 - p},${g}))'`;
+    const f = CONTRAST_FLAT_PIVOT * 255;
+    const curve = v.contrast < 0
+      ? `'${f}+(val-${f})*${contrastSlope(v.contrast)}'`
+      : `'if(lt(val,${p}),${p}*pow(val/${p},${g}),255-${255 - p}*pow(max(255-val,0)/${255 - p},${g}))'`;
     out.push(`lutrgb=r=${curve}:g=${curve}:b=${curve}`);
   }
   if (v.saturation) out.push(`eq=saturation=${1 + v.saturation / 50}`);

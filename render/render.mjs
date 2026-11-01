@@ -35,16 +35,19 @@ function curve(keys, k, p0) {
   return `if(lt(${F},${r(keys[0].t)}),${keys[0][k]},${e})`;
 }
 
-/** Curve strength for a contrast value (src/lib/adjust.ts contrastGamma). */
-function contrastGamma(c) {
-  const points = [[0, 1], [10, 1.22], [20, 1.46], [35, 1.94], [50, 3.1]];
-  const a = Math.min(50, Math.abs(c));
+/** Straight-line lookup in a measured [slider, value] table (src/lib/adjust.ts measured). */
+function measured(points, v) {
+  const a = Math.max(points[0][0], Math.min(points[points.length - 1][0], v));
   const i = Math.max(0, points.findIndex(([x]) => x >= a) - 1);
   const [x0, y0] = points[i];
   const [x1, y1] = points[i + 1];
-  const g = y0 + ((a - x0) / (x1 - x0)) * (y1 - y0);
-  return c < 0 ? 1 / g : g;
+  return y0 + ((a - x0) / (x1 - x0)) * (y1 - y0);
 }
+
+/** Exposure power (src/lib/adjust.ts exposurePower). */
+const exposurePower = (v) => measured([[-50, 0.28], [-25, 0.44], [0, 1], [20, 1.57], [40, 2.33], [50, 2.95]], v);
+/** Curve strength for a positive contrast value (src/lib/adjust.ts contrastGamma). */
+const contrastGamma = (c) => measured([[0, 1], [10, 1.22], [20, 1.46], [35, 1.94], [50, 3.1]], c);
 
 /** Filters for one clip's look, on a W x H frame (file time of the piece's first frame = p0). */
 function look(a, p0, W, H, fps) {
@@ -62,14 +65,19 @@ function look(a, p0, W, H, fps) {
     const sh = 2 * Math.round((H * s) / 2);
     out.push(`scale=${sw}:${sh}`, `crop=${W}:${H}:${Math.round(((sw - W) / 2) * (1 - v.panX / 100))}:${Math.round(((sh - H) / 2) * (1 - v.panY / 100))}`);
   }
-  // Same numbers as the preview (src/lib/adjust.ts: contrastCurve, tempGains), measured from CapCut.
-  const b = 1 + v.brightness / 100;
-  if (v.brightness) out.push(`colorchannelmixer=rr=${r(b)}:gg=${r(b)}:bb=${r(b)}`);
-  if (v.contrast) {
+  // Same numbers as the preview (src/lib/adjust.ts: exposureCurve, contrastCurve, tempGains), measured from CapCut.
+  // ffmpeg also evaluates each expression for one value past the top (256): the max keeps pow's base from going negative.
+  if (v.brightness) {
+    const c = `'255-255*pow(max(255-val,0)/255,${r(exposurePower(v.brightness))})'`;
+    out.push(`lutrgb=r=${c}:g=${c}:b=${c}`);
+  }
+  if (v.contrast < 0) {
+    const c = `'111.5+(val-111.5)*${r(1 + Math.max(-50, v.contrast) / 125)}'`;
+    out.push(`lutrgb=r=${c}:g=${c}:b=${c}`);
+  } else if (v.contrast) {
     const g = r(contrastGamma(v.contrast));
     const p = r(0.44 * 255);
     const q = r(255 - 0.44 * 255);
-    // ffmpeg also evaluates the expression for one value past the top (256): the max keeps pow's base from going negative.
     const c = `'if(lt(val,${p}),${p}*pow(val/${p},${g}),255-${q}*pow(max(255-val,0)/${q},${g}))'`;
     out.push(`lutrgb=r=${c}:g=${c}:b=${c}`);
   }
