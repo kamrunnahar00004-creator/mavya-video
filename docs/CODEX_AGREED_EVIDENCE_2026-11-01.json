@@ -1,0 +1,3237 @@
+{
+  "reads": {
+    "setup": "Actual Next production handlers and Supabase Auth getUser using a dummy local Auth/SQL HTTP server (8ms Auth,12ms SQL) and offline R2 fetch15ms. No production credentials/data/calls. Phase totals are aggregate service time; parallel SQL may exceed wall time.",
+    "rows": [
+      {
+        "phase": "before",
+        "round": 0,
+        "api": "/api/profile",
+        "milliseconds": 253.120685,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/profiles"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 0,
+        "api": "/api/usage",
+        "milliseconds": 90.929282,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/subscriptions",
+          "/rest/v1/subscriptions",
+          "/rest/v1/rpc/mavya_allowance"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 0,
+        "api": "/api/runs",
+        "milliseconds": 46.23325999999997,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 0,
+        "api": "/api/runs/20000000-0000-4000-8000-000000000001",
+        "milliseconds": 43.919438000000014,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 0,
+        "api": "/api/references",
+        "milliseconds": 43.07212699999991,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/library"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 0,
+        "api": "/api/assets",
+        "milliseconds": 41.44059399999992,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/assets"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 0,
+        "api": "/api/file-prefs",
+        "milliseconds": 68.12278300000003,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 0,
+        "api": "combined-before",
+        "milliseconds": 84.51932199999999,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/library"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 1,
+        "api": "/api/profile",
+        "milliseconds": 28.821492000000035,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/profiles"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 1,
+        "api": "/api/usage",
+        "milliseconds": 44.01775600000008,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/subscriptions",
+          "/rest/v1/subscriptions",
+          "/rest/v1/rpc/mavya_allowance"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 1,
+        "api": "/api/runs",
+        "milliseconds": 41.580223000000046,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 1,
+        "api": "/api/runs/20000000-0000-4000-8000-000000000001",
+        "milliseconds": 39.55284500000005,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 1,
+        "api": "/api/references",
+        "milliseconds": 39.226242000000184,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/library"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 1,
+        "api": "/api/assets",
+        "milliseconds": 39.03780100000017,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/assets"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 1,
+        "api": "/api/file-prefs",
+        "milliseconds": 42.57107799999994,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 1,
+        "api": "combined-before",
+        "milliseconds": 80.66970900000001,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/library"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 2,
+        "api": "/api/profile",
+        "milliseconds": 25.582305000000133,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/profiles"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 2,
+        "api": "/api/usage",
+        "milliseconds": 40.74131999999986,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/subscriptions",
+          "/rest/v1/subscriptions",
+          "/rest/v1/rpc/mavya_allowance"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 2,
+        "api": "/api/runs",
+        "milliseconds": 39.46069699999998,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 2,
+        "api": "/api/runs/20000000-0000-4000-8000-000000000001",
+        "milliseconds": 40.47296700000015,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 2,
+        "api": "/api/references",
+        "milliseconds": 39.04501099999993,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/library"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 2,
+        "api": "/api/assets",
+        "milliseconds": 39.162738999999874,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/assets"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 2,
+        "api": "/api/file-prefs",
+        "milliseconds": 42.14914099999987,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions"
+        ]
+      },
+      {
+        "phase": "before",
+        "round": 2,
+        "api": "combined-before",
+        "milliseconds": 77.6027190000002,
+        "serverTiming": null,
+        "upstream": [
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/library"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 0,
+        "api": "/api/profile",
+        "milliseconds": 282.3799620000002,
+        "serverTiming": "auth;dur=14.46, account;dur=0.00, sql;dur=15.28, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/profiles"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 0,
+        "api": "/api/usage",
+        "milliseconds": 106.32204500000012,
+        "serverTiming": "auth;dur=10.86, account;dur=14.59, sql;dur=51.81, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/subscriptions",
+          "/rest/v1/subscriptions",
+          "/rest/v1/rpc/mavya_allowance"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 0,
+        "api": "/api/runs",
+        "milliseconds": 57.71956300000011,
+        "serverTiming": "auth;dur=10.07, account;dur=13.62, sql;dur=13.80, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 0,
+        "api": "/api/runs/20000000-0000-4000-8000-000000000001",
+        "milliseconds": 52.51043200000004,
+        "serverTiming": "auth;dur=9.50, account;dur=13.50, sql;dur=13.02, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 0,
+        "api": "/api/references",
+        "milliseconds": 52.97750599999972,
+        "serverTiming": "auth;dur=9.64, account;dur=13.61, sql;dur=13.63, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/library"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 0,
+        "api": "/api/assets",
+        "milliseconds": 51.3756529999996,
+        "serverTiming": "auth;dur=9.69, account;dur=13.67, sql;dur=13.45, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/assets"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 0,
+        "api": "/api/file-prefs",
+        "milliseconds": 75.3893579999999,
+        "serverTiming": "auth;dur=9.91, account;dur=13.89, sql;dur=0.00, r2;dur=36.98",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 0,
+        "api": "/api/runs/20000000-0000-4000-8000-000000000001?view=editor",
+        "milliseconds": 72.81542500000023,
+        "serverTiming": "auth;dur=10.30, account;dur=19.61, sql;dur=28.71, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs",
+          "/rest/v1/library"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 1,
+        "api": "/api/profile",
+        "milliseconds": 42.599173000000064,
+        "serverTiming": "auth;dur=10.99, account;dur=0.00, sql;dur=14.47, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/profiles"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 1,
+        "api": "/api/usage",
+        "milliseconds": 50.988170999999966,
+        "serverTiming": "auth;dur=9.68, account;dur=13.40, sql;dur=42.64, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/subscriptions",
+          "/rest/v1/subscriptions",
+          "/rest/v1/rpc/mavya_allowance"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 1,
+        "api": "/api/runs",
+        "milliseconds": 51.41974499999969,
+        "serverTiming": "auth;dur=9.56, account;dur=14.29, sql;dur=14.75, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 1,
+        "api": "/api/runs/20000000-0000-4000-8000-000000000001",
+        "milliseconds": 49.51944000000003,
+        "serverTiming": "auth;dur=9.94, account;dur=13.67, sql;dur=12.76, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 1,
+        "api": "/api/references",
+        "milliseconds": 49.8268149999999,
+        "serverTiming": "auth;dur=9.65, account;dur=13.44, sql;dur=13.82, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/library"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 1,
+        "api": "/api/assets",
+        "milliseconds": 48.60490800000025,
+        "serverTiming": "auth;dur=9.93, account;dur=13.66, sql;dur=12.62, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/assets"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 1,
+        "api": "/api/file-prefs",
+        "milliseconds": 52.86573499999986,
+        "serverTiming": "auth;dur=9.60, account;dur=13.62, sql;dur=0.00, r2;dur=17.49",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 1,
+        "api": "/api/runs/20000000-0000-4000-8000-000000000001?view=editor",
+        "milliseconds": 63.250856999999996,
+        "serverTiming": "auth;dur=9.93, account;dur=13.89, sql;dur=26.69, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs",
+          "/rest/v1/library"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 2,
+        "api": "/api/profile",
+        "milliseconds": 35.37469999999985,
+        "serverTiming": "auth;dur=9.58, account;dur=0.00, sql;dur=13.59, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/profiles"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 2,
+        "api": "/api/usage",
+        "milliseconds": 50.18678799999998,
+        "serverTiming": "auth;dur=9.57, account;dur=13.74, sql;dur=42.04, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/subscriptions",
+          "/rest/v1/subscriptions",
+          "/rest/v1/rpc/mavya_allowance"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 2,
+        "api": "/api/runs",
+        "milliseconds": 54.22527200000013,
+        "serverTiming": "auth;dur=9.54, account;dur=13.61, sql;dur=13.59, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 2,
+        "api": "/api/runs/20000000-0000-4000-8000-000000000001",
+        "milliseconds": 48.73600499999975,
+        "serverTiming": "auth;dur=9.50, account;dur=13.73, sql;dur=13.33, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 2,
+        "api": "/api/references",
+        "milliseconds": 47.735013999999865,
+        "serverTiming": "auth;dur=9.63, account;dur=12.71, sql;dur=12.98, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/library"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 2,
+        "api": "/api/assets",
+        "milliseconds": 49.34183999999959,
+        "serverTiming": "auth;dur=9.76, account;dur=13.57, sql;dur=13.64, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/assets"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 2,
+        "api": "/api/file-prefs",
+        "milliseconds": 53.19431499999973,
+        "serverTiming": "auth;dur=9.69, account;dur=13.62, sql;dur=0.00, r2;dur=17.59",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions"
+        ]
+      },
+      {
+        "phase": "after",
+        "round": 2,
+        "api": "/api/runs/20000000-0000-4000-8000-000000000001?view=editor",
+        "milliseconds": 63.057978000000276,
+        "serverTiming": "auth;dur=9.89, account;dur=13.46, sql;dur=27.20, r2;dur=0.00",
+        "upstream": [
+          "/auth/v1/user",
+          "/auth/v1/user",
+          "/rest/v1/account_deletions",
+          "/rest/v1/runs",
+          "/rest/v1/library"
+        ]
+      }
+    ]
+  },
+  "before": {
+    "setup": "Actual Next production build, proxy bypassed only in isolated copy; synthetic 24 runs and 60 curated refs, API stubs 120ms, Chrome muted, CPU 2x, desktop 1440x1000. FCP is paint timing, usable is control readiness, not formal TTI. Two rAF is a conservative click-to-paint proxy.",
+    "rows": [
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 405,
+        "fp": 60,
+        "fcp": 60,
+        "usableMs": 401.59999999403954,
+        "jsTransferBytes": 243561,
+        "jsEncodedBytes": 240261,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 128.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 128.10000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 122.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 122.5,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": [
+          51
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 360,
+        "fp": 64,
+        "fcp": 64,
+        "usableMs": 356.40000000596046,
+        "jsTransferBytes": 44636,
+        "jsEncodedBytes": 283397,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 133.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 133.7000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 128.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 128.09999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 566,
+        "fp": 64,
+        "fcp": 64,
+        "usableMs": 562.2999999821186,
+        "jsTransferBytes": 312180,
+        "jsEncodedBytes": 306780,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 126.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 126.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 131,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 130.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 130.39999997615814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references/10000000-0000-4000-8000-000000000100",
+            "duration": 122,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          56
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 455,
+        "fp": 60,
+        "fcp": 60,
+        "usableMs": 452.90000000596046,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 306780,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 134.5,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 134.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 133.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 132.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 132.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references/10000000-0000-4000-8000-000000000100",
+            "duration": 121.40000000596046,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      },
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 389,
+        "fp": 136,
+        "fcp": 136,
+        "usableMs": 385.2000000178814,
+        "jsTransferBytes": 243561,
+        "jsEncodedBytes": 240261,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 133,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 133,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 122.39999997615814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 122.09999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": [
+          50
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 352,
+        "fp": 84,
+        "fcp": 84,
+        "usableMs": 348.7999999821186,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 240261,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 127.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 127.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 124.2999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 124.09999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 574,
+        "fp": 60,
+        "fcp": 60,
+        "usableMs": 570.5999999940395,
+        "jsTransferBytes": 312180,
+        "jsEncodedBytes": 306780,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 135.59999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 135.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 123.2000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 122.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 122.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references/10000000-0000-4000-8000-000000000100",
+            "duration": 135.5,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          53
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 454,
+        "fp": 64,
+        "fcp": 64,
+        "usableMs": 451.2000000178814,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 306780,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 125.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 125.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 124.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 124.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 123.7000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references/10000000-0000-4000-8000-000000000100",
+            "duration": 120.59999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      },
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 391,
+        "fp": 128,
+        "fcp": 128,
+        "usableMs": 387,
+        "jsTransferBytes": 243561,
+        "jsEncodedBytes": 240261,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 130,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 129.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 121,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 121.09999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": [
+          58
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 361,
+        "fp": 96,
+        "fcp": 96,
+        "usableMs": 358.19999998807907,
+        "jsTransferBytes": 44636,
+        "jsEncodedBytes": 283397,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 134.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 134.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 127.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 127.2999999821186,
+            "serverTiming": []
+          }
+        ],
+        "videos": 24,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 565,
+        "fp": 56,
+        "fcp": 56,
+        "usableMs": 562.3000000119209,
+        "jsTransferBytes": 312180,
+        "jsEncodedBytes": 306780,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 133.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 133.10000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 131.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 131.59999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 131.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references/10000000-0000-4000-8000-000000000100",
+            "duration": 122.90000000596046,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          50
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 457,
+        "fp": 64,
+        "fcp": 64,
+        "usableMs": 453.69999998807907,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 306780,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 130.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 130.60000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 129.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 129,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 128.59999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references/10000000-0000-4000-8000-000000000100",
+            "duration": 123.5,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      }
+    ],
+    "actions": [
+      {
+        "name": "Tiles top",
+        "videos": 24,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000000",
+          "/studio/10000000-0000-4000-8000-000000000001",
+          "/studio/10000000-0000-4000-8000-000000000002",
+          "/studio/10000000-0000-4000-8000-000000000003",
+          "/studio/10000000-0000-4000-8000-000000000004",
+          "/studio/10000000-0000-4000-8000-000000000005",
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017",
+          "/studio/10000000-0000-4000-8000-000000000018",
+          "/studio/10000000-0000-4000-8000-000000000019",
+          "/studio/10000000-0000-4000-8000-000000000020",
+          "/studio/10000000-0000-4000-8000-000000000021",
+          "/studio/10000000-0000-4000-8000-000000000022",
+          "/studio/10000000-0000-4000-8000-000000000023"
+        ]
+      },
+      {
+        "name": "Tiles bottom",
+        "videos": 24,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000000",
+          "/studio/10000000-0000-4000-8000-000000000001",
+          "/studio/10000000-0000-4000-8000-000000000002",
+          "/studio/10000000-0000-4000-8000-000000000003",
+          "/studio/10000000-0000-4000-8000-000000000004",
+          "/studio/10000000-0000-4000-8000-000000000005",
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017",
+          "/studio/10000000-0000-4000-8000-000000000018",
+          "/studio/10000000-0000-4000-8000-000000000019",
+          "/studio/10000000-0000-4000-8000-000000000020",
+          "/studio/10000000-0000-4000-8000-000000000021",
+          "/studio/10000000-0000-4000-8000-000000000022",
+          "/studio/10000000-0000-4000-8000-000000000023"
+        ]
+      },
+      {
+        "name": "Editor frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 0,
+        "TextOverlay": 0,
+        "WholePlayer": 76,
+        "WholeControls": 75,
+        "ClipEditor": 0,
+        "AdvancedSettings": 75,
+        "Filmstrip": 0
+      },
+      {
+        "name": "Zoom follows clock",
+        "before": "0",
+        "after": "22"
+      },
+      {
+        "name": "Drag timeline handle",
+        "ms": 19
+      },
+      {
+        "name": "Type text",
+        "ms": 13.199999988079071
+      },
+      {
+        "name": "Seek",
+        "ms": 21.69999998807907
+      },
+      {
+        "name": "Editor Cut Undo Redo",
+        "before": 2,
+        "cut": 3,
+        "undo": 2,
+        "redo": 3,
+        "focusInside": true
+      },
+      {
+        "name": "Tiles top",
+        "videos": 24,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000000",
+          "/studio/10000000-0000-4000-8000-000000000001",
+          "/studio/10000000-0000-4000-8000-000000000002",
+          "/studio/10000000-0000-4000-8000-000000000003",
+          "/studio/10000000-0000-4000-8000-000000000004",
+          "/studio/10000000-0000-4000-8000-000000000005",
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017",
+          "/studio/10000000-0000-4000-8000-000000000018",
+          "/studio/10000000-0000-4000-8000-000000000019",
+          "/studio/10000000-0000-4000-8000-000000000020",
+          "/studio/10000000-0000-4000-8000-000000000021",
+          "/studio/10000000-0000-4000-8000-000000000022",
+          "/studio/10000000-0000-4000-8000-000000000023"
+        ]
+      },
+      {
+        "name": "Tiles bottom",
+        "videos": 24,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000000",
+          "/studio/10000000-0000-4000-8000-000000000001",
+          "/studio/10000000-0000-4000-8000-000000000002",
+          "/studio/10000000-0000-4000-8000-000000000003",
+          "/studio/10000000-0000-4000-8000-000000000004",
+          "/studio/10000000-0000-4000-8000-000000000005",
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017",
+          "/studio/10000000-0000-4000-8000-000000000018",
+          "/studio/10000000-0000-4000-8000-000000000019",
+          "/studio/10000000-0000-4000-8000-000000000020",
+          "/studio/10000000-0000-4000-8000-000000000021",
+          "/studio/10000000-0000-4000-8000-000000000022",
+          "/studio/10000000-0000-4000-8000-000000000023"
+        ]
+      },
+      {
+        "name": "Editor frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 0,
+        "TextOverlay": 0,
+        "WholePlayer": 76,
+        "WholeControls": 75,
+        "ClipEditor": 0,
+        "AdvancedSettings": 75,
+        "Filmstrip": 0
+      },
+      {
+        "name": "Zoom follows clock",
+        "before": "0",
+        "after": "22"
+      },
+      {
+        "name": "Drag timeline handle",
+        "ms": 17.200000017881393
+      },
+      {
+        "name": "Type text",
+        "ms": 15.699999988079071
+      },
+      {
+        "name": "Seek",
+        "ms": 16.900000005960464
+      },
+      {
+        "name": "Editor Cut Undo Redo",
+        "before": 2,
+        "cut": 3,
+        "undo": 2,
+        "redo": 3,
+        "focusInside": true
+      },
+      {
+        "name": "Tiles top",
+        "videos": 24,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000000",
+          "/studio/10000000-0000-4000-8000-000000000001",
+          "/studio/10000000-0000-4000-8000-000000000002",
+          "/studio/10000000-0000-4000-8000-000000000003",
+          "/studio/10000000-0000-4000-8000-000000000004",
+          "/studio/10000000-0000-4000-8000-000000000005",
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017",
+          "/studio/10000000-0000-4000-8000-000000000018",
+          "/studio/10000000-0000-4000-8000-000000000019",
+          "/studio/10000000-0000-4000-8000-000000000020",
+          "/studio/10000000-0000-4000-8000-000000000021",
+          "/studio/10000000-0000-4000-8000-000000000022",
+          "/studio/10000000-0000-4000-8000-000000000023"
+        ]
+      },
+      {
+        "name": "Tiles bottom",
+        "videos": 24,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000000",
+          "/studio/10000000-0000-4000-8000-000000000001",
+          "/studio/10000000-0000-4000-8000-000000000002",
+          "/studio/10000000-0000-4000-8000-000000000003",
+          "/studio/10000000-0000-4000-8000-000000000004",
+          "/studio/10000000-0000-4000-8000-000000000005",
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017",
+          "/studio/10000000-0000-4000-8000-000000000018",
+          "/studio/10000000-0000-4000-8000-000000000019",
+          "/studio/10000000-0000-4000-8000-000000000020",
+          "/studio/10000000-0000-4000-8000-000000000021",
+          "/studio/10000000-0000-4000-8000-000000000022",
+          "/studio/10000000-0000-4000-8000-000000000023"
+        ]
+      },
+      {
+        "name": "Editor frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 0,
+        "TextOverlay": 0,
+        "WholePlayer": 76,
+        "WholeControls": 75,
+        "ClipEditor": 0,
+        "AdvancedSettings": 75,
+        "Filmstrip": 0
+      },
+      {
+        "name": "Zoom follows clock",
+        "before": "0",
+        "after": "22"
+      },
+      {
+        "name": "Drag timeline handle",
+        "ms": 7.9000000059604645
+      },
+      {
+        "name": "Type text",
+        "ms": 13.599999994039536
+      },
+      {
+        "name": "Seek",
+        "ms": 25
+      },
+      {
+        "name": "Editor Cut Undo Redo",
+        "before": 2,
+        "cut": 3,
+        "undo": 2,
+        "redo": 3,
+        "focusInside": true
+      }
+    ],
+    "errors": []
+  },
+  "dirty_before": {
+    "setup": "Expected baseline failure: actual page text edit, held completion released before250ms, then real debounced PATCH to offline transport",
+    "actions": [
+      {
+        "name": "Tiles top",
+        "videos": 24,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000000",
+          "/studio/10000000-0000-4000-8000-000000000001",
+          "/studio/10000000-0000-4000-8000-000000000002",
+          "/studio/10000000-0000-4000-8000-000000000003",
+          "/studio/10000000-0000-4000-8000-000000000004",
+          "/studio/10000000-0000-4000-8000-000000000005",
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017",
+          "/studio/10000000-0000-4000-8000-000000000018",
+          "/studio/10000000-0000-4000-8000-000000000019",
+          "/studio/10000000-0000-4000-8000-000000000020",
+          "/studio/10000000-0000-4000-8000-000000000021",
+          "/studio/10000000-0000-4000-8000-000000000022",
+          "/studio/10000000-0000-4000-8000-000000000023"
+        ]
+      },
+      {
+        "name": "Tiles bottom",
+        "videos": 24,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000000",
+          "/studio/10000000-0000-4000-8000-000000000001",
+          "/studio/10000000-0000-4000-8000-000000000002",
+          "/studio/10000000-0000-4000-8000-000000000003",
+          "/studio/10000000-0000-4000-8000-000000000004",
+          "/studio/10000000-0000-4000-8000-000000000005",
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017",
+          "/studio/10000000-0000-4000-8000-000000000018",
+          "/studio/10000000-0000-4000-8000-000000000019",
+          "/studio/10000000-0000-4000-8000-000000000020",
+          "/studio/10000000-0000-4000-8000-000000000021",
+          "/studio/10000000-0000-4000-8000-000000000022",
+          "/studio/10000000-0000-4000-8000-000000000023"
+        ]
+      },
+      {
+        "name": "New video",
+        "ms": 23.900000005960464,
+        "videos": 0
+      },
+      {
+        "name": "Step 1",
+        "ms": 33.5,
+        "videos": 2
+      },
+      {
+        "name": "Step 2",
+        "ms": 33.5,
+        "videos": 2
+      },
+      {
+        "name": "Step 3",
+        "ms": 32.89999997615814,
+        "videos": 2
+      },
+      {
+        "name": "Step 4",
+        "ms": 33.29999998211861,
+        "videos": 2
+      },
+      {
+        "name": "Step 5",
+        "ms": 33.80000001192093,
+        "videos": 2
+      },
+      {
+        "name": "Step 6",
+        "ms": 33.5,
+        "videos": 4
+      },
+      {
+        "name": "Choose your character",
+        "ms": 33.39999997615814,
+        "videos": 4
+      },
+      {
+        "name": "Phone play",
+        "ms": 33.69999998807907,
+        "videos": 4
+      },
+      {
+        "name": "Phone frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 75,
+        "TextOverlay": 0,
+        "WholePlayer": 0,
+        "WholeControls": 0,
+        "ClipEditor": 0,
+        "AdvancedSettings": 0,
+        "Filmstrip": 0
+      },
+      {
+        "name": "My files",
+        "ms": 33.5,
+        "videos": 4
+      },
+      {
+        "name": "My files Generated hooks",
+        "ms": 33.400000005960464,
+        "videos": 5
+      },
+      {
+        "name": "My files Characters",
+        "ms": 33.19999998807907,
+        "videos": 4
+      },
+      {
+        "name": "My files Demos",
+        "ms": 33.30000001192093,
+        "videos": 5
+      },
+      {
+        "name": "My files Uploaded",
+        "ms": 33.400000005960464,
+        "videos": 4
+      },
+      {
+        "name": "My files Music",
+        "ms": 33.30000001192093,
+        "videos": 4
+      },
+      {
+        "name": "My files Hooks",
+        "ms": 33.900000005960464,
+        "videos": 4
+      },
+      {
+        "name": "My files Exported",
+        "ms": 33.19999998807907,
+        "videos": 4
+      },
+      {
+        "name": "Edit video",
+        "ms": 34.900000005960464,
+        "videos": 4
+      },
+      {
+        "name": "Select clip before playback",
+        "ms": 33.5,
+        "videos": 5
+      },
+      {
+        "name": "Editor play",
+        "ms": 33.099999994039536,
+        "videos": 5
+      },
+      {
+        "name": "Editor frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 0,
+        "TextOverlay": 0,
+        "WholePlayer": 75,
+        "WholeControls": 74,
+        "ClipEditor": 0,
+        "AdvancedSettings": 74,
+        "Filmstrip": 0
+      },
+      {
+        "name": "Zoom follows clock",
+        "before": "0",
+        "after": "22"
+      },
+      {
+        "name": "Select clip",
+        "ms": 34,
+        "videos": 5
+      },
+      {
+        "name": "Drag timeline handle",
+        "ms": 23.099999994039536
+      },
+      {
+        "name": "Select text",
+        "ms": 29.299999982118607,
+        "videos": 5
+      },
+      {
+        "name": "Type text",
+        "ms": 26.599999994039536
+      },
+      {
+        "name": "Dirty completion",
+        "visible": false,
+        "savedText": "Audit text",
+        "savedSource": "/audit-fixture.mp4?completed=1"
+      }
+    ],
+    "errors": []
+  },
+  "after": {
+    "setup": "Actual Next production build, proxy bypassed only in isolated copy; synthetic 24 runs and 60 curated refs, API stubs 120ms, Chrome muted, CPU 2x, desktop 1440x1000. FCP is paint timing, usable is control readiness, not formal TTI. Two rAF is a conservative click-to-paint proxy.",
+    "rows": [
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 403,
+        "fp": 116,
+        "fcp": 116,
+        "usableMs": 399.69999998807907,
+        "jsTransferBytes": 243708,
+        "jsEncodedBytes": 240408,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 126.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 125.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 131.19999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 131,
+            "serverTiming": []
+          }
+        ],
+        "videos": 0,
+        "tasks": [
+          50
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 340,
+        "fp": 64,
+        "fcp": 64,
+        "usableMs": 337.59999999403954,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 240408,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 131.2999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 131.10000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 128,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 127.7999999821186,
+            "serverTiming": []
+          }
+        ],
+        "videos": 18,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 456,
+        "fp": 88,
+        "fcp": 88,
+        "usableMs": 453.19999998807907,
+        "jsTransferBytes": 312802,
+        "jsEncodedBytes": 307702,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 136,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 135.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 124.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 124.09999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 123.59999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          54
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 346,
+        "fp": 56,
+        "fcp": 56,
+        "usableMs": 343.09999999403954,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 307702,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 130.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 130.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 129.7000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 129.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 129,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      },
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 359,
+        "fp": 68,
+        "fcp": 68,
+        "usableMs": 354.7000000178814,
+        "jsTransferBytes": 243708,
+        "jsEncodedBytes": 240408,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 134.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 134.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 123.2999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 123.19999998807907,
+            "serverTiming": []
+          }
+        ],
+        "videos": 0,
+        "tasks": [
+          54
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 259,
+        "fp": 80,
+        "fcp": 80,
+        "usableMs": 256.39999997615814,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 240408,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 125.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 125.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 122.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 122.59999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 0,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 459,
+        "fp": 56,
+        "fcp": 56,
+        "usableMs": 455.30000001192093,
+        "jsTransferBytes": 312802,
+        "jsEncodedBytes": 307702,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 132,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 131.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 122.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 121.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 121.40000000596046,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          53
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 347,
+        "fp": 68,
+        "fcp": 68,
+        "usableMs": 343.7999999821186,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 307702,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 130.59999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 130.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 122.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 122.59999999403954,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 122,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      },
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 357,
+        "fp": 68,
+        "fcp": 68,
+        "usableMs": 352.7000000178814,
+        "jsTransferBytes": 243708,
+        "jsEncodedBytes": 240408,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 135.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 135.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 130.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 130.59999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 0,
+        "tasks": [
+          52
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 334,
+        "fp": 68,
+        "fcp": 68,
+        "usableMs": 330.7999999821186,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 240408,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 120.60000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 120.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 133,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 132.7999999821186,
+            "serverTiming": []
+          }
+        ],
+        "videos": 18,
+        "tasks": []
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 370,
+        "fp": 76,
+        "fcp": 76,
+        "usableMs": 367.10000002384186,
+        "jsTransferBytes": 312802,
+        "jsEncodedBytes": 307702,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 123.89999997615814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 124,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 126.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 126.60000002384186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 126.09999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          51
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 347,
+        "fp": 56,
+        "fcp": 56,
+        "usableMs": 343.5,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 307702,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 128.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 128.30000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 128.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 128.39999997615814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 127.89999997615814,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      }
+    ],
+    "actions": [
+      {
+        "name": "Tiles top",
+        "videos": 18,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000000",
+          "/studio/10000000-0000-4000-8000-000000000001",
+          "/studio/10000000-0000-4000-8000-000000000002",
+          "/studio/10000000-0000-4000-8000-000000000003",
+          "/studio/10000000-0000-4000-8000-000000000004",
+          "/studio/10000000-0000-4000-8000-000000000005",
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017"
+        ]
+      },
+      {
+        "name": "Tiles bottom",
+        "videos": 18,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017",
+          "/studio/10000000-0000-4000-8000-000000000018",
+          "/studio/10000000-0000-4000-8000-000000000019",
+          "/studio/10000000-0000-4000-8000-000000000020",
+          "/studio/10000000-0000-4000-8000-000000000021",
+          "/studio/10000000-0000-4000-8000-000000000022",
+          "/studio/10000000-0000-4000-8000-000000000023"
+        ]
+      },
+      {
+        "name": "Editor frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 0,
+        "TextOverlay": 0,
+        "WholePlayer": 1,
+        "WholeMedia": 75,
+        "WholeAudio": 75,
+        "WholeControls": 1,
+        "WholeTransport": 75,
+        "WholePlayhead": 75,
+        "ClipEditor": 0,
+        "AdvancedSettings": 1,
+        "Filmstrip": 0,
+        "AdjustmentControl": 81,
+        "ClockedMotionRow": 75
+      },
+      {
+        "name": "Zoom follows clock",
+        "before": "0",
+        "after": "22"
+      },
+      {
+        "name": "Drag timeline handle",
+        "ms": 17.80000001192093
+      },
+      {
+        "name": "Type text",
+        "ms": 9.5
+      },
+      {
+        "name": "Seek",
+        "ms": 18.80000001192093
+      },
+      {
+        "name": "Editor Cut Undo Redo",
+        "before": 2,
+        "cut": 3,
+        "undo": 2,
+        "redo": 3,
+        "focusInside": true
+      },
+      {
+        "name": "Tiles top",
+        "videos": 18,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000000",
+          "/studio/10000000-0000-4000-8000-000000000001",
+          "/studio/10000000-0000-4000-8000-000000000002",
+          "/studio/10000000-0000-4000-8000-000000000003",
+          "/studio/10000000-0000-4000-8000-000000000004",
+          "/studio/10000000-0000-4000-8000-000000000005",
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017"
+        ]
+      },
+      {
+        "name": "Tiles bottom",
+        "videos": 18,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017",
+          "/studio/10000000-0000-4000-8000-000000000018",
+          "/studio/10000000-0000-4000-8000-000000000019",
+          "/studio/10000000-0000-4000-8000-000000000020",
+          "/studio/10000000-0000-4000-8000-000000000021",
+          "/studio/10000000-0000-4000-8000-000000000022",
+          "/studio/10000000-0000-4000-8000-000000000023"
+        ]
+      },
+      {
+        "name": "Editor frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 0,
+        "TextOverlay": 0,
+        "WholePlayer": 1,
+        "WholeMedia": 75,
+        "WholeAudio": 75,
+        "WholeControls": 1,
+        "WholeTransport": 75,
+        "WholePlayhead": 75,
+        "ClipEditor": 0,
+        "AdvancedSettings": 1,
+        "Filmstrip": 0,
+        "AdjustmentControl": 81,
+        "ClockedMotionRow": 75
+      },
+      {
+        "name": "Zoom follows clock",
+        "before": "0",
+        "after": "23"
+      },
+      {
+        "name": "Drag timeline handle",
+        "ms": 4.899999976158142
+      },
+      {
+        "name": "Type text",
+        "ms": 18.19999998807907
+      },
+      {
+        "name": "Seek",
+        "ms": 31
+      },
+      {
+        "name": "Editor Cut Undo Redo",
+        "before": 2,
+        "cut": 3,
+        "undo": 2,
+        "redo": 3,
+        "focusInside": true
+      },
+      {
+        "name": "Tiles top",
+        "videos": 18,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000000",
+          "/studio/10000000-0000-4000-8000-000000000001",
+          "/studio/10000000-0000-4000-8000-000000000002",
+          "/studio/10000000-0000-4000-8000-000000000003",
+          "/studio/10000000-0000-4000-8000-000000000004",
+          "/studio/10000000-0000-4000-8000-000000000005",
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017"
+        ]
+      },
+      {
+        "name": "Tiles bottom",
+        "videos": 18,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017",
+          "/studio/10000000-0000-4000-8000-000000000018",
+          "/studio/10000000-0000-4000-8000-000000000019",
+          "/studio/10000000-0000-4000-8000-000000000020",
+          "/studio/10000000-0000-4000-8000-000000000021",
+          "/studio/10000000-0000-4000-8000-000000000022",
+          "/studio/10000000-0000-4000-8000-000000000023"
+        ]
+      },
+      {
+        "name": "Editor frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 0,
+        "TextOverlay": 0,
+        "WholePlayer": 1,
+        "WholeMedia": 74,
+        "WholeAudio": 74,
+        "WholeControls": 1,
+        "WholeTransport": 74,
+        "WholePlayhead": 74,
+        "ClipEditor": 0,
+        "AdvancedSettings": 1,
+        "Filmstrip": 0,
+        "AdjustmentControl": 80,
+        "ClockedMotionRow": 74
+      },
+      {
+        "name": "Zoom follows clock",
+        "before": "0",
+        "after": "22"
+      },
+      {
+        "name": "Drag timeline handle",
+        "ms": 10.599999994039536
+      },
+      {
+        "name": "Type text",
+        "ms": 13
+      },
+      {
+        "name": "Seek",
+        "ms": 30.69999998807907
+      },
+      {
+        "name": "Editor Cut Undo Redo",
+        "before": 2,
+        "cut": 3,
+        "undo": 2,
+        "redo": 3,
+        "focusInside": true
+      }
+    ],
+    "errors": []
+  },
+  "dirty_after": {
+    "setup": "Actual Next production build, proxy bypassed only in isolated copy; synthetic 24 runs and 60 curated refs, API stubs 120ms, Chrome muted, CPU 2x, desktop 1440x1000. FCP is paint timing, usable is control readiness, not formal TTI. Two rAF is a conservative click-to-paint proxy.",
+    "rows": [
+      {
+        "path": "/studio",
+        "cold": true,
+        "wallMs": 357,
+        "fp": 64,
+        "fcp": 64,
+        "usableMs": 352,
+        "jsTransferBytes": 243708,
+        "jsEncodedBytes": 240408,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 122.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 122.69999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 132.7999999821186,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 132.59999999403954,
+            "serverTiming": []
+          }
+        ],
+        "videos": 0,
+        "tasks": [
+          58
+        ]
+      },
+      {
+        "path": "/studio",
+        "cold": false,
+        "wallMs": 356,
+        "fp": 64,
+        "fcp": 64,
+        "usableMs": 352.09999999403954,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 240408,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 123.19999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 123,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 132.80000001192093,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs",
+            "duration": 132.30000001192093,
+            "serverTiming": []
+          }
+        ],
+        "videos": 0,
+        "tasks": [
+          57
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": true,
+        "wallMs": 440,
+        "fp": 64,
+        "fcp": 64,
+        "usableMs": 436.80000001192093,
+        "jsTransferBytes": 312802,
+        "jsEncodedBytes": 307702,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 121.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 121.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 123.2000000178814,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 122.90000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 122.39999997615814,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": [
+          54
+        ]
+      },
+      {
+        "path": "/studio/10000000-0000-4000-8000-000000000000",
+        "cold": false,
+        "wallMs": 344,
+        "fp": 64,
+        "fcp": 64,
+        "usableMs": 341.19999998807907,
+        "jsTransferBytes": 300,
+        "jsEncodedBytes": 307702,
+        "api": [
+          {
+            "path": "/api/profile",
+            "duration": 130.19999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/usage",
+            "duration": 130,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/references",
+            "duration": 128.40000000596046,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+            "duration": 128.19999998807907,
+            "serverTiming": []
+          },
+          {
+            "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+            "duration": 128,
+            "serverTiming": []
+          }
+        ],
+        "videos": 1,
+        "tasks": []
+      }
+    ],
+    "actions": [
+      {
+        "name": "Tiles top",
+        "videos": 18,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000000",
+          "/studio/10000000-0000-4000-8000-000000000001",
+          "/studio/10000000-0000-4000-8000-000000000002",
+          "/studio/10000000-0000-4000-8000-000000000003",
+          "/studio/10000000-0000-4000-8000-000000000004",
+          "/studio/10000000-0000-4000-8000-000000000005",
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017"
+        ]
+      },
+      {
+        "name": "Tiles bottom",
+        "videos": 18,
+        "rect": {
+          "width": 171.15625,
+          "height": 304.265625
+        },
+        "ids": [
+          "/studio/10000000-0000-4000-8000-000000000006",
+          "/studio/10000000-0000-4000-8000-000000000007",
+          "/studio/10000000-0000-4000-8000-000000000008",
+          "/studio/10000000-0000-4000-8000-000000000009",
+          "/studio/10000000-0000-4000-8000-000000000010",
+          "/studio/10000000-0000-4000-8000-000000000011",
+          "/studio/10000000-0000-4000-8000-000000000012",
+          "/studio/10000000-0000-4000-8000-000000000013",
+          "/studio/10000000-0000-4000-8000-000000000014",
+          "/studio/10000000-0000-4000-8000-000000000015",
+          "/studio/10000000-0000-4000-8000-000000000016",
+          "/studio/10000000-0000-4000-8000-000000000017",
+          "/studio/10000000-0000-4000-8000-000000000018",
+          "/studio/10000000-0000-4000-8000-000000000019",
+          "/studio/10000000-0000-4000-8000-000000000020",
+          "/studio/10000000-0000-4000-8000-000000000021",
+          "/studio/10000000-0000-4000-8000-000000000022",
+          "/studio/10000000-0000-4000-8000-000000000023"
+        ]
+      },
+      {
+        "name": "New video",
+        "ms": 23.5,
+        "videos": 0
+      },
+      {
+        "name": "Step 1",
+        "ms": 33.30000001192093,
+        "videos": 2
+      },
+      {
+        "name": "Step 2",
+        "ms": 33.19999998807907,
+        "videos": 2
+      },
+      {
+        "name": "Step 3",
+        "ms": 33.20000001788139,
+        "videos": 2
+      },
+      {
+        "name": "Step 4",
+        "ms": 33.29999998211861,
+        "videos": 2
+      },
+      {
+        "name": "Step 5",
+        "ms": 33.599999994039536,
+        "videos": 2
+      },
+      {
+        "name": "Step 6",
+        "ms": 43.69999998807907,
+        "videos": 4
+      },
+      {
+        "name": "Choose your character",
+        "ms": 33.400000005960464,
+        "videos": 4
+      },
+      {
+        "name": "Phone play",
+        "ms": 33.10000002384186,
+        "videos": 4
+      },
+      {
+        "name": "Phone frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 76,
+        "TextOverlay": 0,
+        "WholePlayer": 0,
+        "WholeMedia": 0,
+        "WholeAudio": 0,
+        "WholeControls": 0,
+        "WholeTransport": 0,
+        "WholePlayhead": 0,
+        "ClipEditor": 0,
+        "AdvancedSettings": 0,
+        "Filmstrip": 0
+      },
+      {
+        "name": "My files",
+        "ms": 33.19999998807907,
+        "videos": 4
+      },
+      {
+        "name": "My files Generated hooks",
+        "ms": 32,
+        "videos": 5
+      },
+      {
+        "name": "My files Characters",
+        "ms": 33.099999994039536,
+        "videos": 4
+      },
+      {
+        "name": "My files Demos",
+        "ms": 33.5,
+        "videos": 5
+      },
+      {
+        "name": "My files Uploaded",
+        "ms": 34.29999998211861,
+        "videos": 4
+      },
+      {
+        "name": "My files Music",
+        "ms": 33,
+        "videos": 4
+      },
+      {
+        "name": "My files Hooks",
+        "ms": 33.39999997615814,
+        "videos": 4
+      },
+      {
+        "name": "My files Exported",
+        "ms": 33.400000005960464,
+        "videos": 4
+      },
+      {
+        "name": "Edit video",
+        "ms": 33.30000001192093,
+        "videos": 4
+      },
+      {
+        "name": "Select clip before playback",
+        "ms": 33.29999998211861,
+        "videos": 5
+      },
+      {
+        "name": "Editor play",
+        "ms": 34.70000001788139,
+        "videos": 5
+      },
+      {
+        "name": "Editor frame renders",
+        "RunView": 0,
+        "timeline": 0,
+        "soundPieces": 0,
+        "RunPreview": 0,
+        "TextOverlay": 0,
+        "WholePlayer": 1,
+        "WholeMedia": 75,
+        "WholeAudio": 75,
+        "WholeControls": 1,
+        "WholeTransport": 75,
+        "WholePlayhead": 75,
+        "ClipEditor": 0,
+        "AdvancedSettings": 1,
+        "Filmstrip": 0,
+        "AdjustmentControl": 81,
+        "ClockedMotionRow": 75
+      },
+      {
+        "name": "Zoom follows clock",
+        "before": "0",
+        "after": "22"
+      },
+      {
+        "name": "Select clip",
+        "ms": 33.099999994039536,
+        "videos": 5
+      },
+      {
+        "name": "Drag timeline handle",
+        "ms": 29.30000001192093
+      },
+      {
+        "name": "Select text",
+        "ms": 33.5,
+        "videos": 5
+      },
+      {
+        "name": "Type text",
+        "ms": 30.69999998807907
+      },
+      {
+        "name": "Dirty completion",
+        "visible": true,
+        "savedText": "Audit text edited",
+        "savedSource": "/audit-fixture.mp4?completed=1"
+      },
+      {
+        "name": "Seek",
+        "ms": 32.900000005960464
+      },
+      {
+        "name": "Editor inspection",
+        "videos": 9,
+        "created": 22,
+        "seeks": 25,
+        "decodedBytes": [
+          22635,
+          68421,
+          22635,
+          35804,
+          45270,
+          285942,
+          35804,
+          297989,
+          39013
+        ],
+        "sliders": [
+          "Trim start",
+          "Trim end",
+          "Trim start",
+          "Trim end",
+          "Preview time"
+        ],
+        "buttons": [
+          "Done",
+          "Emoji",
+          "Text style",
+          "Add text",
+          "Delete text",
+          "Play",
+          "Undo",
+          "Redo",
+          "Cut",
+          "Delete",
+          "Copy",
+          "Paste",
+          "Text",
+          "Sound",
+          "Magnet",
+          "Zoom out",
+          "Zoom in"
+        ]
+      },
+      {
+        "name": "Editor Cut Undo Redo",
+        "before": 2,
+        "cut": 3,
+        "undo": 2,
+        "redo": 3,
+        "focusInside": true
+      },
+      {
+        "name": "Viral library",
+        "ms": 36.19999998807907,
+        "videos": 0
+      }
+    ],
+    "requests": [
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 17919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=summary",
+        "method": "GET",
+        "bytes": 17919,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs",
+        "method": "POST",
+        "bytes": 993,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/5f3365ca-4bca-4114-9fc5-6a108e39c2d4?view=editor",
+        "method": "GET",
+        "bytes": 1699,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/5f3365ca-4bca-4114-9fc5-6a108e39c2d4/generate",
+        "method": "GET",
+        "bytes": 64,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000?view=editor",
+        "method": "GET",
+        "bytes": 1699,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 64,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/profile",
+        "method": "GET",
+        "bytes": 76,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/usage",
+        "method": "GET",
+        "bytes": 38,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=catalog&scope=curated&all=1",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000?view=editor",
+        "method": "GET",
+        "bytes": 1699,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/generate",
+        "method": "GET",
+        "bytes": 64,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000/export",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=faces",
+        "method": "GET",
+        "bytes": 6241,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/file-prefs",
+        "method": "GET",
+        "bytes": 24,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs?view=history",
+        "method": "GET",
+        "bytes": 20199,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/assets",
+        "method": "GET",
+        "bytes": 2,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/references?view=cards",
+        "method": "GET",
+        "bytes": 26991,
+        "fixtureDelayMs": 120
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "PATCH",
+        "bytes": 1019,
+        "fixtureDelayMs": 120,
+        "patch": {
+          "hook": {
+            "mode": "upload",
+            "source": "library",
+            "describe": "Audit motion",
+            "describeReady": true,
+            "text": "Audit text",
+            "clip": null,
+            "face": {
+              "kind": "character",
+              "id": "olivia"
+            },
+            "generated": {
+              "src": "/audit-fixture.mp4",
+              "seconds": 3,
+              "at": "2026-11-01T00:00:00.000Z"
+            },
+            "adjust": {
+              "keys": [
+                {
+                  "t": 0,
+                  "zoom": 0,
+                  "panX": 0,
+                  "panY": 0
+                },
+                {
+                  "t": 3,
+                  "zoom": 60,
+                  "panX": 20,
+                  "panY": 0
+                }
+              ]
+            },
+            "start": 0,
+            "end": 2.837
+          },
+          "demo": {
+            "clip": null,
+            "frame": "none",
+            "mode": "clips",
+            "clips": [
+              {
+                "id": "demo1",
+                "label": "Demo",
+                "src": "/audit-fixture.mp4",
+                "seconds": 6,
+                "start": 0,
+                "end": 3
+              }
+            ]
+          },
+          "texts": [
+            {
+              "id": "hook",
+              "text": "Audit text",
+              "start": 0,
+              "end": 2.837,
+              "x": 50,
+              "y": 22,
+              "size": 4.6,
+              "font": "Arial",
+              "color": "#ffffff",
+              "style": "outline"
+            }
+          ],
+          "project": null
+        }
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "PATCH",
+        "bytes": 1019,
+        "fixtureDelayMs": 120,
+        "patch": {
+          "texts": [
+            {
+              "id": "hook",
+              "text": "Audit text edited",
+              "start": 0,
+              "end": 3,
+              "x": 50,
+              "y": 22,
+              "size": 4.6,
+              "font": "Arial",
+              "color": "#ffffff",
+              "style": "outline"
+            }
+          ],
+          "hook": {
+            "mode": "upload",
+            "source": "library",
+            "describe": "Audit motion",
+            "describeReady": true,
+            "text": "Audit text edited",
+            "clip": null,
+            "face": {
+              "kind": "character",
+              "id": "olivia"
+            },
+            "generated": {
+              "src": "/audit-fixture.mp4?completed=1",
+              "seconds": 3,
+              "at": "2026-11-01T00:00:00.000Z"
+            },
+            "adjust": {
+              "keys": [
+                {
+                  "t": 0,
+                  "zoom": 0,
+                  "panX": 0,
+                  "panY": 0
+                },
+                {
+                  "t": 3,
+                  "zoom": 60,
+                  "panX": 20,
+                  "panY": 0
+                }
+              ]
+            }
+          },
+          "project": null
+        }
+      },
+      {
+        "path": "/api/runs/10000000-0000-4000-8000-000000000000",
+        "method": "PATCH",
+        "bytes": 1116,
+        "fixtureDelayMs": 120,
+        "patch": {
+          "demo": {
+            "clip": null,
+            "frame": "none",
+            "mode": "clips",
+            "clips": [
+              {
+                "id": "demo1",
+                "label": "Demo",
+                "src": "/audit-fixture.mp4",
+                "seconds": 6,
+                "start": 0,
+                "end": 3,
+                "parts": [
+                  {
+                    "id": "p0",
+                    "start": 0,
+                    "end": 0.827
+                  },
+                  {
+                    "id": "qvvacl4u",
+                    "start": 0.827,
+                    "end": 3
+                  }
+                ]
+              }
+            ]
+          },
+          "texts": [
+            {
+              "id": "hook",
+              "text": "Audit text edited",
+              "start": 0,
+              "end": 3,
+              "x": 50,
+              "y": 22,
+              "size": 4.6,
+              "font": "Arial",
+              "color": "#ffffff",
+              "style": "outline"
+            }
+          ],
+          "project": null,
+          "hook": {
+            "mode": "upload",
+            "source": "library",
+            "describe": "Audit motion",
+            "describeReady": true,
+            "text": "Audit text edited",
+            "clip": null,
+            "face": {
+              "kind": "character",
+              "id": "olivia"
+            },
+            "generated": {
+              "src": "/audit-fixture.mp4?completed=1",
+              "seconds": 3,
+              "at": "2026-11-01T00:00:00.000Z"
+            },
+            "adjust": {
+              "keys": [
+                {
+                  "t": 0,
+                  "zoom": 0,
+                  "panX": 0,
+                  "panY": 0
+                },
+                {
+                  "t": 3,
+                  "zoom": 60,
+                  "panX": 20,
+                  "panY": 0
+                }
+              ]
+            }
+          },
+          "sounds": [],
+          "sound": null
+        }
+      }
+    ],
+    "errors": []
+  }
+}

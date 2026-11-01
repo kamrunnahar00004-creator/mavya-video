@@ -1,3 +1,4 @@
+import { readResponse } from "@/lib/server/read-timing";
 import { billingRow } from "@/lib/server/billing-state";
 import { connection } from "next/server";
 import { allowance, subscriptionOf } from "@/lib/server/usage";
@@ -5,6 +6,10 @@ import { currentUser, signInFirst } from "@/lib/server/who";
 
 /** The signed-in user's plan, AI hooks used this period and the limit (Settings > Usage and Billing). */
 export async function GET() {
+  return readResponse(() => readGET());
+}
+
+async function readGET() {
   await connection();
   const who = await currentUser();
   if (!who) return signInFirst();

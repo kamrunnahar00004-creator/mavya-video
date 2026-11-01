@@ -1,3 +1,4 @@
+import { readPhase, readResponse } from "@/lib/server/read-timing";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { connection } from "next/server";
@@ -24,15 +25,19 @@ async function readLocal(): Promise<Profile> {
 type Row = { first_name: string; last_name: string; avatar_url: string };
 
 async function readAccount(): Promise<Profile | null> {
-  const user = await getSessionUser();
+  const user = await readPhase("auth", getSessionUser);
   if (!user) return null;
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.from("profiles").select("first_name, last_name, avatar_url").eq("id", user.id).maybeSingle<Row>();
+  const { data, error } = await readPhase("sql", async () => await supabase.from("profiles").select("first_name, last_name, avatar_url").eq("id", user.id).maybeSingle<Row>());
   if (error) throw error;
   return { email: user.email ?? "", firstName: data?.first_name ?? "", lastName: data?.last_name ?? "", avatar: data?.avatar_url ?? "" };
 }
 
 export async function GET() {
+  return readResponse(() => readGET());
+}
+
+async function readGET() {
   await connection();
   if (!authEnabled()) return Response.json(await readLocal());
   try {

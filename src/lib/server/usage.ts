@@ -1,4 +1,5 @@
 import "server-only";
+import { readPhase } from "@/lib/server/read-timing";
 import { cloud } from "@/lib/server/store";
 import { createSupabaseAdminClient, getSessionUser } from "@/lib/supabase/server";
 import type { BillingCycle, PlanId } from "@/lib/plans";
@@ -19,7 +20,7 @@ type Sub = { plan: PlanId | null; cycle: BillingCycle | null; status: string | n
 
 export async function subscriptionOf(who: string): Promise<Sub | null> {
   if (!cloud()) return null;
-  const { data, error } = await createSupabaseAdminClient().from("subscriptions").select("plan, cycle, status, current_period_start, current_period_end, cancel_at_period_end").eq("user_id", who).maybeSingle<Sub>();
+  const { data, error } = await readPhase("sql", async () => await createSupabaseAdminClient().from("subscriptions").select("plan, cycle, status, current_period_start, current_period_end, cancel_at_period_end").eq("user_id", who).maybeSingle<Sub>());
   if (error) throw error;
   if (!data?.plan || !["active", "trialing"].includes(data.status ?? "")) return null;
   if (!data.current_period_start || !data.current_period_end || new Date(data.current_period_start).getTime() > Date.now() || new Date(data.current_period_end).getTime() <= Date.now()) return null;
@@ -29,7 +30,8 @@ export async function subscriptionOf(who: string): Promise<Sub | null> {
 /** Read the same monthly window and ledger that the atomic reservation uses. Errors fail closed. */
 export async function allowance(who: string): Promise<Allowance> {
   if (!cloud()) return { plan: null, admin: false, used: 0, limit: 0, resetsAt: null };
-  const { data, error } = await createSupabaseAdminClient().rpc("mavya_allowance", { p_user: who, p_admin: await adminUser(who) });
+  const admin = await adminUser(who);
+  const { data, error } = await readPhase("sql", async () => await createSupabaseAdminClient().rpc("mavya_allowance", { p_user: who, p_admin: admin }));
   if (error || !data) throw error ?? new Error("Allowance unavailable");
   return data as Allowance;
 }

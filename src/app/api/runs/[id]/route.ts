@@ -1,15 +1,26 @@
-import { deleteRun, getRun, updateRun } from "@/lib/server/store";
+import { readResponse } from "@/lib/server/read-timing";
+import { deleteRun, getRun, getReference, updateRun } from "@/lib/server/store";
 import type { Run } from "@/lib/types";
 import { validRunPatch } from "@/lib/server/run-validation";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { renderLimitError } from "@/lib/render-limits";
 import { timeline, videoLength } from "@/lib/edit";
 
-export async function GET(_request: Request, ctx: RouteContext<"/api/runs/[id]">) {
+export async function GET(request: Request, ctx: RouteContext<"/api/runs/[id]">) {
+  return readResponse(() => readGET(request, ctx));
+}
+
+async function readGET(request: Request, ctx: RouteContext<"/api/runs/[id]">) {
   const { id } = await ctx.params;
   const who = await currentUser();
   if (!who) return signInFirst();
   const run = await getRun(id, who);
+  if (new URL(request.url).searchParams.get("view") === "editor") {
+    if (!run) return Response.json({ error: "Not found" }, { status: 404 });
+    const source = run.sourceRefId ? await getReference(run.sourceRefId, who) : null;
+    if (run.sourceRefId && !source) return Response.json({ error: "Not found" }, { status: 404 });
+    return Response.json({ run, source }, { headers: { "Cache-Control": "private, no-store" } });
+  }
   return run ? Response.json(run) : Response.json({ error: "Not found" }, { status: 404 });
 }
 

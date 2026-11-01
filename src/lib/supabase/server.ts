@@ -1,4 +1,5 @@
 import "server-only";
+import { readPhase } from "@/lib/server/read-timing";
 import { assertProductionConfig } from "@/lib/production-config";
 import { workSignal } from "@/lib/server/work-budget";
 import { cache } from "react";
@@ -38,7 +39,7 @@ export const getSessionUser = cache(async () => {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await readPhase("auth", () => supabase.auth.getUser());
   return user;
 });
 

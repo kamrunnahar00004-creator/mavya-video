@@ -1,4 +1,5 @@
 import "server-only";
+import { readPhase } from "@/lib/server/read-timing";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -106,7 +107,7 @@ export async function listReferences(who: string): Promise<Reference[]> {
 export async function getReference(id: string, who: string): Promise<Reference | null> {
   if (!cloud()) return (await readDb()).references.find((r) => r.id === id) ?? null;
   if (!/^[0-9a-f-]{36}$/.test(id)) return null;
-  const { data, error } = await db().from("library").select("*").eq("id", id).maybeSingle<LibraryRow>();
+  const { data, error } = await readPhase("sql", async () => await db().from("library").select("*").eq("id", id).maybeSingle<LibraryRow>());
   if (error) throw error;
   if (!data || (data.owner === "user" && data.user_id !== who)) return null;
   return fromRow(data);
@@ -175,7 +176,7 @@ export async function listRuns(who: string): Promise<Run[]> {
 export async function getRun(id: string, who: string): Promise<Run | null> {
   if (!cloud()) return (await readDb()).runs.find((r) => r.id === id) ?? null;
   if (!/^[0-9a-f-]{36}$/.test(id)) return null;
-  const { data, error } = await db().from("runs").select("data").eq("id", id).eq("user_id", who).maybeSingle<Pick<RunRow, "data">>();
+  const { data, error } = await readPhase("sql", async () => await db().from("runs").select("data").eq("id", id).eq("user_id", who).maybeSingle<Pick<RunRow, "data">>());
   if (error) throw error;
   return data?.data ?? null;
 }
@@ -427,9 +428,12 @@ export async function getFilePrefs(who: string): Promise<FilePrefs> {
     text = await readFile(PREFS_FILE, "utf8").catch(() => null);
   } else {
     // A short-lived link, read straight into memory (no new file; a missing object is a 404 = nothing changed yet).
-    const res = await fetch(await signedGet(prefsKey(who), 60), { cache: "no-store" });
-    if (res.ok) text = await res.text();
-    else if (res.status !== 404) throw Error(`prefs ${res.status}`);
+    text = await readPhase("r2", async () => {
+      const res = await fetch(await signedGet(prefsKey(who), 60), { cache: "no-store" });
+      if (res.ok) return res.text();
+      if (res.status !== 404) throw Error(`prefs ${res.status}`);
+      return null;
+    });
   }
   try {
     const v = text ? (JSON.parse(text) as Partial<FilePrefs>) : {};

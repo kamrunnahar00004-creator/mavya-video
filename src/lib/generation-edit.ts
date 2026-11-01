@@ -28,3 +28,14 @@ export function generationPatch(run: Run, input: Run, generated: Generated, sugg
   if (hook.generated) versions.push(hook.generated);
   return { hook: { ...hook, generated, versions: versions.slice(-50), start: 0, end: generated.seconds, parts: undefined, text: item.text }, texts: [item, ...texts.filter((t) => t.id !== "hook")] };
 }
+
+/** A completion snapshot must not erase edits still waiting for their debounce save. */
+export function reconcileGeneration(run: Run, updated: Run, dirty: { texts: boolean; adjust: boolean }): Run {
+  if (!dirty.texts && !dirty.adjust) return { ...run, hook: updated.hook, texts: updated.texts, project: null };
+  const generated = updated.hook.generated;
+  const local = generated ? generationPatch(run, run, generated, updated.hook.text) : { hook: run.hook, texts: runTexts(run) };
+  const localTexts = local.texts ?? runTexts(run);
+  const texts = dirty.texts ? localTexts : localTexts.map(t => t.id === "hook" ? { ...t, text: updated.hook.text } : t);
+  const text = texts.find(t => t.id === "hook")?.text ?? (dirty.texts ? local.hook.text : updated.hook.text);
+  return { ...run, hook: { ...updated.hook, adjust: dirty.adjust ? run.hook.adjust : updated.hook.adjust, text }, texts, project: null };
+}

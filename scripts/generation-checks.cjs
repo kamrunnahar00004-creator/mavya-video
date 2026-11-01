@@ -10,7 +10,7 @@ function load(file, stubs = {}, env = {}) {
   const module = { exports: {} };
   const source = ts.transpileModule(fs.readFileSync(path.join(root, file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
   vm.runInNewContext(source, { module, exports: module.exports, require(id) {
-    if (id === 'server-only') return {};
+    if (id === 'server-only') return {};if(id==='@/lib/server/read-timing')return {readPhase:(_phase,work)=>work(),readResponse:work=>work()};
     if (Object.hasOwn(stubs, id)) return stubs[id];
     throw new Error(`Unstubbed import: ${id}`);
   }, Buffer, Response, Request, URL, AbortSignal, process: { env }, console: { error() {} } }, { filename: file });

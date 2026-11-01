@@ -1,9 +1,14 @@
+import { readResponse } from "@/lib/server/read-timing";
 import { connection } from "next/server";
 import { getFilePrefs, changeFilePrefs } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 
 /** My files: the seller's names for items and the items removed from the list (see FilePrefs). */
 export async function GET() {
+  return readResponse(() => readGET());
+}
+
+async function readGET() {
   await connection();
   const who = await currentUser();
   if (!who) return signInFirst();

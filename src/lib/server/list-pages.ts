@@ -1,4 +1,5 @@
 import "server-only";
+import { readPhase } from "@/lib/server/read-timing";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { cloud, listAssets, listReferences, listRuns } from "@/lib/server/store";
 import { coverLinks } from "@/lib/server/covers";
@@ -51,7 +52,7 @@ export async function listPage(kind: Kind, who: string, request: Request) {
       let query = createSupabaseAdminClient().from(table).select(kind === "assets" ? "media_id,name,kind,created_at" : kind === "references" ? (compact ? compactSelect : refSummary ? "id,owner,created_at,refStyle:data->ai->style," + refKeys.map(k => k + ":data->" + k).join(",") : "id,owner,data,created_at") : runSelect ?? (summary ? "id,created_at,title:data->>title,updatedAt:data->>updatedAt,sourceRefId:data->>sourceRefId,hook:data->hook,demo:data->demo,product:data->product,sounds:data->sounds,sound:data->sound" : "id,data,created_at"));
       query = kind === "references" ? curatedOnly ? query.eq("owner", "curated") : query.or(`owner.eq.curated,user_id.eq.${who}`) : query.eq("user_id", who);
       if (batchAfter) query = query.or(`created_at.lt.${batchAfter.at},and(created_at.eq.${batchAfter.at},${idKey}.lt.${batchAfter.id})`);
-      const { data, error } = await query.order("created_at", { ascending: false }).order(idKey, { ascending: false }).limit(Math.min(size - rows.length, DATABASE_BATCH));
+      const { data, error } = await readPhase("sql", async () => await query.order("created_at", { ascending: false }).order(idKey, { ascending: false }).limit(Math.min(size - rows.length, DATABASE_BATCH)));
       if (error) throw error;
       const page = (data ?? []) as unknown as Row[];
       if (!page.length) { continuation = false; break; }
@@ -89,7 +90,7 @@ export async function listPage(kind: Kind, who: string, request: Request) {
     const covers = new Map<string, string>();
     const imageURL = "/api/references/thumbnails?ids=" + ids.join(",");
     if (ids.length && cloud()) {
-      const { data, error } = await createSupabaseAdminClient().from("library").select("id,thumb:data->analysis->segments->0->>thumb,fallback:data->>thumbUrl").in("id", ids).or(`owner.eq.curated,user_id.eq.${who}`);
+      const { data, error } = await readPhase("sql", async () => await createSupabaseAdminClient().from("library").select("id,thumb:data->analysis->segments->0->>thumb,fallback:data->>thumbUrl").in("id", ids).or(`owner.eq.curated,user_id.eq.${who}`));
       if (error) throw error;
       for (const row of (data ?? []) as unknown as {id:string;thumb:string|null;fallback:string|null}[]) {
         const thumb = row.thumb ?? row.fallback;

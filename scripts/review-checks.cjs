@@ -8,7 +8,7 @@ const ts = require('typescript');
 const root = path.resolve(__dirname, '..');
 const originalLoad = Module._load;
 Module._load = function (id, parent, main) {
-  if (id === 'server-only') return {};
+  if (id === 'server-only') return {};if(id==='@/lib/server/read-timing')return {readPhase:(_phase,work)=>work(),readResponse:work=>work()};
   if (id.startsWith('@/')) id = path.join(root, 'src', id.slice(2)) + '.ts';
   return originalLoad.call(this, id, parent, main);
 };

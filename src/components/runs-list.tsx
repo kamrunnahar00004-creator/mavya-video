@@ -19,11 +19,30 @@ type View = "grid" | "list";
 /** A video's picture: the generated hook's first frame, else the stolen hook's cover. */
 function Cover({ run, source }: { run: Run; source?: Reference }) {
   const thumb = (run as Run & {cover?: string}).cover ?? source?.analysis?.segments[0]?.thumb ?? source?.thumbUrl;
-  if (run.hook.generated) return <MediaVideo src={`${run.hook.generated.src}#t=0.5`} muted preload="metadata" className="absolute inset-0 h-full w-full object-cover" />;
+  if (run.hook.generated) return <TileVideo src={`${run.hook.generated.src}#t=0.5`} />;
   if (thumb)
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={thumb} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />;
   return null;
+}
+
+/** Keep the same visible tile, without retaining a decoder for offscreen rows. */
+function TileVideo({ src }: { src: string }) {
+  const box = useRef<HTMLSpanElement>(null);
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      let alive = true;
+      queueMicrotask(() => { if (alive) setNear(true); });
+      return () => { alive = false; };
+    }
+    const observer = new IntersectionObserver(([entry]) => setNear(entry.isIntersecting), { rootMargin: "200px" });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return <span ref={box} className="absolute inset-0">{near && <MediaVideo src={src} muted preload="metadata" className="absolute inset-0 h-full w-full object-cover" />}</span>;
 }
 
 /** Progress as a short label: "Ready", or the next step to do. */

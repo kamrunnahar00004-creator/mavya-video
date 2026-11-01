@@ -1,4 +1,5 @@
 "use client";
+import { flushSync } from "react-dom";
 import { RouteSkeleton } from "@/components/route-skeleton";
 import { MediaVideo } from "@/components/media-video";
 
@@ -12,6 +13,7 @@ import { analyzeVideo } from "@/lib/analyze";
 import { CHARACTERS, characterById } from "@/lib/characters";
 import { DEFAULT_FONT } from "@/lib/studio-data";
 import { type Adjust, speedOf } from "@/lib/adjust";
+import { reconcileGeneration } from "@/lib/generation-edit";
 import { soundPieces } from "@/lib/sound";
 
 import { type Seg, clipSrc, demoClips, moveClipPiece, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, snapTexts, storeParts, timeline } from "@/lib/edit";
@@ -115,18 +117,14 @@ export function RunView() {
       setRefs(old => [...(old ?? []).filter(r => !r.partial), ...page.items.filter(r => !(old ?? []).some(x => !x.partial && x.id === r.id))]);
       setRefCursor(page.next);
     }).catch(() => { if (alive) { setRefs(old => old ?? []); setToast("Library is unavailable. Try again."); } });
-    void fetch(`/api/runs/${id}`).then(async response => {
+    void fetch(`/api/runs/${id}?view=editor`, { cache: "no-store" }).then(async response => {
       if (!response.ok) throw Error("missing");
-      let data = await response.json() as Run;
+      const loaded = await response.json() as { run: Run; source: Reference | null };
+      let data = loaded.run;
       if (!alive) return;
-      let full: Reference | null = null;
-      if (data.sourceRefId) {
-        const selected = await fetch(`/api/references/${data.sourceRefId}`, { cache: "no-store" });
-        if (!selected.ok) throw Error("source");
-        full = await selected.json() as Reference;
-        const got = full;
-        if (alive) setRefs(old => [got, ...(old ?? []).filter(r => r.id !== got.id)]);
-      } else setRefs(old => old ?? []);
+      const full = loaded.source;
+      if (full) setRefs(old => [full, ...(old ?? []).filter(r => r.id !== full.id)]);
+      else setRefs(old => old ?? []);
       // Texts a hair off a clip's edge (older 0.1s rounding) snap onto it, so captions start and end with their clip.
       const texts = runTexts(data);
       const fixed = snapTexts(texts, timeline(data, full));
@@ -229,12 +227,22 @@ export function RunView() {
     });
   }, [id, takeAI, writePlan]);
 
-  const onGenerated = useCallback((updated: Run) => setRun((r) => r?.id === updated.id ? { ...r, hook: updated.hook, texts: updated.texts, project: null } : r), []);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const adjustTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onGenerated = useCallback((updated: Run) => {
+    const dirty = { texts: Boolean(saveTimer.current), adjust: Boolean(adjustTimer.current) };
+    // Complete the merge before a debounce callback can snapshot the run, including at the same timer boundary.
+    flushSync(() => setRun((r) => {
+      if (r?.id !== updated.id) return r;
+      const next = reconcileGeneration(r, updated, dirty);
+      runRef.current = next;
+      return next;
+    }));
+  }, []);
   const onGenerateFailed = useCallback(() => setPicked([4]), []);
   const gen = useHookGeneration(id, onGenerated, onGenerateFailed);
 
   /** Text edits from the preview: applied live, saved shortly after (coalesced). */
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const liveTexts = useCallback((fn: (t: TextLayer[]) => TextLayer[]) => setRun((r) => {
     if (!r) return r;
     const texts = fn(runTexts(r));
@@ -254,7 +262,6 @@ export function RunView() {
   }, [id]);
 
   /** Advanced settings of one clip ("hook" or a demo clip id): applied live, saved shortly after. Speed re-times the texts. */
-  const adjustTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const liveAdjust = useCallback(
     (clipId: string, adjust: Partial<Adjust>) => {
       setRun((r) => {

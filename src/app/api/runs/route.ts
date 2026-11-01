@@ -1,9 +1,14 @@
+import { readResponse } from "@/lib/server/read-timing";
 import { listPage, pageResponse, listError } from "@/lib/server/list-pages";
 import { connection } from "next/server";
 import { createRun, getReference } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 
 export async function GET(request: Request) {
+  return readResponse(() => readGET(request));
+}
+
+async function readGET(request: Request) {
   await connection();
   const who = await currentUser();
   if (!who) return signInFirst();

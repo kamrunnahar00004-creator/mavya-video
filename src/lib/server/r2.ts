@@ -1,4 +1,5 @@
 import "server-only";
+import { readPhase } from "@/lib/server/read-timing";
 import { assertProductionConfig } from "@/lib/production-config";
 import { workSignal } from "@/lib/server/work-budget";
 import { createWriteStream } from "node:fs";
@@ -77,7 +78,7 @@ const readLinks = new Map<string, {until: number; value: Promise<string>}>();
 export function signedGet(key: string, seconds = 3600, download?: string): Promise<string> {
   const disposition = download ? `attachment; filename="${download.replace(/[^\w .-]/g, "_")}"` : undefined;
   // Durable worker/provider specs need their full requested lifetime from admission.
-  if (seconds !== 3600) return getSignedUrl(r2(), new GetObjectCommand({ Bucket: Bucket(), Key: key, ResponseContentDisposition: disposition }), { expiresIn: seconds });
+  if (seconds !== 3600) return readPhase("r2", () => getSignedUrl(r2(), new GetObjectCommand({ Bucket: Bucket(), Key: key, ResponseContentDisposition: disposition }), { expiresIn: seconds }));
   // Keep at least half the original lifetime for the browser's 30-minute redirect cache.
   // Permission checks remain at every API entry; PUT grants are never reused.
   const cacheKey = JSON.stringify([Bucket(), key, seconds, disposition]);
@@ -85,7 +86,7 @@ export function signedGet(key: string, seconds = 3600, download?: string): Promi
   const hit = readLinks.get(cacheKey);
   if (hit && hit.until > now) return hit.value;
   readLinks.delete(cacheKey);
-  const value = getSignedUrl(r2(), new GetObjectCommand({ Bucket: Bucket(), Key: key, ResponseContentDisposition: disposition }), { expiresIn: seconds });
+  const value = readPhase("r2", () => getSignedUrl(r2(), new GetObjectCommand({ Bucket: Bucket(), Key: key, ResponseContentDisposition: disposition }), { expiresIn: seconds }));
   if (seconds >= 120) {
     if (readLinks.size >= 1000) readLinks.delete(readLinks.keys().next().value!);
     const entry = {until: now + (Math.min(seconds / 2, 1800) - 60) * 1000, value};

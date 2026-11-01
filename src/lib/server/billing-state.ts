@@ -1,4 +1,5 @@
 import "server-only";
+import { readPhase } from "@/lib/server/read-timing";
 import type Stripe from "stripe";
 import type { BillingCycle, PlanId } from "@/lib/plans";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
@@ -17,7 +18,7 @@ export async function billingRpc<T>(name: string, args: Record<string, unknown>)
   return data as T;
 }
 export async function billingRow(user: string): Promise<BillingRow | null> {
-  const { data, error } = await db().from("subscriptions").select("plan,cycle,status,current_period_end,cancel_at_period_end,stripe_customer_id,stripe_subscription_id,last_event_created,billing_revision").eq("user_id", user).maybeSingle<BillingRow>();
+  const { data, error } = await readPhase("sql", async () => await db().from("subscriptions").select("plan,cycle,status,current_period_end,cancel_at_period_end,stripe_customer_id,stripe_subscription_id,last_event_created,billing_revision").eq("user_id", user).maybeSingle<BillingRow>());
   if (error) throw error;
   return data;
 }
