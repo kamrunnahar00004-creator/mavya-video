@@ -760,6 +760,9 @@ export function RunView() {
                   if (notes !== (run.productNotes ?? "")) save({ productNotes: notes });
                   // Send is the explicit click: with a clip picked, the script is rewritten with the new context.
                   if (run.sourceRefId || (hook.source === "describe" && hook.describeReady)) requestScript();
+                  // Sent = done with this step: it closes and the next unfinished one opens.
+                  setProductOk(run.id);
+                  setPicked(undefined);
                 }}
                 onSave={(notes) => {
                   if (notes !== ((runRef.current ?? run).productNotes ?? "")) save({ productNotes: notes });
