@@ -34,9 +34,8 @@ function blank(ctx: CanvasRenderingContext2D, w: number, h: number): boolean {
 }
 
 /**
- * The address to read a file's pixels from. /api/media redirects to storage, and a crossOrigin video fails through
- * that redirect ("Format error"), so it asks for the storage link and loads it directly. The link is signed afresh,
- * so it also never collides with a copy the page's players cached without CORS.
+ * The address to read a file's pixels from. Storage sends no "Vary: Origin", so a crossOrigin video on the same link
+ * as the page's players reuses their cached non-CORS copy and fails ("Format error"). ?link=1 gives a link of its own.
  */
 export async function pixelLink(src: string): Promise<string> {
   const [path] = src.split("#");

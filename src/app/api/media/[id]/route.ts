@@ -15,8 +15,10 @@ export async function GET(request: Request, ctx: RouteContext<"/api/media/[id]">
   if (!info) return new Response("Not found", { status: 404 });
   const file = localMediaPath(id);
   const params = new URL(request.url).searchParams;
-  // ?link=1: the storage link itself. A video read with crossOrigin (to draw its frames) fails through the redirect.
-  if (params.has("link")) return Response.json({ url: file ? `/api/media/${id}` : await mediaLink(id) }, { headers: { "Cache-Control": "no-store" } });
+  // ?link=1: a storage link for reading pixels (crossOrigin). It must differ from the players' link: storage sends no
+  // "Vary: Origin", so the browser would reuse their cached non-CORS copy and the read fails. A lifetime other than
+  // the default skips the shared link cache, so each one is signed afresh.
+  if (params.has("link")) return Response.json({ url: file ? `/api/media/${id}` : await mediaLink(id, 1800) }, { headers: { "Cache-Control": "no-store" } });
   if (file) return fileResponse(request, file, info.size, info.mime);
   // ?download=<name>: the link saves the file (the export's Download button).
   const download = params.get("download");
