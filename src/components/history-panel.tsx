@@ -15,13 +15,14 @@ import { HookPreview, embedUrl } from "@/components/source-picker";
 
 type Face = NonNullable<Run["hook"]["face"]>;
 type Generated = NonNullable<Run["hook"]["generated"]>;
-type Tab = "hooks" | "characters" | "generated" | "demos" | "music" | "exports";
+type Tab = "hooks" | "characters" | "generated" | "demos" | "uploads" | "music" | "exports";
 type Sort = "new" | "old";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "generated", label: "Generated hooks" },
   { id: "characters", label: "Characters" },
   { id: "demos", label: "Demos" },
+  { id: "uploads", label: "Uploaded" },
   { id: "music", label: "Music" },
   { id: "hooks", label: "Hooks" },
   { id: "exports", label: "Exported" },
@@ -36,6 +37,7 @@ const FILTERS: Record<Tab, { id: string; label: string }[]> = {
   characters: [{ id: "all", label: "All" }, { id: "character", label: "Characters" }, { id: "photo", label: "Photos" }],
   generated: [],
   demos: [],
+  uploads: [],
   music: [{ id: "all", label: "All" }, { id: "song", label: "Songs" }, { id: "upload", label: "Uploads" }, { id: "hook", label: "Hook sounds" }],
   exports: [],
 };
@@ -50,7 +52,9 @@ const title = (r: Run) => (r.title === "Untitled run" ? "Untitled video" : r.tit
  * uploaded), characters and photos, generated hooks (every version), demos as they were cut, music, exports.
  * Use replaces that part of the open video (an old generated hook also brings its hook and character).
  */
-export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUseHook, onUseFace, onUseGenerated, onUseDemo, onUseSound }: {
+export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUseHook, onUseFace, onUseGenerated, onUseDemo, onUseUpload, onUseSound }: {
+  /** An uploaded clip goes into this video's demo. */
+  onUseUpload: (a: Asset) => void;
   run: Run;
   refs: Reference[];
   refreshKey?: number;
@@ -170,6 +174,10 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
   const demoNow = demoKey(demoClips(run).filter((c) => clipSrc(c)));
   const soundsNow = new Set((run.sounds ?? (run.sound ? [run.sound] : [])).map((p) => p.src));
 
+  // Every video the seller uploaded, whether or not a video still uses it.
+  const uploads: Entry<Asset>[] = assets.filter((a) => a.kind === "video").map((a) => ({ key: `upload:${a.mediaId}`, at: a.createdAt, kind: "all", value: a }));
+  const usedNow = new Set([...demoClips(run).map((c) => c.mediaId), run.hook.generated?.src.split("/").pop()]);
+
   const music: Entry<SoundPiece>[] = [];
   const seenSound = new Set<string>();
   for (const r of oldestFirst) {
@@ -189,7 +197,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     shown(list)
       .filter((x) => filter === "all" || (filter === "this" ? x.runId === run.id : x.kind === filter))
       .sort((a, b) => (sort === "new" ? b.at.localeCompare(a.at) : a.at.localeCompare(b.at)));
-  const counts: Record<Tab, number> = { hooks: shown(hooks).length, characters: shown(faces).length, generated: shown(generated).length, demos: shown(demos).length, music: shown(music).length, exports: shown(exports).length };
+  const counts: Record<Tab, number> = { hooks: shown(hooks).length, characters: shown(faces).length, generated: shown(generated).length, demos: shown(demos).length, uploads: shown(uploads).length, music: shown(music).length, exports: shown(exports).length };
   // The seller's name for an item, else its default; Rename / Delete save at once (the list updates first).
   const nameOf = (key: string, fallback: string) => prefs.names[key] ?? fallback;
   const changePref = (key: string, change: { name?: string; hidden?: boolean }) => {
@@ -297,6 +305,22 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
         })}
       </Grid>
     ) : empty("Demo clips you cut show here");
+  } else if (tab === "uploads") {
+    const list = pick(uploads);
+    body = list.length ? (
+      <Grid>
+        {list.map((x) => {
+          const src = `/api/media/${x.value.mediaId}`;
+          const inUse = usedNow.has(x.value.mediaId);
+          const use = () => onUseUpload(x.value);
+          return (
+            <Card key={x.key} onOpen={() => setPlaying({ clips: [{ src, start: 0 }], sound: true, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, x.value.name)} meta={meta(x)}>
+              <Still src={src} />
+            </Card>
+          );
+        })}
+      </Grid>
+    ) : empty("Clips you upload show here");
   } else if (tab === "music") {
     const list = pick(music);
     body = list.length ? (

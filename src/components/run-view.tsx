@@ -16,7 +16,7 @@ import { soundPieces } from "@/lib/sound";
 
 import { type Seg, clipSrc, demoClips, moveClipPiece, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, snapTexts, storeParts, timeline } from "@/lib/edit";
 
-import { AVATAR_TONES, TEXT_Y, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
+import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { fmtTime, type DemoClip, type Frame, type Part, type Reference, type Run, type TextLayer, type TextPos } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
 import { ExportButton } from "@/components/export-button";
@@ -1072,6 +1072,16 @@ export function RunView() {
                 setPicked([3]);
                 setLibraryOpen(false);
                 setToast("Hook replaced");
+              }}
+              onUseUpload={(asset) => {
+                setLibraryOpen(false);
+                void clipFromAsset({ ...asset, kind: "video" }).then((c) => {
+                  const seconds = clipSeconds(c.length);
+                  const count = demoClips(runRef.current ?? run).length;
+                  insertClips([{ id: uid(), label: `Clip ${count + 1}`, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds }]);
+                  setPicked([5]);
+                  setToast("Clip added");
+                }).catch(() => setToast("Couldn't add the clip. Try again."));
               }}
               onUseDemo={(clips, from) => {
                 // The demo is replaced by that one, clips as they were cut (empty spaces left out), with its own texts:
