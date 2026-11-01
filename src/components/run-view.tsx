@@ -592,7 +592,7 @@ export function RunView() {
    * become new clips. Up to 3 upload together; each lands as soon as those before it have, so the order holds and
    * the seller sees them arrive. `landed(i)`: file i is in.
    */
-  const fillShots = async (files: File[], from?: string, landed?: (i: number) => void) => {
+  const fillShots = async (files: File[], from?: string, landed?: (i: number) => void, signal?: AbortSignal) => {
     const empty = demoClips(runRef.current ?? run).filter((c) => !clipSrc(c));
     const at = Math.max(0, empty.findIndex((c) => c.id === from));
     const slots = [...empty.slice(at), ...empty.slice(0, at)];
@@ -600,8 +600,9 @@ export function RunView() {
     const waiting: (() => void)[] = [];
     const uploads = files.map((f) => new Promise<Awaited<ReturnType<typeof clipFromFile>>>((resolve, reject) => {
       const go = () => {
+        if (signal?.aborted) return reject(signal.reason);
         active++;
-        clipFromFile(f).then(resolve, reject).finally(() => { active--; waiting.shift()?.(); });
+        clipFromFile(f, signal).then(resolve, reject).finally(() => { active--; waiting.shift()?.(); });
       };
       if (active < 3) go(); else waiting.push(go);
     }));
@@ -609,6 +610,8 @@ export function RunView() {
     uploads.forEach((u) => u.catch(() => undefined));
     for (let i = 0; i < files.length; i++) {
       const c = await uploads[i];
+      // Start over or Cancel: a clip that finished anyway does not land.
+      if (signal?.aborted) return;
       if (i < slots.length) placeClip(slots[i].id, c);
       else {
         setLibraryKey((k) => k + 1);
@@ -953,9 +956,9 @@ export function RunView() {
                 run={run}
                 segs={segs}
                 renderEditor={clipEditor}
-                onFiles={async (files, from, landed) => {
+                onFiles={async (files, from, landed, signal) => {
                   setPicked((p) => Array.from(new Set([...(p ?? openSteps), 5])));
-                  await fillShots(files, from, landed);
+                  await fillShots(files, from, landed, signal);
                 }}
                 copying={copyWaiting}
                 onCheckLibrary={() => { setLibraryTab("demos"); setLibraryOpen(true); }}

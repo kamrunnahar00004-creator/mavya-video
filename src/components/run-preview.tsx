@@ -3,7 +3,7 @@ import { MediaVideo } from "@/components/media-video";
 
 import { memo, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { type Adjust, fullAdjust, speedOf, videoStyle, warmthId, warmthMatrix } from "@/lib/adjust";
+import { type Adjust, contrastId, contrastTable, fullAdjust, speedOf, videoStyle, warmthId, warmthMatrix } from "@/lib/adjust";
 import { type Seg, fileAt, segAt, timeline, videoLength } from "@/lib/edit";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 import { Pause, Play } from "lucide-react";
@@ -188,12 +188,25 @@ const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 6
 /** Hidden SVG holding the warmth color matrix that videoStyle() points to. */
 export function WarmthFilter({ adjust }: { adjust?: Partial<Adjust> | null }) {
   const w = adjust?.warmth ?? 0;
-  if (!w) return null;
+  const c = adjust?.contrast ?? 0;
+  if (!w && !c) return null;
+  const table = c ? contrastTable(c) : "";
   return (
     <svg aria-hidden width="0" height="0" className="absolute">
-      <filter id={warmthId(w)} colorInterpolationFilters="sRGB">
-        <feColorMatrix type="matrix" values={warmthMatrix(w)} />
-      </filter>
+      {w ? (
+        <filter id={warmthId(w)} colorInterpolationFilters="sRGB">
+          <feColorMatrix type="matrix" values={warmthMatrix(w)} />
+        </filter>
+      ) : null}
+      {c ? (
+        <filter id={contrastId(c)} colorInterpolationFilters="sRGB">
+          <feComponentTransfer>
+            <feFuncR type="table" tableValues={table} />
+            <feFuncG type="table" tableValues={table} />
+            <feFuncB type="table" tableValues={table} />
+          </feComponentTransfer>
+        </filter>
+      ) : null}
     </svg>
   );
 }

@@ -38,6 +38,17 @@ const changed = { ...run, hook: { ...run.hook, source: 'describe' } };
 assert.equal(generationPatch(changed, run, generated, '').hook.generated.src, '/old.mp4');
 assert.equal(generationPatch(changed, run, generated, '').hook.versions[0].src, '/new.mp4');
 
+// Contrast and Temp follow values measured from CapCut, and the export repeats the preview's numbers.
+const level = (input, v) => adjust.contrastCurve(input / 255, v) * 255;
+for (const [input, v, out] of [[200, 50, 246.7], [72, 50, 37.4], [136, 20, 144.2], [72, 20, 61.3], [200, 10, 210.9]]) assert.ok(Math.abs(level(input, v) - out) < 10, `contrast ${v} at ${input}`);
+assert.ok(Math.abs(level(120, 0) - 120) < 0.01, 'contrast 0 changes nothing');
+assert.ok(Math.abs(level(level(200, 30), -30) - 200) < 0.01, 'negative contrast undoes positive');
+assert.deepEqual([...adjust.tempGains(50)].map(x => +x.toFixed(2)), [1.7, 0.82, 0.21]);
+assert.deepEqual([...adjust.tempGains(-50)].map(x => +x.toFixed(2)), [0.81, 1.01, 1.52]);
+assert.deepEqual([...adjust.tempGains(0)], [1, 1, 1]);
+const worker = fs.readFileSync(path.join(root, 'render/render.mjs'), 'utf8');
+for (const number of ['[1.7, 0.82, 0.21]', '[0.81, 1.01, 1.52]', '[[0, 1], [10, 1.22], [20, 1.46], [35, 1.94], [50, 3.1]]', '0.44']) assert.ok(worker.includes(number), `export has ${number}`);
+
 async function main() {
   let calls = [], claimed = null, providerError = null, poll = { state: 'running' }, completeError = null;
   class HookStartUncertain extends Error {}

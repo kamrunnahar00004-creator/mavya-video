@@ -350,7 +350,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
   }
 
   return (
-    <div className="card flex h-full w-[500px] max-w-[calc(100vw-24px)] flex-col overflow-hidden">
+    <div className="card flex h-full w-[600px] max-w-[calc(100vw-24px)] flex-col overflow-hidden">
       {listError && <p role="alert" className="px-5 py-2 text-red-500">{listError}</p>}
       {cursors.some(Boolean) && <button type="button" className="btn-secondary m-3 px-4 py-2" disabled={loadingMore} onClick={() => void loadMore()}>Load more</button>}
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
@@ -362,7 +362,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           <X className="h-5 w-5" />
         </button>
       </div>
-      <div className="flex gap-3.5 overflow-x-auto border-b border-line px-4 text-[13px] font-semibold [scrollbar-width:none]">
+      <div className="flex gap-3.5 overflow-x-auto border-b border-line px-4 text-[13px] font-semibold [scrollbar-width:thin]">
         {TABS.map((t) => (
           <button
             key={t.id}

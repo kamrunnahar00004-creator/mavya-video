@@ -1870,7 +1870,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
   copying?: boolean;
   renderEditor: (seg: Seg) => React.ReactNode;
   /** One video = one demo; several = clips in file-name order, filling shots still to film (from shot `from`) first. */
-  onFiles: (files: File[], from?: string, landed?: (i: number) => void) => Promise<void>;
+  onFiles: (files: File[], from?: string, landed?: (i: number) => void, signal?: AbortSignal) => Promise<void>;
   onClips: () => void;
   onUpload: (id: string, f: File) => Promise<void>;
   onRename: (id: string, label: string) => void;
@@ -1888,6 +1888,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
   const [fileOver, setFileOver] = useState(false);
   /** Videos on their way up: shown right away from the file on this computer. */
   const [pending, setPending] = useState<{ url: string; name: string }[]>([]);
+  const uploads = useRef<AbortController | null>(null);
   const mode = run.demo.mode ?? (clips.length ? "single" : undefined);
   const [busy, setBusy] = useState<string | null>(null); // clip id (or "single") being uploaded
   // undefined = nothing chosen yet: the first filmed clip is open, so its preview shows straight away.
@@ -1930,15 +1931,28 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
       gone.forEach((x) => URL.revokeObjectURL(x.url));
     };
     let next = 0;
+    const control = new AbortController();
+    uploads.current = control;
     try {
-      await onFiles(sorted, from, (i) => { clear([items[i]]); next = i + 1; });
-      setOpenId(undefined);
+      await onFiles(sorted, from, (i) => { clear([items[i]]); next = i + 1; }, control.signal);
+      if (!control.signal.aborted) setOpenId(undefined);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed");
+      if (!control.signal.aborted) setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
       clear(items.slice(next));
-      setBusy(null);
+      if (uploads.current === control) {
+        uploads.current = null;
+        setBusy(null);
+      }
     }
+  }
+
+  /** Start over or Cancel: stops every upload at once and takes their tiles away. */
+  function stopUploads() {
+    uploads.current?.abort();
+    uploads.current = null;
+    setPending([]);
+    setBusy(null);
   }
 
   const fileInput = (id: string, onFile: (f: File) => Promise<void>) => (
@@ -1989,7 +2003,14 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
             Check library
           </button>
         </div>
-        {pending.length > 0 && <ol className="mt-3 flex flex-wrap gap-3" aria-label="Uploading clips">{uploadingTiles}</ol>}
+        {pending.length > 0 && (
+          <>
+            <ol className="mt-3 flex flex-wrap gap-3" aria-label="Uploading clips">{uploadingTiles}</ol>
+            <div className="mt-2 flex justify-end">
+              <button type="button" onClick={stopUploads} className="rounded-lg px-2 py-1.5 text-[13px] font-semibold text-soft hover:text-text">Cancel</button>
+            </div>
+          </>
+        )}
         {error && <p role="alert" className="mt-2.5 text-[13px] font-semibold text-red-600">{error}</p>}
       </div>
     );
@@ -2118,7 +2139,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
       )}
 
       <div className="flex justify-end">
-        <button type="button" onClick={onReset} className="rounded-lg px-2 py-1.5 text-[13px] font-semibold text-soft hover:text-text">
+        <button type="button" onClick={() => { stopUploads(); onReset(); }} className="rounded-lg px-2 py-1.5 text-[13px] font-semibold text-soft hover:text-text">
           Start over
         </button>
       </div>

@@ -24,5 +24,5 @@ assert.equal(png.cssProperty('WebkitTextFillColor'),'-webkit-text-fill-color');
 assert.equal(png.cssProperty('WebkitBackgroundClip'),'-webkit-background-clip');
 const {ffmpegAdjust}=load('src/lib/adjust.ts');
 const filters=ffmpegAdjust({brightness:10,contrast:20,saturation:10,warmth:20},1080,1920);
-assert.ok(filters[0].startsWith('colorchannelmixer'));assert.ok(filters[1].startsWith('eq='));assert.ok(filters[2].startsWith('colorchannelmixer'));
+assert.ok(filters[0].startsWith('colorchannelmixer'));assert.ok(filters[1].startsWith('lutrgb='));assert.ok(filters[2].startsWith('eq='));assert.ok(filters[3].startsWith('colorchannelmixer'));
 console.log('PASS: valid CSS property names across all 48 styles and Webkit stroke/fill/clip');

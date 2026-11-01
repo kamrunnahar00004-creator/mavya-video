@@ -35,6 +35,17 @@ function curve(keys, k, p0) {
   return `if(lt(${F},${r(keys[0].t)}),${keys[0][k]},${e})`;
 }
 
+/** Curve strength for a contrast value (src/lib/adjust.ts contrastGamma). */
+function contrastGamma(c) {
+  const points = [[0, 1], [10, 1.22], [20, 1.46], [35, 1.94], [50, 3.1]];
+  const a = Math.min(50, Math.abs(c));
+  const i = Math.max(0, points.findIndex(([x]) => x >= a) - 1);
+  const [x0, y0] = points[i];
+  const [x1, y1] = points[i + 1];
+  const g = y0 + ((a - x0) / (x1 - x0)) * (y1 - y0);
+  return c < 0 ? 1 / g : g;
+}
+
 /** Filters for one clip's look, on a W x H frame (file time of the piece's first frame = p0). */
 function look(a, p0, W, H, fps) {
   const v = { brightness: 0, contrast: 0, saturation: 0, warmth: 0, zoom: 0, panX: 0, panY: 0, flip: false, keys: [], ...(a ?? {}) };
@@ -51,12 +62,23 @@ function look(a, p0, W, H, fps) {
     const sh = 2 * Math.round((H * s) / 2);
     out.push(`scale=${sw}:${sh}`, `crop=${W}:${H}:${Math.round(((sw - W) / 2) * (1 - v.panX / 100))}:${Math.round(((sh - H) / 2) * (1 - v.panY / 100))}`);
   }
-  // Same numbers as the preview's CSS (src/lib/adjust.ts videoStyle / ffmpegAdjust).
+  // Same numbers as the preview (src/lib/adjust.ts: contrastCurve, tempGains), measured from CapCut.
   const b = 1 + v.brightness / 100;
-  const k = (v.warmth / 50) * 0.12;
   if (v.brightness) out.push(`colorchannelmixer=rr=${r(b)}:gg=${r(b)}:bb=${r(b)}`);
-  if (v.contrast || v.saturation) out.push(`eq=contrast=${r(1 + v.contrast / 100)}:saturation=${r(1 + v.saturation / 50)}`);
-  if (v.warmth) out.push(`colorchannelmixer=rr=${r(1 + k)}:gg=${r(1 + k * 0.25)}:bb=${r(1 - k)}`);
+  if (v.contrast) {
+    const g = r(contrastGamma(v.contrast));
+    const p = r(0.44 * 255);
+    const q = r(255 - 0.44 * 255);
+    // ffmpeg also evaluates the expression for one value past the top (256): the max keeps pow's base from going negative.
+    const c = `'if(lt(val,${p}),${p}*pow(val/${p},${g}),255-${q}*pow(max(255-val,0)/${q},${g}))'`;
+    out.push(`lutrgb=r=${c}:g=${c}:b=${c}`);
+  }
+  if (v.saturation) out.push(`eq=saturation=${r(1 + v.saturation / 50)}`);
+  if (v.warmth) {
+    const a = Math.abs(v.warmth) / 50;
+    const [cr, cg, cb] = (v.warmth < 0 ? [0.81, 1.01, 1.52] : [1.7, 0.82, 0.21]).map((x) => r(1 + (x - 1) * a));
+    out.push(`colorchannelmixer=rr=${cr}:gg=${cg}:bb=${cb}`);
+  }
   return out;
 }
 

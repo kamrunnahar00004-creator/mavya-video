@@ -20,13 +20,14 @@ export const round1 = (n: number) => Math.round(n * 10) / 10;
  * Upload a file. With cloud storage the browser sends it straight to storage (no size limit from the server);
  * without it (local), through POST /api/media.
  */
-export async function uploadFile(file: File, asAsset: boolean, purpose?: "export-text"): Promise<{ mediaId: string; mime: string }> {
-  const json = (body: unknown) => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+export async function uploadFile(file: File, asAsset: boolean, purpose?: "export-text", signal?: AbortSignal): Promise<{ mediaId: string; mime: string }> {
+  const json = (body: unknown) => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal });
   const start = await fetch("/api/uploads", json({ step: "start", mime: file.type, size: file.size, purpose }));
   if (start.status !== 501) {
     const s = (await start.json().catch(() => ({}))) as { mediaId?: string; url?: string; error?: string };
     if (!start.ok || !s.mediaId || !s.url) throw new Error(s.error ?? "Upload failed");
-    const put = await fetch(s.url, { method: "PUT", headers: { "content-type": file.type }, body: file }).catch(() => null);
+    const put = await fetch(s.url, { method: "PUT", headers: { "content-type": file.type }, body: file, signal }).catch(() => null);
+    signal?.throwIfAborted();
     if (!put?.ok) throw new Error("Upload failed. Check your connection and try again.");
     const done = await fetch("/api/uploads", json({ step: "finish", mediaId: s.mediaId, mime: file.type, name: file.name, asset: asAsset }));
     const d = (await done.json().catch(() => ({}))) as { mediaId?: string; error?: string };
@@ -36,7 +37,7 @@ export async function uploadFile(file: File, asAsset: boolean, purpose?: "export
   const form = new FormData();
   form.append("file", file);
   if (asAsset) form.append("asset", "1");
-  const res = await fetch("/api/media", { method: "POST", body: form });
+  const res = await fetch("/api/media", { method: "POST", body: form, signal });
   const data = (await res.json()) as { mediaId?: string; mime?: string; error?: string };
   if (!res.ok || !data.mediaId) throw new Error(data.error ?? "Upload failed");
   return { mediaId: data.mediaId, mime: data.mime ?? file.type };
@@ -82,9 +83,9 @@ function fileLength(file: File): Promise<number | null> {
 }
 
 /** Turns an uploaded file into a clip ready for a slot. */
-export async function clipFromFile(file: File): Promise<Clip> {
+export async function clipFromFile(file: File, signal?: AbortSignal): Promise<Clip> {
   const kind = file.type.startsWith("image/") ? "image" : "video";
-  const [{ mediaId }, local] = await Promise.all([uploadFile(file, true), kind === "video" ? fileLength(file) : null]);
+  const [{ mediaId }, local] = await Promise.all([uploadFile(file, true, undefined, signal), kind === "video" ? fileLength(file) : null]);
   return { mediaId, name: file.name, kind, offset: 0, length: kind === "video" ? (local ?? (await videoLength(mediaId))) : null };
 }
 
