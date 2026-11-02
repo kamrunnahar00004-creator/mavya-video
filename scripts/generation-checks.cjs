@@ -47,6 +47,11 @@ assert.ok(Math.abs(level(120, 0) - 120) < 0.01, 'contrast 0 changes nothing');
 assert.ok(Math.abs(level(111.5, -50) - 111.5) < 0.01, 'negative contrast pivots at 111.5');
 assert.ok(Math.abs(level(255, -50) - 197.6) < 0.01, 'negative contrast is a straight line');
 assert.ok(Math.abs(level(0, -25) - 22.3) < 0.01, 'negative contrast lifts blacks');
+// A clip at 9.8196s (unrounded) with its caption saved at 9.82: the caption shows from the clip's first frame,
+// and the previous caption (ending 9.82) does not.
+assert.ok(edit.showsAt({ start: 9.82, end: 12.994 }, 9.8196), 'caption shows at its clip start');
+assert.ok(!edit.showsAt({ start: 7.47, end: 9.82 }, 9.8196), 'previous caption ends at the clip edge');
+assert.ok(edit.showsAt({ start: 0.0004, end: 3.17 }, 0), 'caption shows at 0 in the clip view');
 const lit = (input, v) => adjust.exposureCurve(input / 255, v) * 255;
 assert.ok(Math.abs(lit(120, 0) - 120) < 0.01, 'exposure 0 changes nothing');
 for (const v of [-50, -25, 20, 50]) assert.ok(Math.abs(lit(255, v) - 255) < 0.01 && Math.abs(lit(0, v)) < 0.01, `exposure ${v} keeps black and white`);

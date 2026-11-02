@@ -1,6 +1,12 @@
 import type { Adjust } from "@/lib/adjust";
 import { speedOf } from "@/lib/adjust";
 const roundTime = (n: number) => Math.round(n * 1000) / 1000;
+
+/**
+ * Whether a text shows at time t (end exclusive). Text times are saved to the millisecond and clip edges are not,
+ * so a caption made for a clip can start a fraction of a millisecond after it: within 1 ms counts as the same moment.
+ */
+export const showsAt = (x: { start: number; end: number }, t: number) => t >= x.start - 0.001 && t < x.end - 0.001;
 import type { DemoClip, Part, Reference, Run, TextLayer } from "@/lib/types";
 
 /**

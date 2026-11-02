@@ -14,7 +14,7 @@ import { waveform } from "@/lib/waveform";
 import { ADJUST_ROWS, type Adjust, type AdjustRow, type Motion, NO_ADJUST, fullAdjust, isAdjusted, keyAt, motionAt, moveKey, panBy, setMotion, speedOf, toggleKey, videoStyle } from "@/lib/adjust";
 import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundPieces, soundRows } from "@/lib/sound";
 import type { Song } from "@/app/api/songs/route";
-import { type Seg, clipSrc, demoClips, fileAt, segAt, videoLength, pieceSpans, relAt } from "@/lib/edit";
+import { type Seg, clipSrc, demoClips, fileAt, segAt, showsAt, videoLength, pieceSpans, relAt } from "@/lib/edit";
 
 import { round1, uid, uploadFile } from "@/lib/client";
 import { fmtTime, type DemoClip, type Part, type Reference, type SoundPiece, type Run, type TextLayer } from "@/lib/types";
@@ -250,7 +250,7 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
                   <WarmthFilter adjust={seg.adjust} />
                   <MediaVideo ref={vref} key={`${seg.src}|${version ?? ""}`} src={seg.src} muted={!playing} playsInline onLoadedMetadata={() => seek(0)} className="absolute inset-0 h-full w-full object-cover" style={look} />
                   {/* One caption at a time at a boundary (end is exclusive), except the clip's very end shows its last caption. */}
-                  {local.filter((x) => x.text.trim() && t >= x.start && (t < x.end || (x.end >= len - 0.001 && t >= len - 0.001))).map((x) => <TextOverlay key={x.id} x={x} onPatch={onPatch} />)}
+                  {local.filter((x) => x.text.trim() && (showsAt(x, t) || (x.end >= len - 0.001 && t >= len - 0.001 && t >= x.start - 0.001))).map((x) => <TextOverlay key={x.id} x={x} onPatch={onPatch} />)}
                 </div>
               ) : null)}
             {overlay}
@@ -367,7 +367,7 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
           <div className="fade-in relative aspect-[9/16] h-[min(86vh,900px)] overflow-hidden rounded-2xl bg-black shadow-[0_24px_64px_rgba(0,0,0,0.35)] [container-type:size]" onClick={(e) => e.stopPropagation()}>
             <WarmthFilter adjust={seg.adjust} />
             <TrimmedVideo src={seg.src} parts={seg.parts} rate={speed} adjust={seg.adjust} onTime={setFullT} />
-            {local.filter((x) => x.text.trim() && fullT >= x.start && fullT < x.end).map((x) => <TextOverlay key={x.id} x={x} onPatch={onPatch} />)}
+            {local.filter((x) => x.text.trim() && showsAt(x, fullT)).map((x) => <TextOverlay key={x.id} x={x} onPatch={onPatch} />)}
           </div>
           <button type="button" aria-label="Close" onClick={() => setFull(false)} className="absolute right-6 top-6 rounded-full bg-white/90 p-2 text-ink hover:bg-white">
             <X className="h-5 w-5" />
@@ -617,7 +617,7 @@ function WholeMedia({ playback, segs, texts, playing, onTextMove, cls, style }: 
       ) : (
         <div className="absolute inset-0 flex items-center justify-center text-[12px] font-semibold text-white/40">{seg.id === "hook" ? "Your hook" : "Your demo"}</div>
       )}
-      {texts.filter((x) => x.text.trim() && time >= x.start && time < x.end).map((x) => <TextOverlay key={x.id} x={x} onPatch={onTextMove} />)}
+      {texts.filter((x) => x.text.trim() && showsAt(x, time)).map((x) => <TextOverlay key={x.id} x={x} onPatch={onTextMove} />)}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { MediaVideo } from "@/components/media-video";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Adjust, contrastId, contrastTable, exposureId, exposureTable, fullAdjust, speedOf, videoStyle, warmthId, warmthMatrix } from "@/lib/adjust";
-import { type Seg, fileAt, segAt, timeline, videoLength } from "@/lib/edit";
+import { type Seg, fileAt, segAt, showsAt, timeline, videoLength } from "@/lib/edit";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 import { Pause, Play } from "lucide-react";
 import { AVATAR_TONES, round1 } from "@/lib/client";
@@ -131,7 +131,7 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
               <div className="absolute inset-0 flex items-center justify-center bg-[#14121f] text-[12px] font-semibold text-white/40">{seg.id === "hook" ? "Your hook" : "Your demo"}</div>
             )}
             {seg.id === "hook" && hookCover}
-            {texts.filter((x) => x.text.trim() && time >= x.start && time < x.end).map((x) => <TextOverlay key={x.id} x={x} />)}
+            {texts.filter((x) => x.text.trim() && showsAt(x, time)).map((x) => <TextOverlay key={x.id} x={x} />)}
             {!playing && (
               <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                 <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white">
