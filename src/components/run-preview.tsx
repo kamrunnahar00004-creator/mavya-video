@@ -237,29 +237,37 @@ export function WarmthFilter({ adjust }: { adjust?: Partial<Adjust> | null }) {
   );
 }
 
+/** How long before its turn the next piece starts rolling (hidden, nearly still), so it plays the moment it shows. */
+const PREROLL = 0.35;
+
 /**
- * The clip playing now and, invisible and paused on its first frame, the clip after it, in one keyed list: when the
- * clock reaches the next clip, that same element (already loaded) becomes the visible one and plays. No new player,
- * no poster, no blank frame between clips (founder 2026-10-30: joins like CapCut).
+ * The piece playing now and, invisible, the piece after it (the next piece of a Cut clip, or the next clip's first
+ * piece), each its own player in one keyed list: when the clock reaches the next piece, that same element (already
+ * loaded and already rolling) becomes the visible one. No seek, no start-up pause, no blank frame between clips
+ * (founder 2026-10-30 and 2026-11-03: joins like CapCut, 100% smooth).
  */
 export function SegmentVideos({ segs, seg, at, piece, playing }: { segs: Seg[]; seg: Seg; at: number; piece: number; playing: boolean }) {
-  const next = segs[segs.indexOf(seg) + 1];
-  const list = [seg, ...(next?.src && next.src !== seg.src ? [next] : [])].filter((s) => s.src);
+  const rateOf = (s: Seg) => (s.editable ? speedOf(s.adjust) : 1);
+  const nextSeg = segs.slice(segs.indexOf(seg) + 1).find((s) => s.src);
+  const next = piece + 1 < seg.parts.length ? { s: seg, i: piece + 1 } : nextSeg ? { s: nextSeg, i: 0 } : null;
+  // On-screen time left in the piece playing now (a gap before the next clip counts too).
+  const gap = next && next.s !== seg ? next.s.offset - (seg.offset + seg.len) : 0;
+  const left = (seg.parts[piece].end - at) / rateOf(seg) + gap;
+  const list = [{ s: seg, i: piece, now: true }, ...(next ? [{ ...next, now: false }] : [])].filter((x) => x.s.src);
   return (
     <>
-      {list.map((s) => {
-        const now = s === seg;
-        const start = fileAt(s, 0);
-        const sAt = now ? at : start.file;
+      {list.map(({ s, i, now }) => {
+        const sAt = now ? at : s.parts[i].start;
         const look = s.editable ? videoStyle(s.adjust, sAt) : undefined;
         return (
           <SyncedVideo
-            key={`${s.id}|${s.src}`}
+            key={`${s.id}|${s.src}|${i}`}
             src={s.src!}
             at={sAt}
-            piece={now ? piece : start.i}
+            piece={i}
             playing={now && playing}
-            rate={s.editable ? speedOf(s.adjust) : 1}
+            preroll={!now && playing && left <= PREROLL}
+            rate={rateOf(s)}
             volume={now && s.editable ? fullAdjust(s.adjust).volume / 100 : 0}
             style={now ? look : { ...look, opacity: 0 }}
           />
@@ -269,7 +277,10 @@ export function SegmentVideos({ segs, seg, at, piece, playing }: { segs: Seg[]; 
   );
 }
 
-export function SyncedVideo({ src, at, piece = 0, playing, style, rate = 1, volume = 0 }: { src: string; at: number; /** Which piece of a Cut clip plays; a new piece always jumps to its frame. */ piece?: number; playing: boolean; style?: React.CSSProperties; rate?: number; volume?: number }) {
+/** The slowest rate browsers play at: a pre-rolling video moves about 0.02s before its turn. */
+const CREEP = 0.0625;
+
+export function SyncedVideo({ src, at, piece = 0, playing, preroll = false, style, rate = 1, volume = 0 }: { src: string; at: number; /** Which piece of a Cut clip plays; a new piece always jumps to its frame. */ piece?: number; playing: boolean; /** Hidden and about to play: already running, almost still, so it starts with no delay. */ preroll?: boolean; style?: React.CSSProperties; rate?: number; volume?: number }) {
   const ref = useRef<HTMLVideoElement>(null);
   // Browsers only allow sound after the page was clicked once; until then the video plays silently (it would not play at all otherwise).
   const unlocked = useSoundUnlocked();
@@ -279,8 +290,12 @@ export function SyncedVideo({ src, at, piece = 0, playing, style, rate = 1, volu
     v.volume = Math.max(0, Math.min(1, volume));
     v.muted = volume <= 0 || !unlocked;
   }, [volume, unlocked]);
+  const prerollRef = useRef(preroll);
   useEffect(() => {
-    if (ref.current) ref.current.playbackRate = rate;
+    prerollRef.current = preroll;
+  }, [preroll]);
+  useEffect(() => {
+    if (ref.current && !prerollRef.current) ref.current.playbackRate = rate;
   }, [rate]);
   const atRef = useRef(at);
   useEffect(() => {
@@ -288,12 +303,28 @@ export function SyncedVideo({ src, at, piece = 0, playing, style, rate = 1, volu
   }, [at]);
   useEffect(() => {
     const v = ref.current;
+    if (!v || playing) return;
+    if (preroll) {
+      // Start the decoder now, barely moving, from this piece's first frame.
+      v.currentTime = atRef.current;
+      v.playbackRate = CREEP;
+      void v.play().catch(() => undefined);
+    } else if (!v.paused) {
+      // Paused before its turn came: back to its first frame, normal speed.
+      v.pause();
+      v.playbackRate = rate;
+      v.currentTime = atRef.current;
+    }
+  }, [preroll, playing, rate]);
+  useEffect(() => {
+    const v = ref.current;
     if (!v) return;
     if (playing) {
+      v.playbackRate = rate;
       if (Math.abs(v.currentTime - atRef.current) > 0.3) v.currentTime = atRef.current;
-      void v.play().catch(() => undefined);
-    } else v.pause();
-  }, [playing]);
+      if (v.paused) void v.play().catch(() => undefined);
+    } else if (!prerollRef.current) v.pause();
+  }, [playing, rate]);
   useEffect(() => {
     const v = ref.current;
     if (!v || v.readyState < 1) return;
@@ -313,8 +344,8 @@ export function SyncedVideo({ src, at, piece = 0, playing, style, rate = 1, volu
       preload="auto"
       onLoadedMetadata={(e) => {
         e.currentTarget.currentTime = atRef.current;
-        e.currentTarget.playbackRate = rate;
-        if (playing) void e.currentTarget.play().catch(() => undefined);
+        e.currentTarget.playbackRate = prerollRef.current && !playing ? CREEP : rate;
+        if (playing || prerollRef.current) void e.currentTarget.play().catch(() => undefined);
       }}
       className="pointer-events-none absolute inset-0 h-full w-full object-cover"
       style={style}
