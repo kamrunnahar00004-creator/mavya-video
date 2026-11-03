@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import localFont from "next/font/local";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -30,6 +31,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {children}
         {/* Vercel Speed Insights (real-user page speed, Vercel Pro). */}
         <SpeedInsights />
+        {/* Vercel Web Analytics (visitors and page views, no cookies). */}
+        <Analytics />
       </body>
     </html>
   );
