@@ -2564,11 +2564,10 @@ function ClipControls({ label, src, speed = 1, playing, onPlay, t, len, pieces, 
           {clock(t)} / {clock(len)}
         </span>
         <div className="ml-auto flex items-center gap-1">
-          {canUndo && (
-            <button type="button" onClick={onUndo} title="Undo" aria-label="Undo" className="rounded-lg p-1.5 text-muted hover:bg-raised hover:text-text">
-              <Undo2 className="h-4 w-4" />
-            </button>
-          )}
+          {/* Always there, like the full editor's: greyed out until there is something to undo. */}
+          <button type="button" disabled={!canUndo} onClick={onUndo} title="Undo" aria-label="Undo" className="rounded-lg p-1.5 text-muted hover:bg-raised hover:text-text disabled:text-soft disabled:opacity-50 disabled:hover:bg-transparent">
+            <Undo2 className="h-4 w-4" />
+          </button>
           {onDelete && (
             <button type="button" onClick={onDelete} title="Delete this piece (Delete)" aria-label="Delete piece" className="rounded-lg p-1.5 text-muted hover:bg-raised hover:text-text">
               <Trash2 className="h-4 w-4" />
