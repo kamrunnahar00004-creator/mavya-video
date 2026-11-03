@@ -108,9 +108,11 @@ export const previewArgs = (input, out, master) => {
   const video = (crf) => ["-fpsmax", "30", "-c:v", "libx264", "-preset", "veryfast", ...lean, "-crf", String(crf), "-g", "30", "-keyint_min", "30", "-sc_threshold", "0", "-pix_fmt", "yuv420p"];
   const audio = ["-c:a", "aac", "-b:a", "160k", "-ac", "2", "-movflags", "+faststart"];
   if (!master) return ["-y", "-hide_banner", "-i", input, "-map", "0:v:0", "-map", "0:a:0?", "-vf", fit(480), ...video(26), ...audio, out];
-  // One decode of the original, two copies: the 480p preview and the export's 1080p working copy (short side 1080:
-  // a 720x1280 export stays fully sharp up to 1.5x zoom, from a quarter of 4K's pixels; founder 2026-11-03).
-  return ["-y", "-hide_banner", "-i", input, "-filter_complex", `[0:v:0]split=2[a][b];[a]${fit(480)}[p];[b]${fit(1080)}[m]`,
+  // One decode of the original, two copies: the 480p preview and the export's working copy, cut to the export frame
+  // (the centre 9:16 of the original at 1080x1920: what the export shows, as sharp as the original allows, and nothing
+  // left for the export to crop or scale; founder 2026-11-03).
+  const vertical = "crop='trunc(min(iw,ih*9/16)/2)*2':'trunc(min(ih,iw*16/9)/2)*2',scale=1080:1920";
+  return ["-y", "-hide_banner", "-i", input, "-filter_complex", `[0:v:0]split=2[a][b];[a]${fit(480)}[p];[b]${vertical}[m]`,
     "-map", "[p]", "-map", "0:a:0?", ...video(26), ...audio, out,
     "-map", "[m]", "-map", "0:a:0?", ...video(18), ...audio, master];
 };
@@ -150,8 +152,11 @@ export function stepArgs(spec, step, src, out) {
   const v = [
     `trim=start=${r(step.start)}:end=${r(step.end)}`,
     "setpts=PTS-STARTPTS",
-    `scale=${W}:${H}:force_original_aspect_ratio=increase`,
-    `crop=${W}:${H}`,
+    // Cover the frame from the centre: crop the source to the frame's shape first, then scale. The same picture as
+    // scaling up and cropping, without scaling the parts that are thrown away (a 4K landscape clip was scaled to
+    // 3413x1920 per frame before; 2026-11-03).
+    `crop='trunc(min(iw,ih*${W}/${H})/2)*2':'trunc(min(ih,iw*${H}/${W})/2)*2'`,
+    `scale=${W}:${H}`,
     "setsar=1",
     // One frame rate before the look: zoompan makes one frame per input frame at `fps`.
     `fps=${fps}`,

@@ -13,7 +13,9 @@ export const oldPreviewKey = (id: string) => `media/${id.replace(/\.[^.]+$/, "")
  * The export's working copy (short side 1080), made in the same pass: a 720x1280 export reads it instead of a 4K
  * original, a quarter of the pixels to decode on the small render server (founder 2026-11-03: no paid upgrade).
  */
-export const masterKey = (id: string) => `media/${id.replace(/\.[^.]+$/, "")}.m1080.mp4`;
+export const masterKey = (id: string) => `media/${id.replace(/\.[^.]+$/, "")}.v1080.mp4`;
+/** The first working copies (short side 1080, not cut to the frame), still removed with the account. */
+export const oldMasterKey = (id: string) => `media/${id.replace(/\.[^.]+$/, "")}.m1080.mp4`;
 
 /** Below this the original plays and exports fine as it is. */
 const SMALL = 3 * 1024 * 1024;

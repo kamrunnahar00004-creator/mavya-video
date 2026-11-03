@@ -33,7 +33,7 @@ assert.equal(previewKey(`${id}.mov`), `media/${id}.p480.mp4`);
 const preview = fs.readFileSync(path.join(root, 'src/components/run-preview.tsx'), 'utf8');
 assert.match(preview, /src=\{s\.id === "hook" \? s\.src! : previewOf\(s\.src!\)\}/);
 const deletion = fs.readFileSync(path.join(root, 'src/lib/server/account-deletion.ts'), 'utf8');
-assert.match(deletion, /d\.media_ids\.flatMap\(id => \[previewKey\(id\), oldPreviewKey\(id\), masterKey\(id\)\]\)\]/, 'account deletion removes copies');
+assert.match(deletion, /d\.media_ids\.flatMap\(id => \[previewKey\(id\), oldPreviewKey\(id\), masterKey\(id\), oldMasterKey\(id\)\]\)\]/, 'account deletion removes copies');
 
 // Real ffmpeg: a 4K 60 fps landscape recording and a portrait one come out short side 480, at most 30 fps.
 (async () => {
@@ -64,10 +64,10 @@ assert.match(deletion, /d\.media_ids\.flatMap\(id => \[previewKey\(id\), oldPrev
       assert.equal(shown, want, name);
       assert.match(info, /(\d+(?:\.\d+)?) fps/);
       assert.ok(Number(/(\d+(?:\.\d+)?) fps/.exec(info)[1]) <= 30, `${name}: at most 30 fps`);
-      // Same pass with the export's working copy: short side 1080 next to the 480p preview.
+      // Same pass with the export's working copy: the centre 9:16 cut to the export frame, next to the 480p preview.
       const master = path.join(dir, `${name}-master.mp4`), out2 = path.join(dir, `${name}-p2.mp4`);
       execFileSync(ff, ['-v', 'error', ...previewArgs(src, out2, master)]);
-      for (const [file, size] of [[out2, want], [master, want.replace('854', '1920').replace('480', '1080')]]) {
+      for (const [file, size] of [[out2, want], [master, '1080x1920']]) {
         let info2 = '';
         try { execFileSync(ff, ['-hide_banner', '-i', file], { stdio: ['ignore', 'pipe', 'pipe'] }); } catch (e) { info2 = String(e.stderr); }
         const d = /Video: .*?(\d{3,4})x(\d{3,4})/.exec(info2);

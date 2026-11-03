@@ -132,13 +132,13 @@ async function deletion() {
   let phase = 'storage', cursor = 1; const deleted = [], patches = [];
   const route = load('src/lib/server/account-deletion.ts', {
     '@/lib/server/billing-state': { billingRpc: async () => ({ user_id: id(1), state: phase, media_ids: [id(5) + '.jpg'], extra_keys: [], cursor, cleanup_after: '2026-01-01', lease_token: 'fixture' }) },
-    '@/lib/server/account-state': {}, '@/lib/server/stripe': {}, '@/lib/server/previews': { previewKey: (x) => `media/${x.replace(/\.[^.]+$/, '')}.p480.mp4`, oldPreviewKey: (x) => `media/${x.replace(/\.[^.]+$/, '')}.preview.mp4`, masterKey: (x) => `media/${x.replace(/\.[^.]+$/, '')}.m1080.mp4` },
+    '@/lib/server/account-state': {}, '@/lib/server/stripe': {}, '@/lib/server/previews': { previewKey: (x) => `media/${x.replace(/\.[^.]+$/, '')}.p480.mp4`, oldPreviewKey: (x) => `media/${x.replace(/\.[^.]+$/, '')}.preview.mp4`, masterKey: (x) => `media/${x.replace(/\.[^.]+$/, '')}.v1080.mp4`, oldMasterKey: (x) => `media/${x.replace(/\.[^.]+$/, '')}.m1080.mp4` },
     '@/lib/server/r2': { deleteObjectStrict: async key => deleted.push(key) },
     '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from: () => ({ update(p) { patches.push(p); return this; }, eq() { return this; }, select: async () => ({ data: [{ user_id: id(1) }], error: null }) }), auth: { admin: { deleteUser: async () => ({ error: null }) } } }) }
   });
-  await route.advanceDeletion(id(1)); assert.deepEqual(deleted, ['covers/' + id(5) + '.jpg.webp', 'media/' + id(5) + '.p480.mp4', 'media/' + id(5) + '.preview.mp4', 'media/' + id(5) + '.m1080.mp4', 'prefs/' + id(1) + '/files.json']);
+  await route.advanceDeletion(id(1)); assert.deepEqual(deleted, ['covers/' + id(5) + '.jpg.webp', 'media/' + id(5) + '.p480.mp4', 'media/' + id(5) + '.preview.mp4', 'media/' + id(5) + '.v1080.mp4', 'media/' + id(5) + '.m1080.mp4', 'prefs/' + id(1) + '/files.json']);
   deleted.length = 0; phase = 'auth'; cursor = 1;
-  await route.advanceDeletion(id(1)); assert.deepEqual(deleted, ['covers/' + id(5) + '.jpg.webp', 'media/' + id(5) + '.p480.mp4', 'media/' + id(5) + '.preview.mp4', 'media/' + id(5) + '.m1080.mp4', 'prefs/' + id(1) + '/files.json'], 'old auth-phase deletions also finish derivatives before auth removal');
+  await route.advanceDeletion(id(1)); assert.deepEqual(deleted, ['covers/' + id(5) + '.jpg.webp', 'media/' + id(5) + '.p480.mp4', 'media/' + id(5) + '.preview.mp4', 'media/' + id(5) + '.v1080.mp4', 'media/' + id(5) + '.m1080.mp4', 'prefs/' + id(1) + '/files.json'], 'old auth-phase deletions also finish derivatives before auth removal');
 }
 
 (async () => { await covers(); await auth(); await backgroundPlayback(); await library(); await creation(); await deletion(); console.log('PASS: curated-only grants, fresh authorization, bounded background playback, account-safe catalog, 2301-row continuation, valid image batches, atomic retry creation and derivative deletion'); })().catch(error => { console.error(error); process.exitCode = 1; });
