@@ -8,7 +8,7 @@ const SECTIONS: LegalSection[] = [
     title: "What we collect",
     body: [
       "Your account details (name, email). What you make in Mavya: uploaded videos, photos, audio, text and your video projects. Billing details are handled by Stripe; we never see your full card number.",
-      "Basic usage data, such as pages visited and features used, to keep Mavya working and improve it.",
+      "Basic usage data, such as pages visited and features used, to keep Mavya working and improve it. This includes Vercel Analytics and Microsoft Clarity, which records anonymized sessions (clicks, scrolling and page layout) so we can see where the app is hard to use.",
     ],
   },
   {
@@ -21,7 +21,7 @@ const SECTIONS: LegalSection[] = [
   {
     title: "Who processes it",
     body: [
-      "We use trusted providers to run Mavya: hosting and storage, Stripe for payments, an email provider, and AI video providers that receive the inputs for a hook only when you click Generate.",
+      "We use trusted providers to run Mavya: hosting and storage, Stripe for payments, an email provider, Vercel Analytics and Microsoft Clarity for usage analytics, and AI video providers that receive the inputs for a hook only when you click Generate.",
       "Each provider only gets what it needs for its part of the job.",
     ],
   },
