@@ -39,7 +39,9 @@ export async function advanceExport(who: string, id: string) {
    else if (!lane && process.env.EXPORT_FAST !== "0") {
     // Fast lane first (src/lib/server/fast-export.ts): every piece at once on Vercel.
     await save({ state: "running", payload: { ...j.payload, lane: "vercel", laneAt: Date.now() } });
-    await callInternal("/api/internal/export-run", { job: j.id }, 1500).catch(() => undefined);
+    const started = await callInternal("/api/internal/export-run", { job: j.id }, 15_000).then((r) => r.status === 202).catch(() => false);
+    // Not started: straight to the Render worker on the next check.
+    if (!started) await save({ payload: { ...j.payload, lane: "vercel-failed" } });
    }
    else if (lane === "vercel" && Date.now() - laneAt < 5 * 60_000) { /* the fast lane is running; its upload finishes the job */ }
    else {

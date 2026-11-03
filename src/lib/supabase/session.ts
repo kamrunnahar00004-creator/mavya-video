@@ -7,7 +7,8 @@ import { createServerClient } from "@supabase/ssr";
  * open). Signed in, /login goes to the app. Without Supabase keys this is a passthrough, so the app still runs
  * locally with no accounts.
  */
-const PUBLIC_API = ["/api/contact", "/api/stripe/webhook", "/api/internal/generations"];
+// The fast export lane's own calls carry no user session; those routes check the render secret themselves.
+const PUBLIC_API = ["/api/contact", "/api/stripe/webhook", "/api/internal/generations", "/api/internal/export-run", "/api/internal/export-step"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
