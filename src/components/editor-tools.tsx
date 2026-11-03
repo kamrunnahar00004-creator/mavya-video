@@ -1926,7 +1926,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
   onDelete: (id: string) => void;
   /** Move a clip to a new position (0-based). */
   onMove: (id: string, to: number) => void;
-  /** Swap two clips' places (a tile dropped on another). */
+  /** Put clip `a` in clip `b`'s place; `b` and the clips after it move one to the right (a tile dropped on another). */
   onSwap: (a: string, b: string) => void;
   onReset: () => void;
 }) {
@@ -2081,7 +2081,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
   }
 
   // One row of 9:16 tiles, like a phone editor's clip strip: filmed clips show a frame, shots still to film are
-  // dashed with their name. Click a tile to open it below; drop one tile on another to swap them.
+  // dashed with their name. Click a tile to open it below; drop one tile on another to put it in that place.
   const selected = clips.find((c) => c.id === openId) ?? null;
   const selSeg = selected ? segs.find((s) => s.id === selected.id) : undefined;
   const selIndex = selected ? clips.indexOf(selected) : -1;
@@ -2100,7 +2100,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
                 draggable={clips.length > 1}
                 aria-label={`${c.label}${filmed ? "" : ", not filmed yet"}`}
                 aria-pressed={on}
-                title={clips.length > 1 ? "Click to open. Drag onto another clip to swap them." : undefined}
+                title={clips.length > 1 ? "Click to open. Drag onto another clip to put it there." : undefined}
                 onClick={() => setOpenId(on ? null : c.id)}
                 onDragStart={(e) => {
                   e.dataTransfer.effectAllowed = "move";

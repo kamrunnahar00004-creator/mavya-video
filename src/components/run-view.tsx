@@ -670,14 +670,13 @@ export function RunView() {
     next.splice(to, 0, moved);
     reorderClips(next);
   };
-  /** A tile dropped on another: the two clips trade places, each with its texts. */
+  /** A tile dropped on another: it takes that clip's place and that clip and the ones after it move one to the right
+   *  (founder 2026-11-03, was a swap). Texts go with their clips. */
   const swapClips = (a: string, b: string) => {
     const clips = demoClips(run);
-    const i = clips.findIndex((c) => c.id === a);
-    const j = clips.findIndex((c) => c.id === b);
-    if (i < 0 || j < 0 || i === j) return;
-    const next = [...clips];
-    [next[i], next[j]] = [next[j], next[i]];
+    if (a === b || !clips.some((c) => c.id === a) || !clips.some((c) => c.id === b)) return;
+    const next = clips.filter((c) => c.id !== a);
+    next.splice(next.findIndex((c) => c.id === b), 0, clips.find((c) => c.id === a)!);
     reorderClips(next);
   };
   /** Put the demo clips in this order. Texts that sit on one clip go with it; texts across several clips keep their time. */
