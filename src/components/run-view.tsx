@@ -16,7 +16,7 @@ import { type Adjust, speedOf } from "@/lib/adjust";
 import { reconcileGeneration } from "@/lib/generation-edit";
 import { soundPieces } from "@/lib/sound";
 
-import { type Seg, clipSrc, demoClips, moveClipPiece, splitDemoClip, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, snapTexts, storeParts, timeline } from "@/lib/edit";
+import { type Seg, clipGroup, clipSrc, demoClips, moveClipPiece, splitDemoClip, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, snapTexts, storeParts, timeline } from "@/lib/edit";
 
 import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { fmtTime, type DemoClip, type Frame, type Part, type Reference, type Run, type TextLayer, type TextPos } from "@/lib/types";
@@ -674,9 +674,11 @@ export function RunView() {
    *  (founder 2026-11-03, was a swap). Texts go with their clips. */
   const swapClips = (a: string, b: string) => {
     const clips = demoClips(run);
-    if (a === b || !clips.some((c) => c.id === a) || !clips.some((c) => c.id === b)) return;
-    const next = clips.filter((c) => c.id !== a);
-    next.splice(next.findIndex((c) => c.id === b), 0, clips.find((c) => c.id === a)!);
+    // A cut clip's halves move together, and go in front of the whole tile they were dropped on.
+    const moving = clipGroup(clips, a), target = clipGroup(clips, b)[0];
+    if (!moving.length || !target || moving.includes(target)) return;
+    const next = clips.filter((c) => !moving.includes(c));
+    next.splice(next.indexOf(target), 0, ...moving);
     reorderClips(next);
   };
   /** Put the demo clips in this order. Texts that sit on one clip go with it; texts across several clips keep their time. */

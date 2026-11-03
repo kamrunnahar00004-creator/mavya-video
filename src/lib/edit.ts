@@ -258,10 +258,23 @@ export function splitDemoClip(run: Run, clipId: string, file: number, newId: str
   const cut = roundTime(file);
   const first = storeParts([...seg.parts.slice(0, i), { ...p, end: cut }]);
   const second = storeParts([{ id: partId, start: cut, end: p.end }, ...seg.parts.slice(i + 1)]);
+  const group = own.group ?? own.id;
   const rest: DemoClip = { ...own };
   delete rest.gap;
-  const next: DemoClip = { ...rest, id: newId, ...second };
-  return { demo: { ...run.demo, mode: "clips", clips: clips.flatMap((c) => (c.id === clipId ? [{ ...c, ...first }, next] : [c])) } };
+  const next: DemoClip = { ...rest, id: newId, group, ...second };
+  return { demo: { ...run.demo, mode: "clips", clips: clips.flatMap((c) => (c.id === clipId ? [{ ...c, group, ...first }, next] : [c])) } };
+}
+
+/** The clips shown together with clip `id`: it and its neighbours cut from the same clip (one tile, one box). */
+export function clipGroup(clips: DemoClip[], id: string): DemoClip[] {
+  const i = clips.findIndex((c) => c.id === id);
+  if (i < 0) return [];
+  const g = clips[i].group;
+  if (!g) return [clips[i]];
+  let a = i, b = i;
+  while (a > 0 && clips[a - 1].group === g) a--;
+  while (b < clips.length - 1 && clips[b + 1].group === g) b++;
+  return clips.slice(a, b + 1);
 }
 
 /** Reorder a clip, or extract one piece, preserving text attached to its frames. */

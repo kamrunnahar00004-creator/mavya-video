@@ -322,6 +322,8 @@ export type DemoClip = {
   /** Suggested on-screen length, seconds. */
   target?: number;
   mediaId?: string;
+  /** Clips cut from one clip share this: side by side they show as one tile, each half with its own settings. */
+  group?: string;
   /** A video that is not an upload. */
   src?: string;
   name?: string;

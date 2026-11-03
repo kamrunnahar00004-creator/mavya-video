@@ -15,7 +15,7 @@ import { waveform } from "@/lib/waveform";
 import { ADJUST_ROWS, type Adjust, type AdjustRow, type Motion, NO_ADJUST, fullAdjust, isAdjusted, keyAt, motionAt, moveKey, panBy, setMotion, speedOf, toggleKey, videoStyle } from "@/lib/adjust";
 import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundPieces, soundRows } from "@/lib/sound";
 import type { Song } from "@/app/api/songs/route";
-import { type Seg, clipSrc, demoClips, fileAt, segAt, showsAt, videoLength, pieceSpans, relAt } from "@/lib/edit";
+import { type Seg, clipGroup, clipSrc, demoClips, fileAt, segAt, showsAt, videoLength, pieceSpans, relAt } from "@/lib/edit";
 
 import { round1, uid, uploadFile } from "@/lib/client";
 import { fmtTime, type DemoClip, type Part, type Reference, type SoundPiece, type Run, type TextLayer } from "@/lib/types";
@@ -2082,25 +2082,34 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
 
   // One row of 9:16 tiles, like a phone editor's clip strip: filmed clips show a frame, shots still to film are
   // dashed with their name. Click a tile to open it below; drop one tile on another to put it in that place.
+  // A clip that was Cut stays one tile: its halves sit side by side, each with its own settings (founder 2026-11-03).
+  const tiles = clips.reduce<DemoClip[][]>((out, c) => {
+    const last = out[out.length - 1];
+    if (last && c.group && last[0].group === c.group) last.push(c);
+    else out.push([c]);
+    return out;
+  }, []);
   const selected = clips.find((c) => c.id === openId) ?? null;
   const selSeg = selected ? segs.find((s) => s.id === selected.id) : undefined;
-  const selIndex = selected ? clips.indexOf(selected) : -1;
+  const members = selected ? clipGroup(clips, selected.id) : [];
+  const selIndex = selected ? tiles.findIndex((g) => g.includes(selected)) : -1;
   return (
     <div {...dropZone} className={`space-y-4 rounded-xl ${dropRing}`}>
       <ol className="flex flex-wrap gap-3" aria-label="Demo clips">
-        {clips.map((c, i) => {
-          const seg = segs.find((s) => s.id === c.id);
+        {tiles.map((group, i) => {
+          const c = group[0];
           const filmed = Boolean(clipSrc(c));
-          const on = openId === c.id;
-          const len = seg ? seg.len : c.target;
+          const on = group.some((x) => x.id === openId);
+          const lens = group.map((x) => segs.find((s) => s.id === x.id)?.len);
+          const len = lens.every((x) => x !== undefined) ? lens.reduce((a: number, x) => a + (x ?? 0), 0) : c.target;
           return (
             <li key={c.id} className="w-[96px]">
               <button
                 type="button"
-                draggable={clips.length > 1}
+                draggable={tiles.length > 1}
                 aria-label={`${c.label}${filmed ? "" : ", not filmed yet"}`}
                 aria-pressed={on}
-                title={clips.length > 1 ? "Click to open. Drag onto another clip to put it there." : undefined}
+                title={tiles.length > 1 ? "Click to open. Drag onto another clip to put it there." : undefined}
                 onClick={() => setOpenId(on ? null : c.id)}
                 onDragStart={(e) => {
                   e.dataTransfer.effectAllowed = "move";
@@ -2127,15 +2136,16 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
                     return;
                   }
                   const from = e.dataTransfer.getData("text/plain") || dragId;
-                  if (from && from !== c.id && clips.some((x) => x.id === from)) onSwap(from, c.id);
+                  if (from && !group.some((x) => x.id === from) && clips.some((x) => x.id === from)) onSwap(from, c.id);
                   setDragId(null);
                   setDropAt(null);
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "ArrowLeft" && i > 0) { e.preventDefault(); onMove(c.id, i - 1); }
-                  if (e.key === "ArrowRight" && i < clips.length - 1) { e.preventDefault(); onMove(c.id, i + 1); }
+                  // Arrow keys move the whole tile one place (a cut clip's halves move together).
+                  if (e.key === "ArrowLeft" && i > 0) { e.preventDefault(); onSwap(c.id, tiles[i - 1][0].id); }
+                  if (e.key === "ArrowRight" && i < tiles.length - 1) { e.preventDefault(); onSwap(tiles[i + 1][0].id, c.id); }
                 }}
-                className={`relative block aspect-[9/16] w-full overflow-hidden rounded-xl transition-[box-shadow,opacity] ${filmed ? "bg-ink" : "border-2 border-dashed border-line-strong bg-panel hover:border-accent"} ${on ? "ring-2 ring-accent ring-offset-2 ring-offset-panel" : ""} ${dropAt === i ? "ring-2 ring-accent" : ""} ${dragId === c.id ? "opacity-40" : ""} ${clips.length > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
+                className={`relative block aspect-[9/16] w-full overflow-hidden rounded-xl transition-[box-shadow,opacity] ${filmed ? "bg-ink" : "border-2 border-dashed border-line-strong bg-panel hover:border-accent"} ${on ? "ring-2 ring-accent ring-offset-2 ring-offset-panel" : ""} ${dropAt === i ? "ring-2 ring-accent" : ""} ${dragId === c.id ? "opacity-40" : ""} ${tiles.length > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
               >
                 {filmed ? (
                   <MediaVideo src={`${previewOf(clipSrc(c))}#t=0.5`} muted preload="metadata" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
@@ -2169,7 +2179,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
             <input
               value={selected.label}
               maxLength={60}
-              onChange={(e) => onRename(selected.id, e.target.value)}
+              onChange={(e) => members.forEach((m) => onRename(m.id, e.target.value))}
               aria-label={`Clip ${selIndex + 1} name`}
               className="min-w-0 flex-1 bg-transparent text-[14px] font-semibold outline-none"
             />
@@ -2185,13 +2195,28 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
                 <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => void takeMany(e.target.files, selected.id).then(() => (e.target.value = ""))} />
               </label>
             )}
-            <button type="button" onClick={() => { onDelete(selected.id); setOpenId(null); }} aria-label={`Delete clip ${selIndex + 1}`} title="Delete clip" className="rounded-lg p-2 text-soft hover:bg-red-50 hover:text-red-600">
+            <button type="button" onClick={() => { onDelete(selected.id); setOpenId(members.find((m) => m.id !== selected.id)?.id ?? null); }} aria-label={members.length > 1 ? `Delete part ${members.indexOf(selected) + 1}` : `Delete clip ${selIndex + 1}`} title={members.length > 1 ? "Delete this part" : "Delete clip"} className="rounded-lg p-2 text-soft hover:bg-red-50 hover:text-red-600">
               <Trash2 className="h-4 w-4" />
             </button>
             <button type="button" onClick={() => setOpenId(null)} aria-label="Close" className="rounded-lg p-2 text-soft hover:bg-raised hover:text-text">
               <X className="h-4 w-4" />
             </button>
           </div>
+          {members.length > 1 && (
+            // The halves of a cut clip, in order and to scale: pick one to edit it on its own.
+            <div role="group" aria-label="Parts of this clip" className="flex gap-1 px-3 pt-3">
+              {members.map((m, k) => {
+                const len = segs.find((s) => s.id === m.id)?.len;
+                const here = m.id === selected.id;
+                return (
+                  <button key={m.id} type="button" aria-pressed={here} onClick={() => setOpenId(m.id)} style={{ flexGrow: len ?? 1, flexBasis: 0 }}
+                    className={`h-9 min-w-[48px] rounded-lg text-[12.5px] font-bold tabular-nums ${here ? "bg-accent text-white" : "bg-raised text-muted hover:text-text"}`}>
+                    {k + 1}{len ? ` · ${len.toFixed(1)}s` : ""}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {clipSrc(selected) && selSeg ? (
             <div className="p-3">{renderEditor(selSeg)}</div>
           ) : selected.camera || selected.steps?.length ? (

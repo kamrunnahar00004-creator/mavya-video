@@ -64,6 +64,12 @@ assert.ok(Math.abs(level(0, -25) - 22.3) < 0.01, 'negative contrast lifts blacks
   assert.ok(Math.abs(edit.videoLength(after) - edit.videoLength(before)) < 1e-9, 'video length unchanged');
   assert.ok(Math.abs(after[2].offset + after[2].len - (before[1].offset + before[1].len)) < 1e-9, 'second half ends where the clip ended');
   assert.equal(edit.splitDemoClip(r, 'c1', 0.5, 'x', 'y'), null, 'a cut outside the clip does nothing');
+  // The halves stay one tile: same group, and a second cut joins that group.
+  assert.equal(clips[0].group, 'c1'); assert.equal(clips[1].group, 'c1'); assert.equal(clips[2].group, undefined);
+  const again = edit.splitDemoClip({ ...r, demo: split.demo }, 'c1b', 6, 'c1c', 'p2').demo.clips;
+  assert.deepEqual([...edit.clipGroup(again, 'c1c')].map(c => c.id), ['c1', 'c1b', 'c1c']);
+  assert.deepEqual([...edit.clipGroup(again, 'c2')].map(c => c.id), ['c2']);
+  assert.deepEqual([...edit.clipGroup([again[0], again[3], again[1]], 'c1')].map(c => c.id), ['c1'], 'halves moved apart are separate tiles');
 }
 // A clip at 9.8196s (unrounded) with its caption saved at 9.82: the caption shows from the clip's first frame,
 // and the previous caption (ending 9.82) does not.
