@@ -221,8 +221,10 @@ export function finalArgs(spec, list, local, out) {
   args.push(
     "-filter_complex", graph.join(";"),
     "-map", "[vout]", "-map", "[aout]",
-    // zerolatency: no lookahead buffers, about half the memory of plain veryfast (the file is a bit larger).
-    "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency", "-crf", "19", "-pix_fmt", "yuv420p", "-r", String(fps), "-threads", "2",
+    // zerolatency: no lookahead buffers, low memory. ultrafast at crf 17: the join was the slowest part of a 1080x1920
+    // export (55 s of 168 s on Vercel with veryfast); the file is larger, the picture as clean, and Reels re-encode
+    // every upload anyway (2026-11-03).
+    "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-crf", "17", "-pix_fmt", "yuv420p", "-r", String(fps), "-threads", "2",
     "-c:a", "aac", "-b:a", "160k",
     "-t", String(r(total)),
     "-movflags", "+faststart",

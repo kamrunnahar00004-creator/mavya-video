@@ -78,15 +78,19 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
       const bounds=renderLimitError(segments,exportLayers(snapshot).length,soundPieces(snapshot,total).length,total);
       if(bounds)throw Error(bounds);
       const {textPng}=await import("@/lib/text-png");
-      const manifest=[];
-      // Draw/upload one at a time, avoiding 200 simultaneous full-resolution canvases.
-      for(const t of exportLayers(snapshot)){
+      const layers=exportLayers(snapshot);
+      const manifest:{id:string;mediaId:string;x:number;y:number}[]=new Array(layers.length);
+      // Draw one at a time (no 200 simultaneous full-resolution canvases); upload up to 4 at once meanwhile.
+      const uploading=new Set<Promise<void>>();
+      for(const [i,t] of layers.entries()){
         const drawn=await textPng(t);
         if(!drawn)throw Error("A text image could not be drawn.");
         const blob=await (await fetch(drawn.png)).blob();
-        const uploaded=await uploadFile(new File([blob],"text.png",{type:"image/png"}),false,"export-text");
-        manifest.push({id:t.id,mediaId:uploaded.mediaId,x:drawn.x,y:drawn.y});
+        const up:Promise<void>=uploadFile(new File([blob],"text.png",{type:"image/png"}),false,"export-text").then(uploaded=>{manifest[i]={id:t.id,mediaId:uploaded.mediaId,x:drawn.x,y:drawn.y};}).finally(()=>{uploading.delete(up);});
+        uploading.add(up);
+        if(uploading.size>=4)await Promise.race(uploading);
       }
+      await Promise.all(uploading);
       const sent=await fetch(`/api/runs/${run.id}/export`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({snapshot:snapshot.updatedAt,texts:manifest}),signal:AbortSignal.timeout(60_000)});
       const reply=await sent.json().catch(()=>null);
       if(!sent.ok||!reply?.job)throw Error(reply?.error??"Couldn't start the export. Try again.");
