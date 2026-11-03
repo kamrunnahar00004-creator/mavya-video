@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { cloud, extFor, isMediaId } from "@/lib/server/store";
 import { startUpload, finishUpload, expireUploads } from "@/lib/server/uploads";
 import { currentUser, signInFirst } from "@/lib/server/who";
+import { requestPreview } from "@/lib/server/previews";
 export const maxDuration = 300;
 export async function POST(request: Request) {
  if (!cloud()) return Response.json({ error: "Direct uploads need storage" }, { status: 501 });
@@ -17,7 +18,12 @@ export async function POST(request: Request) {
    if (b.purpose === "export-text" && (mime !== "image/png" || b.size > 3_000_000)) return Response.json({ error: "Text image is too large." }, { status: 413 });
    return Response.json(await startUpload(who, mime, b.size, b.purpose === "export-text"));
   }
-  if (b?.step === "finish" && typeof b.mediaId === "string" && isMediaId(b.mediaId)) return Response.json(await finishUpload(who, b.mediaId, mime, b.asset === true ? String(b.name ?? "Upload").slice(0,200) : null));
+  if (b?.step === "finish" && typeof b.mediaId === "string" && isMediaId(b.mediaId)) {
+   const done = await finishUpload(who, b.mediaId, mime, b.asset === true ? String(b.name ?? "Upload").slice(0,200) : null);
+   // A video gets its light preview copy straight away, so the editor plays smoothly from the start.
+   if (mime.startsWith("video/")) after(() => requestPreview(done.mediaId));
+   return Response.json(done);
+  }
   return Response.json({ error: "Bad upload." }, { status: 400 });
  } catch (error) {
   console.error("upload", error);

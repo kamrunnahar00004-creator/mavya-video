@@ -37,11 +37,12 @@ function blank(ctx: CanvasRenderingContext2D, w: number, h: number): boolean {
  * The address to read a file's pixels from. Storage sends no "Vary: Origin", so a crossOrigin video on the same link
  * as the page's players reuses their cached non-CORS copy and fails ("Format error"). ?link=1 gives a link of its own.
  */
-export async function pixelLink(src: string): Promise<string> {
+export async function pixelLink(src: string, preview = false): Promise<string> {
   const [path] = src.split("#");
   if (!path.startsWith("/api/media/")) return src;
   try {
-    const res = await fetch(`${path}?link=1`);
+    // preview: the light copy of an uploaded video when it exists (a filmstrip needs small frames, not 4K ones).
+    const res = await fetch(`${path}?link=1${preview ? "&preview=1" : ""}`);
     const data = (await res.json()) as { url?: string };
     return res.ok && data.url ? data.url : src;
   } catch {
@@ -53,7 +54,7 @@ async function grab(src: string, t: number): Promise<string | null> {
   if ((failed.get(src) ?? 0) > Date.now()) return null;
   let entry = players.get(src);
   if (!entry) {
-    const link = await pixelLink(src);
+    const link = await pixelLink(src, true);
     const video = document.createElement("video");
     // Files come from storage on another origin; reading pixels needs a CORS request.
     video.crossOrigin = "anonymous";

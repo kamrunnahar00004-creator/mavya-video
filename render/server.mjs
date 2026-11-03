@@ -4,6 +4,7 @@
 //   GET  /health
 // A job downloads its inputs (short-lived R2 links), runs ffmpeg (render.mjs) and uploads the MP4 to the signed PUT
 // link it was given. The app persists dispatch/output identities; this process retains job status for 6 hours.
+//   POST /previews {id, input, output: {url, contentType}}  -> {state}  a light copy of an uploaded video (see makePreview)
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
@@ -14,7 +15,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID, timingSafeEqual, createHash } from "node:crypto";
 import ffmpegPath from "ffmpeg-static";
-import { finalArgs, plan, stepArgs } from "./render.mjs";
+import { finalArgs, plan, previewArgs, stepArgs } from "./render.mjs";
 
 const SECRET = process.env.RENDER_SECRET ?? "";
 const PORT = Number(process.env.PORT ?? 3200);
@@ -158,10 +159,51 @@ async function work(id) {
   }
 }
 
+/**
+ * Preview copies: a light 720p version of an uploaded video (short side 720, keyframe every second, at most 30 fps)
+ * that the editor and phone preview play. A 4K phone recording is ~46 Mbps; the copy is ~2 Mbps and seeks at once.
+ * Exports always read the original. Exports go first; copies are made while no export waits.
+ */
+/** @type {Map<string, {state: string, at: number, input?: string, output?: {url: string, contentType: string}, error?: string}>} */
+const previews = new Map();
+const previewQueue = [];
+async function makePreview(id) {
+  const p = previews.get(id);
+  if (!p || p.state !== "queued") return;
+  p.state = "running";
+  const controller = new AbortController();
+  const deadline = setTimeout(() => controller.abort(), JOB_MS);
+  let dir;
+  try {
+    dir = await mkdtemp(path.join(tmpdir(), "mavya-preview-"));
+    const input = await probe(await download(p.input, path.join(dir, "in"), controller.signal, { bytes: 0 }), controller.signal);
+    const out = path.join(dir, "out.mp4");
+    await run(previewArgs(input.file, out), null, controller.signal, 600_000);
+    const size = (await stat(out)).size;
+    const put = await fetch(p.output.url, { method: "PUT", headers: { "content-type": p.output.contentType, "content-length": String(size) }, body: createReadStream(out), duplex: "half", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(60_000)]) });
+    if (!put.ok) throw new Error(`upload failed (${put.status})`);
+    p.state = "done";
+  } catch (e) {
+    p.state = "failed";
+    p.error = String(e?.message ?? e).slice(0, 500);
+    console.error("preview", id, p.error);
+  } finally {
+    clearTimeout(deadline);
+    controller.abort();
+    p.input = p.output = undefined;
+    if (dir) await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
 async function next() {
   if (busy) return;
   busy = true;
-  try { while (queue.length) await work(queue.shift()); } finally { busy = false; }
+  try {
+    while (queue.length || previewQueue.length) {
+      if (queue.length) await work(queue.shift());
+      else await makePreview(previewQueue.shift());
+    }
+  } finally { busy = false; }
 }
 
 setInterval(() => {
@@ -169,6 +211,10 @@ setInterval(() => {
   for (const [id, j] of jobs) if (j.at < old && j.state !== "running") {
     jobs.delete(id);
     const at=queue.indexOf(id);if(at>=0)queue.splice(at,1);
+  }
+  for (const [id, p] of previews) if (p.at < old && p.state !== "running") {
+    previews.delete(id);
+    const at = previewQueue.indexOf(id); if (at >= 0) previewQueue.splice(at, 1);
   }
 }, 600_000).unref();
 
@@ -192,6 +238,19 @@ const server = createServer(async (req, res) => {
       queue.push(id);
       void next();
       return send(res, 200, { id });
+    }
+    if (req.method === "POST" && url.pathname === "/previews") {
+      const b = await body(req);
+      const link = (x) => typeof x === "string" && x.length <= 8192 && /^https:\/\//.test(x);
+      if (!/^[0-9a-f-]{36}\.(mp4|mov|webm|m4v)$/i.test(b?.id ?? "") || !link(b.input) || !link(b.output?.url) || b.output.contentType !== "video/mp4") return send(res, 400, { error: "bad preview" });
+      const prior = previews.get(b.id);
+      // Asked again: one copy per file (a failed one may be retried).
+      if (prior && prior.state !== "failed") return send(res, 200, { state: prior.state });
+      if (previewQueue.length >= 200) return send(res, 429, { error: "queue full" });
+      previews.set(b.id, { state: "queued", at: Date.now(), input: b.input, output: { url: b.output.url, contentType: "video/mp4" } });
+      previewQueue.push(b.id);
+      void next();
+      return send(res, 200, { state: "queued" });
     }
     const m = /^\/jobs\/([0-9a-f-]{36})$/.exec(url.pathname);
     if (req.method === "GET" && m) {

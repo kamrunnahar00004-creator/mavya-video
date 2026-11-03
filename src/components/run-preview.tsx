@@ -1,5 +1,6 @@
 "use client";
 import { MediaVideo } from "@/components/media-video";
+import { previewOf } from "@/lib/media-preview";
 
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -262,7 +263,7 @@ export function SegmentVideos({ segs, seg, at, piece, playing }: { segs: Seg[]; 
         return (
           <SyncedVideo
             key={`${s.id}|${s.src}|${i}`}
-            src={s.src!}
+            src={s.id === "hook" ? s.src! : previewOf(s.src!)}
             at={sAt}
             piece={i}
             playing={now && playing}

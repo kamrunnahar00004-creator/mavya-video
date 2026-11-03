@@ -4,6 +4,7 @@ import { billingRpc, withBillingLock } from "@/lib/server/billing-state";
 import { accountClosing } from "@/lib/server/account-state";
 import { stripe } from "@/lib/server/stripe";
 import { deleteObjectStrict } from "@/lib/server/r2";
+import { previewKey } from "@/lib/server/previews";
 import type Stripe from "stripe";
 type Deletion = { user_id: string; state: string; subscription_ids: string[]; checkout: { session_id?: string; params: Stripe.Checkout.SessionCreateParams; request_key: string; created_at: string } | null; media_ids: string[]; extra_keys?: string[]; cursor: number; cleanup_after: string; lease_token: string };
 export async function beginDeletion(user: string) {
@@ -42,7 +43,8 @@ export async function advanceDeletion(user: string) {
   // Existing signed export PUTs last six hours. Keep the ownership index until those grants expire.
   if (Date.now() < Date.parse(d.cleanup_after)) return;
   if (d.state === "storage" || d.state === "auth") {
-   const keys = [...d.media_ids.map(id => `media/${id}`), ...(d.extra_keys ?? []), ...d.media_ids.map(id => `covers/${id}.webp`)];
+   // Preview copies last: appended, so a deletion already in progress keeps its cursor positions.
+   const keys = [...d.media_ids.map(id => `media/${id}`), ...(d.extra_keys ?? []), ...d.media_ids.map(id => `covers/${id}.webp`), ...d.media_ids.map(id => previewKey(id))];
    const batch = keys.slice(d.cursor, d.cursor + 40);
    for (let i = 0; i < batch.length; i += 5) await Promise.all(batch.slice(i, i + 5).map(key => deleteObjectStrict(key)));
    d.cursor += batch.length;

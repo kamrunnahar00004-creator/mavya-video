@@ -1,5 +1,6 @@
 "use client";
 import { MediaVideo } from "@/components/media-video";
+import { previewOf } from "@/lib/media-preview";
 import dynamic from "next/dynamic";
 
 import { memo, useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
@@ -248,7 +249,7 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
                   className={`absolute inset-0 overflow-hidden ${zoomed ? "cursor-grab touch-none active:cursor-grabbing" : "cursor-zoom-in"}`}
                 >
                   <WarmthFilter adjust={seg.adjust} />
-                  <MediaVideo ref={vref} key={`${seg.src}|${version ?? ""}`} src={seg.src} muted={!playing} playsInline onLoadedMetadata={() => seek(0)} className="absolute inset-0 h-full w-full object-cover" style={look} />
+                  <MediaVideo ref={vref} key={`${seg.src}|${version ?? ""}`} src={seg.id === "hook" ? seg.src : previewOf(seg.src)} muted={!playing} playsInline onLoadedMetadata={() => seek(0)} className="absolute inset-0 h-full w-full object-cover" style={look} />
                   {/* One caption at a time at a boundary (end is exclusive), except the clip's very end shows its last caption. */}
                   {local.filter((x) => x.text.trim() && (showsAt(x, t) || (x.end >= len - 0.001 && t >= len - 0.001 && t >= x.start - 0.001))).map((x) => <TextOverlay key={x.id} x={x} onPatch={onPatch} />)}
                 </div>
@@ -366,7 +367,7 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-6" onClick={() => setFull(false)}>
           <div className="fade-in relative aspect-[9/16] h-[min(86vh,900px)] overflow-hidden rounded-2xl bg-black shadow-[0_24px_64px_rgba(0,0,0,0.35)] [container-type:size]" onClick={(e) => e.stopPropagation()}>
             <WarmthFilter adjust={seg.adjust} />
-            <TrimmedVideo src={seg.src} parts={seg.parts} rate={speed} adjust={seg.adjust} onTime={setFullT} />
+            <TrimmedVideo src={seg.id === "hook" ? seg.src : previewOf(seg.src)} parts={seg.parts} rate={speed} adjust={seg.adjust} onTime={setFullT} />
             {local.filter((x) => x.text.trim() && showsAt(x, fullT)).map((x) => <TextOverlay key={x.id} x={x} onPatch={onPatch} />)}
           </div>
           <button type="button" aria-label="Close" onClick={() => setFull(false)} className="absolute right-6 top-6 rounded-full bg-white/90 p-2 text-ink hover:bg-white">
@@ -2124,7 +2125,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
                 className={`relative block aspect-[9/16] w-full overflow-hidden rounded-xl transition-[box-shadow,opacity] ${filmed ? "bg-ink" : "border-2 border-dashed border-line-strong bg-panel hover:border-accent"} ${on ? "ring-2 ring-accent ring-offset-2 ring-offset-panel" : ""} ${dropAt === i ? "ring-2 ring-accent" : ""} ${dragId === c.id ? "opacity-40" : ""} ${clips.length > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
               >
                 {filmed ? (
-                  <MediaVideo src={`${clipSrc(c)}#t=0.5`} muted preload="metadata" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+                  <MediaVideo src={`${previewOf(clipSrc(c))}#t=0.5`} muted preload="metadata" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
                 ) : (
                   <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-soft">
                     {busy === c.id ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}

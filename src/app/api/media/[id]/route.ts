@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
+import { previewKey, previewReady, requestPreview } from "@/lib/server/previews";
+import { signedGet } from "@/lib/server/r2";
 import { fileResponse } from "@/lib/server/file-response";
 import { localMediaPath, mediaAccess, mediaLink } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
@@ -18,8 +20,22 @@ export async function GET(request: Request, ctx: RouteContext<"/api/media/[id]">
   // ?link=1: a storage link for reading pixels (crossOrigin). It must differ from the players' link: storage sends no
   // "Vary: Origin", so the browser would reuse their cached non-CORS copy and the read fails. A lifetime other than
   // the default skips the shared link cache, so each one is signed afresh.
-  if (params.has("link")) return Response.json({ url: file ? `/api/media/${id}` : await mediaLink(id, 1800) }, { headers: { "Cache-Control": "no-store" } });
+  // ?preview=1: the light copy of an uploaded video when it exists (src/lib/server/previews.ts), else the original.
+  const preview = params.has("preview") && !file && info.mime.startsWith("video/") && (await previewReady(id));
+  if (params.has("link")) return Response.json({ url: file ? `/api/media/${id}` : preview ? await signedGet(previewKey(id), 1800) : await mediaLink(id, 1800) }, { headers: { "Cache-Control": "no-store" } });
   if (file) return fileResponse(request, file, info.size, info.mime);
+  if (params.has("preview") && info.mime.startsWith("video/")) {
+    if (preview) {
+      const res = NextResponse.redirect(await signedGet(previewKey(id)), 302);
+      res.headers.set("Cache-Control", "private, max-age=1800");
+      return res;
+    }
+    // No copy yet: ask for one and play the original meanwhile (not remembered, so the copy is used once it lands).
+    after(() => requestPreview(id));
+    const res = NextResponse.redirect(await mediaLink(id), 302);
+    res.headers.set("Cache-Control", "no-store");
+    return res;
+  }
   // ?download=<name>: the link saves the file (the export's Download button).
   const download = params.get("download");
   const res = NextResponse.redirect(await mediaLink(id, undefined, download ? `${download.slice(0, 80)}.${id.split(".").pop()}` : undefined), 302);
