@@ -109,6 +109,9 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
                 <svg viewBox="0 0 26 12" className="h-[10px] w-auto"><rect x="0.5" y="0.5" width="22" height="11" rx="3" fill="none" stroke="white" strokeOpacity="0.5" /><rect x="2" y="2" width="16" height="8" rx="1.6" fill="white" /><rect x="23.5" y="4" width="1.8" height="4" rx="0.9" fill="white" fillOpacity="0.5" /></svg>
               </span>
             </div>
+            {/* The video is 9:16 like the export and the clip editors, so its texts wrap and sit the same in all of them.
+                The taller phone screen shows it full width, like TikTok does on a tall phone. */}
+            <div className="absolute inset-x-0 top-1/2 aspect-[9/16] w-full -translate-y-1/2 overflow-hidden [container-type:size]">
             {!hit ? null : seg.src ? (
               <>
                 <WarmthFilter adjust={seg.editable ? seg.adjust : null} />
@@ -132,6 +135,7 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
             )}
             {seg.id === "hook" && hookCover}
             {texts.filter((x) => x.text.trim() && showsAt(x, time)).map((x) => <TextOverlay key={x.id} x={x} />)}
+            </div>
             {!playing && (
               <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                 <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white">
