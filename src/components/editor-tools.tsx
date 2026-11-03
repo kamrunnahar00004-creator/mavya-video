@@ -40,7 +40,9 @@ function magnet(points: number[], tol: number) {
 const optionBtn = (on: boolean) =>
   `flex items-center gap-1.5 rounded-lg border px-3.5 py-2.5 text-[14px] font-semibold ${on ? "border-accent bg-accent-tint text-accent" : "border-line-strong bg-panel text-text hover:border-accent hover:text-accent"}`;
 
-export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTextPlaceholder = "Text", onRegenerateFirst, onParts, onAdjust, onPatch, onAdd, onRemove, onApplyAll }: {
+export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTextPlaceholder = "Text", onRegenerateFirst, onParts, onSplit, onAdjust, onPatch, onAdd, onRemove, onApplyAll }: {
+  /** Cut makes a new clip from the rest (demo clips); without it, Cut splits this clip into pieces (the hook). */
+  onSplit?: (file: number) => void;
   /** Extra controls in the right column, under the settings. */
   side?: React.ReactNode;
   /** The first text row gets a Regenerate icon (the hook's line); called with that text's id. */
@@ -293,9 +295,11 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
               }}
               canCut={canCut}
               onCut={() => {
-                // Cut = two pieces side by side in this clip; nothing is removed or moved.
                 setPlaying(false);
                 const f = Math.round(fileT * 1000) / 1000;
+                // A demo clip splits into two clips, each with its own settings (like CapCut).
+                if (onSplit) return onSplit(f);
+                // The hook: two pieces side by side in this clip; nothing is removed or moved.
                 // Only a split: both pieces stay as they were, nothing is selected or greyed out (founder 2026-10-30).
                 const second = { id: uid(), start: f, end: herePart.end };
                 change([...seg.parts.slice(0, here.i), { ...herePart, end: f }, second, ...seg.parts.slice(here.i + 1)]);
@@ -1389,7 +1393,7 @@ type EditorSnap = { hook: Run["hook"]; demo: Run["demo"]; texts: TextLayer[]; so
  * The full editor (Edit under the phone): every clip, text and sound on one timeline, like CapCut but only what
  * Mavya does. Select something to change it on the right; Cut (S), Delete and Undo work on the selection.
  */
-export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, onParts, onDeleteClip, onAddVideos, onInsertClip, onMoveClip, onShiftClip, onCloseGaps, onAdjust, onPatchText, onAddText, onRemoveText, onApplyAll, onPieces }: {
+export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, onParts, onSplitClip, onDeleteClip, onAddVideos, onInsertClip, onMoveClip, onShiftClip, onCloseGaps, onAdjust, onPatchText, onAddText, onRemoveText, onApplyAll, onPieces }: {
   run: Run;
   source: Reference | null;
   segs: Seg[];
@@ -1399,6 +1403,8 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
   onRestore: (s: EditorSnap) => void;
   /** hold = keep the clips after it in place (magnet off). */
   onParts: (clipId: string, parts: Part[], hold?: boolean) => void;
+  /** Cut a demo clip in two clips at file time `file`; the new one gets `newId` and its piece `partId`. */
+  onSplitClip: (clipId: string, file: number, newId: string, partId: string) => void;
   onDeleteClip: (clipId: string, hold?: boolean) => void;
   onShiftClip: (clipId: string, to: number) => void;
   onCloseGaps: () => void;
@@ -1484,6 +1490,13 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
     if ((file - p.start) / sp <= 0.2 || (p.end - file) / sp <= 0.2) return;
     const second = { id: uid(), start: r3(file), end: p.end };
     remember();
+    if (seg.id !== "hook") {
+      // A demo clip splits into two clips, each with its own settings (like CapCut).
+      const clipId = uid();
+      onSplitClip(seg.id, r3(file), clipId, second.id);
+      pick({ kind: "clip", seg: clipId, part: second.id });
+      return;
+    }
     onParts(seg.id, [...seg.parts.slice(0, i), { ...p, end: r3(file) }, second, ...seg.parts.slice(i + 1)]);
     pick({ kind: "clip", seg: seg.id, part: second.id });
   };

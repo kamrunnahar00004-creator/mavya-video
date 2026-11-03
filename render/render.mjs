@@ -91,12 +91,13 @@ function look(a, p0, W, H, fps) {
 }
 
 /**
- * ffmpeg arguments for the preview copy of an uploaded video (server.mjs makePreview): short side 720 (never larger
- * than the source), at most 30 fps, a keyframe every second so the editor seeks at once, ~2 Mbps instead of ~46.
+ * ffmpeg arguments for the preview copy of an uploaded video (server.mjs makePreview): short side 480 (never larger
+ * than the source; founder 2026-11-03: smoothness over quality in the editor), at most 30 fps, a keyframe every
+ * second so the editor seeks at once, well under 1 Mbps instead of ~46.
  */
 export const previewArgs = (input, out) => [
   "-y", "-hide_banner", "-i", input, "-map", "0:v:0", "-map", "0:a:0?",
-  "-vf", "scale=w='if(gt(iw,ih),-2,min(720,iw))':h='if(gt(iw,ih),min(720,ih),-2)'", "-fpsmax", "30",
+  "-vf", "scale=w='if(gt(iw,ih),-2,min(480,iw))':h='if(gt(iw,ih),min(480,ih),-2)'", "-fpsmax", "30",
   "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-g", "30", "-keyint_min", "30", "-sc_threshold", "0", "-pix_fmt", "yuv420p",
   "-c:a", "aac", "-b:a", "128k", "-ac", "2", "-movflags", "+faststart", out,
 ];

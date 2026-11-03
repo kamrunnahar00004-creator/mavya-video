@@ -242,6 +242,28 @@ export function removeDemoClip(run: Run, clipId: string, texts: TextLayer[], hol
   return { demo: { ...run.demo, clips }, texts: nextTexts };
 }
 
+/**
+ * Cut a demo clip in two at file time `file`, like CapCut's split: the second half becomes its own clip right after
+ * it (same file and settings), so each half is then edited on its own (founder 2026-11-03). Nothing moves on the
+ * timeline, so texts stay where they are.
+ */
+export function splitDemoClip(run: Run, clipId: string, file: number, newId: string, partId: string): Pick<Run, "demo"> | null {
+  const clips = demoClips(run);
+  const own = clips.find((c) => c.id === clipId);
+  const seg = timeline(run, null).find((s) => s.id === clipId);
+  if (!own || !seg || !seg.editable) return null;
+  const i = seg.parts.findIndex((p) => file > p.start && file < p.end);
+  if (i < 0) return null;
+  const p = seg.parts[i];
+  const cut = roundTime(file);
+  const first = storeParts([...seg.parts.slice(0, i), { ...p, end: cut }]);
+  const second = storeParts([{ id: partId, start: cut, end: p.end }, ...seg.parts.slice(i + 1)]);
+  const rest: DemoClip = { ...own };
+  delete rest.gap;
+  const next: DemoClip = { ...rest, id: newId, ...second };
+  return { demo: { ...run.demo, mode: "clips", clips: clips.flatMap((c) => (c.id === clipId ? [{ ...c, ...first }, next] : [c])) } };
+}
+
 /** Reorder a clip, or extract one piece, preserving text attached to its frames. */
 export function moveClipPiece(run: Run, texts: TextLayer[], segId: string, partId: string, beforeId: string | null, newId: string): Pick<Run, "hook" | "demo" | "texts"> | null {
   const before = timeline(run, null);

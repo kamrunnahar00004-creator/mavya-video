@@ -47,6 +47,24 @@ assert.ok(Math.abs(level(120, 0) - 120) < 0.01, 'contrast 0 changes nothing');
 assert.ok(Math.abs(level(111.5, -50) - 111.5) < 0.01, 'negative contrast pivots at 111.5');
 assert.ok(Math.abs(level(255, -50) - 197.6) < 0.01, 'negative contrast is a straight line');
 assert.ok(Math.abs(level(0, -25) - 22.3) < 0.01, 'negative contrast lifts blacks');
+// Cut on a demo clip: two clips with the same file and settings, the timeline and texts unchanged.
+{
+  const look = { brightness: 5, contrast: 8, zoom: 18, speed: 1.15 };
+  const r = { id: 'r', hook: { generated: { src: '/api/media/h.mp4', seconds: 4 }, start: 0, end: 4 }, demo: { mode: 'clips', clips: [{ id: 'c1', label: 'Clip 1', mediaId: 'm.mp4', seconds: 10, start: 1, end: 9, adjust: look, gap: 0.5 }, { id: 'c2', label: 'Clip 2', mediaId: 'n.mp4', seconds: 3, start: 0, end: 3 }] }, texts: [] };
+  const before = edit.timeline(r, null);
+  const split = edit.splitDemoClip(r, 'c1', 4.25, 'c1b', 'p1');
+  const clips = split.demo.clips;
+  assert.deepEqual(clips.map(c => c.id), ['c1', 'c1b', 'c2']);
+  assert.deepEqual([clips[0].start, clips[0].end, clips[1].start, clips[1].end], [1, 4.25, 4.25, 9]);
+  assert.equal(clips[1].mediaId, 'm.mp4');
+  assert.deepEqual(clips[1].adjust, look, 'the new clip starts with the same settings');
+  assert.notEqual(clips[1].adjust, undefined);
+  assert.equal(clips[0].gap, 0.5); assert.equal(clips[1].gap, undefined, 'no space opens between the halves');
+  const after = edit.timeline({ ...r, demo: split.demo }, null);
+  assert.ok(Math.abs(edit.videoLength(after) - edit.videoLength(before)) < 1e-9, 'video length unchanged');
+  assert.ok(Math.abs(after[2].offset + after[2].len - (before[1].offset + before[1].len)) < 1e-9, 'second half ends where the clip ended');
+  assert.equal(edit.splitDemoClip(r, 'c1', 0.5, 'x', 'y'), null, 'a cut outside the clip does nothing');
+}
 // A clip at 9.8196s (unrounded) with its caption saved at 9.82: the caption shows from the clip's first frame,
 // and the previous caption (ending 9.82) does not.
 assert.ok(edit.showsAt({ start: 9.82, end: 12.994 }, 9.8196), 'caption shows at its clip start');

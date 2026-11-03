@@ -16,7 +16,7 @@ import { type Adjust, speedOf } from "@/lib/adjust";
 import { reconcileGeneration } from "@/lib/generation-edit";
 import { soundPieces } from "@/lib/sound";
 
-import { type Seg, clipSrc, demoClips, moveClipPiece, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, snapTexts, storeParts, timeline } from "@/lib/edit";
+import { type Seg, clipSrc, demoClips, moveClipPiece, splitDemoClip, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, snapTexts, storeParts, timeline } from "@/lib/edit";
 
 import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { fmtTime, type DemoClip, type Frame, type Part, type Reference, type Run, type TextLayer, type TextPos } from "@/lib/types";
@@ -485,7 +485,13 @@ export function RunView() {
     liveTexts((t) => t.filter((x) => x.id !== tid));
     commitTexts();
   };
-  /** A clip's pieces changed (Cut, trim or delete a piece, Undo). Texts follow the same frames; texts only on a deleted piece go with it. */
+  /** Cut a demo clip into two clips (each edited on its own); the new one opens. Nothing moves on the timeline. */
+  const splitClip = (clipId: string, file: number, newId = uid(), partId = uid()) => {
+    const next = splitDemoClip(runRef.current ?? run, clipId, file, newId, partId);
+    if (next) save(next);
+    return next ? newId : null;
+  };
+  /** A clip's pieces changed (trim or delete a piece, Undo; Cut on the hook). Texts follow the same frames; texts only on a deleted piece go with it. */
   const setParts = (clipId: string, parts: Part[], hold = false) => {
     const seg = segs.find((x) => x.id === clipId);
     if (!seg || !parts.length) return;
@@ -533,6 +539,7 @@ export function RunView() {
       seg={seg}
       texts={texts}
       onParts={(parts) => setParts(seg.id, parts)}
+      onSplit={(file) => void splitClip(seg.id, file)}
       onAdjust={(a) => liveAdjust(seg.id, a)}
       onPatch={patchText}
       onAdd={addText}
@@ -1141,6 +1148,7 @@ export function RunView() {
           onClose={() => setEditing(false)}
           onRestore={(x) => save({ hook: x.hook, demo: x.demo, texts: x.texts, sounds: x.sounds, sound: null })}
           onParts={setParts}
+          onSplitClip={(clipId, file, newId, partId) => void splitClip(clipId, file, newId, partId)}
           onDeleteClip={deleteClip}
           onAddVideos={addVideos}
           onInsertClip={(clip, at) => insertClips([clip], at)}

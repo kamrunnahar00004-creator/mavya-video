@@ -35,15 +35,15 @@ assert.match(preview, /src=\{s\.id === "hook" \? s\.src! : previewOf\(s\.src!\)\
 const deletion = fs.readFileSync(path.join(root, 'src/lib/server/account-deletion.ts'), 'utf8');
 assert.match(deletion, /d\.media_ids\.map\(id => previewKey\(id\)\)\]/, 'account deletion removes copies');
 
-// Real ffmpeg: a 4K 60 fps landscape recording and a portrait one come out short side 720, at most 30 fps.
+// Real ffmpeg: a 4K 60 fps landscape recording and a portrait one come out short side 480, at most 30 fps.
 (async () => {
   const { previewArgs } = await import(path.join(root, 'render/render.mjs'));
   const ff = require('ffmpeg-static');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mavya-preview-'));
   try {
     const cases = [
-      ['landscape', ['-f', 'lavfi', '-i', 'testsrc2=s=3840x2160:r=60:d=2.2', '-f', 'lavfi', '-i', 'sine=d=2.2'], '1280x720'],
-      ['portrait', ['-f', 'lavfi', '-i', 'testsrc2=s=1080x1920:r=30:d=2.2'], '720x1280'],
+      ['landscape', ['-f', 'lavfi', '-i', 'testsrc2=s=3840x2160:r=60:d=2.2', '-f', 'lavfi', '-i', 'sine=d=2.2'], '854x480'],
+      ['portrait', ['-f', 'lavfi', '-i', 'testsrc2=s=1080x1920:r=30:d=2.2'], '480x854'],
     ];
     for (const [name, input, want] of cases) {
       const src = path.join(dir, `${name}.mp4`), out = path.join(dir, `${name}-preview.mp4`);
@@ -57,7 +57,7 @@ assert.match(deletion, /d\.media_ids\.map\(id => previewKey\(id\)\)\]/, 'account
       assert.match(info, /(\d+(?:\.\d+)?) fps/);
       assert.ok(Number(/(\d+(?:\.\d+)?) fps/.exec(info)[1]) <= 30, `${name}: at most 30 fps`);
     }
-    console.log('PASS: preview copies (short side 720, at most 30 fps), keys, players and deletion');
+    console.log('PASS: preview copies (short side 480, at most 30 fps), keys, players and deletion');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

@@ -2,7 +2,7 @@ import "server-only";
 import { objectInfo, signedGet, signedPut } from "@/lib/server/r2";
 
 /**
- * Preview copies of uploaded videos: a light 720p version the editor and phone preview play (render/server.mjs
+ * Preview copies of uploaded videos: a light 480p version the editor and phone preview play (render/server.mjs
  * makePreview). Phone recordings are often 4K at ~46 Mbps; playing those in a 250px preview stalls. The export always
  * reads the original. A copy belongs to its original: the same media access opens it, and account deletion removes it.
  */

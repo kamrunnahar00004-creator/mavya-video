@@ -160,8 +160,8 @@ async function work(id) {
 }
 
 /**
- * Preview copies: a light 720p version of an uploaded video (short side 720, keyframe every second, at most 30 fps)
- * that the editor and phone preview play. A 4K phone recording is ~46 Mbps; the copy is ~2 Mbps and seeks at once.
+ * Preview copies: a light 480p version of an uploaded video (render.mjs previewArgs) that the editor and phone
+ * preview play. A 4K phone recording is ~46 Mbps; the copy is well under 1 Mbps and seeks at once.
  * Exports always read the original. Exports go first; copies are made while no export waits.
  */
 /** @type {Map<string, {state: string, at: number, input?: string, output?: {url: string, contentType: string}, error?: string}>} */
