@@ -1,12 +1,14 @@
 const assert=require('node:assert/strict'),{load}=require('./check-module.cjs');
 async function main(){
- let record={id:'job',user_id:'owner',run_id:'run',media_id:'out.mp4',state:'running',created_at:new Date().toISOString(),cleaned:false,cleanup_cursor:0,overlay_ids:['1.png','2.png','3.png','4.png','5.png','6.png'],payload:{meta:{seconds:3}}};
+ let record={id:'job',user_id:'owner',run_id:'run',media_id:'out.mp4',state:'running',created_at:new Date().toISOString(),cleaned:false,cleanup_cursor:0,overlay_ids:['1.png','2.png','3.png','4.png','5.png','6.png'],payload:{meta:{seconds:3},lane:'render'}};
  let events=[],append=0,head={size:100,mime:'video/mp4'},protocol=1,network=[];
  const db={from(table){return {update(p){this.patch=p;return this;},delete(){events.push(['metadata',table]);return this;},eq(){return this;},async select(){Object.assign(record,this.patch);return {data:[{id:'job'}]};},then(resolve){resolve({error:null});}};}};
  const api=load('src/lib/server/export-jobs.ts',{
   '@/lib/supabase/server':{createSupabaseAdminClient:()=>db},
   '@/lib/server/billing-state':{billingRpc:async(name,args)=>{assert.equal(args.p_user,'owner');assert.equal(args.p_id,'job');if(record.cleaned)return null;record.lease_token='lease';return JSON.parse(JSON.stringify(record));}},
   '@/lib/server/account-state':{accountClosing:async()=>false},
+  // These checks cover the Render worker path: the fast lane counts as already tried.
+  '@/lib/server/fast-export':{callInternal:async()=>({ok:false})},
   '@/lib/server/store':{getRun:async()=>({id:'run'}),registerMedia:async()=>events.push('register'),appendExport:async()=>{append++;return {src:'/api/media/out.mp4',seconds:3};}},
   '@/lib/server/r2':{objectInfo:async()=>head,deleteObjectStrict:async key=>events.push(key)}
  },{RENDER_URL:'https://fixture.invalid',RENDER_SECRET:'fixture-only'},{fetch:async(url,options)=>{network.push([url,options?.method]);return url.endsWith('/health')?Response.json({protocol}):options?.method==='POST'?Response.json({id:'job'}):new Response(null,{status:404});}});

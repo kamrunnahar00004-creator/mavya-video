@@ -4,6 +4,7 @@ import { billingRpc } from "@/lib/server/billing-state";
 import { accountClosing } from "@/lib/server/account-state";
 import { appendExport, getRun, registerMedia } from "@/lib/server/store";
 import { deleteObjectStrict, objectInfo } from "@/lib/server/r2";
+import { type ExportPayload, callInternal } from "@/lib/server/fast-export";
 type Result = { src: string; seconds: number; at: string };
 export type ExportJob = { id: string; user_id: string; run_id: string; media_id: string; overlay_ids: string[]; state: string; created_at: string; result: Result | null; cleaned: boolean; cleanup_cursor: number; progress: number; lease_token: string; payload: { meta: { seconds: number }; [key: string]: unknown } };
 export async function exportJob(who: string, run: string, id?: string) {
@@ -33,8 +34,17 @@ export async function advanceExport(who: string, id: string) {
    } else { await deleteObjectStrict(`media/${j.media_id}`); await save({ state: "failed" }); j.state = "failed"; }
   }
   if (["pending", "running"].includes(j.state)) {
+   const lane = (j.payload as ExportPayload).lane, laneAt = (j.payload as ExportPayload).laneAt ?? 0;
    if (Date.now() - Date.parse(j.created_at) > 6 * 3600_000) { await save({ state: "failed" }); j.state = "failed"; }
+   else if (!lane && process.env.EXPORT_FAST !== "0") {
+    // Fast lane first (src/lib/server/fast-export.ts): every piece at once on Vercel.
+    await save({ state: "running", payload: { ...j.payload, lane: "vercel", laneAt: Date.now() } });
+    await callInternal("/api/internal/export-run", { job: j.id }, 1500).catch(() => undefined);
+   }
+   else if (lane === "vercel" && Date.now() - laneAt < 5 * 60_000) { /* the fast lane is running; its upload finishes the job */ }
    else {
+    // The fast lane failed or stalled: the Render worker runs the same job.
+    if (lane !== "render") { await save({ payload: { ...j.payload, lane: "render" } }); (j.payload as ExportPayload).lane = "render"; }
     const base = process.env.RENDER_URL?.replace(/\/+$/, "");
     const headers = { authorization: `Bearer ${process.env.RENDER_SECRET}`, "content-type": "application/json" };
     if (!base || !process.env.RENDER_SECRET) throw new Error("Render unavailable");
@@ -44,7 +54,9 @@ export async function advanceExport(who: string, id: string) {
      const capability = await health.json().catch(() => null) as { protocol?: number } | null;
      // Protocol 3 = durable job ids + 720x1280 exports (Codex V9: protocol 2 covered both 1080 and 720 workers).
      if (!health.ok || capability?.protocol !== 3) throw new Error("Render worker update required");
-     const sent = await fetch(`${base}/jobs`, { method: "POST", headers, body: JSON.stringify(j.payload), signal: AbortSignal.timeout(55_000) });
+     const job = { ...(j.payload as ExportPayload) };
+     delete job.lane; delete job.laneAt;
+     const sent = await fetch(`${base}/jobs`, { method: "POST", headers, body: JSON.stringify(job), signal: AbortSignal.timeout(55_000) });
      const dispatched = await sent.json().catch(() => null) as { id?: string } | null;
      if (!sent.ok || dispatched?.id !== j.id) throw new Error(`Render dispatch identity ${sent.status}`);
      await save({ state: "running" });

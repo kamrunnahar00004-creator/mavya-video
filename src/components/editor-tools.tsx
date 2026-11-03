@@ -1927,7 +1927,7 @@ function ShotBrief({ clip }: { clip: DemoClip }) {
  * Step 5: one finished demo video, or "Plan it shot by shot": the stolen clip's demo shot for shot, one card per shot
  * with how to film it; its on-screen text goes on when the footage is uploaded. Every clip opens in the ClipEditor.
  */
-export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, onClips, onCheckLibrary, onUpload, onRename, onDelete, onMove, onSwap, onReset }: {
+export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, onClips, onCheckLibrary, onUpload, onRename, onDelete, onSwap, onReset }: {
   /** My files, on its Demos tab: reuse a demo from another video. */
   onCheckLibrary: () => void;
   run: Run;

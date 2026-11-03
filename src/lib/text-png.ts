@@ -9,8 +9,9 @@ import { textLinesLoaded } from "@/lib/text-lines";
  * preview uses (TextRender in run-preview.tsx): same size (percent of the frame height), position, box width and
  * style. The font is embedded (only the glyphs this text uses) so the drawing never falls back to another font.
  */
-const W = 720;
-const H = 1280;
+// The export frame (render/constraints.json): 1080x1920 since 2026-11-03, what Reels play at.
+const W = 1080;
+const H = 1920;
 
 /** The built-in fonts are next/font copies of these Google families. */
 const GOOGLE_NAME: Record<keyof typeof FONTS, string> = { anton: "Anton", montserrat: "Montserrat", poppins: "Poppins", bebas: "Bebas Neue", marker: "Permanent Marker", geist: "Geist" };

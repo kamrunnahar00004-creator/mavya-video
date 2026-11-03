@@ -223,7 +223,7 @@ setInterval(() => {
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? "/", "http://x");
-    if (url.pathname === "/health") return send(res, 200, { ok: true, protocol: 3, size: "720x1280", queued: queue.length, busy });
+    if (url.pathname === "/health") return send(res, 200, { ok: true, protocol: 3, size: "1080x1920", queued: queue.length, busy });
     if (!authed(req)) return send(res, 401, { error: "unauthorized" });
     if (req.method === "POST" && url.pathname === "/jobs") {
       const b = await body(req);
