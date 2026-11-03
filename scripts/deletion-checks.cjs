@@ -5,7 +5,7 @@ async function main(){
  let cancelFails=true,storageFails=false,events=[];
  const db={from(){return {update(patch){this.patch=patch;return this;},eq(){return this;},async select(){Object.assign(record,this.patch);return {data:[{user_id:'owner'}]};}};},auth:{admin:{async deleteUser(){events.push('auth');return {error:null};}}}};
  const api=load('src/lib/server/account-deletion.ts',{
-  '@/lib/supabase/server':{createSupabaseAdminClient:()=>db},'@/lib/server/previews':{previewKey:id=>`media/${id.replace(/\.[^.]+$/,'')}.p480.mp4`,oldPreviewKey:id=>`media/${id.replace(/\.[^.]+$/,'')}.preview.mp4`},
+  '@/lib/supabase/server':{createSupabaseAdminClient:()=>db},'@/lib/server/previews':{previewKey:id=>`media/${id.replace(/\.[^.]+$/,'')}.p480.mp4`,oldPreviewKey:id=>`media/${id.replace(/\.[^.]+$/,'')}.preview.mp4`,masterKey:id=>`media/${id.replace(/\.[^.]+$/,'')}.m1080.mp4`},
   '@/lib/server/billing-state':{billingRpc:async name=>{assert.equal(name,'mavya_claim_deletion');if(record.state==='done')return null;record.lease_token='lease';return JSON.parse(JSON.stringify(record));},withBillingLock:()=>{throw Error('not expected');}},
   '@/lib/server/account-state':{accountClosing:async()=>true},
   '@/lib/server/stripe':{stripe:()=>({checkout:{sessions:{retrieve:async()=>({id:'cs',status:'open'}),expire:async()=>events.push('expire')}},subscriptions:{retrieve:async()=>({status:'active'}),cancel:async(id,params)=>{events.push('cancel');assert.equal(params.prorate,false);assert.equal(params.invoice_now,false);if(cancelFails)throw Error('Stripe down');}}})},

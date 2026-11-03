@@ -177,11 +177,13 @@ async function makePreview(id) {
   try {
     dir = await mkdtemp(path.join(tmpdir(), "mavya-preview-"));
     const input = await probe(await download(p.input, path.join(dir, "in"), controller.signal, { bytes: 0 }), controller.signal);
-    const out = path.join(dir, "out.mp4");
-    await run(previewArgs(input.file, out), null, controller.signal, 600_000);
-    const size = (await stat(out)).size;
-    const put = await fetch(p.output.url, { method: "PUT", headers: { "content-type": p.output.contentType, "content-length": String(size) }, body: createReadStream(out), duplex: "half", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(60_000)]) });
-    if (!put.ok) throw new Error(`upload failed (${put.status})`);
+    const out = path.join(dir, "out.mp4"), master = p.master ? path.join(dir, "master.mp4") : undefined;
+    await run(previewArgs(input.file, out, master), null, controller.signal, 900_000);
+    for (const [file, target] of [[out, p.output], ...(master ? [[master, p.master]] : [])]) {
+      const size = (await stat(file)).size;
+      const put = await fetch(target.url, { method: "PUT", headers: { "content-type": target.contentType, "content-length": String(size) }, body: createReadStream(file), duplex: "half", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(120_000)]) });
+      if (!put.ok) throw new Error(`upload failed (${put.status})`);
+    }
     p.state = "done";
   } catch (e) {
     p.state = "failed";
@@ -190,7 +192,7 @@ async function makePreview(id) {
   } finally {
     clearTimeout(deadline);
     controller.abort();
-    p.input = p.output = undefined;
+    p.input = p.output = p.master = undefined;
     if (dir) await rm(dir, { recursive: true, force: true }).catch(() => undefined);
   }
 }
@@ -242,13 +244,13 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/previews") {
       const b = await body(req);
       const link = (x) => typeof x === "string" && x.length <= 8192 && /^https:\/\//.test(x);
-      if (!/^[0-9a-f-]{36}\.(mp4|mov|webm|m4v)$/i.test(b?.id ?? "") || !link(b.input) || !link(b.output?.url) || b.output.contentType !== "video/mp4") return send(res, 400, { error: "bad preview" });
-      // One copy per file and copy name (a new copy size gets a new name); a failed one may be retried.
-      const key = `${b.id}|${new URL(b.output.url).pathname}`;
+      if (!/^[0-9a-f-]{36}\.(mp4|mov|webm|m4v)$/i.test(b?.id ?? "") || !link(b.input) || !link(b.output?.url) || b.output.contentType !== "video/mp4" || (b.master !== undefined && (!link(b.master?.url) || b.master.contentType !== "video/mp4"))) return send(res, 400, { error: "bad preview" });
+      // One job per file and copy names (a new copy gets a new name); a failed one may be retried.
+      const key = `${b.id}|${new URL(b.output.url).pathname}|${b.master ? new URL(b.master.url).pathname : ""}`;
       const prior = previews.get(key);
       if (prior && prior.state !== "failed") return send(res, 200, { state: prior.state });
       if (previewQueue.length >= 200) return send(res, 429, { error: "queue full" });
-      previews.set(key, { state: "queued", at: Date.now(), input: b.input, output: { url: b.output.url, contentType: "video/mp4" } });
+      previews.set(key, { state: "queued", at: Date.now(), input: b.input, output: { url: b.output.url, contentType: "video/mp4" }, ...(b.master ? { master: { url: b.master.url, contentType: "video/mp4" } } : {}) });
       previewQueue.push(key);
       void next();
       return send(res, 200, { state: "queued" });

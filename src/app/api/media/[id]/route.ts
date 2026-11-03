@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { previewKey, previewReady, requestPreview } from "@/lib/server/previews";
+import { masterReady, previewKey, previewReady, requestPreview } from "@/lib/server/previews";
 import { signedGet } from "@/lib/server/r2";
 import { fileResponse } from "@/lib/server/file-response";
 import { localMediaPath, mediaAccess, mediaLink } from "@/lib/server/store";
@@ -26,6 +26,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/media/[id]">
   if (file) return fileResponse(request, file, info.size, info.mime);
   if (params.has("preview") && info.mime.startsWith("video/")) {
     if (preview) {
+      // Older uploads have a preview but no export copy yet: make it now, so the next export is fast.
+      after(async () => { if (!(await masterReady(id))) await requestPreview(id); });
       const res = NextResponse.redirect(await signedGet(previewKey(id)), 302);
       res.headers.set("Cache-Control", "private, max-age=1800");
       return res;

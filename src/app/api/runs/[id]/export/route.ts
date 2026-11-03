@@ -8,6 +8,8 @@ import { fullAdjust } from "@/lib/adjust";
 import { segSpeed, timeline, videoLength } from "@/lib/edit";
 import { cloud, getRun, libraryLink, mediaAccess, mediaLink, mediaUploadLink, newUpload } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
+import { masterKey, masterReady } from "@/lib/server/previews";
+import { signedGet } from "@/lib/server/r2";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 import { RENDER_LIMITS, renderLimitError } from "@/lib/render-limits";
 
@@ -18,9 +20,14 @@ const LINK_SECONDS = 6 * 3600;
 const renderer = () => (process.env.RENDER_URL && process.env.RENDER_SECRET ? { url: process.env.RENDER_URL.replace(/\/+$/, ""), secret: process.env.RENDER_SECRET } : null);
 
 /** A link the render server can download a run's file from (null when it is not this user's). */
-async function inputLink(src: string, who: string, origin: string): Promise<string | null> {
+async function inputLink(src: string, who: string, origin: string, working = false): Promise<string | null> {
   const media = /^\/api\/media\/([^/?#]+)$/.exec(src);
-  if (media) return (await mediaAccess(media[1], who)) ? mediaLink(media[1], LINK_SECONDS) : null;
+  if (media) {
+    if (!(await mediaAccess(media[1], who))) return null;
+    // Demo clips: the 1080p working copy when it exists (src/lib/server/previews.ts), else the original.
+    if (working && (await masterReady(media[1]).catch(() => false))) return signedGet(masterKey(media[1]), LINK_SECONDS);
+    return mediaLink(media[1], LINK_SECONDS);
+  }
   const sound = /^\/api\/sounds\/([A-Za-z0-9_-]+)$/.exec(src);
   if (sound) return libraryLink("audio", sound[1], LINK_SECONDS);
   // Files that ship with the app (public/).
@@ -67,7 +74,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
 
   const segments = [];
   for (const s of segs) {
-    const url = await inputLink(s.src!, who, origin);
+    // The hook always exports from its own file (it stays exactly as generated).
+    const url = await inputLink(s.src!, who, origin, s.id !== "hook");
     if (!url) return Response.json({ error: `A clip in "${s.label}" can't be found. Upload it again.` }, { status: 400 });
     const a = fullAdjust(s.adjust);
     segments.push({

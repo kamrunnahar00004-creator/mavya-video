@@ -100,12 +100,17 @@ function look(a, p0, W, H, fps) {
  * than the source; founder 2026-11-03: smoothness over quality in the editor), at most 30 fps, a keyframe every
  * second so the editor seeks at once, well under 1 Mbps instead of ~46.
  */
-export const previewArgs = (input, out) => [
-  "-y", "-hide_banner", "-i", input, "-map", "0:v:0", "-map", "0:a:0?",
-  "-vf", "scale=w='if(gt(iw,ih),-2,min(480,iw))':h='if(gt(iw,ih),min(480,ih),-2)'", "-fpsmax", "30",
-  "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-g", "30", "-keyint_min", "30", "-sc_threshold", "0", "-pix_fmt", "yuv420p",
-  "-c:a", "aac", "-b:a", "128k", "-ac", "2", "-movflags", "+faststart", out,
-];
+export const previewArgs = (input, out, master) => {
+  const fit = (n) => `scale=w='if(gt(iw,ih),-2,min(${n},iw))':h='if(gt(iw,ih),min(${n},ih),-2)'`;
+  const video = (crf) => ["-fpsmax", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", String(crf), "-g", "30", "-keyint_min", "30", "-sc_threshold", "0", "-pix_fmt", "yuv420p"];
+  const audio = ["-c:a", "aac", "-b:a", "160k", "-ac", "2", "-movflags", "+faststart"];
+  if (!master) return ["-y", "-hide_banner", "-i", input, "-map", "0:v:0", "-map", "0:a:0?", "-vf", fit(480), ...video(26), ...audio, out];
+  // One decode of the original, two copies: the 480p preview and the export's 1080p working copy (short side 1080:
+  // a 720x1280 export stays fully sharp up to 1.5x zoom, from a quarter of 4K's pixels; founder 2026-11-03).
+  return ["-y", "-hide_banner", "-i", input, "-filter_complex", `[0:v:0]split=2[a][b];[a]${fit(480)}[p];[b]${fit(1080)}[m]`,
+    "-map", "[p]", "-map", "0:a:0?", ...video(26), ...audio, out,
+    "-map", "[m]", "-map", "0:a:0?", ...video(18), ...audio, master];
+};
 
 /** The pieces to render, in order: black gaps and clip pieces, each with its on-screen length. */
 export function plan(spec) {

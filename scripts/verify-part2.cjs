@@ -34,6 +34,7 @@ async function admission(){
   'next/server':{after:()=>assert.fail('render must not be scheduled')},'@/lib/export-layers':{exportLayers:()=>[]},
   '@/lib/server/billing-state':{billingRpc:()=>{reserved++;return true;}},
   '@/lib/supabase/server':{},'@/lib/server/export-jobs':{},'node:crypto':require('node:crypto'),'@/lib/adjust':{},
+  '@/lib/server/previews':{masterKey:()=>'',masterReady:async()=>false},'@/lib/server/r2':{signedGet:async()=>''},
   '@/lib/edit':{timeline:()=>segments,videoLength:()=>seconds},
   '@/lib/server/store':{cloud:()=>true,getRun:async()=>({hook:{generated:{src:'/fixture.mp4'}}})},
   '@/lib/server/who':{currentUser:async()=> 'owner'},'@/lib/sound':{soundPieces:()=>[]}
