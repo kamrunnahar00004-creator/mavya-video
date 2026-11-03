@@ -171,9 +171,14 @@ export function finalArgs(spec, list, local, out) {
   let v = "joined";
   spec.overlays.forEach((o, oi) => {
     // A text image is one frame. As a plain input, overlay dropped later-starting texts on real clips (2026-10-24:
-    // the second text never appeared); looped at the video's frame rate it is a steady stream that ends with it.
-    args.push("-loop", "1", "-framerate", String(fps), "-t", String(r(total)), "-i", local.overlays[oi]);
-    graph.push(`[${v}][${n++}:v]overlay=${Math.round(o.x)}:${Math.round(o.y)}:shortest=1:enable='between(t,${r(o.start)},${r(o.end - 0.001)})'[o${oi}]`);
+    // the second text never appeared), so it is repeated into a steady stream at the video's frame rate that ends
+    // with it. The repeat happens inside the filter graph (loop filter), which makes a frame only when overlay asks:
+    // as a looped input (-loop 1) ffmpeg read every text far ahead of the video and queued the frames, 2.8 GB for a
+    // 22 s video with 13 texts on a 512 MB worker (2026-11-03: exports died at 69%).
+    args.push("-i", local.overlays[oi]);
+    // A second past the end: the video, not the text, decides where the export ends (shortest), so no frame is lost.
+    graph.push(`[${n++}:v]loop=loop=-1:size=1,setpts=N/${fps}/TB,trim=duration=${r(total + 1)}[t${oi}]`);
+    graph.push(`[${v}][t${oi}]overlay=${Math.round(o.x)}:${Math.round(o.y)}:shortest=1:enable='between(t,${r(o.start)},${r(o.end - 0.001)})'[o${oi}]`);
     v = `o${oi}`;
   });
   graph.push(`[${v}]format=yuv420p[vout]`);
