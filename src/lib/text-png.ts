@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { FONTS, SYSTEM_FONTS } from "@/lib/studio-data";
 import { textLook } from "@/lib/text-styles";
 import type { TextLayer } from "@/lib/types";
+import { textLinesLoaded } from "@/lib/text-lines";
 
 /**
  * Draws one on-screen text as a full-frame transparent PNG (720x1280, the export size) for the export, with the exact CSS the
@@ -61,10 +62,12 @@ export async function textPng(x: TextLayer): Promise<{ png: string; x: number; y
   if (!x.text.trim()) return null;
   const look = textLook(x.style, x.color, x.second);
   const { family, face } = await fontFor(x.font, look.text.textTransform === "uppercase" ? x.text.toUpperCase() : x.text);
-  const base: CSSProperties = { fontFamily: family, fontSize: `${(x.size / 100) * H}px`, fontWeight: 800, lineHeight: 1.12, textAlign: "center", whiteSpace: "pre-wrap", overflowWrap: "break-word", display: "block" };
+  // The very lines the preview shows (textLines), never wrapped again here.
+  const lines = await textLinesLoaded(x, look);
+  const base: CSSProperties = { fontFamily: family, fontSize: `${(x.size / 100) * H}px`, fontWeight: 800, lineHeight: 1.12, textAlign: "center", whiteSpace: "pre", display: "block" };
   const inner = look.box
-    ? `<span style="${textCss({ ...base, lineHeight: 1.45 })}"><span style="${textCss({ ...look.text, ...look.box })}">${xml(x.text)}</span></span>`
-    : `<span style="${textCss({ ...base, ...look.text })}">${xml(x.text)}</span>`;
+    ? `<span style="${textCss({ ...base, lineHeight: 1.45 })}"><span style="${textCss({ ...look.text, ...look.box })}">${xml(lines)}</span></span>`
+    : `<span style="${textCss({ ...base, ...look.text })}">${xml(lines)}</span>`;
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject x="0" y="0" width="${W}" height="${H}">` +
     `<div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:${W}px;height:${H}px;margin:0">` +

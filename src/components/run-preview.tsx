@@ -11,6 +11,7 @@ import { Pause, Play } from "lucide-react";
 import { AVATAR_TONES, round1 } from "@/lib/client";
 import { fontCss, loadFonts } from "@/lib/studio-data";
 import { textLook } from "@/lib/text-styles";
+import { textLines } from "@/lib/text-lines";
 import type { Reference, Run, TextLayer } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
 
@@ -516,8 +517,16 @@ export const TextOverlay = memo(function TextOverlay({ x, onMove: onMoveProp, on
 
 function TextRender({ x, editing, onDone }: { x: TextLayer; editing: boolean; onDone: (t: string) => void }) {
   useEffect(() => loadFonts([x.font]), [x.font]);
-  const base: React.CSSProperties = { fontFamily: fontCss(x.font), fontSize: `${x.size}cqh`, fontWeight: 800, lineHeight: 1.12, textAlign: "center", whiteSpace: "pre-wrap", overflowWrap: "break-word", display: "block", outline: "none" };
+  // Line breaks come from textLines (the export draws the very same lines); measured again once fonts load.
+  const [, fontsLoaded] = useState(0);
+  useEffect(() => {
+    const done = () => fontsLoaded((n) => n + 1);
+    document.fonts.addEventListener("loadingdone", done);
+    return () => document.fonts.removeEventListener("loadingdone", done);
+  }, []);
   const look = textLook(x.style, x.color, x.second);
+  const shown = editing ? x.text : textLines(x, look);
+  const base: React.CSSProperties = { fontFamily: fontCss(x.font), fontSize: `${x.size}cqh`, fontWeight: 800, lineHeight: 1.12, textAlign: "center", whiteSpace: editing ? "pre-wrap" : "pre", overflowWrap: "break-word", display: "block", outline: "none" };
   const editable = {
     contentEditable: editing,
     suppressContentEditableWarning: true,
@@ -536,14 +545,14 @@ function TextRender({ x, editing, onDone }: { x: TextLayer; editing: boolean; on
     return (
       <span style={{ ...base, lineHeight: 1.45 }}>
         <span {...editable} style={{ ...look.text, ...look.box, outline: look.box.outline ?? "none" }}>
-          {x.text}
+          {shown}
         </span>
       </span>
     );
   }
   return (
     <span {...editable} style={{ ...base, ...look.text }}>
-      {x.text}
+      {shown}
     </span>
   );
 }

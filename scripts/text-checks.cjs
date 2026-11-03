@@ -8,8 +8,7 @@ function load(file, stubs={}) {
   return module.exports;
 }
 const styles=load('src/lib/text-styles.ts');
-const png=load('src/lib/text-png.ts',{'@/lib/studio-data':{FONTS:{},SYSTEM_FONTS:['Arial']},'@/lib/text-styles':styles});
-assert.equal(styles.STYLE_PRESETS.length,48);
+const png=load('src/lib/text-png.ts',{'@/lib/studio-data':{FONTS:{},SYSTEM_FONTS:['Arial']},'@/lib/text-styles':styles,'@/lib/text-lines':{textLinesLoaded:async x=>x.text}});assert.equal(styles.STYLE_PRESETS.length,48);
 for(const preset of styles.STYLE_PRESETS){
   const look=preset.look('#ffffff','#111111');
   for(const [key,value] of Object.entries({...look.text,...look.box})){
