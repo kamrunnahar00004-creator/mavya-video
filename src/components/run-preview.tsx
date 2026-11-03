@@ -76,14 +76,17 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
 
   return (
     // The phone is sized to fit the screen's height, so the play bar never falls below the fold.
-    <div className="flex w-full flex-col items-center gap-4" style={{ maxWidth: "min(258px, calc((100dvh - 230px) * 9 / 19.5 + 20px))" }}>
-      {/* Generic modern phone: titanium-style frame, thin bezel, island, side buttons. No brand. */}
-      <div className="relative w-full rounded-[46px] bg-[linear-gradient(145deg,#d9dbe0,#8e9199_45%,#c7c9ce)] p-[3px] shadow-[0_30px_60px_-24px_rgba(15,23,42,0.55)]">
-        <span aria-hidden className="absolute -left-[3px] top-[18%] h-[6%] w-[3px] rounded-l bg-[#9a9da4]" />
-        <span aria-hidden className="absolute -left-[3px] top-[27%] h-[9%] w-[3px] rounded-l bg-[#9a9da4]" />
-        <span aria-hidden className="absolute -left-[3px] top-[38%] h-[9%] w-[3px] rounded-l bg-[#9a9da4]" />
-        <span aria-hidden className="absolute -right-[3px] top-[30%] h-[13%] w-[3px] rounded-r bg-[#9a9da4]" />
-        <div className="rounded-[43px] bg-black p-[7px]">
+    <div className="flex w-full flex-col items-center gap-4" style={{ maxWidth: "min(258px, calc((100dvh - 230px) * 9 / 19.5 + 13px))" }}>
+      {/* Generic current phone: brushed metal frame with a lit edge, very thin bezel, floating island, Action /
+          volume / power / camera buttons. No brand. */}
+      <div className="relative w-full rounded-[48px] bg-[linear-gradient(150deg,#eceef1_0%,#a7aab1_22%,#d6d8dc_48%,#8d9098_76%,#c9cbd0_100%)] p-[2.5px] shadow-[0_34px_70px_-26px_rgba(15,23,42,0.6),0_2px_6px_rgba(15,23,42,0.18)]">
+        <span aria-hidden className="pointer-events-none absolute inset-[1px] rounded-[47px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.55),inset_0_-1px_2px_rgba(0,0,0,0.25)]" />
+        <span aria-hidden className="absolute -left-[2.5px] top-[17%] h-[4.5%] w-[2.5px] rounded-l-sm bg-[linear-gradient(90deg,#7f828a,#b9bbc1)]" />
+        <span aria-hidden className="absolute -left-[2.5px] top-[25%] h-[8%] w-[2.5px] rounded-l-sm bg-[linear-gradient(90deg,#7f828a,#b9bbc1)]" />
+        <span aria-hidden className="absolute -left-[2.5px] top-[35%] h-[8%] w-[2.5px] rounded-l-sm bg-[linear-gradient(90deg,#7f828a,#b9bbc1)]" />
+        <span aria-hidden className="absolute -right-[2.5px] top-[27%] h-[12%] w-[2.5px] rounded-r-sm bg-[linear-gradient(270deg,#7f828a,#b9bbc1)]" />
+        <span aria-hidden className="absolute -right-[2px] top-[56%] h-[7%] w-[2px] rounded-r-sm bg-[linear-gradient(270deg,#5d6068,#9a9da4)]" />
+        <div className="rounded-[45.5px] bg-black p-[4px]">
           <div
             role="button"
             tabIndex={0}
@@ -99,16 +102,23 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
               if (!playing) claimPlayback("phone");
               setPlaying((p) => !p);
             }}
-            className="relative aspect-[9/19.5] w-full cursor-pointer overflow-hidden rounded-[36px] bg-[#14121f] [container-type:size]"
+            className="relative aspect-[9/19.5] w-full cursor-pointer overflow-hidden rounded-[41.5px] bg-black [container-type:size]"
           >
-            <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-[6%] items-center justify-between px-[9%] text-[11px] font-semibold text-white">
+            <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-[5.8%] items-center justify-between pl-[11%] pr-[8.5%] text-[11.5px] font-semibold tracking-[-0.01em] text-white">
               <span>9:41</span>
-              <span className="absolute left-1/2 top-[34%] h-[46%] w-[31%] -translate-x-1/2 rounded-full bg-black" />
-              <span className="flex items-center gap-1">
-                <svg viewBox="0 0 18 12" className="h-[9px] w-auto fill-white"><rect x="0" y="8" width="3" height="4" rx="1" /><rect x="5" y="5.5" width="3" height="6.5" rx="1" /><rect x="10" y="3" width="3" height="9" rx="1" /><rect x="15" y="0" width="3" height="12" rx="1" /></svg>
-                <svg viewBox="0 0 26 12" className="h-[10px] w-auto"><rect x="0.5" y="0.5" width="22" height="11" rx="3" fill="none" stroke="white" strokeOpacity="0.5" /><rect x="2" y="2" width="16" height="8" rx="1.6" fill="white" /><rect x="23.5" y="4" width="1.8" height="4" rx="0.9" fill="white" fillOpacity="0.5" /></svg>
+              <span className="flex items-center gap-[4px]">
+                <svg viewBox="0 0 18 12" className="h-[8.5px] w-auto fill-white"><rect x="0" y="8" width="3" height="4" rx="1" /><rect x="5" y="5.5" width="3" height="6.5" rx="1" /><rect x="10" y="3" width="3" height="9" rx="1" /><rect x="15" y="0" width="3" height="12" rx="1" /></svg>
+                <svg viewBox="0 0 16 12" className="h-[8.5px] w-auto fill-white"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.7 10.7 0 0 0 8 .4C5.2.4 2.5 1.5.5 3.4l1.2 1.3A9 9 0 0 1 8 2.2Zm0 3.6c1.4 0 2.7.5 3.7 1.4l1.2-1.3A7.2 7.2 0 0 0 8 4c-1.8 0-3.5.7-4.9 1.9l1.2 1.3c1-.9 2.3-1.4 3.7-1.4Zm0 3.5c-.5 0-1 .2-1.3.5L8 11.2l1.3-1.4c-.3-.3-.8-.5-1.3-.5Z" /></svg>
+                <svg viewBox="0 0 27 12" className="h-[9.5px] w-auto"><rect x="0.5" y="0.5" width="23" height="11" rx="3.4" fill="none" stroke="white" strokeOpacity="0.45" /><rect x="2" y="2" width="17" height="8" rx="2" fill="white" /><path d="M25 4.2v3.6c.7-.3 1.2-1 1.2-1.8s-.5-1.5-1.2-1.8Z" fill="white" fillOpacity="0.5" /></svg>
               </span>
             </div>
+            {/* Floating island with its front camera. */}
+            <span aria-hidden className="pointer-events-none absolute left-1/2 top-[1.55%] z-30 flex h-[3.7%] w-[31%] -translate-x-1/2 items-center justify-end rounded-full bg-black pr-[5%]">
+              <span className="h-[38%] w-auto aspect-square rounded-full bg-[radial-gradient(circle_at_35%_35%,#3b4b6b,#0b0f18_70%)]" />
+            </span>
+            {/* Home indicator and a faint glass sheen. */}
+            <span aria-hidden className="pointer-events-none absolute bottom-[0.9%] left-1/2 z-30 h-[4px] w-[35%] -translate-x-1/2 rounded-full bg-white/85" />
+            <span aria-hidden className="pointer-events-none absolute inset-0 z-30 rounded-[41.5px] bg-[linear-gradient(118deg,rgba(255,255,255,0.09)_0%,rgba(255,255,255,0)_32%)]" />
             {/* The video is 9:16 like the export and the clip editors, so its texts wrap and sit the same in all of them.
                 The taller phone screen shows it full width, like TikTok does on a tall phone. */}
             <div className="absolute inset-x-0 top-1/2 aspect-[9/16] w-full -translate-y-1/2 overflow-hidden [container-type:size]">
