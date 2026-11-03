@@ -189,15 +189,6 @@ export function ProductStep({ product, reading, host, error, failedUrl, onAnalyz
           value={url}
           disabled={reading}
           onChange={(e) => setUrl(e.target.value)}
-          onPaste={(e) => {
-            // Pasting a whole link is the action: read it right away, no extra click.
-            const pasted = e.clipboardData.getData("text").trim();
-            if (!url.trim() && /^(https?:\/\/)?[^\s/]+\.[^\s]{2,}$/i.test(pasted)) {
-              e.preventDefault();
-              setUrl(pasted);
-              analyze(pasted);
-            }
-          }}
           placeholder="yourapp.com"
           className="min-w-0 flex-1 rounded-lg border border-line-strong bg-panel px-3 py-2.5 text-[14.5px] outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
         />

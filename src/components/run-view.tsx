@@ -74,6 +74,8 @@ export function RunView() {
   const [picked, setPicked] = useState<number[] | undefined>(undefined);
   /** The run whose step 1 the seller left (opened step 2). */
   const [productOk, setProductOk] = useState<string | null>(null);
+  /** The run whose link was analyzed in this visit. */
+  const [analyzedHere, setAnalyzedHere] = useState<string | null>(null);
   /** Upload: the video is in, waiting for "Use this hook". */
   const [staged, setStaged] = useState<Reference | null>(null);
   const [reading, setReading] = useState(false);
@@ -208,9 +210,11 @@ export function RunView() {
     }
   }, [id, takeAI, save]);
 
-  /** Paste or Analyze: step 1 counts as done at once and the next step opens; the site is read in the background. */
+  /** Analyze: the site is read in the background; step 1 stays open for the optional context until Send or step 2. */
   const analyzeProduct = useCallback((url: string) => {
     setProductJob({ runId: id, url });
+    setAnalyzedHere(id);
+    setProductOk(null);
     setPicked(undefined);
     void readProduct(id, url).then(({ run: r, error }) => {
       if (liveId.current !== id) return;
@@ -414,7 +418,8 @@ export function RunView() {
   if (gen.busy) stepDone[3] = true;
   const stepPending = [productReading, false, false, gen.busy, false, false];
   // Step 1 stays open (for the optional context) until the seller opens step 2, unless a hook is already in.
-  const holdProduct = !stepDone[1] && productOk !== run.id && !job?.error && Boolean(run.product?.brief || productReading);
+  // After an Analyze click it stays open even when a hook is already in: the seller may still type context.
+  const holdProduct = (!stepDone[1] || analyzedHere === run.id) && productOk !== run.id && !job?.error && Boolean(run.product?.brief || productReading);
   const current = holdProduct ? 1 : stepDone.findIndex((d) => !d) + 1 || stepDone.length; // 1-based; all done = last step
   /** Generate: the hook clip and the demo plan start together; step 5 opens while both run. */
   const startGenerate = (note?: string) => {
