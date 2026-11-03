@@ -114,8 +114,8 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
 
   /** Renders in this browser, then uploads the file as the export job's result. null: use the server instead. */
   async function exportInBrowser(snapshot:Run,total:number,layers:ReturnType<typeof exportLayers>,textPng:typeof import("@/lib/text-png").textPng,browser:typeof import("@/lib/browser-export")):Promise<"started">{
-    const post=async(mode:string)=>{
-      const sent=await fetch(`/api/runs/${run.id}/export`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({snapshot:snapshot.updatedAt,mode}),signal:AbortSignal.timeout(60_000)});
+    const post=async(mode:string,job?:string)=>{
+      const sent=await fetch(`/api/runs/${run.id}/export`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({snapshot:snapshot.updatedAt,mode,job}),signal:AbortSignal.timeout(60_000)});
       const reply=await sent.json().catch(()=>null);
       if(!sent.ok)throw Error(reply?.error??"Couldn't start the export. Try again.");
       return reply;
@@ -140,7 +140,13 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
     if(alive.current)setDone({src:local.current,seconds:Math.round(total*10)/10,at:new Date().toISOString()});
     let put:Response|null=null;
     for(let i=0;i<3&&!put?.ok;i++)put=await fetch(reserved.upload,{method:"PUT",headers:{"content-type":"video/mp4"},body:blob}).catch(()=>null);
-    if(!put?.ok)onToast("Couldn't save the video to My files. Download it now.");
+    if(!put?.ok){
+      // The video is here to download; end the job so Export is free again at once.
+      await post("cancel",reserved.job).catch(()=>undefined);
+      blocked.current=false;
+      if(alive.current){setProgress(null);onToast("Couldn't save the video to My files. Download it now.");}
+      return "started";
+    }
     if(alive.current){setProgress(0.95);setJobId(reserved.job);}
     return "started";
   }

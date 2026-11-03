@@ -9,7 +9,7 @@ import { segSpeed, timeline, videoLength } from "@/lib/edit";
 import { cloud, getRun, libraryLink, mediaAccess, mediaLink, mediaUploadLink, newUpload } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { masterKey, masterReady } from "@/lib/server/previews";
-import { signedGet } from "@/lib/server/r2";
+import { deleteObjectStrict, signedGet } from "@/lib/server/r2";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 import { RENDER_LIMITS, renderLimitError } from "@/lib/render-limits";
 
@@ -43,6 +43,17 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   if (!cloud() || !render) return Response.json({ error: "Export is not connected yet." }, { status: 503 });
   const run = await getRun(id, who);
   if (!run) return Response.json({ error: "Not found" }, { status: 404 });
+  const body = await request.json().catch(()=>null) as {snapshot?:unknown;mode?:unknown;job?:unknown;texts?:{id?:unknown;mediaId?:unknown;x?:unknown;y?:unknown}[]} | null;
+  if (body?.mode === "cancel") {
+    // A browser export whose upload failed: end its job now, so Export works again at once (instead of after the
+    // 15 minute wait in advanceExport). A file that did arrive is removed; the browser still has the video.
+    if (typeof body.job !== "string" || !/^[0-9a-f-]{36}$/i.test(body.job)) return Response.json({ error: "Not found" }, { status: 404 });
+    const db = createSupabaseAdminClient();
+    const { data, error } = await db.from("export_jobs").update({ state: "failed", updated_at: new Date().toISOString() }).eq("id", body.job).eq("user_id", who).eq("run_id", id).in("state", ["pending", "running"]).eq("payload->>lane", "browser").select("media_id");
+    if (error) throw error;
+    for (const row of data ?? []) await deleteObjectStrict(`media/${row.media_id}`).catch(() => undefined);
+    return Response.json({ ok: true });
+  }
   if (!run.hook.generated) return Response.json({ error: "Generate the hook first." }, { status: 400 });
   const sourceSegments = timeline(run, null).filter(s => s.src);
   const bounds = renderLimitError(sourceSegments, exportLayers(run).length, soundPieces(run, videoLength(sourceSegments)).length, videoLength(sourceSegments));
@@ -50,7 +61,6 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
 
   const existing = await exportJob(who, id);
   if (existing) return Response.json({job:existing.id});
-  const body = await request.json().catch(()=>null) as {snapshot?:unknown;mode?:unknown;texts?:{id?:unknown;mediaId?:unknown;x?:unknown;y?:unknown}[]} | null;
   // Browser export (src/lib/browser-export.ts): mode "sources" returns the job's spec (the same segments and sounds
   // the server would render) so the browser can render it; mode "local" then reserves the job for the finished file
   // the browser uploads (texts are drawn into it, so none are sent).
