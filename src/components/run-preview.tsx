@@ -5,7 +5,7 @@ import { previewOf } from "@/lib/media-preview";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Adjust, contrastId, contrastTable, exposureId, exposureTable, fullAdjust, speedOf, videoStyle, warmthId, warmthMatrix } from "@/lib/adjust";
-import { type Seg, fileAt, segAt, showsAt, timeline, videoLength } from "@/lib/edit";
+import { type Seg, fileAt, pieceSpans, segAt, showsAt, timeline, videoLength } from "@/lib/edit";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 import { Pause, Play } from "lucide-react";
 import { AVATAR_TONES, round1 } from "@/lib/client";
@@ -30,16 +30,27 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
   usePlaybackClaims("phone", setPlaying);
 
   // One clock for the whole preview. Plays once: at the end it goes back to 0 and stays paused.
+  // While a video plays, the clock follows that video's own time, so the picture never has to jump to catch up: if
+  // the video waits a moment (loading, a join), the clock waits with it. Gaps without a video run on the wall clock.
   const tNow = useRef(t);
   useEffect(() => { tNow.current = t; }, [t]);
+  const masterRef: Master = useRef(null);
   useEffect(() => {
     if (!playing) return;
     let raf = 0;
     let last: number | null = null;
+    let held = 0;
     const tick = (now: number) => {
       const dt = last === null ? 0 : (now - last) / 1000;
       last = now;
-      const next = tNow.current + dt;
+      let next = tNow.current + dt;
+      const m = masterRef.current;
+      if (m && m.v.readyState >= 2) {
+        const vt = m.time(m.v.currentTime);
+        // Follow the video when it is near the clock; a video stuck for over a second is left behind.
+        if (vt <= tNow.current && held < 1) { held += dt; next = tNow.current; }
+        else if (vt < tNow.current + 0.5) { held = 0; next = vt; }
+      }
       if (next >= total) {
         tNow.current = 0;
         setT(0);
@@ -126,7 +137,7 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
             {!hit ? null : seg.src ? (
               <>
                 <WarmthFilter adjust={seg.editable ? seg.adjust : null} />
-                <SegmentVideos segs={segs} seg={seg} at={at} piece={piece} playing={playing} />
+                <SegmentVideos segs={segs} seg={seg} at={at} piece={piece} playing={playing} masterRef={masterRef} />
                 {seg.id === "hook" && hook.face && hook.face.kind !== "described" && !hook.clip && !hook.generated && (
                   <span className="pointer-events-none absolute left-2 top-8 flex items-center gap-1.5 rounded-lg bg-black/55 px-2 py-1 text-[10.5px] font-bold text-white">
                     <span className="relative h-4 w-4 overflow-hidden rounded-full">
@@ -247,14 +258,24 @@ const PREROLL = 0.35;
  * loaded and already rolling) becomes the visible one. No seek, no start-up pause, no blank frame between clips
  * (founder 2026-10-30 and 2026-11-03: joins like CapCut, 100% smooth).
  */
-export function SegmentVideos({ segs, seg, at, piece, playing }: { segs: Seg[]; seg: Seg; at: number; piece: number; playing: boolean }) {
+export function SegmentVideos({ segs, seg, at, piece, playing, masterRef }: { segs: Seg[]; seg: Seg; at: number; piece: number; playing: boolean; /** Set: the clock follows the playing video. */ masterRef?: Master }) {
   const rateOf = (s: Seg) => (s.editable ? speedOf(s.adjust) : 1);
   const nextSeg = segs.slice(segs.indexOf(seg) + 1).find((s) => s.src);
   const next = piece + 1 < seg.parts.length ? { s: seg, i: piece + 1 } : nextSeg ? { s: nextSeg, i: 0 } : null;
   // On-screen time left in the piece playing now (a gap before the next clip counts too).
   const gap = next && next.s !== seg ? next.s.offset - (seg.offset + seg.len) : 0;
   const left = (seg.parts[piece].end - at) / rateOf(seg) + gap;
-  const list = [{ s: seg, i: piece, now: true }, ...(next ? [{ ...next, now: false }] : [])].filter((x) => x.s.src);
+  // Two players take turns in fixed places: the one playing is never moved in the page when the next takes over
+  // (moving a playing video makes the browser rebuild its picture, a visible freeze).
+  const g = segs.slice(0, segs.indexOf(seg)).reduce((n, s) => n + s.parts.length, 0) + piece;
+  const list = [{ s: seg, i: piece, now: true, slot: g % 2 }, ...(next ? [{ ...next, now: false, slot: (g + 1) % 2 }] : [])]
+    .filter((x) => x.s.src)
+    .sort((a, b) => a.slot - b.slot);
+  const p = seg.parts[piece];
+  const span = pieceSpans(seg)[piece];
+  // The playing video's own time on the timeline: the preview's clock follows it (see RunPreview).
+  // At the piece's last frame it is a hair past the end, so the next piece always takes over (no rounding stall).
+  const time = (ct: number) => seg.offset + span.at + (Math.max(p.start, Math.min(p.end, ct)) - p.start) / rateOf(seg) + (ct >= p.end - 0.001 ? 0.0001 : 0);
   return (
     <>
       {list.map(({ s, i, now }) => {
@@ -268,6 +289,8 @@ export function SegmentVideos({ segs, seg, at, piece, playing }: { segs: Seg[]; 
             piece={i}
             playing={now && playing}
             preroll={!now && playing && left <= PREROLL}
+            masterRef={now ? masterRef : undefined}
+            masterTime={now ? time : undefined}
             rate={rateOf(s)}
             volume={now && s.editable ? fullAdjust(s.adjust).volume / 100 : 0}
             style={now ? look : { ...look, opacity: 0 }}
@@ -278,11 +301,20 @@ export function SegmentVideos({ segs, seg, at, piece, playing }: { segs: Seg[]; 
   );
 }
 
+/** The video the preview's clock follows, and how its time maps onto the timeline. */
+export type Master = React.RefObject<{ v: HTMLVideoElement; time: (ct: number) => number } | null>;
+
 /** The slowest rate browsers play at: a pre-rolling video moves about 0.02s before its turn. */
 const CREEP = 0.0625;
 
-export function SyncedVideo({ src, at, piece = 0, playing, preroll = false, style, rate = 1, volume = 0 }: { src: string; at: number; /** Which piece of a Cut clip plays; a new piece always jumps to its frame. */ piece?: number; playing: boolean; /** Hidden and about to play: already running, almost still, so it starts with no delay. */ preroll?: boolean; style?: React.CSSProperties; rate?: number; volume?: number }) {
+export function SyncedVideo({ src, at, piece = 0, playing, preroll = false, masterRef, masterTime, style, rate = 1, volume = 0 }: { src: string; at: number; /** Which piece of a Cut clip plays; a new piece always jumps to its frame. */ piece?: number; playing: boolean; /** Hidden and about to play: already running, almost still, so it starts with no delay. */ preroll?: boolean; /** This is the video the clock follows. */ masterRef?: Master; masterTime?: (ct: number) => number; style?: React.CSSProperties; rate?: number; volume?: number }) {
   const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!masterRef || !masterTime || !v) return;
+    masterRef.current = { v, time: masterTime };
+    return () => { if (masterRef.current?.v === v) masterRef.current = null; };
+  });
   // Browsers only allow sound after the page was clicked once; until then the video plays silently (it would not play at all otherwise).
   const unlocked = useSoundUnlocked();
   useEffect(() => {
@@ -329,9 +361,10 @@ export function SyncedVideo({ src, at, piece = 0, playing, preroll = false, styl
   useEffect(() => {
     const v = ref.current;
     if (!v || v.readyState < 1) return;
-    // Paused: follow the scrubber. Playing: only correct real drift (e.g. after a loop).
-    if (playing ? Math.abs(v.currentTime - at) > 0.5 : Math.abs(v.currentTime - at) > 0.04) v.currentTime = at;
-  }, [at, playing]);
+    // Paused: follow the scrubber. Playing: only correct real drift (e.g. after a loop); a video the clock follows
+    // never drifts, so it is never made to jump.
+    if (playing ? !masterRef && Math.abs(v.currentTime - at) > 0.5 : Math.abs(v.currentTime - at) > 0.04) v.currentTime = at;
+  }, [at, playing, masterRef]);
   useEffect(() => {
     const v = ref.current;
     if (v && v.readyState >= 1) v.currentTime = atRef.current;
