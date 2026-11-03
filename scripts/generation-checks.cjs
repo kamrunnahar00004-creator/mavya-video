@@ -80,6 +80,8 @@ assert.deepEqual([...adjust.tempGains(50)].map(x => +x.toFixed(2)), [1.7, 0.82, 
 assert.deepEqual([...adjust.tempGains(-50)].map(x => +x.toFixed(2)), [0.81, 1.01, 1.52]);
 assert.deepEqual([...adjust.tempGains(0)], [1, 1, 1]);
 const worker = fs.readFileSync(path.join(root, 'render/render.mjs'), 'utf8');
+// Joined pieces never make ffmpeg rebuild the final filters mid-video (texts after the hook vanished, frames dropped).
+assert.ok(worker.includes('"-colorspace", "bt709"') && worker.includes('"-reinit_filter", "0"'), 'export pieces share colour tags and the final pass never reinitializes');
 for (const number of ['[1.7, 0.82, 0.21]', '[0.81, 1.01, 1.52]', '[[0, 1], [10, 1.22], [20, 1.46], [35, 1.94], [50, 3.1]]', '[[-50, 0.28], [-25, 0.44], [0, 1], [20, 1.57], [40, 2.33], [50, 2.95]]', '0.44', '111.5']) assert.ok(worker.includes(number), `export has ${number}`);
 
 async function main() {

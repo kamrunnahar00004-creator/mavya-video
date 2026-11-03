@@ -19,8 +19,13 @@
 const r = (n) => Math.round(n * 1000) / 1000;
 const AF = "aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo";
 const BASE = ["-nostdin", "-y", "-v", "error", "-filter_complex_threads", "1", "-filter_threads", "1"];
-/** Intermediate pieces: fast, near-lossless, all identical so the concat demuxer can join them. */
-const PIECE_OUT = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "12", "-pix_fmt", "yuv420p", "-threads", "1", "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", "-f", "matroska"];
+/**
+ * Intermediate pieces: fast, near-lossless, all identical so the concat demuxer can join them. Identical includes
+ * the colour tags: a generated hook has none and phone clips say bt709, and when they changed mid-join ffmpeg rebuilt
+ * the final pass's filters there, which reset every text's timing (no text after the hook) and dropped frames
+ * (2026-11-03).
+ */
+const PIECE_OUT = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "12", "-pix_fmt", "yuv420p", "-color_range", "tv", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-threads", "1", "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", "-f", "matroska"];
 
 /** Smooth (ease in-out) value of keyframe field `k` at file time it + p0, as an ffmpeg expression. */
 function curve(keys, k, p0) {
@@ -162,7 +167,8 @@ export function stepArgs(spec, step, src, out) {
  */
 export function finalArgs(spec, list, local, out) {
   const { fps, total } = spec;
-  const args = [...BASE, "-progress", "pipe:1", "-threads", "1", "-f", "concat", "-safe", "0", "-i", list];
+  // -reinit_filter 0: the joined pieces are all 720x1280 yuv420p; never rebuild the filters mid-video (see PIECE_OUT).
+  const args = [...BASE, "-progress", "pipe:1", "-threads", "1", "-reinit_filter", "0", "-f", "concat", "-safe", "0", "-i", list];
   const graph = [];
   let n = 1;
   // Matroska timestamps have millisecond precision. Normalize the joined stream before overlay's shortest check,
