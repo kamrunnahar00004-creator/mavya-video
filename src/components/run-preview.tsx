@@ -249,22 +249,18 @@ export function WarmthFilter({ adjust }: { adjust?: Partial<Adjust> | null }) {
   );
 }
 
-/** How long before its turn the next piece starts rolling (hidden, nearly still), so it plays the moment it shows. */
-const PREROLL = 0.35;
-
 /**
- * The piece playing now and, invisible, the piece after it (the next piece of a Cut clip, or the next clip's first
- * piece), each its own player in one keyed list: when the clock reaches the next piece, that same element (already
- * loaded and already rolling) becomes the visible one. No seek, no start-up pause, no blank frame between clips
- * (founder 2026-10-30 and 2026-11-03: joins like CapCut, 100% smooth).
+ * The piece playing now and, invisible and paused on its first frame, the piece after it (the next piece of a Cut
+ * clip, or the next clip's first piece), each its own player: when the clock reaches the next piece, that same
+ * element (already loaded, already on its frame) becomes the visible one and plays. No seek, no blank frame
+ * (founder 2026-10-30 and 2026-11-03: joins like CapCut, smooth). Measured 2026-11-03: rolling the next one early
+ * at a crawl made it worse (Chrome restarts a video's sound clock when its speed comes back up: a 0.3 s freeze at
+ * the join and 0.5 s after it), so the next one waits paused.
  */
 export function SegmentVideos({ segs, seg, at, piece, playing, masterRef }: { segs: Seg[]; seg: Seg; at: number; piece: number; playing: boolean; /** Set: the clock follows the playing video. */ masterRef?: Master }) {
   const rateOf = (s: Seg) => (s.editable ? speedOf(s.adjust) : 1);
   const nextSeg = segs.slice(segs.indexOf(seg) + 1).find((s) => s.src);
   const next = piece + 1 < seg.parts.length ? { s: seg, i: piece + 1 } : nextSeg ? { s: nextSeg, i: 0 } : null;
-  // On-screen time left in the piece playing now (a gap before the next clip counts too).
-  const gap = next && next.s !== seg ? next.s.offset - (seg.offset + seg.len) : 0;
-  const left = (seg.parts[piece].end - at) / rateOf(seg) + gap;
   // Two players take turns in fixed places: the one playing is never moved in the page when the next takes over
   // (moving a playing video makes the browser rebuild its picture, a visible freeze).
   const g = segs.slice(0, segs.indexOf(seg)).reduce((n, s) => n + s.parts.length, 0) + piece;
@@ -288,7 +284,6 @@ export function SegmentVideos({ segs, seg, at, piece, playing, masterRef }: { se
             at={sAt}
             piece={i}
             playing={now && playing}
-            preroll={!now && playing && left <= PREROLL}
             masterRef={now ? masterRef : undefined}
             masterTime={now ? time : undefined}
             rate={rateOf(s)}
@@ -304,10 +299,7 @@ export function SegmentVideos({ segs, seg, at, piece, playing, masterRef }: { se
 /** The video the preview's clock follows, and how its time maps onto the timeline. */
 export type Master = React.RefObject<{ v: HTMLVideoElement; time: (ct: number) => number } | null>;
 
-/** The slowest rate browsers play at: a pre-rolling video moves about 0.02s before its turn. */
-const CREEP = 0.0625;
-
-export function SyncedVideo({ src, at, piece = 0, playing, preroll = false, masterRef, masterTime, style, rate = 1, volume = 0 }: { src: string; at: number; /** Which piece of a Cut clip plays; a new piece always jumps to its frame. */ piece?: number; playing: boolean; /** Hidden and about to play: already running, almost still, so it starts with no delay. */ preroll?: boolean; /** This is the video the clock follows. */ masterRef?: Master; masterTime?: (ct: number) => number; style?: React.CSSProperties; rate?: number; volume?: number }) {
+export function SyncedVideo({ src, at, piece = 0, playing, masterRef, masterTime, style, rate = 1, volume = 0 }: { src: string; at: number; /** Which piece of a Cut clip plays; a new piece always jumps to its frame. */ piece?: number; playing: boolean; /** This is the video the clock follows. */ masterRef?: Master; masterTime?: (ct: number) => number; style?: React.CSSProperties; rate?: number; volume?: number }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const v = ref.current;
@@ -323,12 +315,8 @@ export function SyncedVideo({ src, at, piece = 0, playing, preroll = false, mast
     v.volume = Math.max(0, Math.min(1, volume));
     v.muted = volume <= 0 || !unlocked;
   }, [volume, unlocked]);
-  const prerollRef = useRef(preroll);
   useEffect(() => {
-    prerollRef.current = preroll;
-  }, [preroll]);
-  useEffect(() => {
-    if (ref.current && !prerollRef.current) ref.current.playbackRate = rate;
+    if (ref.current) ref.current.playbackRate = rate;
   }, [rate]);
   const atRef = useRef(at);
   useEffect(() => {
@@ -336,28 +324,12 @@ export function SyncedVideo({ src, at, piece = 0, playing, preroll = false, mast
   }, [at]);
   useEffect(() => {
     const v = ref.current;
-    if (!v || playing) return;
-    if (preroll) {
-      // Start the decoder now, barely moving, from this piece's first frame.
-      v.currentTime = atRef.current;
-      v.playbackRate = CREEP;
-      void v.play().catch(() => undefined);
-    } else if (!v.paused) {
-      // Paused before its turn came: back to its first frame, normal speed.
-      v.pause();
-      v.playbackRate = rate;
-      v.currentTime = atRef.current;
-    }
-  }, [preroll, playing, rate]);
-  useEffect(() => {
-    const v = ref.current;
     if (!v) return;
     if (playing) {
-      v.playbackRate = rate;
       if (Math.abs(v.currentTime - atRef.current) > 0.3) v.currentTime = atRef.current;
-      if (v.paused) void v.play().catch(() => undefined);
-    } else if (!prerollRef.current) v.pause();
-  }, [playing, rate]);
+      void v.play().catch(() => undefined);
+    } else v.pause();
+  }, [playing]);
   useEffect(() => {
     const v = ref.current;
     if (!v || v.readyState < 1) return;
@@ -378,8 +350,8 @@ export function SyncedVideo({ src, at, piece = 0, playing, preroll = false, mast
       preload="auto"
       onLoadedMetadata={(e) => {
         e.currentTarget.currentTime = atRef.current;
-        e.currentTarget.playbackRate = prerollRef.current && !playing ? CREEP : rate;
-        if (playing || prerollRef.current) void e.currentTarget.play().catch(() => undefined);
+        e.currentTarget.playbackRate = rate;
+        if (playing) void e.currentTarget.play().catch(() => undefined);
       }}
       className="pointer-events-none absolute inset-0 h-full w-full object-cover"
       style={style}
