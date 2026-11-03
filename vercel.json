@@ -1,3 +1,7 @@
 {
-  "crons": [{ "path": "/api/internal/generations", "schedule": "* * * * *" }]
+  "crons": [{ "path": "/api/internal/generations", "schedule": "* * * * *" }],
+  "functions": {
+    "src/app/api/internal/export-step/route.ts": { "memory": 3009 },
+    "src/app/api/internal/export-run/route.ts": { "memory": 3009 }
+  }
 }

@@ -67,18 +67,21 @@ async function probe(file: string): Promise<Probe> {
 }
 
 /** One piece (or black gap) of the job, uploaded for the join. */
-export async function renderStep(job: string, i: number): Promise<boolean> {
+export async function renderStep(job: string, i: number): Promise<{ download: number; render: number; upload: number } | null> {
   const p = await payloadOf(job);
-  if (!p) return false;
+  if (!p) return null;
   const step = plan(p.spec)[i];
-  if (!step) return false;
+  if (!step) return null;
   const dir = await mkdtemp(path.join(tmpdir(), "mavya-step-"));
   try {
+    const t0 = Date.now();
     const src = step.kind === "piece" ? await probe(await download(p.spec.segments[step.si!].url, path.join(dir, "in"))) : null;
+    const t1 = Date.now();
     const out = path.join(dir, "out.mkv");
     await ffmpeg(stepArgs(p.spec, step, src, out), 270_000);
+    const t2 = Date.now();
     await putObject(stepKey(job, i), await readFile(out), "video/x-matroska");
-    return true;
+    return { download: t1 - t0, render: t2 - t1, upload: Date.now() - t2 };
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => undefined);
   }
@@ -90,20 +93,31 @@ export async function runFastExport(job: string): Promise<void> {
   if (!p) return;
   const steps = plan(p.spec);
   const dir = await mkdtemp(path.join(tmpdir(), "mavya-final-"));
+  // How long each phase took, kept on the job (payload.fastTiming) to find what is slow.
+  const t0 = Date.now(), timing: Record<string, number> = {};
+  const mark = (name: string) => { timing[name] = Math.round((Date.now() - t0) / 100) / 10; };
   try {
-    const done = await Promise.all(steps.map((_, i) => callInternal("/api/internal/export-step", { job, i }, 290_000).then((r) => r.ok).catch(() => false)));
+    const done = await Promise.all(steps.map((_, i) => callInternal("/api/internal/export-step", { job, i }, 290_000).then((r) => (r.ok ? r.json() : null)).catch(() => null)));
+    mark("pieces");
+    (timing as Record<string, unknown>).steps = done;
     if (!done.every(Boolean)) throw new Error("a piece failed");
     const files = await Promise.all(steps.map(async (_, i) => download(await signedGet(stepKey(job, i), 900), path.join(dir, `s${i}.mkv`))));
     const overlays = await Promise.all(p.spec.overlays.map((o: { url: string }, i: number) => download(o.url, path.join(dir, `t${i}.png`))));
     const sounds = await Promise.all(p.spec.sounds.map(async (s: { url: string }, i: number) => probe(await download(s.url, path.join(dir, `a${i}`)))));
+    mark("downloads");
     const list = path.join(dir, "list.txt");
     await writeFile(list, files.map((f) => `file '${f}'`).join("\n"));
     const out = path.join(dir, "out.mp4");
     await ffmpeg(finalArgs(p.spec, list, { sounds, overlays }, out).filter((a, k, all) => a !== "-progress" && all[k - 1] !== "-progress"), 270_000);
+    mark("join");
     const size = (await stat(out)).size;
     const put = await fetch(p.output.url, { method: "PUT", headers: { "content-type": p.output.contentType, "content-length": String(size) }, body: await readFile(out), signal: AbortSignal.timeout(120_000) });
     if (!put.ok) throw new Error(`upload failed (${put.status})`);
+    mark("upload");
   } finally {
+    const db = createSupabaseAdminClient();
+    const { data } = await db.from("export_jobs").select("payload").eq("id", job).maybeSingle<{ payload: ExportPayload }>();
+    if (data) await db.from("export_jobs").update({ payload: { ...data.payload, fastTiming: timing } }).eq("id", job);
     await rm(dir, { recursive: true, force: true }).catch(() => undefined);
     await Promise.all(steps.map((_, i) => deleteObject(stepKey(job, i)).catch(() => undefined)));
   }
