@@ -29,6 +29,8 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
   }, []);
 
   const [jobId,setJobId]=useState<string|null>(null);
+  // The browser export's own copy of the video, shown at once while the upload to My files finishes.
+  const local=useRef<string|null>(null);
   const blocked=useRef(false);
   const callback=useRef(onDone);
   const notify=useRef(onToast);
@@ -54,7 +56,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
         const reply=await response?.json().catch(()=>null);
         if(stop)return;
         if(reply?.state==="done"&&reply.export){
-          setProgress(null);setJobId(null);blocked.current=false;setDone(reply.export);callback.current(reply.export);return;
+          setProgress(null);setJobId(null);blocked.current=false;if(!local.current)setDone(reply.export);callback.current(reply.export);return;
         }
         if(reply?.state==="failed"||response?.status===404){setProgress(null);setJobId(null);blocked.current=false;notify.current(reply?.error??"The export failed. Try again.");return;}
         failures=response?.ok?0:failures+1;
@@ -68,6 +70,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
   async function start() {
     if(blocked.current)return;
     blocked.current=true;setProgress(0);
+    if(local.current){URL.revokeObjectURL(local.current);local.current=null;}
     try{
       await beforeExport();
       if(!(await waitRunSaves(run.id)))throw Error("Couldn't save your changes. Try again.");
@@ -79,6 +82,14 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
       if(bounds)throw Error(bounds);
       const {textPng}=await import("@/lib/text-png");
       const layers=exportLayers(snapshot);
+      // Browser export first (Chrome and Edge): seconds instead of minutes. Anything it can't do falls back to the
+      // server export below, which renders the same job.
+      const browser=await import("@/lib/browser-export");
+      if(await browser.browserExportSupported(1080,1920)){
+        const result=await exportInBrowser(snapshot,total,layers,textPng,browser).catch(error=>{console.warn("browser export",error);return null;});
+        if(result==="started")return;
+        setProgress(0);
+      }
       const manifest:{id:string;mediaId:string;x:number;y:number}[]=new Array(layers.length);
       // Draw one at a time (no 200 simultaneous full-resolution canvases); upload up to 4 at once meanwhile.
       const uploading=new Set<Promise<void>>();
@@ -99,6 +110,39 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
       blocked.current=false;
       if(alive.current){setProgress(null);onToast(error instanceof Error?error.message:"Couldn't start the export. Try again.");}
     }
+  }
+
+  /** Renders in this browser, then uploads the file as the export job's result. null: use the server instead. */
+  async function exportInBrowser(snapshot:Run,total:number,layers:ReturnType<typeof exportLayers>,textPng:typeof import("@/lib/text-png").textPng,browser:typeof import("@/lib/browser-export")):Promise<"started">{
+    const post=async(mode:string)=>{
+      const sent=await fetch(`/api/runs/${run.id}/export`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({snapshot:snapshot.updatedAt,mode}),signal:AbortSignal.timeout(60_000)});
+      const reply=await sent.json().catch(()=>null);
+      if(!sent.ok)throw Error(reply?.error??"Couldn't start the export. Try again.");
+      return reply;
+    };
+    const sources=await post("sources");
+    if(sources?.job){setJobId(sources.job);return "started";}
+    // Texts are drawn while the clips download.
+    const texts=(async()=>{
+      const out=[];
+      for(const t of layers){
+        const drawn=await textPng(t);
+        if(drawn)out.push({png:drawn.png,x:drawn.x,y:drawn.y,start:Math.max(0,t.start),end:Math.min(total,t.end)});
+      }
+      return out;
+    })();
+    texts.catch(()=>undefined);
+    const blob=await browser.browserExport(sources.spec,texts,p=>{if(alive.current)setProgress(previous=>Math.max(previous??0,Math.min(0.92,p*0.92)));});
+    const reserved=await post("local");
+    if(!reserved?.job||!reserved.upload)throw Error("no job");
+    if(local.current)URL.revokeObjectURL(local.current);
+    local.current=URL.createObjectURL(blob);
+    if(alive.current)setDone({src:local.current,seconds:Math.round(total*10)/10,at:new Date().toISOString()});
+    let put:Response|null=null;
+    for(let i=0;i<3&&!put?.ok;i++)put=await fetch(reserved.upload,{method:"PUT",headers:{"content-type":"video/mp4"},body:blob}).catch(()=>null);
+    if(!put?.ok)onToast("Couldn't save the video to My files. Download it now.");
+    if(alive.current){setProgress(0.95);setJobId(reserved.job);}
+    return "started";
   }
 
   const busy = progress !== null;
@@ -125,7 +169,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
               </button>
             </div>
             <MediaVideo src={done.src} controls autoPlay playsInline className="mt-4 aspect-[9/16] max-h-[60vh] w-full rounded-xl bg-black object-contain" />
-            <a href={`${done.src}?download=${encodeURIComponent(name)}`} download className="btn-primary mt-4 w-full py-2.5 text-[14px]">
+            <a href={done.src.startsWith("blob:")?done.src:`${done.src}?download=${encodeURIComponent(name)}`} download={`${name}.mp4`} className="btn-primary mt-4 w-full py-2.5 text-[14px]">
               <Download className="h-4 w-4" />
               Download
             </a>

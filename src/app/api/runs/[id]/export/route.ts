@@ -50,11 +50,15 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
 
   const existing = await exportJob(who, id);
   if (existing) return Response.json({job:existing.id});
-  const body = await request.json().catch(()=>null) as {snapshot?:unknown;texts?:{id?:unknown;mediaId?:unknown;x?:unknown;y?:unknown}[]} | null;
-  if(body?.snapshot!==run.updatedAt || !Array.isArray(body.texts) || body.texts.length>RENDER_LIMITS.overlays) return Response.json({error:"Your run changed. Save and try again."},{status:409});
-  const texts=body.texts;
+  const body = await request.json().catch(()=>null) as {snapshot?:unknown;mode?:unknown;texts?:{id?:unknown;mediaId?:unknown;x?:unknown;y?:unknown}[]} | null;
+  // Browser export (src/lib/browser-export.ts): mode "sources" returns the job's spec (the same segments and sounds
+  // the server would render) so the browser can render it; mode "local" then reserves the job for the finished file
+  // the browser uploads (texts are drawn into it, so none are sent).
+  const mode = body?.mode === "sources" || body?.mode === "local" ? body.mode : null;
+  if(body?.snapshot!==run.updatedAt || (!mode && !Array.isArray(body.texts)) || (body.texts?.length ?? 0)>RENDER_LIMITS.overlays) return Response.json({error:"Your run changed. Save and try again."},{status:409});
+  const texts=mode?[]:body.texts!;
   const expected=exportLayers(run);
-  if(texts.length!==expected.length || new Set(texts.map(t=>t?.id)).size!==texts.length || expected.some(t=>!texts.some(p=>p?.id===t.id)))return Response.json({error:"Text images are incomplete. Try again."},{status:400});
+  if(!mode && (texts.length!==expected.length || new Set(texts.map(t=>t?.id)).size!==texts.length || expected.some(t=>!texts.some(p=>p?.id===t.id))))return Response.json({error:"Text images are incomplete. Try again."},{status:400});
   const ids=texts.map(t=>typeof t.mediaId==="string"?t.mediaId:"");
   if(new Set(ids).size!==ids.length)return Response.json({error:"Invalid text images."},{status:400});
   if(ids.length){
@@ -73,9 +77,11 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   if (total > RENDER_LIMITS.seconds) return Response.json({ error: "Videos can be up to 3 minutes." }, { status: 400 });
 
   const segments = [];
-  for (const s of segs) {
-    // The hook always exports from its own file (it stays exactly as generated).
-    const url = await inputLink(s.src!, who, origin, s.id !== "hook");
+  // Every link at once (one by one took seconds for a 10-clip video). The hook always exports from its own file (it
+  // stays exactly as generated).
+  const links = await Promise.all(segs.map((s) => inputLink(s.src!, who, origin, s.id !== "hook")));
+  for (const [i, s] of segs.entries()) {
+    const url = links[i];
     if (!url) return Response.json({ error: `A clip in "${s.label}" can't be found. Upload it again.` }, { status: 400 });
     const a = fullAdjust(s.adjust);
     segments.push({
@@ -95,13 +101,15 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
 
   const pieces = soundPieces(run, total);
   const sounds = [];
+  const soundLinks = await Promise.all(pieces.map((p, i) => (pieceEnd(pieces, i, total) - p.at < 0.05 || p.volume <= 0 ? null : inputLink(p.src, who, origin))));
   for (const [i, p] of pieces.entries()) {
     const end = pieceEnd(pieces, i, total);
     if (end - p.at < 0.05 || p.volume <= 0) continue;
-    const url = await inputLink(p.src, who, origin);
+    const url = soundLinks[i];
     if (url) sounds.push({ url, at: p.at, dur: end - p.at, start: p.start, volume: p.volume / 100 });
   }
 
+  if (mode === "sources") return Response.json({ spec: { width: W, height: H, fps: FPS, total, segments, sounds, overlays: [] } }, { headers: { "Cache-Control": "no-store" } });
   const overlays=[];
   for(const t of texts){
     if(typeof t.x!=="number"||typeof t.y!=="number"||!Number.isFinite(t.x)||!Number.isFinite(t.y)||t.x<0||t.x>W||t.y<0||t.y>H)return Response.json({error:"Invalid text position."},{status:400});
@@ -110,11 +118,11 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   }
   const {mediaId}=newUpload("video/mp4"), job=randomUUID();
   const meta={who,runId:id,mediaId,seconds:Math.round(total*10)/10};
-  const payload={id:job,spec:{width:W,height:H,fps:FPS,total,segments,sounds,overlays},output:{url:await mediaUploadLink(mediaId,"video/mp4",LINK_SECONDS),contentType:"video/mp4"},meta};
+  const payload={id:job,spec:{width:W,height:H,fps:FPS,total,segments,sounds,overlays},output:{url:await mediaUploadLink(mediaId,"video/mp4",LINK_SECONDS),contentType:"video/mp4"},meta,...(mode==="local"?{lane:"browser",laneAt:Date.now()}:{})};
   const reserved=await billingRpc<boolean>("mavya_reserve_export",{p_user:who,p_run:id,p_expected:run.updatedAt,p_id:job,p_media:mediaId,p_payload:payload,p_overlays:ids});
   if(!reserved)return Response.json({error:"Your run changed. Try again."},{status:409});
   after(async()=>{try{await advanceExport(who,job);}catch(error){console.error("export worker",job,error);}});
-  return Response.json({job});
+  return Response.json(mode==="local"?{job,upload:payload.output.url}:{job});
 }
 
 export async function GET(request: Request, ctx: RouteContext<"/api/runs/[id]/export">) {

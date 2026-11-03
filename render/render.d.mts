@@ -7,3 +7,6 @@ export function plan(spec: Spec): Step[];
 export function stepArgs(spec: Spec, step: Step, src: Probe | null, out: string): string[];
 export function finalArgs(spec: Spec, list: string, local: { sounds: Probe[]; overlays: string[] }, out: string): string[];
 export function previewArgs(input: string, out: string, master?: string): string[];
+export type Look = { brightness?: number; contrast?: number; saturation?: number; warmth?: number; zoom?: number; panX?: number; panY?: number; flip?: boolean; keys?: { t: number; zoom: number; panX: number; panY: number }[] };
+export function exposurePower(v: number): number;
+export function contrastGamma(c: number): number;

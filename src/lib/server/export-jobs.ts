@@ -36,6 +36,11 @@ export async function advanceExport(who: string, id: string) {
   if (["pending", "running"].includes(j.state)) {
    const lane = (j.payload as ExportPayload).lane, laneAt = (j.payload as ExportPayload).laneAt ?? 0;
    if (Date.now() - Date.parse(j.created_at) > 6 * 3600_000) { await save({ state: "failed" }); j.state = "failed"; }
+   else if (lane === "browser") {
+    // Rendered in the user's browser, which uploads the file to the output link (the check above then finishes the
+    // job). No texts were uploaded for a server copy, so a browser that never delivers ends the job as failed.
+    if (Date.now() - laneAt > 15 * 60_000) { await save({ state: "failed" }); j.state = "failed"; }
+   }
    else if (!lane && process.env.EXPORT_FAST !== "0") {
     // Fast lane first (src/lib/server/fast-export.ts): every piece at once on Vercel.
     await save({ state: "running", payload: { ...j.payload, lane: "vercel", laneAt: Date.now() } });

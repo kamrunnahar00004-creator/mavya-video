@@ -50,9 +50,9 @@ function measured(points, v) {
 }
 
 /** Exposure power (src/lib/adjust.ts exposurePower). */
-const exposurePower = (v) => measured([[-50, 0.28], [-25, 0.44], [0, 1], [20, 1.57], [40, 2.33], [50, 2.95]], v);
+export const exposurePower = (v) => measured([[-50, 0.28], [-25, 0.44], [0, 1], [20, 1.57], [40, 2.33], [50, 2.95]], v);
 /** Curve strength for a positive contrast value (src/lib/adjust.ts contrastGamma). */
-const contrastGamma = (c) => measured([[0, 1], [10, 1.22], [20, 1.46], [35, 1.94], [50, 3.1]], c);
+export const contrastGamma = (c) => measured([[0, 1], [10, 1.22], [20, 1.46], [35, 1.94], [50, 3.1]], c);
 
 /** Filters for one clip's look, on a W x H frame (file time of the piece's first frame = p0). */
 function look(a, p0, W, H, fps) {
