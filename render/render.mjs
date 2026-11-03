@@ -102,7 +102,10 @@ function look(a, p0, W, H, fps) {
  */
 export const previewArgs = (input, out, master) => {
   const fit = (n) => `scale=w='if(gt(iw,ih),-2,min(${n},iw))':h='if(gt(iw,ih),min(${n},ih),-2)'`;
-  const video = (crf) => ["-fpsmax", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", String(crf), "-g", "30", "-keyint_min", "30", "-sc_threshold", "0", "-pix_fmt", "yuv420p"];
+  // Lean encoders when making both copies at once: one pass with default x264 threads peaked at 671 MB on a 4K
+  // clip and the 512 MB render server restarted; single-threaded, no lookahead: 298 MB (2026-11-03).
+  const lean = master ? ["-tune", "zerolatency", "-x264-params", "threads=1:lookahead-threads=1"] : [];
+  const video = (crf) => ["-fpsmax", "30", "-c:v", "libx264", "-preset", "veryfast", ...lean, "-crf", String(crf), "-g", "30", "-keyint_min", "30", "-sc_threshold", "0", "-pix_fmt", "yuv420p"];
   const audio = ["-c:a", "aac", "-b:a", "160k", "-ac", "2", "-movflags", "+faststart"];
   if (!master) return ["-y", "-hide_banner", "-i", input, "-map", "0:v:0", "-map", "0:a:0?", "-vf", fit(480), ...video(26), ...audio, out];
   // One decode of the original, two copies: the 480p preview and the export's 1080p working copy (short side 1080:
@@ -192,7 +195,10 @@ export function finalArgs(spec, list, local, out) {
     args.push("-i", local.overlays[oi]);
     // A second past the end: the video, not the text, decides where the export ends (shortest), so no frame is lost.
     graph.push(`[${n++}:v]loop=loop=-1:size=1,setpts=N/${fps}/TB,trim=duration=${r(total + 1)}[t${oi}]`);
-    graph.push(`[${v}][t${oi}]overlay=${Math.round(o.x)}:${Math.round(o.y)}:shortest=1:enable='between(t,${r(o.start)},${r(o.end - 0.001)})'[o${oi}]`);
+    // On the same frames as the clips: plan() rounds every clip edge to a whole frame, so a text made for a clip
+    // (2.715 s against a clip starting on frame 81, 2.700 s) starts and ends on that frame, not one frame late.
+    const from = (Math.round(o.start * fps) - 0.5) / fps, to = (Math.round(o.end * fps) - 0.5) / fps;
+    graph.push(`[${v}][t${oi}]overlay=${Math.round(o.x)}:${Math.round(o.y)}:shortest=1:enable='between(t,${r(from)},${r(to)})'[o${oi}]`);
     v = `o${oi}`;
   });
   graph.push(`[${v}]format=yuv420p[vout]`);
