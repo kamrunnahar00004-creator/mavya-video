@@ -97,7 +97,9 @@ export async function runFastExport(job: string): Promise<void> {
   const t0 = Date.now(), timing: Record<string, number> = {};
   const mark = (name: string) => { timing[name] = Math.round((Date.now() - t0) / 100) / 10; };
   try {
-    const done = await Promise.all(steps.map((_, i) => callInternal("/api/internal/export-step", { job, i }, 290_000).then((r) => (r.ok ? r.json() : null)).catch(() => null)));
+    // Spread over four copies of the piece route (four functions, so not one shared machine).
+    const route = (i: number) => (i % 4 ? `/api/internal/export-step-${i % 4}` : "/api/internal/export-step");
+    const done = await Promise.all(steps.map((_, i) => callInternal(route(i), { job, i }, 290_000).then((r) => (r.ok ? r.json() : null)).catch(() => null)));
     mark("pieces");
     (timing as Record<string, unknown>).steps = done;
     if (!done.every(Boolean)) throw new Error("a piece failed");
