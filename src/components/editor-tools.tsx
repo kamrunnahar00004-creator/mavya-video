@@ -1979,8 +1979,8 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
     const control = new AbortController();
     uploads.current = control;
     try {
+      // The clip the seller has open stays open while and after new ones land.
       await onFiles(sorted, from, (i) => { clear([items[i]]); next = i + 1; }, control.signal);
-      if (!control.signal.aborted) setOpenId(undefined);
     } catch (e) {
       const canceled = control.signal.aborted;
       // An earlier file failed: stop the remaining transfers instead of hiding their tiles while they keep uploading.
