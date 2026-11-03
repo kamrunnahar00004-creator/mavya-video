@@ -27,13 +27,13 @@ assert.equal(previewOf('blob:http://x/1'), 'blob:http://x/1', 'files still uploa
 assert.equal(previewOf(undefined), undefined);
 
 const { previewKey } = load('src/lib/server/previews.ts', { '@/lib/server/r2': {} });
-assert.equal(previewKey(`${id}.mov`), `media/${id}.preview.mp4`);
+assert.equal(previewKey(`${id}.mov`), `media/${id}.p480.mp4`);
 
 // The hook never uses a copy; uploads and the phone preview's demo clips do.
 const preview = fs.readFileSync(path.join(root, 'src/components/run-preview.tsx'), 'utf8');
 assert.match(preview, /src=\{s\.id === "hook" \? s\.src! : previewOf\(s\.src!\)\}/);
 const deletion = fs.readFileSync(path.join(root, 'src/lib/server/account-deletion.ts'), 'utf8');
-assert.match(deletion, /d\.media_ids\.map\(id => previewKey\(id\)\)\]/, 'account deletion removes copies');
+assert.match(deletion, /d\.media_ids\.flatMap\(id => \[previewKey\(id\), oldPreviewKey\(id\)\]\)\]/, 'account deletion removes copies');
 
 // Real ffmpeg: a 4K 60 fps landscape recording and a portrait one come out short side 480, at most 30 fps.
 (async () => {

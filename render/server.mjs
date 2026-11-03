@@ -243,12 +243,13 @@ const server = createServer(async (req, res) => {
       const b = await body(req);
       const link = (x) => typeof x === "string" && x.length <= 8192 && /^https:\/\//.test(x);
       if (!/^[0-9a-f-]{36}\.(mp4|mov|webm|m4v)$/i.test(b?.id ?? "") || !link(b.input) || !link(b.output?.url) || b.output.contentType !== "video/mp4") return send(res, 400, { error: "bad preview" });
-      const prior = previews.get(b.id);
-      // Asked again: one copy per file (a failed one may be retried).
+      // One copy per file and copy name (a new copy size gets a new name); a failed one may be retried.
+      const key = `${b.id}|${new URL(b.output.url).pathname}`;
+      const prior = previews.get(key);
       if (prior && prior.state !== "failed") return send(res, 200, { state: prior.state });
       if (previewQueue.length >= 200) return send(res, 429, { error: "queue full" });
-      previews.set(b.id, { state: "queued", at: Date.now(), input: b.input, output: { url: b.output.url, contentType: "video/mp4" } });
-      previewQueue.push(b.id);
+      previews.set(key, { state: "queued", at: Date.now(), input: b.input, output: { url: b.output.url, contentType: "video/mp4" } });
+      previewQueue.push(key);
       void next();
       return send(res, 200, { state: "queued" });
     }

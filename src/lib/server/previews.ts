@@ -6,7 +6,9 @@ import { objectInfo, signedGet, signedPut } from "@/lib/server/r2";
  * makePreview). Phone recordings are often 4K at ~46 Mbps; playing those in a 250px preview stalls. The export always
  * reads the original. A copy belongs to its original: the same media access opens it, and account deletion removes it.
  */
-export const previewKey = (id: string) => `media/${id.replace(/\.[^.]+$/, "")}.preview.mp4`;
+export const previewKey = (id: string) => `media/${id.replace(/\.[^.]+$/, "")}.p480.mp4`;
+/** The first copies (720p, 2026-11-03), still removed with the account. */
+export const oldPreviewKey = (id: string) => `media/${id.replace(/\.[^.]+$/, "")}.preview.mp4`;
 
 /** Below this the original plays fine as it is. */
 const SMALL = 3 * 1024 * 1024;
