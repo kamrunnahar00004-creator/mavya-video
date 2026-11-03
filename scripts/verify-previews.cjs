@@ -37,7 +37,15 @@ assert.match(deletion, /d\.media_ids\.flatMap\(id => \[previewKey\(id\), oldPrev
 
 // Real ffmpeg: a 4K 60 fps landscape recording and a portrait one come out short side 480, at most 30 fps.
 (async () => {
-  const { previewArgs } = await import(path.join(root, 'render/render.mjs'));
+  const { previewArgs, plan, stepArgs } = await import(path.join(root, 'render/render.mjs'));
+  // Export: each piece of a Cut clip renders with its own look and sound when it has them.
+  {
+    const spec = { width: 720, height: 1280, fps: 30, total: 4, segments: [{ gap: 0, speed: 1, volume: 1, look: null, pieces: [{ start: 0, end: 2 }, { start: 2, end: 4, volume: 0.5, look: { brightness: 20 } }] }], sounds: [], overlays: [] };
+    const steps = plan(spec);
+    const graph = (s) => stepArgs(spec, s, { file: 'x.mp4', hasAudio: true }, 'o.mkv').join(' ');
+    assert.ok(!graph(steps[0]).includes('lutrgb') && graph(steps[0]).includes('volume=1'), 'first piece: the clip\'s look');
+    assert.ok(graph(steps[1]).includes('lutrgb') && graph(steps[1]).includes('volume=0.5'), 'second piece: its own look and volume');
+  }
   const ff = require('ffmpeg-static');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mavya-preview-'));
   try {

@@ -127,7 +127,7 @@ export function plan(spec) {
   };
   spec.segments.forEach((seg, si) => {
     if (seg.gap > 0) add({ kind: "gap" }, seg.gap);
-    seg.pieces.forEach((p) => add({ kind: "piece", si, start: p.start, end: p.end }, Math.max(0.05, p.end - p.start) / seg.speed));
+    seg.pieces.forEach((p, pi) => add({ kind: "piece", si, pi, start: p.start, end: p.end }, Math.max(0.05, p.end - p.start) / seg.speed));
   });
   return steps;
 }
@@ -139,7 +139,10 @@ export function stepArgs(spec, step, src, out) {
   if (step.kind === "gap") {
     return [...BASE, "-f", "lavfi", "-i", `color=c=black:s=${W}x${H}:r=${fps}:d=${step.len}`, "-f", "lavfi", "-i", `anullsrc=r=48000:cl=stereo`, "-t", String(step.len), "-vf", "format=yuv420p,setsar=1", ...PIECE_OUT, ...frameOut, out];
   }
-  const seg = spec.segments[step.si];
+  const seg0 = spec.segments[step.si];
+  // A piece of a Cut clip may carry its own look and sound; Speed is always the clip's.
+  const own = seg0.pieces[step.pi ?? 0] ?? {};
+  const seg = { ...seg0, look: own.look ?? seg0.look, volume: own.volume ?? seg0.volume };
   const len = step.len;
   const v = [
     `trim=start=${r(step.start)}:end=${r(step.end)}`,

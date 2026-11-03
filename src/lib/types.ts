@@ -339,7 +339,8 @@ export type DemoClip = {
 };
 
 /** One kept piece of a clip's file. Cut splits a clip into pieces that sit side by side on its bar. */
-export type Part = { id: string; start: number; end: number };
+/** One piece of a Cut clip. `adjust`: this piece's own look and sound (Speed stays the clip's). */
+export type Part = { id: string; start: number; end: number; adjust?: Partial<Adjust> };
 
 /** A chosen sound: the hook's own sound, a real song's 30s clip, or the user's file. */
 export type PartSound = {

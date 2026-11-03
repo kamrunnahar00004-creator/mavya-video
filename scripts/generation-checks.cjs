@@ -47,6 +47,13 @@ assert.ok(Math.abs(level(120, 0) - 120) < 0.01, 'contrast 0 changes nothing');
 assert.ok(Math.abs(level(111.5, -50) - 111.5) < 0.01, 'negative contrast pivots at 111.5');
 assert.ok(Math.abs(level(255, -50) - 197.6) < 0.01, 'negative contrast is a straight line');
 assert.ok(Math.abs(level(0, -25) - 22.3) < 0.01, 'negative contrast lifts blacks');
+// A Cut clip's piece has its own look; Speed is always the clip's.
+{
+  const seg = { adjust: { brightness: 5, speed: 1.2 }, parts: [{ id: 'a', start: 0, end: 2 }, { id: 'b', start: 2, end: 4, adjust: { brightness: 20, saturation: -10, speed: 2 } }] };
+  assert.equal(edit.pieceAdjust(seg, 0), seg.adjust, 'a piece without its own settings uses the clip\'s');
+  const own = edit.pieceAdjust(seg, 1);
+  assert.equal(own.brightness, 20); assert.equal(own.saturation, -10); assert.equal(own.speed, 1.2, 'speed stays the clip\'s');
+}
 // Cut on a demo clip: two clips with the same file and settings, the timeline and texts unchanged.
 {
   const look = { brightness: 5, contrast: 8, zoom: 18, speed: 1.15 };

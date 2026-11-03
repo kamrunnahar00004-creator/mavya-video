@@ -84,7 +84,12 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
       speed: segSpeed(s),
       volume: s.editable ? a.volume / 100 : 0,
       look: s.editable ? { brightness: a.brightness, contrast: a.contrast, saturation: a.saturation, warmth: a.warmth, zoom: a.zoom, panX: a.panX, panY: a.panY, flip: a.flip, keys: a.keys } : null,
-      pieces: s.parts.map((p) => ({ start: p.start, end: p.end })),
+      // A piece of a Cut clip with its own settings carries its own look and sound (Speed is the clip's).
+      pieces: s.parts.map((p) => {
+        if (!s.editable || !p.adjust) return { start: p.start, end: p.end };
+        const own = fullAdjust({ ...s.adjust, ...p.adjust });
+        return { start: p.start, end: p.end, volume: own.volume / 100, look: { brightness: own.brightness, contrast: own.contrast, saturation: own.saturation, warmth: own.warmth, zoom: own.zoom, panX: own.panX, panY: own.panY, flip: own.flip, keys: own.keys } };
+      }),
     });
   }
 

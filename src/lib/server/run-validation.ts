@@ -29,9 +29,9 @@ function face(v: unknown): boolean {
   return v.kind === "photo" ? mediaId(v.mediaId) : v.kind === "ai" ? number(v.index, 0, AVATAR_TONES.length - 1) && Number.isInteger(v.index) : v.kind === "character" ? id(v.id) : v.kind === "described" && string(v.text);
 }
 
-/** Pieces of a clip after a Cut: file times, each with end > start. */
+/** Pieces of a clip after a Cut: file times, each with end > start, and optionally its own settings. */
 function parts(v: unknown): boolean {
-  return Array.isArray(v) && v.length >= 1 && v.length <= 50 && uniqueIds(v) && v.every((p) => object(p) && id(p.id) && number(p.start) && number(p.end) && (p.end as number) > (p.start as number));
+  return Array.isArray(v) && v.length >= 1 && v.length <= 50 && uniqueIds(v) && v.every((p) => object(p) && id(p.id) && number(p.start) && number(p.end) && (p.end as number) > (p.start as number) && optional(p.adjust, adjust));
 }
 
 function hook(v: unknown): boolean {

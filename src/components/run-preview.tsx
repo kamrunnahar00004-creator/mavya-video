@@ -5,7 +5,7 @@ import { previewOf } from "@/lib/media-preview";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Adjust, contrastId, contrastTable, exposureId, exposureTable, fullAdjust, speedOf, videoStyle, warmthId, warmthMatrix } from "@/lib/adjust";
-import { type Seg, fileAt, pieceSpans, segAt, showsAt, timeline, videoLength } from "@/lib/edit";
+import { type Seg, fileAt, pieceAdjust, pieceSpans, segAt, showsAt, timeline, videoLength } from "@/lib/edit";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 import { Pause, Play } from "lucide-react";
 import { AVATAR_TONES, round1 } from "@/lib/client";
@@ -136,7 +136,6 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
             <div className="absolute inset-x-0 top-1/2 aspect-[9/16] w-full -translate-y-1/2 overflow-hidden [container-type:size]">
             {!hit ? null : seg.src ? (
               <>
-                <WarmthFilter adjust={seg.editable ? seg.adjust : null} />
                 <SegmentVideos segs={segs} seg={seg} at={at} piece={piece} playing={playing} masterRef={masterRef} />
                 {seg.id === "hook" && hook.face && hook.face.kind !== "described" && !hook.clip && !hook.generated && (
                   <span className="pointer-events-none absolute left-2 top-8 flex items-center gap-1.5 rounded-lg bg-black/55 px-2 py-1 text-[10.5px] font-bold text-white">
@@ -274,9 +273,12 @@ export function SegmentVideos({ segs, seg, at, piece, playing, masterRef }: { se
   const time = (ct: number) => seg.offset + span.at + (Math.max(p.start, Math.min(p.end, ct)) - p.start) / rateOf(seg) + (ct >= p.end - 0.001 ? 0.0001 : 0);
   return (
     <>
+      {/* Each piece's own look (its colour filters), kept apart from the players so they never move in the page. */}
+      {list.map(({ s, i }) => <WarmthFilter key={`f|${s.id}|${i}`} adjust={s.editable ? pieceAdjust(s, i) : null} />)}
       {list.map(({ s, i, now }) => {
         const sAt = now ? at : s.parts[i].start;
-        const look = s.editable ? videoStyle(s.adjust, sAt) : undefined;
+        const own = pieceAdjust(s, i);
+        const look = s.editable ? videoStyle(own, sAt) : undefined;
         return (
           <SyncedVideo
             key={`${s.id}|${s.src}|${i}`}
@@ -287,7 +289,7 @@ export function SegmentVideos({ segs, seg, at, piece, playing, masterRef }: { se
             masterRef={now ? masterRef : undefined}
             masterTime={now ? time : undefined}
             rate={rateOf(s)}
-            volume={now && s.editable ? fullAdjust(s.adjust).volume / 100 : 0}
+            volume={now && s.editable ? fullAdjust(own).volume / 100 : 0}
             style={now ? look : { ...look, opacity: 0 }}
           />
         );

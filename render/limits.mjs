@@ -20,7 +20,7 @@ export function validJob(b) {
  for(const seg of s.segments){
   if(!link(seg.url)||!number(seg.speed,0.5,2)||!number(seg.gap,0,180)||!number(seg.volume,0,1)||!Array.isArray(seg.pieces)||!seg.pieces.length)return false;
   pieces+=seg.pieces.length;len+=seg.gap;
-  for(const p of seg.pieces){if(!number(p.start,0,3600)||!number(p.end,p.start+0.01,3600))return false;len+=(p.end-p.start)/seg.speed;}
+  for(const p of seg.pieces){if(!number(p.start,0,3600)||!number(p.end,p.start+0.01,3600))return false;if(p.volume!==undefined&&!number(p.volume,0,1))return false;if(p.look?.keys&&(!Array.isArray(p.look.keys)||p.look.keys.length>limits.keyframes))return false;len+=(p.end-p.start)/seg.speed;}
   if(seg.look?.keys && (!Array.isArray(seg.look.keys)||seg.look.keys.length>limits.keyframes))return false;
  }
  if(pieces>limits.pieces||len>limits.seconds+1||Math.abs(len-s.total)>1)return false;

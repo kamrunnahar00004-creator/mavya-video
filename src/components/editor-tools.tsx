@@ -15,7 +15,7 @@ import { waveform } from "@/lib/waveform";
 import { ADJUST_ROWS, type Adjust, type AdjustRow, type Motion, NO_ADJUST, fullAdjust, isAdjusted, keyAt, motionAt, moveKey, panBy, setMotion, speedOf, toggleKey, videoStyle } from "@/lib/adjust";
 import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundPieces, soundRows } from "@/lib/sound";
 import type { Song } from "@/app/api/songs/route";
-import { type Seg, clipGroup, clipSrc, demoClips, fileAt, segAt, showsAt, videoLength, pieceSpans, relAt } from "@/lib/edit";
+import { type Seg, clipGroup, clipSrc, demoClips, fileAt, pieceAdjust, segAt, showsAt, videoLength, pieceSpans, relAt } from "@/lib/edit";
 
 import { round1, uid, uploadFile } from "@/lib/client";
 import { fmtTime, type DemoClip, type Part, type Reference, type SoundPiece, type Run, type TextLayer } from "@/lib/types";
@@ -40,9 +40,11 @@ function magnet(points: number[], tol: number) {
 const optionBtn = (on: boolean) =>
   `flex items-center gap-1.5 rounded-lg border px-3.5 py-2.5 text-[14px] font-semibold ${on ? "border-accent bg-accent-tint text-accent" : "border-line-strong bg-panel text-text hover:border-accent hover:text-accent"}`;
 
-export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTextPlaceholder = "Text", onRegenerateFirst, onParts, onSplit, onAdjust, onPatch, onAdd, onRemove, onApplyAll }: {
-  /** Cut makes a new clip from the rest (demo clips); without it, Cut splits this clip into pieces (the hook). */
+export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTextPlaceholder = "Text", onRegenerateFirst, onParts, onSplit, onAdjust, onPieceAdjust, onPatch, onAdd, onRemove, onApplyAll }: {
+  /** Cut makes a new clip from the rest (unused since 2026-11-03: Cut splits this clip into pieces again). */
   onSplit?: (file: number) => void;
+  /** One piece's own settings (a Cut clip): everything but Speed. */
+  onPieceAdjust?: (partId: string, a: Partial<Adjust>) => void;
   /** Extra controls in the right column, under the settings. */
   side?: React.ReactNode;
   /** The first text row gets a Regenerate icon (the hook's line); called with that text's id. */
@@ -94,8 +96,8 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
   usePlaybackClaims(`clip:${seg.id}`, setPlaying);
   useEffect(() => {
     const video = vref.current;
-    if (video) video.volume = fullAdjust(seg.adjust).volume / 100;
-  }, [seg.adjust, version]);
+    if (video) video.volume = fullAdjust(pieceAdjust(seg, piece.current)).volume / 100;
+  }, [seg, version, playing]);
   useEffect(() => {
     const video = vref.current;
     if (!video || !playing) return;
@@ -197,10 +199,23 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
     setPick(null);
     jumpTo(next, 0, 0);
   };
-  const look = videoStyle(seg.adjust, fileT);
-  const motion = motionAt(seg.adjust, fileT);
+  // Settings belong to one piece of a Cut clip: the selected one, else the one at the playhead (Speed stays the
+  // clip's). A clip of one piece keeps its settings on the clip itself.
+  const pickedIndex = seg.parts.findIndex((x) => x.id === picked);
+  const target = seg.parts.length > 1 ? (pickedIndex >= 0 ? pickedIndex : here.i) : 0;
+  const adj = pieceAdjust(seg, target);
+  const shown = pieceAdjust(seg, here.i);
+  const setAdj = (a: Partial<Adjust>) => {
+    if (seg.parts.length < 2 || !onPieceAdjust) return onAdjust(a);
+    if (speedOf(a) !== speed) return onAdjust({ ...seg.adjust, speed: speedOf(a) });
+    const own: Partial<Adjust> = { ...fullAdjust(a) };
+    delete own.speed;
+    onPieceAdjust(seg.parts[target].id, own);
+  };
+  const look = videoStyle(shown, fileT);
+  const motion = motionAt(shown, fileT);
   const zoomed = motion.zoom > 0;
-  const allKeys = fullAdjust(seg.adjust).keys.slice().sort((x, y) => x.t - y.t);
+  const allKeys = fullAdjust(adj).keys.slice().sort((x, y) => x.t - y.t);
   function panStart(e: React.PointerEvent<HTMLDivElement>) {
     panned.current = false;
     if (!zoomed) return;
@@ -208,14 +223,14 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
     const sx = e.clientX;
     const sy = e.clientY;
     const at = fileT;
-    const from = motionAt(seg.adjust, at);
+    const from = motionAt(adj, at);
     const move = (ev: PointerEvent) => {
       const dx = ev.clientX - sx;
       const dy = ev.clientY - sy;
       if (!panned.current && Math.hypot(dx, dy) < 4) return;
       if (!panned.current) setPlaying(false);
       panned.current = true;
-      onAdjust(setMotion(seg.adjust, at, panBy(from.zoom, dx, dy, rect.width, rect.height, from)));
+      setAdj(setMotion(adj, at, panBy(from.zoom, dx, dy, rect.width, rect.height, from)));
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -250,7 +265,7 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
                   title={zoomed ? "Drag to move the picture" : undefined}
                   className={`absolute inset-0 overflow-hidden ${zoomed ? "cursor-grab touch-none active:cursor-grabbing" : "cursor-zoom-in"}`}
                 >
-                  <WarmthFilter adjust={seg.adjust} />
+                  <WarmthFilter adjust={shown} />
                   <MediaVideo ref={vref} key={`${seg.src}|${version ?? ""}`} src={seg.id === "hook" ? seg.src : previewOf(seg.src)} muted={!playing} playsInline onLoadedMetadata={() => seek(0)} className="absolute inset-0 h-full w-full object-cover" style={look} />
                   {/* One caption at a time at a boundary (end is exclusive), except the clip's very end shows its last caption. */}
                   {local.filter((x) => x.text.trim() && (showsAt(x, t) || (x.end >= len - 0.001 && t >= len - 0.001 && t >= x.start - 0.001))).map((x) => <TextOverlay key={x.id} x={x} onPatch={onPatch} />)}
@@ -297,11 +312,11 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
               onCut={() => {
                 setPlaying(false);
                 const f = Math.round(fileT * 1000) / 1000;
-                // A demo clip splits into two clips, each with its own settings (like CapCut).
                 if (onSplit) return onSplit(f);
-                // The hook: two pieces side by side in this clip; nothing is removed or moved.
+                // Two pieces side by side in this clip; nothing is removed or moved. The new piece starts with the
+                // same settings; after that each piece's settings are its own.
                 // Only a split: both pieces stay as they were, nothing is selected or greyed out (founder 2026-10-30).
-                const second = { id: uid(), start: f, end: herePart.end };
+                const second: Part = { id: uid(), start: f, end: herePart.end, ...(herePart.adjust ? { adjust: herePart.adjust } : {}) };
                 change([...seg.parts.slice(0, here.i), { ...herePart, end: f }, second, ...seg.parts.slice(here.i + 1)]);
                 setPick(null);
               }}
@@ -317,7 +332,7 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
                 const at = relAt(seg, k.t);
                 return at === null ? [] : [{ i, at }];
               })}
-              onKeyMove={(i, rel) => onAdjust(moveKey(seg.adjust, i, fileAt(seg, Math.max(0, Math.min(len, rel))).file))}
+              onKeyMove={(i, rel) => setAdj(moveKey(adj, i, fileAt(seg, Math.max(0, Math.min(len, rel))).file))}
               canUndo={undo.length > 0}
               onUndo={() => {
                 const last = undo[undo.length - 1];
@@ -336,18 +351,19 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
 
         <div className="flex min-w-0 flex-col gap-3">
           <AdvancedSettings
-            value={seg.adjust}
+            key={seg.parts[target]?.id}
+            value={adj}
             disabled={!live}
-            onChange={onAdjust}
-            motion={motion}
-            keyOn={keyAt(seg.adjust, fileT) >= 0}
+            onChange={setAdj}
+            motion={motionAt(adj, fileT)}
+            keyOn={keyAt(adj, fileT) >= 0}
             onMotion={(patch) => {
               setPlaying(false);
-              onAdjust(setMotion(seg.adjust, fileT, patch));
+              setAdj(setMotion(adj, fileT, patch));
             }}
             onKey={() => {
               setPlaying(false);
-              onAdjust(toggleKey(seg.adjust, fileT));
+              setAdj(toggleKey(adj, fileT));
             }}
           />
           {side}
@@ -370,8 +386,8 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
       {full && live && seg.src && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-6" onClick={() => setFull(false)}>
           <div className="fade-in relative aspect-[9/16] h-[min(86vh,900px)] overflow-hidden rounded-2xl bg-black shadow-[0_24px_64px_rgba(0,0,0,0.35)] [container-type:size]" onClick={(e) => e.stopPropagation()}>
-            <WarmthFilter adjust={seg.adjust} />
-            <TrimmedVideo src={seg.id === "hook" ? seg.src : previewOf(seg.src)} parts={seg.parts} rate={speed} adjust={seg.adjust} onTime={setFullT} />
+            <WarmthFilter adjust={shown} />
+            <TrimmedVideo src={seg.id === "hook" ? seg.src : previewOf(seg.src)} parts={seg.parts} rate={speed} adjust={shown} onTime={setFullT} />
             {local.filter((x) => x.text.trim() && showsAt(x, fullT)).map((x) => <TextOverlay key={x.id} x={x} onPatch={onPatch} />)}
           </div>
           <button type="button" aria-label="Close" onClick={() => setFull(false)} className="absolute right-6 top-6 rounded-full bg-white/90 p-2 text-ink hover:bg-white">
@@ -615,10 +631,7 @@ function WholeMedia({ playback, segs, texts, playing, onTextMove, cls, style }: 
   return (
     <div className={`relative aspect-[9/16] overflow-hidden rounded-2xl border border-line bg-[#14121f] [container-type:size] ${cls}`} style={style}>
       {!hit ? null : seg.src ? (
-        <>
-          <WarmthFilter adjust={seg.editable ? seg.adjust : null} />
-          <SegmentVideos segs={segs} seg={seg} at={at} piece={piece} playing={playing} />
-        </>
+        <SegmentVideos segs={segs} seg={seg} at={at} piece={piece} playing={playing} />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center text-[12px] font-semibold text-white/40">{seg.id === "hook" ? "Your hook" : "Your demo"}</div>
       )}
@@ -1393,7 +1406,7 @@ type EditorSnap = { hook: Run["hook"]; demo: Run["demo"]; texts: TextLayer[]; so
  * The full editor (Edit under the phone): every clip, text and sound on one timeline, like CapCut but only what
  * Mavya does. Select something to change it on the right; Cut (S), Delete and Undo work on the selection.
  */
-export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, onParts, onSplitClip, onDeleteClip, onAddVideos, onInsertClip, onMoveClip, onShiftClip, onCloseGaps, onAdjust, onPatchText, onAddText, onRemoveText, onApplyAll, onPieces }: {
+export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, onParts, onPieceAdjust, onDeleteClip, onAddVideos, onInsertClip, onMoveClip, onShiftClip, onCloseGaps, onAdjust, onPatchText, onAddText, onRemoveText, onApplyAll, onPieces }: {
   run: Run;
   source: Reference | null;
   segs: Seg[];
@@ -1403,8 +1416,8 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
   onRestore: (s: EditorSnap) => void;
   /** hold = keep the clips after it in place (magnet off). */
   onParts: (clipId: string, parts: Part[], hold?: boolean) => void;
-  /** Cut a demo clip in two clips at file time `file`; the new one gets `newId` and its piece `partId`. */
-  onSplitClip: (clipId: string, file: number, newId: string, partId: string) => void;
+  /** One piece's own settings in a Cut clip (everything but Speed). */
+  onPieceAdjust: (clipId: string, partId: string, a: Partial<Adjust>) => void;
   onDeleteClip: (clipId: string, hold?: boolean) => void;
   onShiftClip: (clipId: string, to: number) => void;
   onCloseGaps: () => void;
@@ -1488,15 +1501,9 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
     const p = seg.parts[i];
     const sp = speedOf(seg.adjust);
     if ((file - p.start) / sp <= 0.2 || (p.end - file) / sp <= 0.2) return;
-    const second = { id: uid(), start: r3(file), end: p.end };
+    // Two pieces in the same clip (founder 2026-11-03); the new one starts with the same settings, then its own.
+    const second: Part = { id: uid(), start: r3(file), end: p.end, ...(p.adjust ? { adjust: p.adjust } : {}) };
     remember();
-    if (seg.id !== "hook") {
-      // A demo clip splits into two clips, each with its own settings (like CapCut).
-      const clipId = uid();
-      onSplitClip(seg.id, r3(file), clipId, second.id);
-      pick({ kind: "clip", seg: clipId, part: second.id });
-      return;
-    }
     onParts(seg.id, [...seg.parts.slice(0, i), { ...p, end: r3(file) }, second, ...seg.parts.slice(i + 1)]);
     pick({ kind: "clip", seg: seg.id, part: second.id });
   };
@@ -1554,6 +1561,16 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
     const time = playback.get();
     if (selSeg) {
       const fileT = fileAt(selSeg, Math.max(0, Math.min(selSeg.len, time - selSeg.offset))).file;
+      // The selected piece's own settings (Speed stays the clip's); a clip of one piece keeps them on the clip.
+      const partAt = sel?.kind === "clip" ? Math.max(0, selSeg.parts.findIndex((x) => x.id === sel.part)) : 0;
+      const selAdj = pieceAdjust(selSeg, partAt);
+      const setPieceAdjust = (a: Partial<Adjust>) => {
+        if (selSeg.parts.length < 2) return onAdjust(selSeg.id, a);
+        if (speedOf(a) !== speedOf(selSeg.adjust)) return onAdjust(selSeg.id, { ...selSeg.adjust, speed: speedOf(a) });
+        const own: Partial<Adjust> = { ...fullAdjust(a) };
+        delete own.speed;
+        onPieceAdjust(selSeg.id, selSeg.parts[partAt].id, own);
+      };
       return (
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-[14px] font-semibold">
@@ -1561,16 +1578,16 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
             {selSeg.id === "hook" ? "Hook" : selSeg.label}
           </div>
           <AdvancedSettings
-            key={selSeg.id}
+            key={`${selSeg.id}|${partAt}`}
             defaultOpen
-            playback={{ clock: playback, seg: selSeg, change: (a) => { rememberGesture(); onAdjust(selSeg.id, a); } }}
-            value={selSeg.adjust}
+            playback={{ clock: playback, seg: selSeg, change: (a) => { rememberGesture(); setPieceAdjust(a); } }}
+            value={selAdj}
             disabled={!selSeg.editable || !selSeg.src}
-            onChange={(a) => { rememberGesture(); onAdjust(selSeg.id, a); }}
-            motion={motionAt(selSeg.adjust, fileT)}
-            keyOn={keyAt(selSeg.adjust, fileT) >= 0}
-            onMotion={(patch) => { rememberGesture(); onAdjust(selSeg.id, setMotion(selSeg.adjust, fileT, patch)); }}
-            onKey={() => { rememberGesture(); onAdjust(selSeg.id, toggleKey(selSeg.adjust, fileT)); }}
+            onChange={(a) => { rememberGesture(); setPieceAdjust(a); }}
+            motion={motionAt(selAdj, fileT)}
+            keyOn={keyAt(selAdj, fileT) >= 0}
+            onMotion={(patch) => { rememberGesture(); setPieceAdjust(setMotion(selAdj, fileT, patch)); }}
+            onKey={() => { rememberGesture(); setPieceAdjust(toggleKey(selAdj, fileT)); }}
           />
         </div>
       );

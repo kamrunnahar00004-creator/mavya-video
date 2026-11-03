@@ -16,7 +16,7 @@ import { type Adjust, speedOf } from "@/lib/adjust";
 import { reconcileGeneration } from "@/lib/generation-edit";
 import { soundPieces } from "@/lib/sound";
 
-import { type Seg, clipGroup, clipSrc, demoClips, moveClipPiece, splitDemoClip, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, snapTexts, storeParts, timeline } from "@/lib/edit";
+import { type Seg, clipGroup, clipSrc, demoClips, moveClipPiece, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, snapTexts, storeParts, timeline } from "@/lib/edit";
 
 import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { fmtTime, type DemoClip, type Frame, type Part, type Reference, type Run, type TextLayer, type TextPos } from "@/lib/types";
@@ -288,6 +288,28 @@ export function RunView() {
     [id]
   );
 
+  /** One piece of a Cut clip gets its own settings (Speed stays the clip's, so nothing moves): applied live, saved shortly after. */
+  const livePieceAdjust = useCallback(
+    (clipId: string, partId: string, adjust: Partial<Adjust>) => {
+      setRun((r) => {
+        if (!r) return r;
+        const set = (parts?: Part[]) => parts?.map((p) => (p.id === partId ? { ...p, adjust } : p));
+        const next = clipId === "hook"
+          ? { ...r, hook: { ...r.hook, parts: set(r.hook.parts) } }
+          : { ...r, demo: { ...r.demo, clips: demoClips(r).map((c) => (c.id === clipId ? { ...c, parts: set(c.parts) } : c)) } };
+        runRef.current = next;
+        return next;
+      });
+      if (adjustTimer.current) clearTimeout(adjustTimer.current);
+      adjustTimer.current = setTimeout(() => {
+        adjustTimer.current = null;
+        const cur = runRef.current;
+        if (cur) void patchRun(id, { hook: cur.hook, demo: cur.demo, texts: runTexts(cur), project: null });
+      }, 250);
+    },
+    [id]
+  );
+
   /** Regenerate on the hook text: the next unused line written for this product (free), else three new ones (one AI call). */
   const seenHookText = useRef<Set<string>>(new Set());
   const regenerateHookText = useCallback(async (textId: string) => {
@@ -485,12 +507,6 @@ export function RunView() {
     liveTexts((t) => t.filter((x) => x.id !== tid));
     commitTexts();
   };
-  /** Cut a demo clip into two clips (each edited on its own); the new one opens. Nothing moves on the timeline. */
-  const splitClip = (clipId: string, file: number, newId = uid(), partId = uid()) => {
-    const next = splitDemoClip(runRef.current ?? run, clipId, file, newId, partId);
-    if (next) save(next);
-    return next ? newId : null;
-  };
   /** A clip's pieces changed (trim or delete a piece, Undo; Cut on the hook). Texts follow the same frames; texts only on a deleted piece go with it. */
   const setParts = (clipId: string, parts: Part[], hold = false) => {
     const seg = segs.find((x) => x.id === clipId);
@@ -539,8 +555,8 @@ export function RunView() {
       seg={seg}
       texts={texts}
       onParts={(parts) => setParts(seg.id, parts)}
-      onSplit={(file) => void splitClip(seg.id, file)}
       onAdjust={(a) => liveAdjust(seg.id, a)}
+      onPieceAdjust={(partId, a) => livePieceAdjust(seg.id, partId, a)}
       onPatch={patchText}
       onAdd={addText}
       onRemove={removeText}
@@ -965,6 +981,7 @@ export function RunView() {
                 onPatch={patchText}
                 onAdd={addText}
                 onAdjust={(a) => liveAdjust("hook", a)}
+                onPieceAdjust={(partId, a) => livePieceAdjust("hook", partId, a)}
                 onParts={(parts) => setParts("hook", parts)}
                 onApplyAll={applyTextToAll}
                 onRemove={removeText}
@@ -1149,7 +1166,7 @@ export function RunView() {
           onClose={() => setEditing(false)}
           onRestore={(x) => save({ hook: x.hook, demo: x.demo, texts: x.texts, sounds: x.sounds, sound: null })}
           onParts={setParts}
-          onSplitClip={(clipId, file, newId, partId) => void splitClip(clipId, file, newId, partId)}
+          onPieceAdjust={livePieceAdjust}
           onDeleteClip={deleteClip}
           onAddVideos={addVideos}
           onInsertClip={(clip, at) => insertClips([clip], at)}
@@ -1640,7 +1657,7 @@ function useHookGeneration(runId: string, onGenerated: (updated: Run) => void, o
 
 /** Step 4: the hook clip, in the shared clip editor. Before generating, the video box shows the inputs and a Generate button.
  * The job itself lives on the page (`gen`), so this step can close as soon as Generate is clicked. */
-function GenerateStep({ run, source, seg, texts, gen, onGenerate, onUploadHook, onCheckLibrary, onRegenerateText, onPatch, onAdd, onRemove, onParts, onAdjust, onApplyAll }: {
+function GenerateStep({ run, source, seg, texts, gen, onGenerate, onUploadHook, onCheckLibrary, onRegenerateText, onPatch, onAdd, onRemove, onParts, onPieceAdjust, onAdjust, onApplyAll }: {
   /** A hook video of their own goes in as the hook (no generation). */
   onUploadHook: (f: File) => Promise<void>;
   /** My files, on its Generated tab: reuse a hook made before. */
@@ -1656,6 +1673,7 @@ function GenerateStep({ run, source, seg, texts, gen, onGenerate, onUploadHook, 
   onAdd: (afterId: string | null, window: [number, number]) => void;
   onRemove: (id: string) => void;
   onParts: (parts: Part[]) => void;
+  onPieceAdjust: (partId: string, a: Partial<Adjust>) => void;
   onAdjust: (a: Partial<Adjust>) => void;
   onApplyAll?: (id: string) => void;
 }) {
@@ -1704,6 +1722,7 @@ function GenerateStep({ run, source, seg, texts, gen, onGenerate, onUploadHook, 
       cover={cover}
       onParts={onParts}
       onAdjust={onAdjust}
+      onPieceAdjust={onPieceAdjust}
       onPatch={onPatch}
       onAdd={onAdd}
       onRemove={onRemove}

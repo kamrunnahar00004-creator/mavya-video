@@ -53,6 +53,16 @@ export const storeParts = (parts: Part[]) => ({
 });
 
 const pieceLen = (p: Part, speed: number) => Math.max(0.05, p.end - p.start) / speed;
+
+/**
+ * The look and sound of piece i of a clip: the piece's own settings over the clip's (founder 2026-11-03: settings
+ * apply to the selected piece). Speed is always the clip's, so every piece keeps its place on the timeline.
+ */
+export function pieceAdjust(s: Pick<Seg, "parts" | "adjust">, i: number): Partial<Adjust> | undefined {
+  const own = s.parts[i]?.adjust;
+  if (!own) return s.adjust;
+  return { ...s.adjust, ...own, speed: s.adjust?.speed ?? 1 };
+}
 export const segSpeed = (s: Pick<Seg, "editable" | "adjust">) => (s.editable ? speedOf(s.adjust) : 1);
 
 /** Where each piece starts on screen (from the clip's start), and how long it plays. */
