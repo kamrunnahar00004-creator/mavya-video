@@ -5,7 +5,7 @@ async function main(){
  const cookie=()=>({getAll:()=>[],set(){}}),reply=status=>({status,cookies:cookie()});
  const api=load('src/lib/supabase/session.ts',{'next/server':{NextResponse:{next:()=>reply(200),redirect:()=>reply(307),json:(_body,options)=>reply(options.status)}},'@supabase/ssr':{createServerClient:()=>({auth:{getClaims:async()=>({data:{claims}})}})}},{NEXT_PUBLIC_SUPABASE_URL:'https://fixture.invalid',NEXT_PUBLIC_SUPABASE_ANON_KEY:'fixture',SUPABASE_SERVICE_ROLE_KEY:'fixture',ADMIN_USER_IDS:'admin-id'},{fetch:async()=>Response.json({plan})});
  // The fast export lane's routes carry no session; they check the render secret themselves (src/lib/server/fast-export.ts).
- const publicRoutes=new Set(['/api/contact','/api/stripe/webhook','/api/internal/generations','/api/internal/export-run','/api/internal/export-step','/api/internal/export-step-1','/api/internal/export-step-2','/api/internal/export-step-3']);
+ const publicRoutes=new Set(['/api/contact','/api/stripe/webhook','/api/internal/generations','/api/internal/export-run','/api/internal/export-step']);
  let methods=0,checks=0;
  for(const file of fs.readdirSync('src/app/api',{recursive:true}).filter(f=>f.endsWith('route.ts'))){
   const path='/api/'+file.replace(/\/route.ts$/,'').replace(/^route.ts$/,'').replace(/\[id\]/g,'fixture-id').replace(/\[code\]/g,'clip123');

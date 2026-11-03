@@ -15,9 +15,6 @@ const nextConfig: NextConfig = {
     "/api/sounds/*": ["./node_modules/ffmpeg-static/ffmpeg"],
     // The fast export lane (src/lib/server/fast-export.ts).
     "/api/internal/export-step": ["./node_modules/ffmpeg-static/ffmpeg"],
-    "/api/internal/export-step-1": ["./node_modules/ffmpeg-static/ffmpeg"],
-    "/api/internal/export-step-2": ["./node_modules/ffmpeg-static/ffmpeg"],
-    "/api/internal/export-step-3": ["./node_modules/ffmpeg-static/ffmpeg"],
     "/api/internal/export-run": ["./node_modules/ffmpeg-static/ffmpeg"],
   },
   turbopack: {

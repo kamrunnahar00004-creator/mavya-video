@@ -97,9 +97,7 @@ export async function runFastExport(job: string): Promise<void> {
   const t0 = Date.now(), timing: Record<string, number> = {};
   const mark = (name: string) => { timing[name] = Math.round((Date.now() - t0) / 100) / 10; };
   try {
-    // Spread over four copies of the piece route (four functions, so not one shared machine).
-    const route = (i: number) => (i % 4 ? `/api/internal/export-step-${i % 4}` : "/api/internal/export-step");
-    const done = await Promise.all(steps.map((_, i) => callInternal(route(i), { job, i }, 290_000).then((r) => (r.ok ? r.json() : null)).catch(() => null)));
+    const done = await Promise.all(steps.map((_, i) => callInternal("/api/internal/export-step", { job, i }, 290_000).then((r) => (r.ok ? r.json() : null)).catch(() => null)));
     mark("pieces");
     (timing as Record<string, unknown>).steps = done;
     if (!done.every(Boolean)) throw new Error("a piece failed");
@@ -116,6 +114,9 @@ export async function runFastExport(job: string): Promise<void> {
     const put = await fetch(p.output.url, { method: "PUT", headers: { "content-type": p.output.contentType, "content-length": String(size) }, body: await readFile(out), signal: AbortSignal.timeout(120_000) });
     if (!put.ok) throw new Error(`upload failed (${put.status})`);
     mark("upload");
+  } catch (error) {
+    (timing as Record<string, unknown>).error = String((error as Error)?.message ?? error).slice(0, 300);
+    throw error;
   } finally {
     const db = createSupabaseAdminClient();
     const { data } = await db.from("export_jobs").select("payload").eq("id", job).maybeSingle<{ payload: ExportPayload }>();

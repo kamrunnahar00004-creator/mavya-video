@@ -8,7 +8,7 @@ import { createServerClient } from "@supabase/ssr";
  * locally with no accounts.
  */
 // The fast export lane's own calls carry no user session; those routes check the render secret themselves.
-const PUBLIC_API = ["/api/contact", "/api/stripe/webhook", "/api/internal/generations", "/api/internal/export-run", "/api/internal/export-step", "/api/internal/export-step-1", "/api/internal/export-step-2", "/api/internal/export-step-3"];
+const PUBLIC_API = ["/api/contact", "/api/stripe/webhook", "/api/internal/generations", "/api/internal/export-run", "/api/internal/export-step"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
