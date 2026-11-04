@@ -14,6 +14,7 @@ const link = x => typeof x === 'string' && x.length <= 8192 && /^https:\/\//.tes
 export function validJob(b) {
  const s=b?.spec;
  if (!s || s.width!==limits.width || s.height!==limits.height || s.fps!==limits.fps || !number(s.total,0.05,limits.seconds) || !link(b.output?.url) || b.output.contentType!=='video/mp4') return false;
+ if (b.demo!==undefined && (!link(b.demo?.url) || b.demo.contentType!=='video/mp4')) return false;
  if (!/^[0-9a-f-]{36}$/i.test(b.meta?.who??'') || JSON.stringify(b.meta).length>2048) return false;
  if (!Array.isArray(s.segments)||s.segments.length<1||s.segments.length>limits.segments||!Array.isArray(s.sounds)||s.sounds.length>limits.sounds||!Array.isArray(s.overlays)||s.overlays.length>limits.overlays) return false;
  let pieces=0,len=0;

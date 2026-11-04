@@ -141,6 +141,22 @@ export function plan(spec) {
   return steps;
 }
 
+/**
+ * Where the demo starts in the finished video (seconds, on a frame): after the hook's pieces, the first segment. Every
+ * export also saves its demo part as its own clip (My files, Demos), cut from there without re-encoding. null when
+ * the video has no demo.
+ */
+export function demoAt(spec) {
+  const steps = plan(spec);
+  const i = steps.findIndex((st) => st.kind === "gap" || (st.si ?? 0) > 0);
+  if (i <= 0) return null;
+  const frames = steps.slice(0, i).reduce((a, st) => a + st.frames, 0);
+  return frames > 0 && frames < Math.round(spec.total * spec.fps) ? frames / spec.fps : null;
+}
+
+/** The demo part of a finished export: from its key frame at `at` to the end, picture only, copied as it is. */
+export const demoArgs = (input, out, at) => [...BASE, "-ss", String(at), "-i", input, "-map", "0:v:0", "-c", "copy", "-movflags", "+faststart", out];
+
 /** One step of the plan to an intermediate file. */
 export function stepArgs(spec, step, src, out) {
   const { width: W, height: H, fps } = spec;
@@ -238,6 +254,8 @@ export function finalArgs(spec, list, local, out) {
     // export (55 s of 168 s on Vercel with veryfast); the file is larger, the picture as clean, and Reels re-encode
     // every upload anyway (2026-11-03).
     "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-crf", "17", "-pix_fmt", "yuv420p", "-r", String(fps), "-threads", "2",
+    // A key frame where the demo starts, so its part can be copied out without re-encoding (demoArgs).
+    ...(demoAt(spec) !== null ? ["-force_key_frames", String(r(demoAt(spec)))] : []),
     "-c:a", "aac", "-b:a", "160k",
     "-t", String(r(total)),
     "-movflags", "+faststart",

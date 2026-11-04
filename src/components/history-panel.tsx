@@ -3,13 +3,12 @@ import { MediaVideo } from "@/components/media-video";
 
 import { useEffect, useId, useRef, useState } from "react";
 import { fetchPage } from "@/lib/list-client";
-import { speedOf } from "@/lib/adjust";
 import { claimPlayback, usePlaybackClaims } from "@/components/run-preview";
 import { Check, CirclePlus, Download, Film, FolderOpen, Loader2, MoreVertical, Music, Pause, Play, Trash2, X } from "lucide-react";
 import { characterById } from "@/lib/characters";
-import { clipSrc, demoClips, partsOf } from "@/lib/edit";
+import { clipSrc, demoClips } from "@/lib/edit";
 import { AVATAR_TONES } from "@/lib/client";
-import { fmtDate, fmtTime, type Asset, type DemoClip, type Reference, type Run, type SoundPiece } from "@/lib/types";
+import { fmtDate, fmtTime, type Asset, type Reference, type Run, type SoundPiece } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
 import { HookPreview, embedUrl } from "@/components/source-picker";
 
@@ -66,7 +65,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
   /** `from`: the video it was made in (its hook and character come along). */
   onUseGenerated: (g: Generated, from: Run) => void;
   /** `from`: the video the demo is in (its texts come along). */
-  onUseDemo: (clips: DemoClip[], from: Run) => void;
+  onUseDemo: (demo: { src: string; seconds: number }, from: Run) => void;
   onUseSound: (p: SoundPiece) => void;
 }) {
   const [cursors, setCursors] = useState<(string | null)[]>([]);
@@ -161,17 +160,11 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     }
   }
 
-  // One demo per set of clips (the same files in the same order = the same demo), as they were cut.
-  const demoKey = (clips: DemoClip[]) => clips.map((c) => clipSrc(c)).join("|");
-  const demos: Entry<{ clips: DemoClip[]; run: Run }>[] = [];
-  const seenDemo = new Set<string>();
-  for (const r of oldestFirst) {
-    const clips = demoClips(r).filter((c) => clipSrc(c));
-    if (!clips.length || seenDemo.has(demoKey(clips))) continue;
-    seenDemo.add(demoKey(clips));
-    demos.push({ key: `demo:${demoKey(clips)}`, at: r.updatedAt, ...from(r), kind: "all", value: { clips, run: r } });
-  }
-  const demoNow = demoKey(demoClips(run).filter((c) => clipSrc(c)));
+  // The demo part of every exported video (founder 2026-11-04): one finished clip, texts in, no sound, to reuse
+  // under other hooks.
+  const demos: Entry<{ demo: { src: string; seconds: number }; run: Run }>[] = [];
+  for (const r of all) for (const x of r.exports ?? []) if (x.demo) demos.push({ key: `demo:${x.demo.src}`, at: x.at, ...from(r), kind: "all", value: { demo: x.demo, run: r } });
+  const demoNow = demoClips(run).length === 1 ? clipSrc(demoClips(run)[0]) : null;
   const soundsNow = new Set((run.sounds ?? (run.sound ? [run.sound] : [])).map((p) => p.src));
 
   // Every video the seller uploaded, whether or not a video still uses it.
@@ -289,22 +282,17 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     body = list.length ? (
       <Grid>
         {list.map((x) => {
-          const clips = x.value.clips;
-          const first = partsOf({ start: clips[0].start ?? 0, end: clips[0].end ?? clips[0].seconds ?? 3, parts: clips[0].parts });
-          const len = clips.reduce((t, c) => t + partsOf({ start: c.start ?? 0, end: c.end ?? c.seconds ?? 3, parts: c.parts }).reduce((a, p) => a + (p.end - p.start), 0) / speedOf(c.adjust), 0);
-          const inUse = demoKey(clips) === demoNow;
-          const use = () => onUseDemo(clips, x.value.run);
-          // The popup plays the demo as it was cut: each clip's kept pieces, back to back.
-          const pieces = clips.flatMap((c) => partsOf({ start: c.start ?? 0, end: c.end ?? c.seconds ?? 3, parts: c.parts }).map((p) => ({ src: clipSrc(c) ?? "", start: p.start, end: p.end })));
+          const { demo } = x.value;
+          const inUse = demo.src === demoNow;
+          const use = () => onUseDemo(demo, x.value.run);
           return (
-            <Card key={x.key} onOpen={() => setPlaying({ clips: pieces, sound: true, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, `${clips.length} ${clips.length === 1 ? "clip" : "clips"} · ${fmtTime(len)}`)} meta={meta(x)}>
-              {/* A frame just inside the kept part: at exactly 0s a metadata-only video often shows nothing. */}
-              <Still src={clipSrc(clips[0]) ?? ""} at={Math.min(first[0].start + 0.5, (first[0].start + first[0].end) / 2)} />
+            <Card key={x.key} onOpen={() => setPlaying({ clips: [{ src: demo.src, start: 0 }], sound: false, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, `Demo · ${fmtTime(demo.seconds)}`)} meta={meta(x)}>
+              <Still src={demo.src} at={Math.min(0.5, demo.seconds / 2)} />
             </Card>
           );
         })}
       </Grid>
-    ) : empty("Demo clips you cut show here");
+    ) : empty("The demo part of every video you export shows here");
   } else if (tab === "uploads") {
     const list = pick(uploads);
     body = list.length ? (

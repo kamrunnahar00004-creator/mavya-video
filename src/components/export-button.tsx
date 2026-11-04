@@ -123,7 +123,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
     lifetime.current?.abort();
     const life=new AbortController();
     lifetime.current=life;
-    const post=async(mode:string,extra?:{job?:string;size?:number})=>{
+    const post=async(mode:string,extra?:{job?:string;size?:number;demoSize?:number})=>{
       const sent=await fetch(`/api/runs/${run.id}/export`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({snapshot:snapshot.updatedAt,mode,...extra}),signal:AbortSignal.timeout(60_000)});
       const reply=await sent.json().catch(()=>null);
       if(!sent.ok)throw Error(reply?.error??"Couldn't start the export. Try again.");
@@ -141,8 +141,9 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
       return out;
     })();
     texts.catch(()=>undefined);
-    const blob=await browser.browserExport(sources.spec,texts,p=>{if(alive.current)setProgress(previous=>Math.max(previous??0,Math.min(0.92,p*0.92)));},life.signal);
-    const reserved=await post("local",{size:blob.size});
+    const made=await browser.browserExport(sources.spec,texts,p=>{if(alive.current)setProgress(previous=>Math.max(previous??0,Math.min(0.92,p*0.92)));},life.signal);
+    const blob=made.video;
+    const reserved=await post("local",{size:blob.size,...(made.demo?{demoSize:made.demo.size}:{})});
     if(!reserved?.job||!reserved.upload)throw Error("no job");
     if(local.current)URL.revokeObjectURL(local.current);
     local.current=URL.createObjectURL(blob);
@@ -150,6 +151,9 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
     // Each try has a deadline (at least 2 minutes, or 200 KB/s), so a stalled upload can't hang the button.
     // Every try fits inside the upload link's 15 minutes (13, with room to spare); then the job is ended instead.
     const until=Date.now()+13*60_000;
+    // The demo part first (My files, Demos): the job finishes as soon as the video lands. Its failure is only a
+    // missing demo.
+    if(made.demo&&reserved.demoUpload)await fetch(reserved.demoUpload,{method:"PUT",headers:{"content-type":"video/mp4"},body:made.demo,signal:AbortSignal.any([life.signal,AbortSignal.timeout(Math.max(1000,until-Date.now()))])}).catch(()=>null);
     let put:Response|null=null;
     for(let i=0;i<3&&!put?.ok&&!life.signal.aborted&&until-Date.now()>5_000;i++)put=await fetch(reserved.upload,{method:"PUT",headers:{"content-type":"video/mp4"},body:blob,signal:AbortSignal.any([life.signal,AbortSignal.timeout(until-Date.now())])}).catch(()=>null);
     if(life.signal.aborted)return "started";

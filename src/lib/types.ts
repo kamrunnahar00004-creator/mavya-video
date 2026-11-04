@@ -292,7 +292,8 @@ export type Run = {
   /** Current sound rows and split pieces. An explicit empty array means no sound. */
   sounds?: SoundPiece[];
   /** Finished videos exported from this run, oldest first (shown in My files). */
-  exports?: { src: string; seconds: number; at: string }[];
+  /** Finished videos; demo: the part after the hook, saved as its own clip (My files, Demos). */
+  exports?: { src: string; seconds: number; at: string; demo?: { src: string; seconds: number } }[];
   /** Step 1: the user's product, read from its website by Gemini (POST /api/runs/[id]/product, on an explicit click). */
   product?: { url: string; brief: ProductBrief; at: string } | null;
   /** Up to 5 photos or short videos of the seller's own product (media ids): the script names real screens and buttons from them. */

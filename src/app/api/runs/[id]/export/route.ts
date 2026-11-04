@@ -12,6 +12,7 @@ import { masterKey, masterReady } from "@/lib/server/previews";
 import { signedGet, signedPut } from "@/lib/server/r2";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 import { RENDER_LIMITS, renderLimitError } from "@/lib/render-limits";
+import { demoAt } from "../../../../../../render/render.mjs";
 
 export const maxDuration = 300;
 // 720p: every source is 720p (Kling, library hooks); 1080p only added render time (founder 2026-10-24: as fast as possible).
@@ -43,7 +44,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   if (!cloud() || !render) return Response.json({ error: "Export is not connected yet." }, { status: 503 });
   const run = await getRun(id, who);
   if (!run) return Response.json({ error: "Not found" }, { status: 404 });
-  const body = await request.json().catch(()=>null) as {snapshot?:unknown;mode?:unknown;job?:unknown;size?:unknown;texts?:{id?:unknown;mediaId?:unknown;x?:unknown;y?:unknown}[]} | null;
+  const body = await request.json().catch(()=>null) as {snapshot?:unknown;mode?:unknown;job?:unknown;size?:unknown;demoSize?:unknown;texts?:{id?:unknown;mediaId?:unknown;x?:unknown;y?:unknown}[]} | null;
   if (body?.mode === "cancel") {
     // A browser export whose upload failed: end its job now, so Export works again at once (instead of after the
     // 15 minute wait in advanceExport). The browser still has the video.
@@ -126,14 +127,20 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
     overlays.push({url:await mediaLink(t.mediaId as string,LINK_SECONDS),start:Math.max(0,layer.start),end:Math.min(total,layer.end),x:t.x,y:t.y});
   }
   const {mediaId}=newUpload("video/mp4"), job=randomUUID();
-  const meta={who,runId:id,mediaId,seconds:Math.round(total*10)/10};
-  const payload={id:job,spec:{width:W,height:H,fps:FPS,total,segments,sounds,overlays},output:{url:await mediaUploadLink(mediaId,"video/mp4",LINK_SECONDS),contentType:"video/mp4"},meta,...(mode==="local"?{lane:"browser",laneAt:Date.now(),upload:{key:`exports/${job}/upload.mp4`,size:size!}}:{})};
+  // The demo part (after the hook) is saved as its own clip too (My files, Demos): its own file id.
+  const spec={width:W,height:H,fps:FPS,total,segments,sounds,overlays};
+  const at=demoAt(spec), demoMedia=at!==null?newUpload("video/mp4").mediaId:null;
+  const meta={who,runId:id,mediaId,seconds:Math.round(total*10)/10,...(demoMedia?{demoMediaId:demoMedia,demoSeconds:Math.round((total-at!)*10)/10}:{})};
+  const demoSize=typeof body?.demoSize==="number"&&Number.isInteger(body.demoSize)&&body.demoSize>0&&body.demoSize<=300*1024*1024?body.demoSize:null;
+  const payload={id:job,spec,output:{url:await mediaUploadLink(mediaId,"video/mp4",LINK_SECONDS),contentType:"video/mp4"},meta,
+    ...(demoMedia&&mode!=="local"?{demo:{url:await mediaUploadLink(demoMedia,"video/mp4",LINK_SECONDS),contentType:"video/mp4"}}:{}),
+    ...(demoMedia&&mode==="local"&&demoSize?{demoUpload:{key:`exports/${job}/demo.mp4`,size:demoSize}}:{}),...(mode==="local"?{lane:"browser",laneAt:Date.now(),upload:{key:`exports/${job}/upload.mp4`,size:size!}}:{})};
   const reserved=await billingRpc<boolean>("mavya_reserve_export",{p_user:who,p_run:id,p_expected:run.updatedAt,p_id:job,p_media:mediaId,p_payload:payload,p_overlays:ids});
   if(!reserved)return Response.json({error:"Your run changed. Try again."},{status:409});
   after(async()=>{try{await advanceExport(who,job);}catch(error){console.error("export worker",job,error);}});
   // The browser gets a short, single-size link to a staging key, never the job's own file (advanceExport checks the
   // upload and copies it there).
-  return Response.json(mode==="local"?{job,upload:await signedPut(`exports/${job}/upload.mp4`,"video/mp4",900,size!)}:{job});
+  return Response.json(mode==="local"?{job,upload:await signedPut(`exports/${job}/upload.mp4`,"video/mp4",900,size!),...(payload.demoUpload?{demoUpload:await signedPut(payload.demoUpload.key,"video/mp4",900,payload.demoUpload.size)}:{})}:{job});
 }
 
 export async function GET(request: Request, ctx: RouteContext<"/api/runs/[id]/export">) {

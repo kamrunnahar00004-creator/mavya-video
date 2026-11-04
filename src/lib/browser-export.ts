@@ -1,6 +1,6 @@
 "use client";
-import { ALL_FORMATS, AudioBufferSource, BlobSource, BufferTarget, CanvasSource, EncodedPacketSink, Input, Mp4OutputFormat, Output, VideoSampleSink, canEncodeAudio, canEncodeVideo, type InputVideoTrack } from "mediabunny";
-import { exposurePower, contrastGamma, plan, type Look, type Spec } from "../../render/render.mjs";
+import { ALL_FORMATS, AudioBufferSource, BlobSource, BufferSource, BufferTarget, CanvasSource, EncodedPacketSink, EncodedVideoPacketSource, Input, Mp4OutputFormat, Output, VideoSampleSink, canEncodeAudio, canEncodeVideo, type InputVideoTrack } from "mediabunny";
+import { demoAt, exposurePower, contrastGamma, plan, type Look, type Spec } from "../../render/render.mjs";
 import { frameSchedule, frameTimes, mediaOrigin } from "../../render/frames.mjs";
 
 /**
@@ -182,7 +182,7 @@ const keyOf = (url: string) => url.split("?")[0];
 type Held = { output?: Output; inputs: Input[]; gl?: WebGL2RenderingContext; bitmaps: ImageBitmap[] };
 
 /** Renders the spec to an MP4 in the browser. onProgress gets 0..1. Any failure throws (the server export takes over). */
-export async function browserExport(spec: Spec, textsReady: BrowserText[] | Promise<BrowserText[]>, onProgress: (p: number) => void, signal?: AbortSignal): Promise<Blob> {
+export async function browserExport(spec: Spec, textsReady: BrowserText[] | Promise<BrowserText[]>, onProgress: (p: number) => void, signal?: AbortSignal): Promise<{ video: Blob; demo: Blob | null }> {
   const held: Held = { inputs: [], bitmaps: [] };
   try {
     return await render(spec, textsReady, onProgress, held, signal);
@@ -196,10 +196,12 @@ export async function browserExport(spec: Spec, textsReady: BrowserText[] | Prom
   }
 }
 
-async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserText[]>, onProgress: (p: number) => void, held: Held, signal?: AbortSignal): Promise<Blob> {
+async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserText[]>, onProgress: (p: number) => void, held: Held, signal?: AbortSignal): Promise<{ video: Blob; demo: Blob | null }> {
   const { width: W, height: H, fps } = spec;
   const steps = plan(spec);
   const frameCount = Math.max(1, Math.round(spec.total * fps));
+  // Where the demo starts (render.mjs demoAt): a key frame there lets its part be copied out as its own clip.
+  const at = demoAt(spec), demoFrame = at === null ? -1 : Math.round(at * fps);
 
   // Download every file once, all at once; the picture starts as soon as the first clip is in.
   const blobs = new Map<string, Promise<Blob>>();
@@ -301,7 +303,7 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
     gl.uniform1i(u("mode"), 0);
     // A lost GPU context draws nothing: stop rather than encode black frames.
     if (gl.isContextLost()) throw new Error("webgl context lost");
-    await picture.add(n / fps, 1 / fps);
+    await picture.add(n / fps, 1 / fps, n === demoFrame ? { keyFrame: true } : undefined);
     n++;
     onProgress(0.03 + (n / frameCount) * 0.92);
     signal?.throwIfAborted();
@@ -396,7 +398,38 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
   onProgress(1);
   const buffer = (output.target as BufferTarget).buffer;
   if (!buffer) throw new Error("empty");
-  return new Blob([bt709(new Uint8Array(buffer))], { type: "video/mp4" });
+  const file = bt709(new Uint8Array(buffer));
+  // The demo part: never a reason to fail the export.
+  const demo = at === null ? null : await cutDemo(file, at, fps).catch(() => null);
+  return { video: new Blob([file], { type: "video/mp4" }), demo };
+}
+
+/** The demo part of the finished video (from its key frame at `at`), picture only, packets copied as they are. */
+async function cutDemo(file: Uint8Array<ArrayBuffer>, at: number, fps: number): Promise<Blob | null> {
+  const input = new Input({ source: new BufferSource(file.buffer), formats: ALL_FORMATS });
+  try {
+    const track = await input.getPrimaryVideoTrack();
+    if (!track) return null;
+    const packets = new EncodedPacketSink(track);
+    const key = await packets.getKeyPacket(at + 0.25 / fps);
+    if (!key || Math.abs(key.timestamp - at) > 0.5 / fps) return null;
+    const output = new Output({ format: new Mp4OutputFormat({ fastStart: "in-memory" }), target: new BufferTarget() });
+    const source = new EncodedVideoPacketSource("avc");
+    output.addVideoTrack(source, { frameRate: fps });
+    await output.start();
+    const decoderConfig = (await track.getDecoderConfig()) ?? undefined;
+    let first = true;
+    for await (const p of packets.packets(key)) {
+      await source.add(p.clone({ timestamp: p.timestamp - key.timestamp }), first && decoderConfig ? { decoderConfig } : undefined);
+      first = false;
+    }
+    source.close();
+    await output.finalize();
+    const out = (output.target as BufferTarget).buffer;
+    return out ? new Blob([bt709(new Uint8Array(out))], { type: "video/mp4" }) : null;
+  } finally {
+    input.dispose();
+  }
 }
 
 /**

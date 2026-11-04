@@ -7,8 +7,8 @@ import { copyObject, deleteObjectStrict, objectInfo, objectStart } from "@/lib/s
 import { type ExportPayload, FAST_MAX_STEPS, callInternal } from "@/lib/server/fast-export";
 import { plan } from "../../../render/render.mjs";
 import constraints from "../../../render/constraints.json";
-type Result = { src: string; seconds: number; at: string };
-export type ExportJob = { id: string; user_id: string; run_id: string; media_id: string; overlay_ids: string[]; state: string; created_at: string; result: Result | null; cleaned: boolean; cleanup_cursor: number; progress: number; lease_token: string; payload: { meta: { seconds: number }; [key: string]: unknown } };
+type Result = { src: string; seconds: number; at: string; demo?: { src: string; seconds: number } };
+export type ExportJob = { id: string; user_id: string; run_id: string; media_id: string; overlay_ids: string[]; state: string; created_at: string; result: Result | null; cleaned: boolean; cleanup_cursor: number; progress: number; lease_token: string; payload: { meta: { seconds: number; demoMediaId?: string; demoSeconds?: number }; [key: string]: unknown } };
 export async function exportJob(who: string, run: string, id?: string) {
  let q = createSupabaseAdminClient().from("export_jobs").select("*").eq("user_id", who).eq("run_id", run);
  q = id ? q.eq("id", id) : q.in("state", ["pending", "running"]);
@@ -20,15 +20,15 @@ export async function exportJob(who: string, run: string, id?: string) {
  * after checks: the exact size it promised, an MP4, then a copy to the job's own key, which no browser can write to.
  * Anything else is deleted and the job fails. Returns false when the upload was rejected.
  */
-async function promoteUpload(j: ExportJob, upload: { key: string; size: number }): Promise<boolean> {
+async function promoteUpload(j: ExportJob, upload: { key: string; size: number }, target = j.media_id): Promise<boolean> {
  const info = await objectInfo(upload.key);
  if (!info) return true;
  // Already copied (a later step failed and this is a retry): the job's file stands, whatever was uploaded since.
- if (await objectInfo(`media/${j.media_id}`)) { await deleteObjectStrict(upload.key); return true; }
+ if (await objectInfo(`media/${target}`)) { await deleteObjectStrict(upload.key); return true; }
  // The header read and the copy are both bound to the version checked here (a re-upload in between fails them).
  const start = info.size === upload.size && info.mime === "video/mp4" ? await objectStart(upload.key, 12, info.etag).catch(() => null) : null;
  const mp4 = !!start && start.length === 12 && String.fromCharCode(...start.slice(4, 8)) === "ftyp";
- if (mp4 && !(await objectInfo(`media/${j.media_id}`))) await copyObject(upload.key, `media/${j.media_id}`, info.etag);
+ if (mp4 && !(await objectInfo(`media/${target}`))) await copyObject(upload.key, `media/${target}`, info.etag);
  await deleteObjectStrict(upload.key);
  return mp4;
 }
@@ -64,7 +64,9 @@ export async function advanceExport(who: string, id: string) {
   if (error || !data?.length) throw error ?? new Error("Export lease changed");
  };
  try {
-  const upload = (j.payload as ExportPayload).upload;
+  const upload = (j.payload as ExportPayload).upload, demoUpload = (j.payload as ExportPayload).demoUpload, demoId = j.payload.meta.demoMediaId;
+  // The demo first (the browser uploads it first): a rejected demo is only left out, it never fails the export.
+  if (demoUpload && demoId && ["pending", "running"].includes(j.state)) await promoteUpload(j, demoUpload, demoId);
   if (upload && ["pending", "running"].includes(j.state) && !(await promoteUpload(j, upload))) { await save({ state: "failed" }); j.state = "failed"; }
   const head = await objectInfo(`media/${j.media_id}`);
   if (head && ["pending", "running"].includes(j.state)) {
@@ -72,7 +74,15 @@ export async function advanceExport(who: string, id: string) {
    if (await getRun(j.run_id, who)) {
     try { await registerMedia(j.media_id, "video/mp4", head.size, who, null); }
     catch (error) { if ((error as { code?: string }).code !== "23505") throw error; }
-    const result = await appendExport(j.run_id, j.media_id, { src: `/api/media/${j.media_id}`, seconds: j.payload.meta.seconds, at: j.created_at }, who);
+    // The demo part, when it arrived and looks right: registered as the user's, kept on the export.
+    let demo: Result["demo"];
+    const dhead = demoId ? await objectInfo(`media/${demoId}`) : null;
+    if (demoId && dhead && dhead.size > 0 && dhead.size <= 300 * 1024 * 1024 && dhead.mime === "video/mp4") {
+     try { await registerMedia(demoId, "video/mp4", dhead.size, who, null); }
+     catch (error) { if ((error as { code?: string }).code !== "23505") throw error; }
+     demo = { src: `/api/media/${demoId}`, seconds: j.payload.meta.demoSeconds ?? 0 };
+    }
+    const result = await appendExport(j.run_id, j.media_id, { src: `/api/media/${j.media_id}`, seconds: j.payload.meta.seconds, at: j.created_at, ...(demo ? { demo } : {}) }, who);
     await save({ state: result ? "done" : "failed", result, progress: 1 }); j.state = result ? "done" : "failed";
    } else { await deleteObjectStrict(`media/${j.media_id}`); await save({ state: "failed" }); j.state = "failed"; }
   }
@@ -120,6 +130,9 @@ export async function advanceExport(who: string, id: string) {
   }
   if (["done", "failed"].includes(j.state) && !j.cleaned) {
    if (upload) await deleteObjectStrict(upload.key);
+   if (demoUpload) await deleteObjectStrict(demoUpload.key);
+   // A failed export's demo file was never the user's: remove it.
+   if (j.state === "failed" && demoId) await deleteObjectStrict(`media/${demoId}`);
    // Only export-purpose PNGs from this job's owner are eligible for this cleanup.
    const batch = j.overlay_ids.slice(j.cleanup_cursor, j.cleanup_cursor + 5);
    for (const media of batch) {

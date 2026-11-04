@@ -6,7 +6,7 @@ import { MediaVideo } from "@/components/media-video";
 import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "@/components/pending-link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Check, ChevronDown, Film, FolderOpen, Loader2, PenLine, RefreshCw, SlidersHorizontal, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Film, FolderOpen, Loader2, PenLine, RefreshCw, Replace, SlidersHorizontal, Sparkles, Trash2, Upload, X } from "lucide-react";
 
 
 import { analyzeVideo } from "@/lib/analyze";
@@ -977,6 +977,13 @@ export function RunView() {
                   applyGenerated({ src: `/api/media/${c.mediaId}`, seconds: clipSeconds(c.length), at: new Date().toISOString() }, cur.script?.hookText || cur.hook.text);
                 }}
                 onCheckLibrary={() => { setLibraryTab("generated"); setLibraryOpen(true); }}
+                onReplace={() => {
+                  // Back to the start of this step (Generate hook, Upload, Check library). The hook stays in My files.
+                  if (!hook.generated) return;
+                  const next = { ...hook, generated: undefined, versions: [...(hook.versions ?? []), hook.generated].slice(-50), start: undefined, end: undefined, parts: undefined };
+                  const oldLen = segs[0].len, newLen = timeline({ ...run, hook: next }, source)[0]?.len ?? 0, d = newLen - oldLen;
+                  save({ hook: next, texts: texts.map((x) => (x.id !== "hook" && x.start >= oldLen - 0.001 ? { ...x, start: ms(x.start + d), end: ms(x.end + d) } : x.id === "hook" ? { ...x, end: Math.max(0.1, Math.min(x.end, newLen)) } : x)) });
+                }}
                 onRegenerateText={run.product?.brief ? regenerateHookText : undefined}
                 onPatch={patchText}
                 onAdd={addText}
@@ -1123,24 +1130,14 @@ export function RunView() {
                   setToast("Clip added");
                 }).catch(() => setToast("Couldn't add the clip. Try again."));
               }}
-              onUseDemo={(clips, from) => {
-                // The demo is replaced by that one, clips as they were cut (empty spaces left out), with its own texts:
-                // the old demo's texts go, each of its texts lands on the same clip in this video.
-                const copy = clips.map((c) => ({ ...c, id: uid(), gap: undefined }));
-                const nextRun: Run = { ...run, demo: { ...run.demo, clip: null, mode: copy.length > 1 ? "clips" : "single", clips: copy } };
+              onUseDemo={(demo) => {
+                // The demo becomes that one finished clip (its texts are in the picture), replacing every demo clip, so
+                // one demo can go under many hooks. The old demo's texts go; the hook's stay.
+                const mediaId = demo.src.split("/").pop();
+                const seconds = clipSeconds(demo.seconds);
+                const clip = { id: uid(), label: "Demo", mediaId, name: "Demo", seconds, start: 0, end: seconds };
                 const demoStart = segs[0].len;
-                const theirs = timeline(from, null).filter((g) => g.id !== "hook");
-                const ours = timeline(nextRun, source).filter((g) => g.id !== "hook");
-                const r3 = (x: number) => Math.round(x * 1000) / 1000;
-                const brought = runTexts(from).flatMap((x) => {
-                  if (x.id === "hook") return [];
-                  const i = theirs.findIndex((g) => x.start >= g.offset - 0.05 && x.start < g.offset + g.len);
-                  if (i < 0 || !ours[i]) return [];
-                  const d = ours[i].offset - theirs[i].offset;
-                  return [{ ...x, id: uid(), start: r3(x.start + d), end: r3(x.end + d) }];
-                });
-                const kept = texts.filter((x) => x.id === "hook" || x.start < demoStart - 0.05);
-                save({ demo: nextRun.demo, texts: [...kept, ...brought] });
+                save({ demo: { ...run.demo, clip: null, mode: "single", clips: [clip] }, texts: texts.filter((x) => x.id === "hook" || x.start < demoStart - 0.05) });
                 setLibraryOpen(false);
                 setToast("Demo replaced");
               }}
@@ -1657,11 +1654,13 @@ function useHookGeneration(runId: string, onGenerated: (updated: Run) => void, o
 
 /** Step 4: the hook clip, in the shared clip editor. Before generating, the video box shows the inputs and a Generate button.
  * The job itself lives on the page (`gen`), so this step can close as soon as Generate is clicked. */
-function GenerateStep({ run, source, seg, texts, gen, onGenerate, onUploadHook, onCheckLibrary, onRegenerateText, onPatch, onAdd, onRemove, onParts, onPieceAdjust, onAdjust, onApplyAll }: {
+function GenerateStep({ run, source, seg, texts, gen, onGenerate, onUploadHook, onCheckLibrary, onReplace, onRegenerateText, onPatch, onAdd, onRemove, onParts, onPieceAdjust, onAdjust, onApplyAll }: {
   /** A hook video of their own goes in as the hook (no generation). */
   onUploadHook: (f: File) => Promise<void>;
   /** My files, on its Generated tab: reuse a hook made before. */
   onCheckLibrary: () => void;
+  /** Remove the hook and show this step's options again. */
+  onReplace: () => void;
   onRegenerateText?: (textId: string) => Promise<void>;
   run: Run;
   source: Reference | null;
@@ -1778,10 +1777,16 @@ function GenerateStep({ run, source, seg, texts, gen, onGenerate, onUploadHook, 
             <p role="alert" className="absolute inset-x-2 bottom-2 rounded-md bg-ink/80 px-2.5 py-1.5 text-center text-[12.5px] font-semibold text-white">{genError}</p>
           )}
           {hook.generated && !busy && (
-            <button type="button" onClick={() => setRegen((o) => !o)} aria-expanded={regen} className="absolute right-2 top-2 flex items-center gap-1 rounded-lg bg-black/60 px-2 py-1 text-[12px] font-bold text-white hover:bg-black/75">
-              <RefreshCw className="h-3.5 w-3.5" />
-              Regenerate
-            </button>
+            <div className="absolute right-2 top-2 flex gap-1">
+              <button type="button" onClick={onReplace} className="flex items-center gap-1 rounded-lg bg-black/60 px-2 py-1 text-[12px] font-bold text-white hover:bg-black/75">
+                <Replace className="h-3.5 w-3.5" />
+                Replace
+              </button>
+              <button type="button" onClick={() => setRegen((o) => !o)} aria-expanded={regen} className="flex items-center gap-1 rounded-lg bg-black/60 px-2 py-1 text-[12px] font-bold text-white hover:bg-black/75">
+                <RefreshCw className="h-3.5 w-3.5" />
+                Regenerate
+              </button>
+            </div>
           )}
           {regen && hook.generated && !busy && (
             <form

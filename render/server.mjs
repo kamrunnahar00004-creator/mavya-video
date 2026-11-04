@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID, timingSafeEqual, createHash } from "node:crypto";
 import ffmpegPath from "ffmpeg-static";
-import { finalArgs, plan, previewArgs, stepArgs } from "./render.mjs";
+import { demoArgs, demoAt, finalArgs, plan, previewArgs, stepArgs } from "./render.mjs";
 
 const SECRET = process.env.RENDER_SECRET ?? "";
 const PORT = Number(process.env.PORT ?? 3200);
@@ -142,6 +142,18 @@ async function work(id) {
     },signal,300_000);
     const size = (await stat(out)).size;
     if(size>MAX_FILE_BYTES)throw new Error("Output too large");
+    // The demo part as its own clip (My files, Demos), uploaded before the video: the app finishes the job as soon as
+    // the video lands. A demo that fails never fails the export.
+    const at = job.demo ? demoAt(spec) : null;
+    if (at !== null) {
+      try {
+        const demo = path.join(dir, "demo.mp4");
+        await run(demoArgs(out, demo, at), null, signal);
+        const dsize = (await stat(demo)).size;
+        const sent = await fetch(job.demo.url, { method: "PUT", headers: { "content-type": "video/mp4", "content-length": String(dsize) }, body: createReadStream(demo), duplex: "half", signal: AbortSignal.any([signal, AbortSignal.timeout(60_000)]) });
+        if (!sent.ok) throw new Error(`demo upload failed (${sent.status})`);
+      } catch (e) { console.error("job demo", id, String(e?.message ?? e).slice(0, 300)); }
+    }
     const put = await fetch(output.url, { method: "PUT", headers: { "content-type": output.contentType, "content-length": String(size) }, body: createReadStream(out), duplex: "half", signal: AbortSignal.any([signal,AbortSignal.timeout(60_000)]) });
     if (!put.ok) throw new Error(`upload failed (${put.status})`);
     job.progress = 1;
@@ -154,7 +166,7 @@ async function work(id) {
   } finally {
     clearTimeout(deadline);
     controller.abort();
-    job.spec = job.output = null;
+    job.spec = job.output = job.demo = null;
     if(dir)await rm(dir, { recursive: true, force: true }).catch(()=>undefined);
   }
 }
@@ -236,7 +248,7 @@ const server = createServer(async (req, res) => {
       if(queue.length>=MAX_QUEUE||jobs.size>=2000)return send(res,429,{error:"queue full"});
       if([...jobs.values()].some(j=>j.meta?.who===b.meta.who&&["queued","running"].includes(j.state)))return send(res,429,{error:"one export at a time"});
       const id = /^[0-9a-f-]{36}$/i.test(b.id??"") ? b.id : randomUUID();
-      jobs.set(id, { state: "queued", progress: 0, meta: b.meta ?? null, at: Date.now(), spec: b.spec, output: b.output, digest });
+      jobs.set(id, { state: "queued", progress: 0, meta: b.meta ?? null, at: Date.now(), spec: b.spec, output: b.output, demo: b.demo ?? null, digest });
       queue.push(id);
       void next();
       return send(res, 200, { id });

@@ -10,7 +10,7 @@ import { pipeline } from "node:stream/promises";
 import { ffmpegPath } from "@/lib/server/ffmpeg";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { deleteObject, putObject, signedGet } from "@/lib/server/r2";
-import { finalArgs, plan, stepArgs, type Probe, type Spec } from "../../../render/render.mjs";
+import { demoArgs, demoAt, finalArgs, plan, stepArgs, type Probe, type Spec } from "../../../render/render.mjs";
 import { MAX_FILE_BYTES, MAX_JOB_BYTES, countOverlayPixels, validProbe } from "../../../render/limits.mjs";
 
 /**
@@ -19,7 +19,7 @@ import { MAX_FILE_BYTES, MAX_JOB_BYTES, countOverlayPixels, validProbe } from ".
  * Vercel function at the same time, then one function joins them, adds texts and sound, and uploads the video to the
  * job's output link. If it fails or stalls, advanceExport hands the job to the Render worker instead.
  */
-export type ExportPayload = { id: string; spec: Spec; output: { url: string; contentType: string }; meta: { seconds: number }; lane?: string; laneAt?: number; upload?: { key: string; size: number } };
+export type ExportPayload = { id: string; spec: Spec; output: { url: string; contentType: string }; meta: { seconds: number }; lane?: string; laneAt?: number; upload?: { key: string; size: number }; demo?: { url: string; contentType: string }; demoUpload?: { key: string; size: number } };
 
 /** Jobs with more pieces than this skip the fast lane (each piece is its own function and download). */
 export const FAST_MAX_STEPS = 24;
@@ -168,6 +168,18 @@ export async function runFastExport(job: string): Promise<void> {
     const size = (await stat(out)).size;
     // The same output limit as the worker; and the upload must finish inside this function's time.
     if (size > MAX_FILE_BYTES) throw new Error("output too large");
+    // The demo part as its own clip (My files, Demos), before the video: the job finishes when the video lands. A demo
+    // that fails never fails the export.
+    const at = p.demo ? demoAt(p.spec) : null;
+    if (at !== null && p.demo) {
+      try {
+        const demo = path.join(dir, "demo.mp4");
+        await ffmpeg(demoArgs(out, demo, at), Math.max(1000, Math.min(30_000, end() - 30_000)));
+        const dsize = (await stat(demo)).size;
+        const sent = await fetch(p.demo.url, { method: "PUT", headers: { "content-type": "video/mp4", "content-length": String(dsize) }, body: await readFile(demo), signal: AbortSignal.timeout(Math.max(1000, Math.min(60_000, end() - 30_000))) });
+        if (!sent.ok) throw new Error(`demo upload failed (${sent.status})`);
+      } catch (e) { console.error("fast export demo", job, e); }
+    }
     const put = await fetch(p.output.url, { method: "PUT", headers: { "content-type": p.output.contentType, "content-length": String(size) }, body: await readFile(out), signal: AbortSignal.timeout(Math.max(1000, end())) });
     if (!put.ok) throw new Error(`upload failed (${put.status})`);
     mark("upload");

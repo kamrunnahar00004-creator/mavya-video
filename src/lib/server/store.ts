@@ -491,7 +491,7 @@ export async function changeFilePrefs(who: string, key: string, change: { name?:
 }
 
 /** Append under the database lock, never from a browser/read-modify-write array snapshot. */
-export async function appendExport(id: string, mediaId: string, result: {src: string; seconds: number; at: string}, who: string) {
+export async function appendExport(id: string, mediaId: string, result: {src: string; seconds: number; at: string; demo?: {src: string; seconds: number}}, who: string) {
   if (cloud()) {
     const {data,error} = await db().rpc("mavya_append_export", {p_user:who,p_run:id,p_media:mediaId,p_result:result});
     if (error) throw error;

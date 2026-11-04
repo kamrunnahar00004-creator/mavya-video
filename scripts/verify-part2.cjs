@@ -37,7 +37,7 @@ async function admission(){
   '@/lib/server/previews':{masterKey:()=>'',masterReady:async()=>false},'@/lib/server/r2':{signedGet:async()=>''},
   '@/lib/edit':{timeline:()=>segments,videoLength:()=>seconds},
   '@/lib/server/store':{cloud:()=>true,getRun:async()=>({hook:{generated:{src:'/fixture.mp4'}}})},
-  '@/lib/server/who':{currentUser:async()=> 'owner'},'@/lib/sound':{soundPieces:()=>[]}
+  '@/lib/server/who':{currentUser:async()=> 'owner'},'@/lib/sound':{soundPieces:()=>[]},'../../../../../../render/render.mjs':{demoAt:()=>null}
  },{RENDER_URL:'https://fixture.invalid',RENDER_SECRET:'fixture-only'});
  const invoke=()=>route.POST(new Request('http://fixture/api/export',{method:'POST',body:'{}'}),{params:Promise.resolve({id:'fixture'})});
  let response=await invoke();assert.equal(response.status,400);assert.match((await response.json()).error,/40 clips/);
