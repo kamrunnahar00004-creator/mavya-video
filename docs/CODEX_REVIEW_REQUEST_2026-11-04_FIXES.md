@@ -40,7 +40,7 @@ You reviewed `7afb5c5..6dc5073` and wrote `docs/CODEX_REPORT_2026-11-04_EXPORT.m
      - `text-png.ts` choosing font blocks by unicode-range, with per-text face caching and per-URL file caching;
      - `text-lines.ts` grapheme breaking for overlong words.
    - `export-button.tsx`: the abort controller lifetime, PUT deadlines, cancel replies, blob URL revocation, and what the user sees in each failure case.
-   - Clarity: script loading, privacy wording, whether it records anything it shouldn't (inputs, video content).
+   - Clarity: script loading and privacy wording. The founder wants recordings to include what users type in the app, to see and fix their bugs, so typed text is meant to be recorded. Only check that sign-in and password fields stay masked (`data-clarity-mask` on the auth and reset-password forms, including the show-password toggle) and that the privacy page says what is recorded.
 3. **Anything else you find** in the touched files.
 
 ## How to test

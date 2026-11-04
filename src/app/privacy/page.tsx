@@ -8,7 +8,7 @@ const SECTIONS: LegalSection[] = [
     title: "What we collect",
     body: [
       "Your account details (name, email). What you make in Mavya: uploaded videos, photos, audio, text and your video projects. Billing details are handled by Stripe; we never see your full card number.",
-      "Basic usage data, such as pages visited and features used, to keep Mavya working and improve it. This includes Vercel Analytics and Microsoft Clarity, which records anonymized sessions (clicks, scrolling and page layout) so we can see where the app is hard to use.",
+      "Basic usage data, such as pages visited and features used, to keep Mavya working and improve it. This includes Vercel Analytics and Microsoft Clarity, which records sessions (clicks, scrolling, page layout and text you type in the editor, never your password) so we can see where the app is hard to use and fix problems.",
     ],
   },
   {

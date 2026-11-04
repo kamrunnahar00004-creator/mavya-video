@@ -18,7 +18,8 @@ const satoshi = localFont({
   ],
 });
 // Microsoft Clarity session recordings and heatmaps: shows where visitors stop, not just how many came (the same
-// project the earlier mavya.app used). The id is public, it ships in the page anyway.
+// project the earlier mavya.app used). The id is public, it ships in the page anyway. Recordings include what people
+// type in the app, to see and fix their problems; the sign-in and password forms are masked (data-clarity-mask).
 const CLARITY_PROJECT_ID = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID ?? "x97det48lq";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });

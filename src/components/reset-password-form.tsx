@@ -56,7 +56,7 @@ export function ResetPasswordForm() {
     );
   }
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3.5 rounded-2xl border border-line bg-panel p-6 sm:p-8">
+    <form data-clarity-mask="true" onSubmit={submit} className="flex flex-col gap-3.5 rounded-2xl border border-line bg-panel p-6 sm:p-8">
       <h1 className="text-[24px] font-semibold tracking-[-0.02em]">Set a new password</h1>
       <label className="mt-2 block">
         <span className="mb-1.5 block text-[12.5px] font-semibold text-muted">New password</span>

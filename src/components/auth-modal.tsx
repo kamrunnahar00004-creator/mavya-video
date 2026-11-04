@@ -212,7 +212,7 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
               If <b>{email.trim()}</b> has an account, a reset link is on its way. Check your inbox.
             </p>
           ) : (
-            <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-3.5">
+            <form data-clarity-mask="true" onSubmit={handleSubmit} className="mt-6 flex flex-col gap-3.5">
               <Field label="Email">
                 <input ref={emailRef} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required className={inputClass} placeholder="you@example.com" />
               </Field>
@@ -246,7 +246,7 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
           <span className="h-px flex-1 bg-line" />
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+        <form data-clarity-mask="true" onSubmit={handleSubmit} className="flex flex-col gap-3.5">
           {isSignup && (
             <Field label="Name (optional)">
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={60} className={inputClass} placeholder="Your name" />
