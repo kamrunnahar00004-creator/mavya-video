@@ -303,8 +303,8 @@ export function moveClipPiece(run: Run, texts: TextLayer[], segId: string, partI
   if (extracted) {
     const own = clips.find((c) => c.id === segId);
     moved = own
-      ? { ...own, id: newId, label: `${own.label} (part)`, start: part.start, end: part.end, parts: undefined, gap: undefined }
-      : { id: newId, label: "Hook (part)", src: seg.src ?? undefined, name: "Hook", seconds: seg.seconds, start: part.start, end: part.end, adjust: seg.adjust };
+      ? { ...own, id: newId, label: `${own.label} (part)`, start: part.start, end: part.end, parts: undefined, gap: undefined, adjust: pieceAdjust(seg, partIndex) }
+      : { id: newId, label: "Hook (part)", src: seg.src ?? undefined, name: "Hook", seconds: seg.seconds, start: part.start, end: part.end, adjust: pieceAdjust(seg, partIndex) };
     const rest = storeParts(seg.parts.filter((p) => p.id !== partId));
     if (segId === "hook") hook = { ...hook, ...rest };
     else kept = kept.map((c) => c.id === segId ? { ...c, ...rest } : c);

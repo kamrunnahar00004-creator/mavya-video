@@ -21,16 +21,20 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
   const [progress, setProgress] = useState<number | null>(null);
   const [done, setDone] = useState<Done | null>(null);
   const alive = useRef(true);
+  // Leaving the page stops a browser export (downloads, rendering, upload) and frees its video.
+  const lifetime = useRef<AbortController | null>(null);
   useEffect(() => {
     alive.current = true;
     return () => {
       alive.current = false;
+      lifetime.current?.abort();
     };
   }, []);
 
   const [jobId,setJobId]=useState<string|null>(null);
   // The browser export's own copy of the video, shown at once while the upload to My files finishes.
   const local=useRef<string|null>(null);
+  useEffect(()=>()=>{if(local.current)URL.revokeObjectURL(local.current);},[]);
   const blocked=useRef(false);
   const callback=useRef(onDone);
   const notify=useRef(onToast);
@@ -114,8 +118,11 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
 
   /** Renders in this browser, then uploads the file as the export job's result. null: use the server instead. */
   async function exportInBrowser(snapshot:Run,total:number,layers:ReturnType<typeof exportLayers>,textPng:typeof import("@/lib/text-png").textPng,browser:typeof import("@/lib/browser-export")):Promise<"started">{
-    const post=async(mode:string,job?:string)=>{
-      const sent=await fetch(`/api/runs/${run.id}/export`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({snapshot:snapshot.updatedAt,mode,job}),signal:AbortSignal.timeout(60_000)});
+    lifetime.current?.abort();
+    const life=new AbortController();
+    lifetime.current=life;
+    const post=async(mode:string,extra?:{job?:string;size?:number})=>{
+      const sent=await fetch(`/api/runs/${run.id}/export`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({snapshot:snapshot.updatedAt,mode,...extra}),signal:AbortSignal.timeout(60_000)});
       const reply=await sent.json().catch(()=>null);
       if(!sent.ok)throw Error(reply?.error??"Couldn't start the export. Try again.");
       return reply;
@@ -132,19 +139,23 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
       return out;
     })();
     texts.catch(()=>undefined);
-    const blob=await browser.browserExport(sources.spec,texts,p=>{if(alive.current)setProgress(previous=>Math.max(previous??0,Math.min(0.92,p*0.92)));});
-    const reserved=await post("local");
+    const blob=await browser.browserExport(sources.spec,texts,p=>{if(alive.current)setProgress(previous=>Math.max(previous??0,Math.min(0.92,p*0.92)));},life.signal);
+    const reserved=await post("local",{size:blob.size});
     if(!reserved?.job||!reserved.upload)throw Error("no job");
     if(local.current)URL.revokeObjectURL(local.current);
     local.current=URL.createObjectURL(blob);
     if(alive.current)setDone({src:local.current,seconds:Math.round(total*10)/10,at:new Date().toISOString()});
+    // Each try has a deadline (at least 2 minutes, or 200 KB/s), so a stalled upload can't hang the button.
+    const limit=Math.max(120_000,blob.size/200);
     let put:Response|null=null;
-    for(let i=0;i<3&&!put?.ok;i++)put=await fetch(reserved.upload,{method:"PUT",headers:{"content-type":"video/mp4"},body:blob}).catch(()=>null);
+    for(let i=0;i<3&&!put?.ok&&!life.signal.aborted;i++)put=await fetch(reserved.upload,{method:"PUT",headers:{"content-type":"video/mp4"},body:blob,signal:AbortSignal.any([life.signal,AbortSignal.timeout(limit)])}).catch(()=>null);
     if(!put?.ok){
-      // The video is here to download; end the job so Export is free again at once.
-      await post("cancel",reserved.job).catch(()=>undefined);
-      blocked.current=false;
-      if(alive.current){setProgress(null);onToast("Couldn't save the video to My files. Download it now.");}
+      // The video is here to download; end the job so Export is free again at once. If the server keeps the job
+      // (its file arrived after all, or the cancel didn't get through), follow it like any export.
+      const reply=await post("cancel",{job:reserved.job}).catch(()=>null);
+      if(alive.current)onToast("Couldn't save the video to My files. Download it now.");
+      if(reply?.state==="cancelled"){blocked.current=false;if(alive.current)setProgress(null);}
+      else if(alive.current)setJobId(reserved.job);
       return "started";
     }
     if(alive.current){setProgress(0.95);setJobId(reserved.job);}

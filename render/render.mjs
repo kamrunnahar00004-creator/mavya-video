@@ -214,9 +214,13 @@ export function finalArgs(spec, list, local, out) {
     if (!src.hasAudio || s.dur <= 0.05 || s.volume <= 0) return;
     args.push("-threads", "1", "-i", src.file);
     const f = [AF, `atrim=start=${r(s.start)}`, "asetpts=PTS-STARTPTS"];
-    // A sound shorter than its bar loops back to its start point, like the preview.
+    // A sound shorter than its bar loops back to its start point, like the preview's soundAt: at least every 0.5 s,
+    // silent past the file's end (a short tail used to play once and stop here while the preview looped it).
     const rest = src.duration ? src.duration - s.start : null;
-    if (rest && rest > 0.5 && rest < s.dur - 0.05) f.push(`aloop=loop=-1:size=${Math.round(rest * 48000)}`);
+    if (rest && rest > 0.05 && rest < s.dur - 0.05) {
+      const span = Math.max(0.5, rest);
+      f.push(`apad=whole_dur=${r(span)}`, `atrim=duration=${r(span)}`, `aloop=loop=-1:size=${Math.round(span * 48000)}`);
+    }
     f.push(`atrim=duration=${r(s.dur)}`, `volume=${r(s.volume)}`, `adelay=${Math.round(s.at * 1000)}:all=1`);
     graph.push(`[${n++}:a]${f.join(",")}[m${si}]`);
     mix.push(`[m${si}]`);

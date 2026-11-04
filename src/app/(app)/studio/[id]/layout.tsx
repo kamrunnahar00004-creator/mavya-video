@@ -3,7 +3,7 @@ const tiktok = TikTok_Sans({ variable: "--font-tiktok-sans", subsets: ["latin"],
 // Caption fonts for text overlays.
 const anton = Anton({ variable: "--font-anton", subsets: ["latin"], weight: "400" });
 const bebas = Bebas_Neue({ variable: "--font-bebas", subsets: ["latin"], weight: "400" });
-const montserrat = Montserrat({ variable: "--font-montserrat", subsets: ["latin"], weight: ["700", "900"] });
+const montserrat = Montserrat({ variable: "--font-montserrat", subsets: ["latin"], weight: ["700", "800", "900"] });
 const marker = Permanent_Marker({ variable: "--font-marker", subsets: ["latin"], weight: "400" });
 const poppins = Poppins({ variable: "--font-poppins", subsets: ["latin"], weight: ["600", "800"] });
 

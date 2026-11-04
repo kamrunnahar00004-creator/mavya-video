@@ -109,6 +109,11 @@ export async function objectInfo(key: string): Promise<{size: number; mime: stri
   throw error;
  }
 }
+/** The first `n` bytes of an object (to check what a file really is). */
+export async function objectStart(key: string, n: number): Promise<Uint8Array> {
+ const out = await r2().send(new GetObjectCommand({ Bucket: Bucket(), Key: key, Range: `bytes=0-${n - 1}` }), { abortSignal: workSignal(20_000) });
+ return out.Body ? await out.Body.transformToByteArray() : new Uint8Array();
+}
 export async function copyObject(from: string, to: string, etag: string) {
  await r2().send(new CopyObjectCommand({ Bucket: Bucket(), Key: to, CopySource: `${Bucket()}/${from}`, CopySourceIfMatch: etag }));
 }

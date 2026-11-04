@@ -3,8 +3,10 @@ import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { billingRpc } from "@/lib/server/billing-state";
 import { accountClosing } from "@/lib/server/account-state";
 import { appendExport, getRun, registerMedia } from "@/lib/server/store";
-import { deleteObjectStrict, objectInfo } from "@/lib/server/r2";
-import { type ExportPayload, callInternal } from "@/lib/server/fast-export";
+import { copyObject, deleteObjectStrict, objectInfo, objectStart } from "@/lib/server/r2";
+import { type ExportPayload, FAST_MAX_STEPS, callInternal } from "@/lib/server/fast-export";
+import { plan } from "../../../render/render.mjs";
+import constraints from "../../../render/constraints.json";
 type Result = { src: string; seconds: number; at: string };
 export type ExportJob = { id: string; user_id: string; run_id: string; media_id: string; overlay_ids: string[]; state: string; created_at: string; result: Result | null; cleaned: boolean; cleanup_cursor: number; progress: number; lease_token: string; payload: { meta: { seconds: number }; [key: string]: unknown } };
 export async function exportJob(who: string, run: string, id?: string) {
@@ -13,6 +15,42 @@ export async function exportJob(who: string, run: string, id?: string) {
  const { data, error } = await q.order("created_at", { ascending: false }).limit(1).maybeSingle<ExportJob>();
  if (error) throw error; return data;
 }
+/**
+ * A browser export's upload (payload.upload: a short, size-bound PUT to a staging key) becomes the job's file only
+ * after checks: the exact size it promised, an MP4, then a copy to the job's own key, which no browser can write to.
+ * Anything else is deleted and the job fails. Returns false when the upload was rejected.
+ */
+async function promoteUpload(j: ExportJob, upload: { key: string; size: number }): Promise<boolean> {
+ const info = await objectInfo(upload.key);
+ if (!info) return true;
+ const start = info.size === upload.size && info.mime === "video/mp4" ? await objectStart(upload.key, 12) : null;
+ const mp4 = !!start && start.length === 12 && String.fromCharCode(...start.slice(4, 8)) === "ftyp";
+ if (mp4 && !(await objectInfo(`media/${j.media_id}`))) await copyObject(upload.key, `media/${j.media_id}`, info.etag);
+ await deleteObjectStrict(upload.key);
+ return mp4;
+}
+
+/**
+ * The browser's upload failed: end its job now so Export works again at once. Under the job's lease, so it can never
+ * race the completion; a file that did arrive is kept and finishes the job instead ("pending").
+ */
+export async function cancelBrowserExport(who: string, run: string, id: string): Promise<"cancelled" | "pending"> {
+ const j = await billingRpc<ExportJob | null>("mavya_claim_export", { p_user: who, p_id: id });
+ if (!j) return "pending";
+ const db = createSupabaseAdminClient();
+ const save = async (patch: Record<string, unknown>) => {
+  const { error, data } = await db.from("export_jobs").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id).eq("lease_token", j.lease_token).select("id");
+  if (error || !data?.length) throw error ?? new Error("Export lease changed");
+ };
+ try {
+  const payload = j.payload as ExportPayload;
+  if (j.run_id !== run || payload.lane !== "browser" || !["pending", "running"].includes(j.state)) return "pending";
+  if ((payload.upload && (await objectInfo(payload.upload.key))) || (await objectInfo(`media/${j.media_id}`))) return "pending";
+  await save({ state: "failed" });
+  return "cancelled";
+ } finally { await save({ lease_token: null, lease_until: null }); }
+}
+
 export async function advanceExport(who: string, id: string) {
  if (await accountClosing(who)) return;
  const j = await billingRpc<ExportJob | null>("mavya_claim_export", { p_user: who, p_id: id });
@@ -23,6 +61,8 @@ export async function advanceExport(who: string, id: string) {
   if (error || !data?.length) throw error ?? new Error("Export lease changed");
  };
  try {
+  const upload = (j.payload as ExportPayload).upload;
+  if (upload && ["pending", "running"].includes(j.state) && !(await promoteUpload(j, upload))) { await save({ state: "failed" }); j.state = "failed"; }
   const head = await objectInfo(`media/${j.media_id}`);
   if (head && ["pending", "running"].includes(j.state)) {
    if (head.size <= 0 || head.size > 300 * 1024 * 1024 || head.mime !== "video/mp4") { await save({ state: "failed" }); return; }
@@ -41,7 +81,7 @@ export async function advanceExport(who: string, id: string) {
     // job). No texts were uploaded for a server copy, so a browser that never delivers ends the job as failed.
     if (Date.now() - laneAt > 15 * 60_000) { await save({ state: "failed" }); j.state = "failed"; }
    }
-   else if (!lane && process.env.EXPORT_FAST !== "0") {
+   else if (!lane && process.env.EXPORT_FAST !== "0" && plan((j.payload as ExportPayload).spec).length <= FAST_MAX_STEPS) {
     // Fast lane first (src/lib/server/fast-export.ts): every piece at once on Vercel.
     await save({ state: "running", payload: { ...j.payload, lane: "vercel", laneAt: Date.now() } });
     const started = await callInternal("/api/internal/export-run", { job: j.id }, 15_000).then((r) => r.status === 202).catch(() => false);
@@ -58,9 +98,10 @@ export async function advanceExport(who: string, id: string) {
     const read = await fetch(`${base}/jobs/${j.id}`, { headers, signal: AbortSignal.timeout(55_000), cache: "no-store" });
     if (read.status === 404) {
      const health = await fetch(`${base}/health`, { signal: AbortSignal.timeout(10_000), cache: "no-store" });
-     const capability = await health.json().catch(() => null) as { protocol?: number } | null;
+     const capability = await health.json().catch(() => null) as { protocol?: number; size?: string } | null;
      // Protocol 3 = durable job ids + 720x1280 exports (Codex V9: protocol 2 covered both 1080 and 720 workers).
-     if (!health.ok || capability?.protocol !== 3) throw new Error("Render worker update required");
+     // The worker must also render this app's frame size (protocol 3 covered both 720x1280 and 1080x1920 workers).
+     if (!health.ok || capability?.protocol !== 3 || capability.size !== `${constraints.width}x${constraints.height}`) throw new Error("Render worker update required");
      const job = { ...(j.payload as ExportPayload) };
      delete job.lane; delete job.laneAt;
      const sent = await fetch(`${base}/jobs`, { method: "POST", headers, body: JSON.stringify(job), signal: AbortSignal.timeout(55_000) });
@@ -75,6 +116,7 @@ export async function advanceExport(who: string, id: string) {
    }
   }
   if (["done", "failed"].includes(j.state) && !j.cleaned) {
+   if (upload) await deleteObjectStrict(upload.key);
    // Only export-purpose PNGs from this job's owner are eligible for this cleanup.
    const batch = j.overlay_ids.slice(j.cleanup_cursor, j.cleanup_cursor + 5);
    for (const media of batch) {

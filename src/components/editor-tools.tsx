@@ -108,7 +108,8 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
     return () => { observer.disconnect(); document.removeEventListener("visibilitychange", hide); };
   }, [playing]);
   const [t, setT] = useState(0);
-  const historyKeyFor = (parts: Part[]) => JSON.stringify([seg.src, version, parts]);
+  // Only the pieces' places count (a piece's own look or volume changing must not reset selection, playhead or Undo).
+  const historyKeyFor = (parts: Part[]) => JSON.stringify([seg.src, version, parts.map((p) => [p.id, p.start, p.end])]);
   const partsKey = historyKeyFor(seg.parts);
   const [historyKey, setHistoryKey] = useState(partsKey);
   if (historyKey !== partsKey) {
@@ -162,6 +163,7 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
         }
         i += 1;
         v.currentTime = s.parts[i].start;
+        v.volume = fullAdjust(pieceAdjust(s, i)).volume / 100;
         void v.play().catch(() => undefined);
       } else if (v.currentTime < p.start - 0.05) v.currentTime = p.start;
       piece.current = i;
@@ -205,8 +207,10 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
   const target = seg.parts.length > 1 ? (pickedIndex >= 0 ? pickedIndex : here.i) : 0;
   const adj = pieceAdjust(seg, target);
   const shown = pieceAdjust(seg, here.i);
+  // Fullscreen plays on its own clock (fullT): its look and sound are that piece's.
+  const fullShown = pieceAdjust(seg, fileAt(seg, Math.max(0, Math.min(seg.len, fullT))).i);
   const setAdj = (a: Partial<Adjust>) => {
-    if (seg.parts.length < 2 || !onPieceAdjust) return onAdjust(a);
+    if ((seg.parts.length < 2 && !seg.parts[0]?.adjust) || !onPieceAdjust) return onAdjust(a);
     if (speedOf(a) !== speed) return onAdjust({ ...seg.adjust, speed: speedOf(a) });
     const own: Partial<Adjust> = { ...fullAdjust(a) };
     delete own.speed;
@@ -386,8 +390,8 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
       {full && live && seg.src && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-6" onClick={() => setFull(false)}>
           <div className="fade-in relative aspect-[9/16] h-[min(86vh,900px)] overflow-hidden rounded-2xl bg-black shadow-[0_24px_64px_rgba(0,0,0,0.35)] [container-type:size]" onClick={(e) => e.stopPropagation()}>
-            <WarmthFilter adjust={shown} />
-            <TrimmedVideo src={seg.id === "hook" ? seg.src : previewOf(seg.src)} parts={seg.parts} rate={speed} adjust={shown} onTime={setFullT} />
+            <WarmthFilter adjust={fullShown} />
+            <TrimmedVideo src={seg.id === "hook" ? seg.src : previewOf(seg.src)} parts={seg.parts} rate={speed} adjust={fullShown} onTime={setFullT} />
             {local.filter((x) => x.text.trim() && showsAt(x, fullT)).map((x) => <TextOverlay key={x.id} x={x} onPatch={onPatch} />)}
           </div>
           <button type="button" aria-label="Close" onClick={() => setFull(false)} className="absolute right-6 top-6 rounded-full bg-white/90 p-2 text-ink hover:bg-white">
@@ -1565,7 +1569,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
       const partAt = sel?.kind === "clip" ? Math.max(0, selSeg.parts.findIndex((x) => x.id === sel.part)) : 0;
       const selAdj = pieceAdjust(selSeg, partAt);
       const setPieceAdjust = (a: Partial<Adjust>) => {
-        if (selSeg.parts.length < 2) return onAdjust(selSeg.id, a);
+        if (selSeg.parts.length < 2 && !selSeg.parts[0]?.adjust) return onAdjust(selSeg.id, a);
         if (speedOf(a) !== speedOf(selSeg.adjust)) return onAdjust(selSeg.id, { ...selSeg.adjust, speed: speedOf(a) });
         const own: Partial<Adjust> = { ...fullAdjust(a) };
         delete own.speed;

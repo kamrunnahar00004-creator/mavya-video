@@ -50,8 +50,17 @@ export function textLines(x: Pick<TextLayer, "text" | "font" | "size">, look: { 
     let cur = "";
     for (const word of para.split(/ +/)) {
       const next = cur ? `${cur} ${word}` : word;
-      if (!cur || width(next) <= max) cur = next;
-      else { lines.push(cur); cur = word; }
+      if (width(next) <= max) { cur = next; continue; }
+      if (cur) lines.push(cur);
+      cur = word;
+      // A word wider than the box on its own (a link, a long hashtag) breaks between letters.
+      if (width(word) > max) {
+        cur = "";
+        for (const { segment } of new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(word)) {
+          if (cur && width(cur + segment) > max) { lines.push(cur); cur = ""; }
+          cur += segment;
+        }
+      }
     }
     lines.push(cur);
   }

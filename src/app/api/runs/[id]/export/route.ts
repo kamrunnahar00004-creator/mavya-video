@@ -2,14 +2,14 @@ import { after } from "next/server";
 import { exportLayers } from "@/lib/export-layers";
 import { billingRpc } from "@/lib/server/billing-state";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
-import { advanceExport, exportJob } from "@/lib/server/export-jobs";
+import { advanceExport, cancelBrowserExport, exportJob } from "@/lib/server/export-jobs";
 import { randomUUID } from "node:crypto";
 import { fullAdjust } from "@/lib/adjust";
 import { segSpeed, timeline, videoLength } from "@/lib/edit";
 import { cloud, getRun, libraryLink, mediaAccess, mediaLink, mediaUploadLink, newUpload } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { masterKey, masterReady } from "@/lib/server/previews";
-import { deleteObjectStrict, signedGet } from "@/lib/server/r2";
+import { signedGet, signedPut } from "@/lib/server/r2";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 import { RENDER_LIMITS, renderLimitError } from "@/lib/render-limits";
 
@@ -43,16 +43,12 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   if (!cloud() || !render) return Response.json({ error: "Export is not connected yet." }, { status: 503 });
   const run = await getRun(id, who);
   if (!run) return Response.json({ error: "Not found" }, { status: 404 });
-  const body = await request.json().catch(()=>null) as {snapshot?:unknown;mode?:unknown;job?:unknown;texts?:{id?:unknown;mediaId?:unknown;x?:unknown;y?:unknown}[]} | null;
+  const body = await request.json().catch(()=>null) as {snapshot?:unknown;mode?:unknown;job?:unknown;size?:unknown;texts?:{id?:unknown;mediaId?:unknown;x?:unknown;y?:unknown}[]} | null;
   if (body?.mode === "cancel") {
     // A browser export whose upload failed: end its job now, so Export works again at once (instead of after the
-    // 15 minute wait in advanceExport). A file that did arrive is removed; the browser still has the video.
+    // 15 minute wait in advanceExport). The browser still has the video.
     if (typeof body.job !== "string" || !/^[0-9a-f-]{36}$/i.test(body.job)) return Response.json({ error: "Not found" }, { status: 404 });
-    const db = createSupabaseAdminClient();
-    const { data, error } = await db.from("export_jobs").update({ state: "failed", updated_at: new Date().toISOString() }).eq("id", body.job).eq("user_id", who).eq("run_id", id).in("state", ["pending", "running"]).eq("payload->>lane", "browser").select("media_id");
-    if (error) throw error;
-    for (const row of data ?? []) await deleteObjectStrict(`media/${row.media_id}`).catch(() => undefined);
-    return Response.json({ ok: true });
+    return Response.json({ state: await cancelBrowserExport(who, id, body.job) });
   }
   if (!run.hook.generated) return Response.json({ error: "Generate the hook first." }, { status: 400 });
   const sourceSegments = timeline(run, null).filter(s => s.src);
@@ -65,6 +61,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   // the server would render) so the browser can render it; mode "local" then reserves the job for the finished file
   // the browser uploads (texts are drawn into it, so none are sent).
   const mode = body?.mode === "sources" || body?.mode === "local" ? body.mode : null;
+  // The browser's finished file: its exact size is signed into the upload link (at most what the worker accepts).
+  const size = typeof body?.size === "number" && Number.isInteger(body.size) && body.size > 0 && body.size <= 300 * 1024 * 1024 ? body.size : null;
+  if (mode === "local" && !size) return Response.json({ error: "The video is too large to save." }, { status: 400 });
   if(body?.snapshot!==run.updatedAt || (!mode && !Array.isArray(body.texts)) || (body.texts?.length ?? 0)>RENDER_LIMITS.overlays) return Response.json({error:"Your run changed. Save and try again."},{status:409});
   const texts=mode?[]:body.texts!;
   const expected=exportLayers(run);
@@ -128,11 +127,13 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   }
   const {mediaId}=newUpload("video/mp4"), job=randomUUID();
   const meta={who,runId:id,mediaId,seconds:Math.round(total*10)/10};
-  const payload={id:job,spec:{width:W,height:H,fps:FPS,total,segments,sounds,overlays},output:{url:await mediaUploadLink(mediaId,"video/mp4",LINK_SECONDS),contentType:"video/mp4"},meta,...(mode==="local"?{lane:"browser",laneAt:Date.now()}:{})};
+  const payload={id:job,spec:{width:W,height:H,fps:FPS,total,segments,sounds,overlays},output:{url:await mediaUploadLink(mediaId,"video/mp4",LINK_SECONDS),contentType:"video/mp4"},meta,...(mode==="local"?{lane:"browser",laneAt:Date.now(),upload:{key:`exports/${job}/upload.mp4`,size:size!}}:{})};
   const reserved=await billingRpc<boolean>("mavya_reserve_export",{p_user:who,p_run:id,p_expected:run.updatedAt,p_id:job,p_media:mediaId,p_payload:payload,p_overlays:ids});
   if(!reserved)return Response.json({error:"Your run changed. Try again."},{status:409});
   after(async()=>{try{await advanceExport(who,job);}catch(error){console.error("export worker",job,error);}});
-  return Response.json(mode==="local"?{job,upload:payload.output.url}:{job});
+  // The browser gets a short, single-size link to a staging key, never the job's own file (advanceExport checks the
+  // upload and copies it there).
+  return Response.json(mode==="local"?{job,upload:await signedPut(`exports/${job}/upload.mp4`,"video/mp4",900,size!)}:{job});
 }
 
 export async function GET(request: Request, ctx: RouteContext<"/api/runs/[id]/export">) {

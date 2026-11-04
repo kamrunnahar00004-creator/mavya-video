@@ -37,29 +37,50 @@ const toDataUrl = (blob: Blob) =>
  * width), fetched once per family and reused for every text of the export (2026-11-03: 15 texts took 49 s).
  */
 const faces = new Map<string, Promise<string>>();
-function fontFace(family: string): Promise<string> {
-  let face = faces.get(family);
+function fontFace(family: string, text: string): Promise<string> {
+  const key = `${family}|${text}`;
+  let face = faces.get(key);
   if (!face) {
-    face = loadFace(family).catch((e) => { faces.delete(family); throw e; });
-    faces.set(family, face);
+    face = loadFace(family, text).catch((e) => { faces.delete(key); throw e; });
+    if (faces.size > 500) faces.clear();
+    faces.set(key, face);
   }
   return face;
 }
-async function loadFace(family: string): Promise<string> {
+/** Does a stylesheet block's unicode-range cover any letter of the text? */
+function covers(block: string, text: string): boolean {
+  const range = /unicode-range:\s*([^;]+);/.exec(block)?.[1];
+  if (!range) return true;
+  const spans = range.split(",").map((r) => r.trim().replace(/^U\+/i, "").split("-").map((h) => parseInt(h.replace(/\?/g, "0"), 16)));
+  return [...text].some((ch) => { const c = ch.codePointAt(0)!; return spans.some(([a, b]) => c >= a && c <= (b ?? a)); });
+}
+/** Each font file once per export, however many texts use it. */
+const files = new Map<string, Promise<string>>();
+function fontFile(url: string): Promise<string> {
+  let file = files.get(url);
+  if (!file) {
+    file = fetch(url, { signal: AbortSignal.timeout(20_000) }).then((r) => (r.ok ? r.blob() : Promise.reject(new Error("font")))).then(toDataUrl);
+    file.catch(() => files.delete(url));
+    files.set(url, file);
+  }
+  return file;
+}
+async function loadFace(family: string, text: string): Promise<string> {
   for (const spec of [`${family}:wght@800`, family]) {
     const res = await fetch(`https://fonts.googleapis.com/css2?family=${encodeURIComponent(spec).replace(/%20/g, "+")}&display=block`, { signal: AbortSignal.timeout(10_000) }).catch(() => null);
     if (!res?.ok) continue;
     let sheet = await res.text();
-    // Latin letters only (Google labels each block); other scripts would only make every text image heavier.
+    // The blocks (Google labels each by script) this text's letters need, Latin always, as the editor's font has
+    // them all: a Cyrillic caption keeps its font in the export too.
     const blocks = sheet.split(/(?=\/\* [\w-]+ \*\/)/);
-    const latin = blocks.filter((b) => /^\/\* latin(-ext)? \*\//.test(b));
-    if (latin.length) sheet = latin.join("");
+    const used = blocks.filter((b) => /^\/\* latin(-ext)? \*\//.test(b) || covers(b, text));
+    if (used.length) sheet = used.join("");
     const urls = [...new Set(sheet.match(/https:\/\/fonts\.gstatic\.com\/[^)'"]+/g) ?? [])];
     if (!urls.length) continue;
-    const files = await Promise.all(urls.map((url) => fetch(url, { signal: AbortSignal.timeout(20_000) }).then((r) => (r.ok ? r.blob() : null)).catch(() => null)));
+    const data = await Promise.all(urls.map((url) => fontFile(url).catch(() => null)));
     for (const [i, url] of urls.entries()) {
-      if (!files[i]) throw new Error("The font couldn't load. Try again.");
-      sheet = sheet.split(url).join(await toDataUrl(files[i]!));
+      if (!data[i]) throw new Error("The font couldn't load. Try again.");
+      sheet = sheet.split(url).join(data[i]!);
     }
     return sheet;
   }
@@ -67,17 +88,17 @@ async function loadFace(family: string): Promise<string> {
 }
 
 /** The family name to draw with, and the @font-face rules it needs. */
-async function fontFor(font: string): Promise<{ family: string; face: string }> {
+async function fontFor(font: string, text: string): Promise<{ family: string; face: string }> {
   if ((SYSTEM_FONTS as readonly string[]).includes(font)) return { family: `"${font}", sans-serif`, face: "" };
   const name = font in FONTS ? GOOGLE_NAME[font as keyof typeof FONTS] : font;
-  return { family: `"${name}", sans-serif`, face: await fontFace(name) };
+  return { family: `"${name}", sans-serif`, face: await fontFace(name, text) };
 }
 
 /** The drawn text cropped to what it covers, with where it sits on the 720x1280 frame (null: nothing drawn). */
 export async function textPng(x: TextLayer): Promise<{ png: string; x: number; y: number } | null> {
   if (!x.text.trim()) return null;
   const look = textLook(x.style, x.color, x.second);
-  const { family, face } = await fontFor(x.font);
+  const { family, face } = await fontFor(x.font, x.text);
   // The very lines the preview shows (textLines), never wrapped again here.
   const lines = await textLinesLoaded(x, look);
   const base: CSSProperties = { fontFamily: family, fontSize: `${(x.size / 100) * H}px`, fontWeight: 800, lineHeight: 1.12, textAlign: "center", whiteSpace: "pre", display: "block" };

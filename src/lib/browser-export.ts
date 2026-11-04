@@ -1,6 +1,7 @@
 "use client";
-import { ALL_FORMATS, AudioBufferSource, BlobSource, BufferTarget, CanvasSource, Input, Mp4OutputFormat, Output, VideoSampleSink, canEncodeAudio, canEncodeVideo, type InputVideoTrack } from "mediabunny";
+import { ALL_FORMATS, AudioBufferSource, BlobSource, BufferTarget, CanvasSource, EncodedPacketSink, Input, Mp4OutputFormat, Output, VideoSampleSink, canEncodeAudio, canEncodeVideo, type InputVideoTrack } from "mediabunny";
 import { exposurePower, contrastGamma, plan, type Look, type Spec } from "../../render/render.mjs";
+import { frameSchedule } from "../../render/frames.mjs";
 
 /**
  * Export in the user's browser (founder 2026-11-04: CapCut exports in seconds, so ours must not take minutes). The
@@ -59,7 +60,7 @@ void main() {
   vec3 c = texture(tex, t).rgb;
   if (useExpo == 1) c = vec3(ex(c.r), ex(c.g), ex(c.b));
   if (useContr == 1) c = vec3(co(c.r), co(c.g), co(c.b));
-  float y = dot(c, vec3(0.299, 0.587, 0.114));
+  float y = dot(c, vec3(0.213, 0.715, 0.072)); // CSS saturate(), as the preview draws it
   c = clamp(vec3(y) + (c - vec3(y)) * sat, 0.0, 1.0);
   o = vec4(clamp(c * gains, 0.0, 1.0), 1.0);
 }`;
@@ -156,23 +157,46 @@ export function tempo(chs: Float32Array[], speed: number): Float32Array[] {
   });
 }
 
+/**
+ * A file's sound as stereo at 48 kHz, or null when the file has no sound. A sound that exists but can't be decoded
+ * throws, so the export falls back to the server instead of finishing silent.
+ */
 async function decodeSound(blob: Blob): Promise<Float32Array[] | null> {
-  try {
-    const ctx = new OfflineAudioContext(2, RATE, RATE);
-    const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
-    const l = buf.getChannelData(0);
-    return [l, buf.numberOfChannels > 1 ? buf.getChannelData(1) : l];
-  } catch {
-    return null; // no sound track
-  }
+  const input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
+  const track = await input.getPrimaryAudioTrack().then((t) => !!t, () => null);
+  input.dispose();
+  if (track === false) return null;
+  const buf = await new OfflineAudioContext(2, RATE, RATE).decodeAudioData(await blob.arrayBuffer());
+  const l = buf.getChannelData(0);
+  if (buf.numberOfChannels > 1) return [l, buf.getChannelData(1)];
+  // Mono to stereo at -3 dB per side, like ffmpeg's aformat on the server.
+  const m = l.map((x) => x * Math.SQRT1_2);
+  return [m, m];
 }
 
 // ---------- export ----------
 
 const keyOf = (url: string) => url.split("?")[0];
 
-/** Renders the spec to an MP4 in the browser. onProgress gets 0..1. */
+/** What one export holds open, released however it ends. */
+type Held = { output?: Output; inputs: Input[]; gl?: WebGL2RenderingContext; bitmaps: ImageBitmap[] };
+
+/** Renders the spec to an MP4 in the browser. onProgress gets 0..1. Any failure throws (the server export takes over). */
 export async function browserExport(spec: Spec, textsReady: BrowserText[] | Promise<BrowserText[]>, onProgress: (p: number) => void, signal?: AbortSignal): Promise<Blob> {
+  const held: Held = { inputs: [], bitmaps: [] };
+  try {
+    return await render(spec, textsReady, onProgress, held, signal);
+  } catch (error) {
+    if (held.output && held.output.state !== "finalized") await held.output.cancel().catch(() => undefined);
+    throw error;
+  } finally {
+    for (const input of held.inputs) input.dispose();
+    for (const bitmap of held.bitmaps) bitmap.close();
+    held.gl?.getExtension("WEBGL_lose_context")?.loseContext();
+  }
+}
+
+async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserText[]>, onProgress: (p: number) => void, held: Held, signal?: AbortSignal): Promise<Blob> {
   const { width: W, height: H, fps } = spec;
   const steps = plan(spec);
   const frameCount = Math.max(1, Math.round(spec.total * fps));
@@ -222,12 +246,13 @@ export async function browserExport(spec: Spec, textsReady: BrowserText[] | Prom
       if (!src) continue;
       const start = Math.round(s.start * RATE), len = src[0].length;
       const rest = (len - start) / RATE;
-      const loop = rest > 0.5 && rest < s.dur - 0.05 ? len - start : 0;
+      // Like the preview's soundAt: loop back to the start point, at least every 0.5 s (silence past the file's end).
+      const loop = rest > 0.05 && rest < s.dur - 0.05 ? Math.round(Math.max(0.5, rest) * RATE) : 0;
       const at = Math.round(s.at * RATE), n = Math.round(s.dur * RATE);
       for (let c = 0; c < 2; c++) {
         for (let i = 0; i < n && at + i < total; i++) {
           const j = start + (loop ? i % loop : i);
-          if (j >= len) break;
+          if (j >= len) { if (loop) continue; break; }
           mix[c][at + i] += src[c][j] * s.volume;
         }
       }
@@ -237,6 +262,7 @@ export async function browserExport(spec: Spec, textsReady: BrowserText[] | Prom
   // Picture.
   const canvas = new OffscreenCanvas(W, H);
   const { gl, u, texture, video } = makeGl(canvas);
+  held.gl = gl;
   gl.viewport(0, 0, W, H);
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -244,6 +270,7 @@ export async function browserExport(spec: Spec, textsReady: BrowserText[] | Prom
   const texts = await textsReady;
   const overlays = await Promise.all(texts.map(async (t) => {
     const img = await createImageBitmap(await (await fetch(t.png)).blob(), { premultiplyAlpha: "premultiply" });
+    held.bitmaps.push(img);
     const tex = texture();
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
     // Same frames as finalArgs: from round(start*fps) to round(end*fps)-1.
@@ -255,6 +282,7 @@ export async function browserExport(spec: Spec, textsReady: BrowserText[] | Prom
   const audio = new AudioBufferSource({ codec: "aac", bitrate: 160e3 });
   output.addVideoTrack(picture, { frameRate: fps });
   output.addAudioTrack(audio);
+  held.output = output;
   await output.start();
 
   let n = 0;
@@ -271,6 +299,8 @@ export async function browserExport(spec: Spec, textsReady: BrowserText[] | Prom
     gl.disable(gl.BLEND);
     gl.viewport(0, 0, W, H);
     gl.uniform1i(u("mode"), 0);
+    // A lost GPU context draws nothing: stop rather than encode black frames.
+    if (gl.isContextLost()) throw new Error("webgl context lost");
     await picture.add(n / fps, 1 / fps);
     n++;
     onProgress(0.03 + (n / frameCount) * 0.92);
@@ -288,6 +318,7 @@ export async function browserExport(spec: Spec, textsReady: BrowserText[] | Prom
     let t = inputs.get(k);
     if (!t) {
       const input = new Input({ source: new BlobSource(await blobOf(url)), formats: ALL_FORMATS });
+      held.inputs.push(input);
       const track = await input.getPrimaryVideoTrack();
       if (!track || !(await track.canDecode())) throw new Error("decode");
       // File time as ffmpeg counts it: from the picture's first frame (the sound's encoder delay doesn't count).
@@ -321,26 +352,25 @@ export async function browserExport(spec: Spec, textsReady: BrowserText[] | Prom
     const g = (look.warmth < 0 ? [0.81, 1.01, 1.52] : [1.7, 0.82, 0.21]).map((x) => 1 + (x - 1) * wa);
     gl.uniform3f(u("gains"), ...((look.warmth ? g : [1, 1, 1]) as [number, number, number]));
 
-    // The frames stepArgs picks: trim keeps frames from the first one at or after the cut (p0), fps then gives slot j
-    // the last frame before p0 + (j + 0.5) / fps, speed maps output frame k to a slot, and past the cut's end the last
-    // frame holds (tpad).
+    // The very frames stepArgs' ffmpeg chain picks (render/frames.mjs, checked against ffmpeg): the frame times from
+    // the key frame before the cut to a second past its end, in presentation order.
+    const packets = new EncodedPacketSink(track);
+    const from = (await packets.getKeyPacket(first + st.start!, { metadataOnly: true })) ?? (await packets.getFirstPacket({ metadataOnly: true }));
+    const pts: number[] = [];
+    if (from) {
+      for await (const p of packets.packets(from, undefined, { metadataOnly: true })) {
+        pts.push(p.timestamp - first);
+        if (p.timestamp - first > st.end! + 1) break;
+      }
+    }
+    pts.sort((a, b) => a - b);
+    const schedule = frameSchedule(pts, { start: st.start!, end: st.end!, frames: st.frames }, seg.speed, fps);
     const sink = new VideoSampleSink(track);
-    let p0 = st.start!;
-    for await (const s of sink.samples(first + st.start!)) {
-      const ts = s.timestamp;
-      s.close();
-      if (ts >= first + st.start! - 1e-6) { p0 = ts - first; break; }
-    }
-    const times: number[] = [], files: number[] = [];
-    for (let k = 0; k < st.frames; k++) {
-      // Measured against the server's output (2026-11-04): slot k at speed 1, slot floor(k * speed) + 1 otherwise.
-      const j = seg.speed === 1 ? k : Math.floor(k * seg.speed + 1e-9) + 1;
-      files.push(st.start! + j / fps);
-      times.push(first + Math.min(p0 + (j + 0.5) / fps, st.end!) - 1e-6);
-    }
+    const times = schedule.source.map((i) => (i < 0 ? -1 : first + pts[i]));
+    const files = schedule.slot.map((j) => st.start! + j / fps);
     let k = 0, last: VideoFrame | null = null;
     for await (const sample of sink.samplesAtTimestamps(times)) {
-      if (sample) {
+      if (sample && times[k] >= 0) {
         last?.close();
         last = sample.toVideoFrame();
         sample.close();
