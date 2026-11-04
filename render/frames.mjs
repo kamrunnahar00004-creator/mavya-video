@@ -46,3 +46,37 @@ export function frameSchedule(pts, step, speed, fps) {
   }
   return { source, slot };
 }
+
+/**
+ * Where ffmpeg's file time starts (it subtracts the input's start time): the earliest stream's start, where a sound's
+ * encoder priming (a little before 0, hidden by the file's edit list) counts as 0. Takes a mediabunny Input.
+ * @returns {Promise<number>}
+ */
+export async function mediaOrigin(input) {
+  const video = await input.getPrimaryVideoTrack();
+  const audio = await input.getPrimaryAudioTrack().catch(() => null);
+  const v = video ? await video.getFirstTimestamp() : Infinity;
+  const a = audio ? Math.max(0, await audio.getFirstTimestamp()) : Infinity;
+  return Math.min(v, a);
+}
+
+/**
+ * Presentation times (file time, ascending) of the source frames around a cut, from packet metadata: from the key
+ * frame before the cut, in decode order, until the second key frame past its end (B-frames shown inside the cut can
+ * come after a later frame in decode order, so stopping at the first late timestamp misses them). Takes a mediabunny
+ * EncodedPacketSink.
+ * @returns {Promise<number[]>}
+ */
+export async function frameTimes(packets, origin, start, end) {
+  const opts = { metadataOnly: true };
+  const from = (await packets.getKeyPacket(origin + start, opts)) ?? (await packets.getFirstPacket(opts));
+  const pts = [];
+  if (!from) return pts;
+  let keysAfter = 0;
+  for await (const p of packets.packets(from, undefined, opts)) {
+    const t = p.timestamp - origin;
+    if (p.type === "key" && t > end && ++keysAfter >= 2) break;
+    pts.push(t);
+  }
+  return pts.sort((x, y) => x - y);
+}

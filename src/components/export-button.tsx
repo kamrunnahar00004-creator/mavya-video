@@ -92,6 +92,8 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
       if(await browser.browserExportSupported(1080,1920)){
         const result=await exportInBrowser(snapshot,total,layers,textPng,browser).catch(error=>{console.warn("browser export",error);return null;});
         if(result==="started")return;
+        // Left the page (or stopped): no server export behind the user's back.
+        if(!alive.current||lifetime.current?.signal.aborted)return;
         setProgress(0);
       }
       const manifest:{id:string;mediaId:string;x:number;y:number}[]=new Array(layers.length);
@@ -146,9 +148,11 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
     local.current=URL.createObjectURL(blob);
     if(alive.current)setDone({src:local.current,seconds:Math.round(total*10)/10,at:new Date().toISOString()});
     // Each try has a deadline (at least 2 minutes, or 200 KB/s), so a stalled upload can't hang the button.
-    const limit=Math.max(120_000,blob.size/200);
+    // Every try fits inside the upload link's 15 minutes (13, with room to spare); then the job is ended instead.
+    const until=Date.now()+13*60_000;
     let put:Response|null=null;
-    for(let i=0;i<3&&!put?.ok&&!life.signal.aborted;i++)put=await fetch(reserved.upload,{method:"PUT",headers:{"content-type":"video/mp4"},body:blob,signal:AbortSignal.any([life.signal,AbortSignal.timeout(limit)])}).catch(()=>null);
+    for(let i=0;i<3&&!put?.ok&&!life.signal.aborted&&until-Date.now()>5_000;i++)put=await fetch(reserved.upload,{method:"PUT",headers:{"content-type":"video/mp4"},body:blob,signal:AbortSignal.any([life.signal,AbortSignal.timeout(until-Date.now())])}).catch(()=>null);
+    if(life.signal.aborted)return "started";
     if(!put?.ok){
       // The video is here to download; end the job so Export is free again at once. If the server keeps the job
       // (its file arrived after all, or the cancel didn't get through), follow it like any export.

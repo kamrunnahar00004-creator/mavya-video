@@ -36,6 +36,10 @@ async function main(){
   await api.advanceExport('owner','job');
   assert.equal(copies.length,0);assert.equal(objects['exports/job/upload.mp4'],undefined);assert.equal(record.state,'failed');assert.equal(append,0);
  }
+ // Already copied when a later step failed: a different upload since then can't fail the job or strand its file.
+ browserJob();objects={'media/out.mp4':{size:100,mime:'video/mp4',etag:'e1'},'exports/job/upload.mp4':{size:100,mime:'video/mp4',etag:'e9',bytes:new Uint8Array(12)}};
+ await api.advanceExport('owner','job');
+ assert.equal(copies.length,0);assert.equal(objects['exports/job/upload.mp4'],undefined);assert.equal(record.state,'done');assert.equal(append,1);
  // Nothing uploaded yet: the job waits.
  browserJob();objects={};await api.advanceExport('owner','job');assert.equal(record.state,'running');
  // Cancel under the lease: a file that arrived keeps the job; with nothing uploaded it fails at once.
@@ -44,6 +48,6 @@ async function main(){
  browserJob();objects={};
  assert.equal(await api.cancelBrowserExport('owner','other-run','job'),'pending');assert.equal(record.state,'running');
  assert.equal(await api.cancelBrowserExport('owner','run','job'),'cancelled');assert.equal(record.state,'failed');
- console.log('PASS: durable export recovers from output without worker/browser, owned registration, single append, bounded resumable PNG cleanup, terminal replay, worker size check, checked browser uploads and leased cancel');
+ console.log('PASS: durable export recovers from output without worker/browser, owned registration, single append, bounded resumable PNG cleanup, terminal replay, worker size check, checked browser uploads (copied file wins on retry) and leased cancel');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

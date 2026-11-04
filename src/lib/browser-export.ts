@@ -1,7 +1,7 @@
 "use client";
 import { ALL_FORMATS, AudioBufferSource, BlobSource, BufferTarget, CanvasSource, EncodedPacketSink, Input, Mp4OutputFormat, Output, VideoSampleSink, canEncodeAudio, canEncodeVideo, type InputVideoTrack } from "mediabunny";
 import { exposurePower, contrastGamma, plan, type Look, type Spec } from "../../render/render.mjs";
-import { frameSchedule } from "../../render/frames.mjs";
+import { frameSchedule, frameTimes, mediaOrigin } from "../../render/frames.mjs";
 
 /**
  * Export in the user's browser (founder 2026-11-04: CapCut exports in seconds, so ours must not take minutes). The
@@ -247,7 +247,7 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
       const start = Math.round(s.start * RATE), len = src[0].length;
       const rest = (len - start) / RATE;
       // Like the preview's soundAt: loop back to the start point, at least every 0.5 s (silence past the file's end).
-      const loop = rest > 0.05 && rest < s.dur - 0.05 ? Math.round(Math.max(0.5, rest) * RATE) : 0;
+      const loop = rest > 0 && rest < s.dur - 0.05 ? Math.round(Math.max(0.5, rest) * RATE) : 0;
       const at = Math.round(s.at * RATE), n = Math.round(s.dur * RATE);
       for (let c = 0; c < 2; c++) {
         for (let i = 0; i < n && at + i < total; i++) {
@@ -321,8 +321,8 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
       held.inputs.push(input);
       const track = await input.getPrimaryVideoTrack();
       if (!track || !(await track.canDecode())) throw new Error("decode");
-      // File time as ffmpeg counts it: from the picture's first frame (the sound's encoder delay doesn't count).
-      t = { track, first: await track.getFirstTimestamp() };
+      // File time as ffmpeg counts it (render/frames.mjs mediaOrigin).
+      t = { track, first: await mediaOrigin(input) };
       inputs.set(k, t);
     }
     return t;
@@ -352,18 +352,8 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
     const g = (look.warmth < 0 ? [0.81, 1.01, 1.52] : [1.7, 0.82, 0.21]).map((x) => 1 + (x - 1) * wa);
     gl.uniform3f(u("gains"), ...((look.warmth ? g : [1, 1, 1]) as [number, number, number]));
 
-    // The very frames stepArgs' ffmpeg chain picks (render/frames.mjs, checked against ffmpeg): the frame times from
-    // the key frame before the cut to a second past its end, in presentation order.
-    const packets = new EncodedPacketSink(track);
-    const from = (await packets.getKeyPacket(first + st.start!, { metadataOnly: true })) ?? (await packets.getFirstPacket({ metadataOnly: true }));
-    const pts: number[] = [];
-    if (from) {
-      for await (const p of packets.packets(from, undefined, { metadataOnly: true })) {
-        pts.push(p.timestamp - first);
-        if (p.timestamp - first > st.end! + 1) break;
-      }
-    }
-    pts.sort((a, b) => a - b);
+    // The very frames stepArgs' ffmpeg chain picks (render/frames.mjs, checked against ffmpeg).
+    const pts = await frameTimes(new EncodedPacketSink(track), first, st.start!, st.end!);
     const schedule = frameSchedule(pts, { start: st.start!, end: st.end!, frames: st.frames }, seg.speed, fps);
     const sink = new VideoSampleSink(track);
     const times = schedule.source.map((i) => (i < 0 ? -1 : first + pts[i]));

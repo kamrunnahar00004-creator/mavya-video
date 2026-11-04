@@ -208,7 +208,7 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
 
         {isForgot ? (
           sent ? (
-            <p role="status" className="mt-6 rounded-lg bg-raised px-4 py-3 text-[14px] leading-relaxed text-text">
+            <p role="status" data-clarity-mask="true" className="mt-6 rounded-lg bg-raised px-4 py-3 text-[14px] leading-relaxed text-text">
               If <b>{email.trim()}</b> has an account, a reset link is on its way. Check your inbox.
             </p>
           ) : (

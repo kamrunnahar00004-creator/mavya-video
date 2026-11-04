@@ -11,7 +11,7 @@ import { ffmpegPath } from "@/lib/server/ffmpeg";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { deleteObject, putObject, signedGet } from "@/lib/server/r2";
 import { finalArgs, plan, stepArgs, type Probe, type Spec } from "../../../render/render.mjs";
-import { MAX_FILE_BYTES, MAX_JOB_BYTES, validProbe } from "../../../render/limits.mjs";
+import { MAX_FILE_BYTES, MAX_JOB_BYTES, countOverlayPixels, validProbe } from "../../../render/limits.mjs";
 
 /**
  * The fast export lane (founder 2026-11-03: 1080x1920 in about a minute, no paid server). The very job the Render
@@ -56,23 +56,33 @@ function ffmpeg(args: string[], ms: number): Promise<string> {
   }));
 }
 
-/** Downloads one input, within the worker's per-file budget (render/limits.mjs). */
-async function download(url: string, file: string, budget?: { bytes: number }) {
+/** Bytes a phase may download in all; every chunk is charged as it arrives, so parallel downloads share it. */
+type Budget = { bytes: number; max: number };
+const budgetOf = (max: number): Budget => ({ bytes: 0, max });
+
+/** Downloads one input within the worker's per-file limit (render/limits.mjs) and its phase's shared budget. */
+async function download(url: string, file: string, budget: Budget, ms = 120_000) {
   if (!/^https:\/\//.test(url)) throw new Error("bad input link");
-  const res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
+  const res = await fetch(url, { signal: AbortSignal.timeout(Math.max(1000, ms)) });
   if (!res.ok || !res.body) throw new Error(`input download failed (${res.status})`);
   if (Number(res.headers.get("content-length") ?? 0) > MAX_FILE_BYTES) throw new Error("input too large");
   let bytes = 0;
   const count = new TransformStream<Uint8Array, Uint8Array>({
     transform(chunk, out) {
       bytes += chunk.byteLength;
-      if (bytes > MAX_FILE_BYTES || (budget && budget.bytes + bytes > MAX_JOB_BYTES)) throw new Error("input too large");
+      budget.bytes += chunk.byteLength;
+      if (bytes > MAX_FILE_BYTES || budget.bytes > budget.max) throw new Error("input too large");
       out.enqueue(chunk);
     },
   });
   await pipeline(Readable.fromWeb(res.body.pipeThrough(count) as never), createWriteStream(file));
-  if (budget) budget.bytes += bytes;
   return file;
+}
+
+/** A PNG's size from its header (text images: the worker's decoded-pixel budget). */
+async function pngSize(file: string): Promise<[number, number]> {
+  const head = (await readFile(file)).subarray(16, 24);
+  return [head.readUInt32BE(0), head.readUInt32BE(4)];
 }
 
 /** Like the worker's probe: sound or not, and the length (a short song loops). */
@@ -97,13 +107,14 @@ export async function renderStep(job: string, i: number, until = Date.now() + 28
   const dir = await mkdtemp(path.join(tmpdir(), "mavya-step-"));
   try {
     const t0 = Date.now();
-    const src = step.kind === "piece" ? await probe(await download(p.spec.segments[step.si!].url, path.join(dir, "in"))) : null;
+    const src = step.kind === "piece" ? await probe(await download(p.spec.segments[step.si!].url, path.join(dir, "in"), budgetOf(MAX_FILE_BYTES), left())) : null;
+    if (left() <= 0) throw new Error("export step too late");
     const t1 = Date.now();
     const out = path.join(dir, "out.mkv");
     await ffmpeg(stepArgs(p.spec, step, src, out), Math.max(1000, Math.min(270_000, left())));
     const t2 = Date.now();
     // Past the coordinator's deadline nobody will join this piece: never leave it behind in storage.
-    if (left() <= 0 || !(await payloadOf(job))) throw new Error("export step too late");
+    if (left() <= 0 || !(await payloadOf(job)) || left() <= 0) throw new Error("export step too late");
     await putObject(stepKey(job, i), await readFile(out), "video/x-matroska");
     return { download: t1 - t0, render: t2 - t1, upload: Date.now() - t2 };
   } finally {
@@ -119,6 +130,8 @@ export async function runFastExport(job: string): Promise<void> {
   const dir = await mkdtemp(path.join(tmpdir(), "mavya-final-"));
   // How long each phase took, kept on the job (payload.fastTiming) to find what is slow.
   const t0 = Date.now(), timing: Record<string, number> = {};
+  // Time left in this function (300 s, a margin kept for cleanup): every phase's timer comes out of it.
+  const end = () => t0 + 285_000 - Date.now();
   const mark = (name: string) => { timing[name] = Math.round((Date.now() - t0) / 100) / 10; };
   try {
     // At most FAST_CONCURRENCY pieces at once, all inside one deadline that leaves time for the join.
@@ -135,18 +148,22 @@ export async function runFastExport(job: string): Promise<void> {
     mark("pieces");
     (timing as Record<string, unknown>).steps = done;
     if (!done.every(Boolean)) throw new Error("a piece failed");
-    const files = await Promise.all(steps.map(async (_, i) => download(await signedGet(stepKey(job, i), 900), path.join(dir, `s${i}.mkv`))));
-    const budget = { bytes: 0 };
-    const overlays = await Promise.all(p.spec.overlays.map((o: { url: string }, i: number) => download(o.url, path.join(dir, `t${i}.png`), budget)));
-    const sounds = await Promise.all(p.spec.sounds.map(async (s: { url: string }, i: number) => probe(await download(s.url, path.join(dir, `a${i}`), budget))));
+    // The join's own budgets: inputs as the worker allows, the joined pieces (made here, near-lossless) twice that.
+    const pieces = budgetOf(2 * MAX_JOB_BYTES), inputs = budgetOf(MAX_JOB_BYTES), pixels = {};
+    const files = await Promise.all(steps.map(async (_, i) => download(await signedGet(stepKey(job, i), 900), path.join(dir, `s${i}.mkv`), pieces, end() - 60_000)));
+    const overlays = await Promise.all(p.spec.overlays.map((o: { url: string }, i: number) => download(o.url, path.join(dir, `t${i}.png`), inputs, end() - 60_000)));
+    for (const file of overlays) countOverlayPixels(pixels, ...(await pngSize(file)));
+    const sounds = await Promise.all(p.spec.sounds.map(async (s: { url: string }, i: number) => probe(await download(s.url, path.join(dir, `a${i}`), inputs, end() - 60_000))));
     mark("downloads");
     const list = path.join(dir, "list.txt");
     await writeFile(list, files.map((f) => `file '${f}'`).join("\n"));
     const out = path.join(dir, "out.mp4");
-    await ffmpeg(finalArgs(p.spec, list, { sounds, overlays }, out).filter((a, k, all) => a !== "-progress" && all[k - 1] !== "-progress"), 270_000);
+    await ffmpeg(finalArgs(p.spec, list, { sounds, overlays }, out).filter((a, k, all) => a !== "-progress" && all[k - 1] !== "-progress"), Math.max(1000, end() - 20_000));
     mark("join");
     const size = (await stat(out)).size;
-    const put = await fetch(p.output.url, { method: "PUT", headers: { "content-type": p.output.contentType, "content-length": String(size) }, body: await readFile(out), signal: AbortSignal.timeout(120_000) });
+    // The same output limit as the worker; and the upload must finish inside this function's time.
+    if (size > MAX_FILE_BYTES) throw new Error("output too large");
+    const put = await fetch(p.output.url, { method: "PUT", headers: { "content-type": p.output.contentType, "content-length": String(size) }, body: await readFile(out), signal: AbortSignal.timeout(Math.max(1000, end())) });
     if (!put.ok) throw new Error(`upload failed (${put.status})`);
     mark("upload");
   } catch (error) {

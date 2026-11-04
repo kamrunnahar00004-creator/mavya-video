@@ -23,7 +23,10 @@ export async function exportJob(who: string, run: string, id?: string) {
 async function promoteUpload(j: ExportJob, upload: { key: string; size: number }): Promise<boolean> {
  const info = await objectInfo(upload.key);
  if (!info) return true;
- const start = info.size === upload.size && info.mime === "video/mp4" ? await objectStart(upload.key, 12) : null;
+ // Already copied (a later step failed and this is a retry): the job's file stands, whatever was uploaded since.
+ if (await objectInfo(`media/${j.media_id}`)) { await deleteObjectStrict(upload.key); return true; }
+ // The header read and the copy are both bound to the version checked here (a re-upload in between fails them).
+ const start = info.size === upload.size && info.mime === "video/mp4" ? await objectStart(upload.key, 12, info.etag).catch(() => null) : null;
  const mp4 = !!start && start.length === 12 && String.fromCharCode(...start.slice(4, 8)) === "ftyp";
  if (mp4 && !(await objectInfo(`media/${j.media_id}`))) await copyObject(upload.key, `media/${j.media_id}`, info.etag);
  await deleteObjectStrict(upload.key);

@@ -86,7 +86,11 @@ function look(a, p0, W, H, fps) {
     const c = `'if(lt(val,${p}),${p}*pow(val/${p},${g}),255-${q}*pow(max(255-val,0)/${q},${g}))'`;
     out.push(`lutrgb=r=${c}:g=${c}:b=${c}`);
   }
-  if (v.saturation) out.push(`eq=saturation=${r(1 + v.saturation / 50)}`);
+  if (v.saturation) {
+    // CSS saturate(), the preview's own matrix (and the browser export's), in RGB: eq's YUV saturation differed.
+    const s = 1 + v.saturation / 50, k = (w, own) => r(own ? w + (1 - w) * s : w - w * s);
+    out.push(`colorchannelmixer=rr=${k(0.213, 1)}:rg=${k(0.715)}:rb=${k(0.072)}:gr=${k(0.213)}:gg=${k(0.715, 1)}:gb=${k(0.072)}:br=${k(0.213)}:bg=${k(0.715)}:bb=${k(0.072, 1)}`);
+  }
   if (v.warmth) {
     const a = Math.abs(v.warmth) / 50;
     const [cr, cg, cb] = (v.warmth < 0 ? [0.81, 1.01, 1.52] : [1.7, 0.82, 0.21]).map((x) => r(1 + (x - 1) * a));
@@ -217,7 +221,7 @@ export function finalArgs(spec, list, local, out) {
     // A sound shorter than its bar loops back to its start point, like the preview's soundAt: at least every 0.5 s,
     // silent past the file's end (a short tail used to play once and stop here while the preview looped it).
     const rest = src.duration ? src.duration - s.start : null;
-    if (rest && rest > 0.05 && rest < s.dur - 0.05) {
+    if (rest !== null && rest > 0 && rest < s.dur - 0.05) {
       const span = Math.max(0.5, rest);
       f.push(`apad=whole_dur=${r(span)}`, `atrim=duration=${r(span)}`, `aloop=loop=-1:size=${Math.round(span * 48000)}`);
     }
