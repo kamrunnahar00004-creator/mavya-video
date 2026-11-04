@@ -79,10 +79,15 @@ async function download(url: string, file: string, budget: Budget, ms = 120_000)
   return file;
 }
 
-/** A PNG's size from its header (text images: the worker's decoded-pixel budget). */
+/**
+ * A text image's size from its PNG header (the worker's decoded-pixel budget). Anything that isn't a PNG is refused:
+ * ffmpeg decodes by content, so a JPEG named .png would be counted wrong (2026-11-04 Codex: 1x1 counted, 512x512 drawn).
+ */
 async function pngSize(file: string): Promise<[number, number]> {
-  const head = (await readFile(file)).subarray(16, 24);
-  return [head.readUInt32BE(0), head.readUInt32BE(4)];
+  const head = (await readFile(file)).subarray(0, 24);
+  const png = head.length === 24 && head.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) && head.toString("latin1", 12, 16) === "IHDR";
+  if (!png) throw new Error("text image is not a PNG");
+  return [head.readUInt32BE(16), head.readUInt32BE(20)];
 }
 
 /** Like the worker's probe: sound or not, and the length (a short song loops). */
