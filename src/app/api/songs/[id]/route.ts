@@ -2,6 +2,20 @@ import { boundedFetch } from "@/lib/server/bounded-fetch";
 import { saveMedia } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 
+/** Plays a song's 30-second clip: Deezer clip links expire about 15 minutes after the catalog hands them out, longer
+ *  than the song list stays cached, so each play asks Deezer for a fresh link and redirects to it. */
+export async function GET(_request: Request, ctx: RouteContext<"/api/songs/[id]">) {
+  const { id } = await ctx.params;
+  if (!/^\d{1,15}$/.test(id)) return new Response(null, { status: 404 });
+  try {
+    const track = (await (await boundedFetch(`https://api.deezer.com/track/${id}`, { headers: { "Accept-Language": "en" }, cache: "no-store" })).json()) as { preview?: string };
+    if (!track.preview?.startsWith("https://")) return new Response(null, { status: 404 });
+    return new Response(null, { status: 302, headers: { Location: track.preview, "Cache-Control": "private, max-age=300" } });
+  } catch {
+    return new Response(null, { status: 502 });
+  }
+}
+
 /** Saves a song's 30-second clip into the user's files (Deezer clip links expire after a few hours), so the run keeps playing it. */
 export async function POST(_request: Request, ctx: RouteContext<"/api/songs/[id]">) {
   const { id } = await ctx.params;

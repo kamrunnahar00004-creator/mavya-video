@@ -55,7 +55,7 @@ export function SongBrowser({ busyId, onClose, onUse }: { busyId: number | null;
     stop();
     if (same) return;
     claimPlayback(who);
-    const a = new Audio(song.preview);
+    const a = new Audio(`/api/songs/${song.id}`);
     a.onended = () => { if (audio.current === a) stop(); };
     audio.current = a;
     void a.play().catch(() => { if (audio.current === a) stop(); });
