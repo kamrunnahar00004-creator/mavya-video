@@ -13,16 +13,41 @@ import { frameSchedule, frameTimes, mediaOrigin } from "../../render/frames.mjs"
 export type BrowserText = { png: string; x: number; y: number; start: number; end: number };
 
 /**
- * 10 Mbps, the usual 1080p30 export (CapCut's recommended, Premiere's high preset). Asked as variable, a hardware
- * encoder came in near half (5.4 Mbps measured, founder's Chrome 2026-11-05), so constant first; where the encoder
- * can't do constant, variable with headroom.
+ * Picture quality (founder 2026-11-05: an uploaded iPhone clip must come out looking like the original).
+ *
+ * Measured in Chrome 156 on Windows through this very file (docs/CODEX_QUALITY_REPORT_2026-11-05_UPLOADED_CLIPS.md):
+ * fed canvas (RGBX) frames, the hardware H.264 encoder ignores the bitrate. Asked for 10 Mbps it gave 6.7, asked for 30
+ * it gave 7.4, so iPhone clips scored VMAF 92 against the original. Asked for a fixed quality instead (quantizer
+ * mode, QP 20) it scored 98.6 to 99.7 (VMAF 95 and up: no visible difference), at 23 to 39 Mbps. Chrome's software
+ * encoder (OpenH264) rejects quantizer mode but honours a bitrate: 20 Mbps scored 97.1 to 98.1.
+ *
+ * So: the hardware encoder at QP 20; where quantizer mode is unsupported or fails, the software encoder at 22 Mbps;
+ * failing both, the hardware encoder at a bitrate (the old path, the lowest quality). QP stays 20 for the whole video:
+ * a file too large to save in My files can still be downloaded (Codex 2026-11-05: no untested quality loss for size).
  */
-const STEADY = new Quality({ bitrate: 10e6, bitrateMode: "constant" });
-const LOOSE = new Quality({ bitrate: 14e6, bitrateMode: "variable" });
-async function pictureQuality(width: number, height: number): Promise<Quality | null> {
-  if (await canEncodeVideo("avc", { width, height, quality: STEADY })) return STEADY;
-  return (await canEncodeVideo("avc", { width, height, quality: LOOSE })) ? LOOSE : null;
+export const QP = 20;
+const SOFT_BITRATE = 22e6;
+/** The level the measured QP runs used: 5.1 allows the 40+ Mbps a sharp 1080x1920 frame can take. */
+const LEVEL_51 = "avc1.640033";
+/** One encoder setting to try, with a short label kept on the export job (which one a user's browser picked). */
+type Picture = { label: string; quality: Quality; fullCodecString?: string; hardwareAcceleration?: "prefer-software" };
+const PICTURES: Picture[] = [
+  { label: `hw-qp${QP}`, quality: new Quality({ quantizer: QP }), fullCodecString: LEVEL_51 },
+  { label: `hw-qp${QP}-auto`, quality: new Quality({ quantizer: QP }) },
+  { label: `sw-${SOFT_BITRATE / 1e6}m`, quality: new Quality({ bitrate: SOFT_BITRATE, bitrateMode: "variable" }), hardwareAcceleration: "prefer-software" },
+  { label: "hw-10m", quality: new Quality({ bitrate: 10e6, bitrateMode: "constant" }) },
+  { label: "hw-14m-vbr", quality: new Quality({ bitrate: 14e6, bitrateMode: "variable" }) },
+];
+/** Every setting this browser says it supports, best first (the exact configuration the export uses). */
+async function pictureSettings(width: number, height: number): Promise<Picture[]> {
+  const ok = await Promise.all(PICTURES.map(({ quality, fullCodecString, hardwareAcceleration }) =>
+    canEncodeVideo("avc", { width, height, quality, fullCodecString, hardwareAcceleration, latencyMode: "quality" }).catch(() => false)));
+  return PICTURES.filter((_, i) => ok[i]);
 }
+/** A source file could not be downloaded or read: another encoder setting would not help. */
+class SourceError extends Error {}
+/** The app build that made the export, kept with the encoder label (Vercel exposes the commit to the browser). */
+const BUILD = (process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ?? "local").slice(0, 7);
 const RATE = 48000;
 
 /** Chrome or Edge with a working H.264 + AAC encoder at the export size. */
@@ -33,7 +58,7 @@ export async function browserExportSupported(width: number, height: number): Pro
     if (typeof VideoEncoder === "undefined" || typeof VideoDecoder === "undefined" || typeof AudioEncoder === "undefined" || typeof OffscreenCanvas === "undefined") return false;
     if (!new OffscreenCanvas(1, 1).getContext("webgl2")) return false;
     const [video, audio] = await Promise.all([
-      pictureQuality(width, height).then(Boolean),
+      pictureSettings(width, height).then((list) => list.length > 0),
       canEncodeAudio("aac", { numberOfChannels: 2, sampleRate: RATE, bitrate: 160e3 }),
     ]);
     return video && audio;
@@ -193,41 +218,52 @@ const keyOf = (url: string) => url.split("?")[0];
 /** What one export holds open, released however it ends. */
 type Held = { output?: Output; inputs: Input[]; gl?: WebGL2RenderingContext; bitmaps: ImageBitmap[] };
 
-/** Renders the spec to an MP4 in the browser. onProgress gets 0..1. Any failure throws (the server export takes over). */
-export async function browserExport(spec: Spec, textsReady: BrowserText[] | Promise<BrowserText[]>, onProgress: (p: number) => void, signal?: AbortSignal): Promise<{ video: Blob; demo: Blob | null }> {
-  const held: Held = { inputs: [], bitmaps: [] };
-  try {
-    return await render(spec, textsReady, onProgress, held, signal);
-  } catch (error) {
-    if (held.output && held.output.state !== "finalized") await held.output.cancel().catch(() => undefined);
-    throw error;
-  } finally {
-    for (const input of held.inputs) input.dispose();
-    for (const bitmap of held.bitmaps) bitmap.close();
-    held.gl?.getExtension("WEBGL_lose_context")?.loseContext();
-  }
-}
-
-async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserText[]>, onProgress: (p: number) => void, held: Held, signal?: AbortSignal): Promise<{ video: Blob; demo: Blob | null }> {
-  const { width: W, height: H, fps } = spec;
-  const steps = plan(spec);
-  const frameCount = Math.max(1, Math.round(spec.total * fps));
-  // Where the demo starts (render.mjs demoAt): a key frame there lets its part be copied out as its own clip.
-  const at = demoAt(spec), demoFrame = at === null ? -1 : Math.round(at * fps);
-
+/**
+ * Renders the spec to an MP4 in the browser. onProgress gets 0..1. Each supported encoder setting is tried in turn
+ * while the encoder itself fails (configure, encode or flush); the files are downloaded once for all tries. A source
+ * that can't be downloaded or read, cancellation, or every setting failing throws.
+ */
+export async function browserExport(spec: Spec, textsReady: BrowserText[] | Promise<BrowserText[]>, onProgress: (p: number) => void, signal?: AbortSignal): Promise<{ video: Blob; demo: Blob | null; encoder: string }> {
+  const settings = await pictureSettings(spec.width, spec.height);
+  if (!settings.length) throw new Error("encoder");
   // Download every file once, all at once; the picture starts as soon as the first clip is in.
   const blobs = new Map<string, Promise<Blob>>();
   for (const s of [...spec.segments, ...spec.sounds]) {
     const k = keyOf(s.url);
     if (blobs.has(k)) continue;
     const blob = fetch(s.url, { signal, cache: "no-store" }).then((res) => {
-      if (!res.ok) throw new Error(`fetch ${res.status}`);
+      if (!res.ok) throw new SourceError(`fetch ${res.status}`);
       return res.blob();
-    });
+    }, (error) => { throw signal?.aborted ? error : new SourceError(String(error)); });
     blob.catch(() => undefined);
     blobs.set(k, blob);
   }
   const blobOf = (url: string) => blobs.get(keyOf(url))!;
+  let last: unknown = null;
+  for (const setting of settings) {
+    const held: Held = { inputs: [], bitmaps: [] };
+    try {
+      return await render(spec, textsReady, onProgress, held, setting, blobOf, signal);
+    } catch (error) {
+      if (held.output && held.output.state !== "finalized") await held.output.cancel().catch(() => undefined);
+      if (signal?.aborted || error instanceof SourceError) throw error;
+      console.warn("browser export:", setting.label, "failed", error);
+      last = error;
+    } finally {
+      for (const input of held.inputs) input.dispose();
+      for (const bitmap of held.bitmaps) bitmap.close();
+      held.gl?.getExtension("WEBGL_lose_context")?.loseContext();
+    }
+  }
+  throw last;
+}
+
+async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserText[]>, onProgress: (p: number) => void, held: Held, setting: Picture, blobOf: (url: string) => Promise<Blob>, signal?: AbortSignal): Promise<{ video: Blob; demo: Blob | null; encoder: string }> {
+  const { width: W, height: H, fps } = spec;
+  const steps = plan(spec);
+  const frameCount = Math.max(1, Math.round(spec.total * fps));
+  // Where the demo starts (render.mjs demoAt): a key frame there lets its part be copied out as its own clip.
+  const at = demoAt(spec), demoFrame = at === null ? -1 : Math.round(at * fps);
 
   // Sound: every piece and sound mixed like the server's final pass (summed, no normalizing).
   const sounds = new Map<string, Promise<Float32Array[] | null>>();
@@ -292,9 +328,11 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
   }));
 
   const output = new Output({ format: new Mp4OutputFormat({ fastStart: "in-memory" }), target: new BufferTarget() });
-  const quality = await pictureQuality(W, H);
-  if (!quality) throw new Error("encoder");
-  const picture = new CanvasSource(canvas, { codec: "avc", quality, keyFrameInterval: 2 });
+  // QP mode: mediabunny puts the quantizer on every frame (the demo key frame below keeps it).
+  const picture = new CanvasSource(canvas, {
+    codec: "avc", quality: setting.quality, keyFrameInterval: 2, latencyMode: "quality",
+    fullCodecString: setting.fullCodecString, hardwareAcceleration: setting.hardwareAcceleration,
+  });
   const audio = new AudioBufferSource({ codec: "aac", bitrate: 160e3 });
   output.addVideoTrack(picture, { frameRate: fps });
   output.addAudioTrack(audio);
@@ -336,7 +374,7 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
       const input = new Input({ source: new BlobSource(await blobOf(url)), formats: ALL_FORMATS });
       held.inputs.push(input);
       const track = await input.getPrimaryVideoTrack();
-      if (!track || !(await track.canDecode())) throw new Error("decode");
+      if (!track || !(await track.canDecode())) throw new SourceError("decode");
       // File time as ffmpeg counts it (render/frames.mjs mediaOrigin).
       t = { track, first: await mediaOrigin(input) };
       inputs.set(k, t);
@@ -412,14 +450,20 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
   onProgress(1);
   const buffer = (output.target as BufferTarget).buffer;
   if (!buffer) throw new Error("empty");
-  const file = bt709(new Uint8Array(buffer));
+  // Chrome's hardware encoders write BT.709 into the H.264 stream; the software encoder writes sRGB, and the file's
+  // colour box must then say the same (Codex 2026-11-05), so it is relabelled only for the hardware ones.
+  const soft = setting.hardwareAcceleration === "prefer-software";
+  const raw = new Uint8Array(buffer), file = soft ? raw : bt709(raw);
   // The demo part: never a reason to fail the export.
-  const demo = at === null ? null : await cutDemo(file, at, fps).catch(() => null);
-  return { video: new Blob([file], { type: "video/mp4" }), demo };
+  const demo = at === null ? null : await cutDemo(file, at, fps, !soft).catch(() => null);
+  const mbps = (file.length * 8) / Math.max(0.1, spec.total) / 1e6;
+  // Whole-file rate (picture, sound and container).
+  const encoder = `${setting.label} ${mbps.toFixed(1)}mbps-file ${BUILD}`;
+  return { video: new Blob([file], { type: "video/mp4" }), demo, encoder };
 }
 
 /** The demo part of the finished video (from its key frame at `at`), picture only, packets copied as they are. */
-async function cutDemo(file: Uint8Array<ArrayBuffer>, at: number, fps: number): Promise<Blob | null> {
+async function cutDemo(file: Uint8Array<ArrayBuffer>, at: number, fps: number, relabel: boolean): Promise<Blob | null> {
   const input = new Input({ source: new BufferSource(file.buffer), formats: ALL_FORMATS });
   try {
     const track = await input.getPrimaryVideoTrack();
@@ -440,7 +484,7 @@ async function cutDemo(file: Uint8Array<ArrayBuffer>, at: number, fps: number): 
     source.close();
     await output.finalize();
     const out = (output.target as BufferTarget).buffer;
-    return out ? new Blob([bt709(new Uint8Array(out))], { type: "video/mp4" }) : null;
+    return out ? new Blob([relabel ? bt709(new Uint8Array(out)) : new Uint8Array(out)], { type: "video/mp4" }) : null;
   } finally {
     input.dispose();
   }

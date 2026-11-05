@@ -44,7 +44,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   if (!cloud() || !render) return Response.json({ error: "Export is not connected yet." }, { status: 503 });
   const run = await getRun(id, who);
   if (!run) return Response.json({ error: "Not found" }, { status: 404 });
-  const body = await request.json().catch(()=>null) as {snapshot?:unknown;mode?:unknown;job?:unknown;size?:unknown;demoSize?:unknown;texts?:{id?:unknown;mediaId?:unknown;x?:unknown;y?:unknown}[]} | null;
+  const body = await request.json().catch(()=>null) as {snapshot?:unknown;mode?:unknown;job?:unknown;size?:unknown;demoSize?:unknown;encoder?:unknown;texts?:{id?:unknown;mediaId?:unknown;x?:unknown;y?:unknown}[]} | null;
   if (body?.mode === "cancel") {
     // A browser export whose upload failed: end its job now, so Export works again at once (instead of after the
     // 15 minute wait in advanceExport). The browser still has the video.
@@ -130,7 +130,10 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   // The demo part (after the hook) is saved as its own clip too (My files, Demos): its own file id.
   const spec={width:W,height:H,fps:FPS,total,segments,sounds,overlays};
   const at=demoAt(spec), demoMedia=at!==null?newUpload("video/mp4").mediaId:null;
-  const meta={who,runId:id,mediaId,seconds:Math.round(total*10)/10,...(demoMedia?{demoMediaId:demoMedia,demoSeconds:Math.round((total-at!)*10)/10}:{})};
+  // Browser export: which picture setting the user's browser used and the rate it reached (browser-export.ts), to check
+  // production files (Codex 2026-11-05).
+  const encoder=mode==="local"&&typeof body?.encoder==="string"&&/^[\w .-]{1,80}$/.test(body.encoder)?body.encoder:null;
+  const meta={who,runId:id,mediaId,seconds:Math.round(total*10)/10,...(encoder?{encoder}:{}),...(demoMedia?{demoMediaId:demoMedia,demoSeconds:Math.round((total-at!)*10)/10}:{})};
   const demoSize=typeof body?.demoSize==="number"&&Number.isInteger(body.demoSize)&&body.demoSize>0&&body.demoSize<=300*1024*1024?body.demoSize:null;
   const payload={id:job,spec,output:{url:await mediaUploadLink(mediaId,"video/mp4",LINK_SECONDS),contentType:"video/mp4"},meta,
     ...(demoMedia&&mode!=="local"?{demo:{url:await mediaUploadLink(demoMedia,"video/mp4",LINK_SECONDS),contentType:"video/mp4"}}:{}),

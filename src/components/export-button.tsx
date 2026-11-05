@@ -86,15 +86,16 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
       if(bounds)throw Error(bounds);
       const {textPng}=await import("@/lib/text-png");
       const layers=exportLayers(snapshot);
-      // Browser export first (Chrome and Edge): seconds instead of minutes. Anything it can't do falls back to the
-      // server export below, which renders the same job.
+      // Browser export (Chrome and Edge): seconds instead of minutes, and the best picture (browser-export.ts). Once it
+      // has started, a failure ends here with a message: it is never rendered again on the server (founder
+      // 2026-11-05: exports run in the user's browser). Only browsers without it (Safari, Firefox) use the server.
       const browser=await import("@/lib/browser-export");
       if(await browser.browserExportSupported(1080,1920)){
         const result=await exportInBrowser(snapshot,total,layers,textPng,browser).catch(error=>{console.warn("browser export",error);return null;});
         if(result==="started")return;
-        // Left the page (or stopped): no server export behind the user's back.
-        if(!alive.current||lifetime.current?.signal.aborted)return;
-        setProgress(0);
+        blocked.current=false;
+        if(alive.current&&!lifetime.current?.signal.aborted){setProgress(null);onToast("Couldn't export in this browser. Check your connection and try again.");}
+        return;
       }
       const manifest:{id:string;mediaId:string;x:number;y:number}[]=new Array(layers.length);
       // Draw one at a time (no 200 simultaneous full-resolution canvases); upload up to 4 at once meanwhile.
@@ -123,7 +124,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
     lifetime.current?.abort();
     const life=new AbortController();
     lifetime.current=life;
-    const post=async(mode:string,extra?:{job?:string;size?:number;demoSize?:number})=>{
+    const post=async(mode:string,extra?:{job?:string;size?:number;demoSize?:number;encoder?:string})=>{
       const sent=await fetch(`/api/runs/${run.id}/export`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({snapshot:snapshot.updatedAt,mode,...extra}),signal:AbortSignal.timeout(60_000)});
       const reply=await sent.json().catch(()=>null);
       if(!sent.ok)throw Error(reply?.error??"Couldn't start the export. Try again.");
@@ -143,11 +144,15 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
     texts.catch(()=>undefined);
     const made=await browser.browserExport(sources.spec,texts,p=>{if(alive.current)setProgress(previous=>Math.max(previous??0,Math.min(0.92,p*0.92)));},life.signal);
     const blob=made.video;
-    const reserved=await post("local",{size:blob.size,...(made.demo?{demoSize:made.demo.size}:{})});
-    if(!reserved?.job||!reserved.upload)throw Error("no job");
+    // The finished video can be downloaded at once, whatever happens to the cloud copy below: a failed reservation
+    // or a file too large to save never throws it away or renders it again on the server (Codex 2026-11-05).
     if(local.current)URL.revokeObjectURL(local.current);
     local.current=URL.createObjectURL(blob);
     if(alive.current)setDone({src:local.current,seconds:Math.round(total*10)/10,at:new Date().toISOString()});
+    const unsaved=(message:string)=>{blocked.current=false;if(alive.current){setProgress(null);onToast(message);}return "started" as const;};
+    if(blob.size>300*1024*1024||(made.demo?.size??0)>300*1024*1024)return unsaved("This video is too large to save in My files. Download it now.");
+    const reserved=await post("local",{size:blob.size,encoder:made.encoder,...(made.demo?{demoSize:made.demo.size}:{})}).catch(()=>null);
+    if(!reserved?.job||!reserved.upload)return unsaved("Couldn't save the video to My files. Download it now.");
     // Each try has a deadline (at least 2 minutes, or 200 KB/s), so a stalled upload can't hang the button.
     // Every try fits inside the upload link's 15 minutes (13, with room to spare); then the job is ended instead.
     const until=Date.now()+13*60_000;
