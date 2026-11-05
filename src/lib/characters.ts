@@ -5,7 +5,7 @@
  * Order mixes looks and backgrounds so the grid never opens with one type.
  */
 export const CHARACTERS = [
-  "olivia", "zuri", "mei", "jake", "ella", "diya", "sienna", "simone", "yuna", "liam",
+  "olivia", "zuri", "mei", "jake", "summer", "ella", "diya", "sienna", "simone", "yuna", "liam",
   "ava", "amara", "isla", "hana", "marcus", "mia", "riya", "jada", "freya", "minho",
   "ruby", "priya", "sora", "nora", "imani", "noah", "harper", "tiana", "mina", "emma",
   "kenji", "bella", "nala", "isha", "maddie", "aiko", "andre", "eva", "jordan", "clara",
