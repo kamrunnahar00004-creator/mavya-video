@@ -13,10 +13,14 @@ import type { Run } from "@/lib/types";
 
 type Done = { src: string; seconds: number; at: string };
 
+/** The export route refused, with a message meant for the user. */
+class ServerSaid extends Error {}
+
 /**
  * Export in the run header: draws the texts (text-png.ts), starts the render (POST /api/runs/[id]/export), shows
  * the progress on the button, then opens the finished video with Download. The video is also kept in My files.
  */
+
 export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { run: Run; beforeExport: () => Promise<void>; ready: boolean; onToast: (msg: string) => void; onDone: (x: Done) => void }) {
   const [progress, setProgress] = useState<number | null>(null);
   const [done, setDone] = useState<Done | null>(null);
@@ -86,15 +90,17 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
       if(bounds)throw Error(bounds);
       const {textPng}=await import("@/lib/text-png");
       const layers=exportLayers(snapshot);
-      // Browser export (Chrome and Edge): seconds instead of minutes, and the best picture (browser-export.ts). Once it
-      // has started, a failure ends here with a message: it is never rendered again on the server (founder
-      // 2026-11-05: exports run in the user's browser). Only browsers without it (Safari, Firefox) use the server.
+      // Browser export (Chrome, Edge, Firefox): seconds instead of minutes, and the best picture (browser-export.ts).
+      // Once it has started, a failure ends here with a message: it is never rendered again on the server (founder
+      // 2026-11-05: exports run in the user's browser). Browsers without it (Safari for now) use the server.
       const browser=await import("@/lib/browser-export");
       if(await browser.browserExportSupported(1080,1920)){
-        const result=await exportInBrowser(snapshot,total,layers,textPng,browser).catch(error=>{console.warn("browser export",error);return null;});
+        let said:string|null=null;
+        const result=await exportInBrowser(snapshot,total,layers,textPng,browser).catch(error=>{console.warn("browser export",error);if(error instanceof ServerSaid)said=error.message;return null;});
         if(result==="started")return;
         blocked.current=false;
-        if(alive.current&&!lifetime.current?.signal.aborted){setProgress(null);onToast("Couldn't export in this browser. Check your connection and try again.");}
+        // The server's own words when it refused (for example, clips still being prepared), else a general message.
+        if(alive.current&&!lifetime.current?.signal.aborted){setProgress(null);onToast(said??"Couldn't export in this browser. Check your connection and try again.");}
         return;
       }
       const manifest:{id:string;mediaId:string;x:number;y:number}[]=new Array(layers.length);
@@ -127,7 +133,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
     const post=async(mode:string,extra?:{job?:string;size?:number;demoSize?:number;encoder?:string})=>{
       const sent=await fetch(`/api/runs/${run.id}/export`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({snapshot:snapshot.updatedAt,mode,...extra}),signal:AbortSignal.timeout(60_000)});
       const reply=await sent.json().catch(()=>null);
-      if(!sent.ok)throw Error(reply?.error??"Couldn't start the export. Try again.");
+      if(!sent.ok)throw new ServerSaid(reply?.error??"Couldn't start the export. Try again.");
       return reply;
     };
     const sources=await post("sources");

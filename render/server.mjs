@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID, timingSafeEqual, createHash } from "node:crypto";
 import ffmpegPath from "ffmpeg-static";
-import { demoArgs, demoAt, finalArgs, plan, previewArgs, stepArgs } from "./render.mjs";
+import { demoArgs, demoAt, finalArgs, isHdr, plan, previewRuns, stepArgs } from "./render.mjs";
 
 const SECRET = process.env.RENDER_SECRET ?? "";
 const PORT = Number(process.env.PORT ?? 3200);
@@ -72,7 +72,7 @@ async function probe(file, signal) {
   const dim=/Video:.*?(\d{2,5})x(\d{2,5})/.exec(out);
   const duration=d?+d[1]*3600 + +d[2]*60 + +d[3]:null;
   if(!validProbe(dim?+dim[1]:0,dim?+dim[2]:0,duration))throw new Error("Input dimensions or duration exceed limits");
-  return {file,hasAudio:/Stream #.*Audio:/.test(out),duration,width:dim?+dim[1]:0,height:dim?+dim[2]:0};
+  return {file,hasAudio:/Stream #.*Audio:/.test(out),duration,width:dim?+dim[1]:0,height:dim?+dim[2]:0,hdr:isHdr(out)};
 }
 
 async function download(url, file, signal, budget) {
@@ -190,7 +190,7 @@ async function makePreview(id) {
     dir = await mkdtemp(path.join(tmpdir(), "mavya-preview-"));
     const input = await probe(await download(p.input, path.join(dir, "in"), controller.signal, { bytes: 0 }), controller.signal);
     const out = path.join(dir, "out.mp4"), master = p.master ? path.join(dir, "master.mp4") : undefined;
-    await run(previewArgs(input.file, out, master), null, controller.signal, 900_000);
+    for (const args of previewRuns(input.file, out, master, input.hdr)) await run(args, null, controller.signal, 900_000);
     for (const [file, target] of [[out, p.output], ...(master ? [[master, p.master]] : [])]) {
       const size = (await stat(file)).size;
       const put = await fetch(target.url, { method: "PUT", headers: { "content-type": target.contentType, "content-length": String(size) }, body: createReadStream(file), duplex: "half", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(120_000)]) });

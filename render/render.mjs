@@ -100,25 +100,56 @@ function look(a, p0, W, H, fps) {
 }
 
 /**
+ * HDR (HLG or PQ) to SDR BT.709, for the copies of an HDR upload (iPhones film HDR by default). Without it the 10-bit
+ * BT.2020 picture lands in an 8-bit BT.709 file unconverted and looks flat and washed out. Runs after the copy is
+ * scaled down, so the float frames stay small (25 MB at 1080x1920, not 100 MB at 4K) on the 512 MB render server.
+ * Mobius keeps mid-tones as they are and only rolls off highlights: on an HLG test clip made from an SDR original it
+ * kept average brightness at 97 (original 101), where hable gave 71 (2026-11-05).
+ */
+export const TONEMAP = "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=mobius:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p";
+/** HDR from ffmpeg's stream line, e.g. "yuv420p10le(tv, bt2020nc/bt2020/arib-std-b67)". */
+export const isHdr = (probeText) => /Video:.*\b(arib-std-b67|smpte2084)\b/.test(probeText);
+
+/**
  * ffmpeg arguments for the preview copy of an uploaded video (server.mjs makePreview): short side 480 (never larger
  * than the source; founder 2026-11-03: smoothness over quality in the editor), at most 30 fps, a keyframe every
- * second so the editor seeks at once, well under 1 Mbps instead of ~46.
+ * second so the editor seeks at once, well under 1 Mbps instead of ~46. `hdr`: tone-map to SDR (TONEMAP).
  */
-export const previewArgs = (input, out, master) => {
+export const previewArgs = (input, out, master, hdr = false) => {
   const fit = (n) => `scale=w='if(gt(iw,ih),-2,min(${n},iw))':h='if(gt(iw,ih),min(${n},ih),-2)'`;
+  const tm = hdr ? `,${TONEMAP}` : "";
   // Lean encoders when making both copies at once: one pass with default x264 threads peaked at 671 MB on a 4K
   // clip and the 512 MB render server restarted; single-threaded, no lookahead: 298 MB (2026-11-03).
   const lean = master ? ["-tune", "zerolatency", "-x264-params", "threads=1:lookahead-threads=1"] : [];
-  const video = (crf) => ["-fpsmax", "30", "-c:v", "libx264", "-preset", "veryfast", ...lean, "-crf", String(crf), "-g", "30", "-keyint_min", "30", "-sc_threshold", "0", "-pix_fmt", "yuv420p"];
+  const video = (crf) => ["-fpsmax", "30", "-c:v", "libx264", "-preset", "veryfast", ...lean, "-crf", String(crf), "-g", "30", "-keyint_min", "30", "-sc_threshold", "0", "-pix_fmt", "yuv420p", ...(hdr ? ["-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709"] : [])];
   const audio = ["-c:a", "aac", "-b:a", "160k", "-ac", "2", "-movflags", "+faststart"];
-  if (!master) return ["-y", "-hide_banner", "-i", input, "-map", "0:v:0", "-map", "0:a:0?", "-vf", fit(480), ...video(26), ...audio, out];
+  if (!master) return ["-y", "-hide_banner", "-i", input, "-map", "0:v:0", "-map", "0:a:0?", "-vf", fit(480) + tm, ...video(26), ...audio, out];
   // One decode of the original, two copies: the 480p preview and the export's working copy, cut to the export frame
   // (the centre 9:16 of the original at 1080x1920: what the export shows, as sharp as the original allows, and nothing
   // left for the export to crop or scale; founder 2026-11-03).
   const vertical = "crop='trunc(min(iw,ih*9/16)/2)*2':'trunc(min(ih,iw*16/9)/2)*2',scale=1080:1920";
-  return ["-y", "-hide_banner", "-i", input, "-filter_complex", `[0:v:0]split=2[a][b];[a]${fit(480)}[p];[b]${vertical}[m]`,
+  return ["-y", "-hide_banner", "-i", input, "-filter_complex", `[0:v:0]split=2[a][b];[a]${fit(480)}${tm}[p];[b]${vertical}${tm}[m]`,
     "-map", "[p]", "-map", "0:a:0?", ...video(26), ...audio, out,
     "-map", "[m]", "-map", "0:a:0?", ...video(18), ...audio, master];
+};
+
+/**
+ * The ffmpeg runs that make an upload's copies. SDR: one pass (previewArgs). HDR: the two copies one after the other,
+ * each decoding with one thread: 4K 10-bit HEVC decode plus the float tone-map peaked at 579 MB in one pass with two
+ * decoder threads, 410 MB with one, and 364 MB per copy when run separately (2026-11-05), under the 512 MB server.
+ */
+export const previewRuns = (input, out, master, hdr = false) => {
+  if (!hdr) return [previewArgs(input, out, master)];
+  const one = (args) => { const i = args.indexOf("-i"); return [...args.slice(0, i), "-threads", "1", ...args.slice(i)]; };
+  return [one(previewArgs(input, out, undefined, true)), ...(master ? [one(masterArgs(input, master))] : [])];
+};
+/** The working copy alone (HDR uploads: tone-mapped, see previewRuns). */
+const masterArgs = (input, master) => {
+  const vertical = "crop='trunc(min(iw,ih*9/16)/2)*2':'trunc(min(ih,iw*16/9)/2)*2',scale=1080:1920";
+  return ["-y", "-hide_banner", "-i", input, "-map", "0:v:0", "-map", "0:a:0?", "-vf", `${vertical},${TONEMAP}`,
+    "-fpsmax", "30", "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency", "-x264-params", "threads=1:lookahead-threads=1",
+    "-crf", "18", "-g", "30", "-keyint_min", "30", "-sc_threshold", "0", "-pix_fmt", "yuv420p", "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
+    "-c:a", "aac", "-b:a", "160k", "-ac", "2", "-movflags", "+faststart", master];
 };
 
 /** The pieces to render, in order: black gaps and clip pieces, each with its on-screen length. */

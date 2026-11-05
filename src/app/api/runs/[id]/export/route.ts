@@ -8,7 +8,7 @@ import { fullAdjust } from "@/lib/adjust";
 import { segSpeed, timeline, videoLength } from "@/lib/edit";
 import { cloud, getRun, libraryLink, mediaAccess, mediaLink, mediaUploadLink, newUpload } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
-import { masterKey, masterReady } from "@/lib/server/previews";
+import { exportSource, masterKey } from "@/lib/server/previews";
 import { signedGet, signedPut } from "@/lib/server/r2";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 import { RENDER_LIMITS, renderLimitError } from "@/lib/render-limits";
@@ -20,13 +20,17 @@ const { width: W, height: H, fps: FPS } = RENDER_LIMITS;
 const LINK_SECONDS = 6 * 3600;
 const renderer = () => (process.env.RENDER_URL && process.env.RENDER_SECRET ? { url: process.env.RENDER_URL.replace(/\/+$/, ""), secret: process.env.RENDER_SECRET } : null);
 
-/** A link the render server can download a run's file from (null when it is not this user's). */
-async function inputLink(src: string, who: string, origin: string, working = false): Promise<string | null> {
+/** A link the render server can download a run's file from (null when it is not this user's; "wait" while a demo
+ *  clip's working copy is still being made). */
+async function inputLink(src: string, who: string, origin: string, working = false): Promise<string | null | "wait"> {
   const media = /^\/api\/media\/([^/?#]+)$/.exec(src);
   if (media) {
     if (!(await mediaAccess(media[1], who))) return null;
-    // Demo clips: the 1080p working copy when it exists (src/lib/server/previews.ts), else the original.
-    if (working && (await masterReady(media[1]).catch(() => false))) return signedGet(masterKey(media[1]), LINK_SECONDS);
+    // Demo clips: the 1080p working copy (src/lib/server/previews.ts exportSource: tone-mapped for HDR uploads).
+    if (working) {
+      const from = await exportSource(media[1]).catch(() => "wait" as const);
+      return from === "copy" ? signedGet(masterKey(media[1]), LINK_SECONDS) : "wait";
+    }
     return mediaLink(media[1], LINK_SECONDS);
   }
   const sound = /^\/api\/sounds\/([A-Za-z0-9_-]+)$/.exec(src);
@@ -90,8 +94,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   // Every link at once (one by one took seconds for a 10-clip video). The hook always exports from its own file (it
   // stays exactly as generated).
   const links = await Promise.all(segs.map((s) => inputLink(s.src!, who, origin, s.id !== "hook")));
+  if (links.includes("wait")) return Response.json({ error: "Your clips are still being prepared. Try again in a minute." }, { status: 409 });
   for (const [i, s] of segs.entries()) {
-    const url = links[i];
+    const url = links[i] as string | null;
     if (!url) return Response.json({ error: `A clip in "${s.label}" can't be found. Upload it again.` }, { status: 400 });
     const a = fullAdjust(s.adjust);
     segments.push({
@@ -116,7 +121,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
     const end = pieceEnd(pieces, i, total);
     if (end - p.at < 0.05 || p.volume <= 0) continue;
     const url = soundLinks[i];
-    if (url) sounds.push({ url, at: p.at, dur: end - p.at, start: p.start, volume: p.volume / 100 });
+    if (url && url !== "wait") sounds.push({ url, at: p.at, dur: end - p.at, start: p.start, volume: p.volume / 100 });
   }
 
   if (mode === "sources") return Response.json({ spec: { width: W, height: H, fps: FPS, total, segments, sounds, overlays: [] } }, { headers: { "Cache-Control": "no-store" } });

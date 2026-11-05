@@ -3,8 +3,8 @@ import { objectInfo, signedGet, signedPut } from "@/lib/server/r2";
 
 /**
  * Preview copies of uploaded videos: a light 480p version the editor and phone preview play (render/server.mjs
- * makePreview). Phone recordings are often 4K at ~46 Mbps; playing those in a 250px preview stalls. The export always
- * reads the original. A copy belongs to its original: the same media access opens it, and account deletion removes it.
+ * makePreview). Phone recordings are often 4K at ~46 Mbps; playing those in a 250px preview stalls. The export reads the
+ * working copy below. A copy belongs to its original: the same media access opens it, and account deletion removes it.
  */
 export const previewKey = (id: string) => `media/${id.replace(/\.[^.]+$/, "")}.p480.mp4`;
 /** The first copies (720p, 2026-11-03), still removed with the account. */
@@ -17,8 +17,6 @@ export const masterKey = (id: string) => `media/${id.replace(/\.[^.]+$/, "")}.v1
 /** The first working copies (short side 1080, not cut to the frame), still removed with the account. */
 export const oldMasterKey = (id: string) => `media/${id.replace(/\.[^.]+$/, "")}.m1080.mp4`;
 
-/** Below this the original plays and exports fine as it is. */
-const SMALL = 3 * 1024 * 1024;
 
 const ready = new Map<string, number>();
 /** Whether this copy exists (a found copy is remembered; a missing one is checked again after a short while). */
@@ -43,7 +41,9 @@ export async function requestPreview(id: string): Promise<void> {
     if (asked.size > 5000) asked.clear();
     asked.set(id, Date.now() + 10 * 60_000);
     const original = await objectInfo(`media/${id}`);
-    if (!original || original.size < SMALL || ((await previewReady(id)) && (await masterReady(id)))) return;
+    // Every video gets its copies, small ones too: an HDR clip must never reach the export unconverted (render.mjs
+    // TONEMAP; Codex 2026-11-05).
+    if (!original || ((await previewReady(id)) && (await masterReady(id)))) return;
     const res = await fetch(`${base}/previews`, {
       method: "POST",
       headers: { authorization: `Bearer ${process.env.RENDER_SECRET}`, "content-type": "application/json" },
@@ -59,4 +59,16 @@ export async function requestPreview(id: string): Promise<void> {
     asked.delete(id);
     console.error("preview", id, error);
   }
+}
+
+/**
+ * The export's source for an uploaded clip: the working copy when it is ready, else "wait" (and the copy is asked for
+ * again). Never the original: the browser shows an HDR original flat and washed out (measured in Chrome 2026-11-05)
+ * and only the copy is known to be SDR, so during a render server outage exports wait rather than risk it (Codex
+ * 2026-11-05).
+ */
+export async function exportSource(id: string): Promise<"copy" | "wait"> {
+  if (await masterReady(id)) return "copy";
+  await requestPreview(id);
+  return "wait";
 }

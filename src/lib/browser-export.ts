@@ -6,8 +6,8 @@ import { frameSchedule, frameTimes, mediaOrigin } from "../../render/frames.mjs"
 /**
  * Export in the user's browser (founder 2026-11-04: CapCut exports in seconds, so ours must not take minutes). The
  * very job the server would render (render/render.mjs: same plan, same frame choice, same look formulas, same text
- * timing), drawn with WebGL and encoded by the browser's own (usually hardware) H.264 encoder at 1080x1920.
- * Chrome and Edge only; anything unsupported throws and the export button falls back to the server export.
+ * timing), drawn with WebGL and encoded by the browser's own H.264 encoder at 1080x1920.
+ * Chrome, Edge and Firefox 130+ (Safari is not tested yet: it uses the server export).
  */
 
 export type BrowserText = { png: string; x: number; y: number; start: number; end: number };
@@ -38,11 +38,21 @@ const PICTURES: Picture[] = [
   { label: "hw-10m", quality: new Quality({ bitrate: 10e6, bitrateMode: "constant" }) },
   { label: "hw-14m-vbr", quality: new Quality({ bitrate: 14e6, bitrateMode: "variable" }) },
 ];
+/**
+ * Firefox (159, Windows, 2026-11-05) says it supports quantizer mode but ignores the value (QP 14, 16 and 20 gave the
+ * same bytes, VMAF 92.6). Its software encoder at a constant 40 Mbps scored 97.5 (30 Mbps reached), 22 Mbps variable
+ * 95.7. So Firefox skips QP.
+ */
+const FIREFOX_PICTURES: Picture[] = [
+  { label: "ff-sw-40m", quality: new Quality({ bitrate: 40e6, bitrateMode: "constant" }), hardwareAcceleration: "prefer-software" },
+  ...PICTURES.filter((p) => !p.label.startsWith("hw-qp")),
+];
 /** Every setting this browser says it supports, best first (the exact configuration the export uses). */
 async function pictureSettings(width: number, height: number): Promise<Picture[]> {
-  const ok = await Promise.all(PICTURES.map(({ quality, fullCodecString, hardwareAcceleration }) =>
+  const list = firefox() ? FIREFOX_PICTURES : PICTURES;
+  const ok = await Promise.all(list.map(({ quality, fullCodecString, hardwareAcceleration }) =>
     canEncodeVideo("avc", { width, height, quality, fullCodecString, hardwareAcceleration, latencyMode: "quality" }).catch(() => false)));
-  return PICTURES.filter((_, i) => ok[i]);
+  return list.filter((_, i) => ok[i]);
 }
 /** A source file could not be downloaded or read: another encoder setting would not help. */
 class SourceError extends Error {}
@@ -50,16 +60,35 @@ class SourceError extends Error {}
 const BUILD = (process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ?? "local").slice(0, 7);
 const RATE = 48000;
 
-/** Chrome or Edge with a working H.264 + AAC encoder at the export size. */
+/**
+ * AAC for the sound. Chrome and Edge have it built in; Firefox (159 on Windows, 2026-11-05) has no AAC encoder, so it
+ * gets mediabunny's WASM one (FFmpeg's AAC encoder, loaded only when needed).
+ */
+let aacReady: Promise<void> | null = null;
+const AAC = { numberOfChannels: 2, sampleRate: 48000, bitrate: 160e3 };
+function ensureAac(): Promise<void> {
+  aacReady ??= canEncodeAudio("aac", AAC).then(async (native) => {
+    if (native) return;
+    const { registerAacEncoder } = await import("@mediabunny/aac-encoder");
+    registerAacEncoder();
+  });
+  aacReady.catch(() => { aacReady = null; });
+  return aacReady;
+}
+
+/** Firefox from version 130 (WebCodecs video encoding); Safari is not tested yet and uses the server export. */
+const firefox = () => Number(/Firefox\/(\d+)/.exec(navigator.userAgent)?.[1] ?? 0) >= 130;
+
+/** Chrome, Edge or Firefox with a working H.264 + AAC encoder at the export size. */
 export async function browserExportSupported(width: number, height: number): Promise<boolean> {
   try {
     const brands = (navigator as Navigator & { userAgentData?: { brands?: { brand: string }[] } }).userAgentData?.brands ?? [];
-    if (!brands.some((b) => /Chromium|Google Chrome|Microsoft Edge/.test(b.brand))) return false;
+    if (!brands.some((b) => /Chromium|Google Chrome|Microsoft Edge/.test(b.brand)) && !firefox()) return false;
     if (typeof VideoEncoder === "undefined" || typeof VideoDecoder === "undefined" || typeof AudioEncoder === "undefined" || typeof OffscreenCanvas === "undefined") return false;
     if (!new OffscreenCanvas(1, 1).getContext("webgl2")) return false;
     const [video, audio] = await Promise.all([
       pictureSettings(width, height).then((list) => list.length > 0),
-      canEncodeAudio("aac", { numberOfChannels: 2, sampleRate: RATE, bitrate: 160e3 }),
+      ensureAac().then(() => canEncodeAudio("aac", AAC)),
     ]);
     return video && audio;
   } catch {
@@ -226,6 +255,7 @@ type Held = { output?: Output; inputs: Input[]; gl?: WebGL2RenderingContext; bit
 export async function browserExport(spec: Spec, textsReady: BrowserText[] | Promise<BrowserText[]>, onProgress: (p: number) => void, signal?: AbortSignal): Promise<{ video: Blob; demo: Blob | null; encoder: string }> {
   const settings = await pictureSettings(spec.width, spec.height);
   if (!settings.length) throw new Error("encoder");
+  await ensureAac();
   // Download every file once, all at once; the picture starts as soon as the first clip is in.
   const blobs = new Map<string, Promise<Blob>>();
   for (const s of [...spec.segments, ...spec.sounds]) {
