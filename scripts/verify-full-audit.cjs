@@ -21,6 +21,9 @@ async function prefs(){
  assert.deepEqual(value,{names:{a:'Alpha',b:'Beta'},hidden:['c']});assert.ok(conflicts>0);
  await api.changeFilePrefs('owner','a',{name:''});await api.changeFilePrefs('owner','c',{hidden:false});
  assert.deepEqual(value,{names:{b:'Beta'},hidden:[]});
+ // My files multi-select Delete: several keys hidden in one write, alongside a concurrent single change.
+ await Promise.all([api.changeFilePrefs('owner',['x','y','z'],{hidden:true}),api.changeFilePrefs('owner','w',{hidden:true})]);
+ assert.deepEqual(new Set(value.hidden),new Set(['x','y','z','w']));assert.deepEqual(value.names,{b:'Beta'});
 }
 async function lists(){
  const stamp='2026-11-01T00:00:00Z',item={id:'a',createdAt:stamp,updatedAt:stamp,title:'Video',sourceRefId:null,hook:{face:{kind:'character',id:'olivia'},generated:{src:'/clip',seconds:3},versions:[]},demo:{clip:null,clips:[]},texts:[],sounds:[],exports:[],project:{large:'x'.repeat(100000)},script:{large:'x'.repeat(20000)},product:{privateContext:'not needed'}};

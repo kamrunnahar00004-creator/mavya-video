@@ -456,16 +456,20 @@ export async function setFilePrefs(who: string, prefs: FilePrefs): Promise<void>
 
 /** Apply one preference change against the latest object, retrying storage CAS conflicts. */
 let prefsWriting: Promise<void> = Promise.resolve();
-export async function changeFilePrefs(who: string, key: string, change: { name?: string; hidden?: boolean }): Promise<FilePrefs> {
+/** `key` may list several items (My files' multi-select Delete): every one gets the same change, in one write. */
+export async function changeFilePrefs(who: string, key: string | string[], change: { name?: string; hidden?: boolean }): Promise<FilePrefs> {
+  const keys = Array.isArray(key) ? key : [key];
   const apply = (prefs: FilePrefs): FilePrefs => {
     const names = { ...prefs.names };
-    if (change.name !== undefined) {
-      const name = change.name.trim().slice(0, 80);
-      if (name) names[key] = name; else delete names[key];
-    }
     const hidden = new Set(prefs.hidden);
-    if (change.hidden === true) hidden.add(key);
-    if (change.hidden === false) hidden.delete(key);
+    for (const k of keys) {
+      if (change.name !== undefined) {
+        const name = change.name.trim().slice(0, 80);
+        if (name) names[k] = name; else delete names[k];
+      }
+      if (change.hidden === true) hidden.add(k);
+      if (change.hidden === false) hidden.delete(k);
+    }
     return { names: Object.fromEntries(Object.entries(names).slice(-5000)), hidden: [...hidden].slice(-5000) };
   };
   if (!cloud()) {

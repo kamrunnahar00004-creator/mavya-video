@@ -53,7 +53,8 @@ const title = (r: Run) => (r.title === "Untitled run" ? "Untitled video" : r.tit
  */
 export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUseHook, onUseFace, onUseGenerated, onUseDemo, onUseUpload, onUseSound }: {
   /** An uploaded clip goes into this video's demo. */
-  onUseUpload: (a: Asset) => void;
+  /** One upload, or several picked together (Select in the Uploaded tab). */
+  onUseUpload: (a: Asset[]) => void;
   run: Run;
   refs: Reference[];
   refreshKey?: number;
@@ -81,6 +82,11 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
   const [filter, setFilter] = useState("all");
   const [sort, setSort] = useState<Sort>("new");
   const [prefs, setPrefs] = useState<{ names: Record<string, string>; hidden: string[] }>({ names: {}, hidden: [] });
+  // Uploaded tab: Select turns the grid into checkboxes, for Use or Delete on many clips at once.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const stopSelecting = () => { setSelecting(false); setSelected([]); setConfirmDelete(false); };
   useEffect(() => {
     let alive = true;
     void fetch("/api/file-prefs").then((r) => (r.ok ? r.json() : null)).then((p) => { if (alive && p?.names) setPrefs(p); }).catch(() => undefined);
@@ -190,6 +196,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     shown(list)
       .filter((x) => filter === "all" || (filter === "this" ? x.runId === run.id : x.kind === filter))
       .sort((a, b) => (sort === "new" ? b.at.localeCompare(a.at) : a.at.localeCompare(b.at)));
+  const uploadList = pick(uploads);
   const counts: Record<Tab, number> = { hooks: shown(hooks).length, characters: shown(faces).length, generated: shown(generated).length, demos: shown(demos).length, uploads: shown(uploads).length, music: shown(music).length, exports: shown(exports).length };
   // The seller's name for an item, else its default; Rename / Delete save at once (the list updates first).
   const nameOf = (key: string, fallback: string) => prefs.names[key] ?? fallback;
@@ -200,6 +207,13 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
       return { names, hidden: change.hidden ? [...p.hidden, key] : p.hidden };
     });
     void fetch("/api/file-prefs", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ key, ...change }) })
+      .then((r) => { if (!r.ok) throw Error(); })
+      .catch(() => setListError("Couldn't save. Try again."));
+  };
+  /** Delete for several items at once: one save for all of them. */
+  const hideMany = (keys: string[]) => {
+    setPrefs((p) => ({ names: p.names, hidden: [...new Set([...p.hidden, ...keys])] }));
+    void fetch("/api/file-prefs", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ keys, hidden: true }) })
       .then((r) => { if (!r.ok) throw Error(); })
       .catch(() => setListError("Couldn't save. Try again."));
   };
@@ -294,15 +308,17 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
       </Grid>
     ) : empty("The demo part of every video you export shows here");
   } else if (tab === "uploads") {
-    const list = pick(uploads);
+    const list = uploadList;
     body = list.length ? (
       <Grid>
         {list.map((x) => {
           const src = `/api/media/${x.value.mediaId}`;
           const inUse = usedNow.has(x.value.mediaId);
-          const use = () => onUseUpload(x.value);
+          const use = () => onUseUpload([x.value]);
+          const on = selected.includes(x.key);
           return (
-            <Card key={x.key} onOpen={() => setPlaying({ clips: [{ src, start: 0 }], sound: true, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, x.value.name)} meta={meta(x)}>
+            <Card key={x.key} onOpen={() => setPlaying({ clips: [{ src, start: 0 }], sound: true, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, x.value.name)} meta={meta(x)}
+              selected={selecting ? on : undefined} onSelect={() => { setConfirmDelete(false); setSelected((k) => (on ? k.filter((y) => y !== x.key) : [...k, x.key])); }}>
               <Still src={src} />
             </Card>
           );
@@ -358,6 +374,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
             onClick={() => {
               setTab(t.id);
               setFilter("all");
+              stopSelecting();
             }}
             className={`-mb-px flex shrink-0 items-center gap-1 border-b-2 py-2.5 ${tab === t.id ? "border-ink text-text" : "border-transparent text-soft hover:text-text"}`}
           >
@@ -368,16 +385,52 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
       </div>
       <div className="flex items-center gap-1.5 px-4 py-2.5">
         {FILTERS[tab].length > 1 && FILTERS[tab].map((f) => (
-          <button key={f.id} type="button" onClick={() => setFilter(f.id)} className={chip(filter === f.id)}>
+          <button key={f.id} type="button" onClick={() => { setFilter(f.id); stopSelecting(); }} className={chip(filter === f.id)}>
             {f.label}
           </button>
         ))}
-        <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort" className="ml-auto rounded-lg border border-line bg-panel px-2 py-1 text-[12.5px] font-semibold text-muted outline-none focus:border-accent">
+        {tab === "uploads" && runs && uploadList.length > 0 && (
+          <button type="button" onClick={() => (selecting ? stopSelecting() : setSelecting(true))} className={`ml-auto ${chip(selecting)}`}>
+            {selecting ? "Cancel" : "Select"}
+          </button>
+        )}
+        <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort" className={`${tab === "uploads" && runs && uploadList.length > 0 ? "" : "ml-auto "}rounded-lg border border-line bg-panel px-2 py-1 text-[12.5px] font-semibold text-muted outline-none focus:border-accent`}>
           <option value="new">Newest</option>
           <option value="old">Oldest</option>
         </select>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">{body}</div>
+      {selecting && tab === "uploads" && (() => {
+        const picked = uploadList.filter((x) => selected.includes(x.key));
+        const usable = picked.filter((x) => !usedNow.has(x.value.mediaId));
+        const all = picked.length === uploadList.length;
+        return (
+          <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3 text-[13px]">
+            <span className="font-semibold">{picked.length} selected</span>
+            <button type="button" onClick={() => { setConfirmDelete(false); setSelected(all ? [] : uploadList.map((x) => x.key)); }} className="font-semibold text-accent hover:underline">
+              {all ? "Clear" : "Select all"}
+            </button>
+            <div className="ml-auto flex items-center gap-2">
+              {confirmDelete ? (
+                <>
+                  <span className="text-muted">Delete {picked.length} from My files?</span>
+                  <button type="button" onClick={() => setConfirmDelete(false)} className="btn-secondary px-3 py-1.5">No</button>
+                  <button type="button" onClick={() => { hideMany(picked.map((x) => x.key)); stopSelecting(); }} className="rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-700">Delete</button>
+                </>
+              ) : (
+                <>
+                  <button type="button" disabled={!picked.length} onClick={() => setConfirmDelete(true)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 font-semibold text-red-600 hover:border-red-300 disabled:opacity-40">
+                    <Trash2 className="h-3.5 w-3.5" />Delete
+                  </button>
+                  <button type="button" disabled={!usable.length} title={picked.length && !usable.length ? "Already in this video" : undefined} onClick={() => { onUseUpload(usable.map((x) => x.value)); stopSelecting(); }} className="btn-primary flex items-center gap-1.5 px-3 py-1.5 disabled:opacity-40">
+                    <CirclePlus className="h-3.5 w-3.5" />Use{usable.length > 1 ? ` ${usable.length}` : ""}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
       {playing && <PlayPopup p={playing} onClose={() => setPlaying(null)} />}
       {hookView && <HookPreview r={hookView.r} onClose={() => setHookView(null)} onUse={hookView.onUse ? () => { hookView.onUse?.(); setHookView(null); } : undefined} />}
     </div>
@@ -448,20 +501,29 @@ function NameLine({ name, editing, onEdit, onDone }: { name: string; editing: bo
 }
 
 /** A history item: the picture (9:16, or square for faces; `onOpen` plays it in a popup), a green check when this video uses it, ⋮ for Use / Rename / Delete. */
-function Card({ children, meta, name, onRename, onDelete, onUse, inUse = false, download, onOpen, square = false }: ItemActions & { children: React.ReactNode; meta: React.ReactNode; onOpen?: () => void; square?: boolean }) {
+/** `selected` set (true/false) = Select mode: a click ticks the card instead of playing it, and the ⋮ menu hides. */
+function Card({ children, meta, name, onRename, onDelete, onUse, inUse = false, download, onOpen, square = false, selected, onSelect }: ItemActions & { children: React.ReactNode; meta: React.ReactNode; onOpen?: () => void; square?: boolean; selected?: boolean; onSelect?: () => void }) {
   const [renaming, setRenaming] = useState(false);
+  const selecting = selected !== undefined && !!onSelect;
+  const open = selecting ? onSelect : onOpen;
   const box = `relative block w-full overflow-hidden rounded-xl border bg-raised ${inUse ? "border-emerald-500" : "border-line"} ${square ? "aspect-square" : "aspect-[9/16]"}`;
   return (
     <div className="min-w-0">
       <div className="relative">
-        {onOpen ? (
-          <button type="button" onClick={onOpen} aria-label="Play" className={`${box} group`}>
+        {open ? (
+          <button type="button" onClick={open} aria-label={selecting ? "Select" : "Play"} aria-pressed={selecting ? selected : undefined} className={`${box} group ${selecting && selected ? "ring-2 ring-accent ring-offset-1" : ""}`}>
             {children}
+            {selecting ? (
+              <span className={`absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 ${selected ? "border-accent bg-accent text-white" : "border-white bg-black/30"}`}>
+                {selected && <Check className="h-3 w-3" strokeWidth={3} />}
+              </span>
+            ) : (
             <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/25">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100">
                 <Play className="ml-0.5 h-4 w-4" fill="currentColor" />
               </span>
             </span>
+            )}
           </button>
         ) : (
           <div className={box}>{children}</div>
@@ -471,9 +533,11 @@ function Card({ children, meta, name, onRename, onDelete, onUse, inUse = false, 
             <Check className="h-3 w-3" strokeWidth={3} />
           </span>
         )}
-        <div className="absolute right-1 top-1">
-          <ItemMenu onUse={onUse} inUse={inUse} download={download} onDelete={onDelete} />
-        </div>
+        {!selecting && (
+          <div className="absolute right-1 top-1">
+            <ItemMenu onUse={onUse} inUse={inUse} download={download} onDelete={onDelete} />
+          </div>
+        )}
       </div>
       <div className="mt-1.5 px-0.5">
         <NameLine key={`${name}|${renaming}`} name={name} editing={renaming} onEdit={() => setRenaming(true)} onDone={(n) => { setRenaming(false); if (n !== null && n.trim() !== name) onRename(n); }} />

@@ -1120,15 +1120,18 @@ export function RunView() {
                 setLibraryOpen(false);
                 setToast("Hook replaced");
               }}
-              onUseUpload={(asset) => {
+              onUseUpload={(assets) => {
+                // One or several uploads (My files' multi-select): added at the end, in the order they were listed.
                 setLibraryOpen(false);
-                void clipFromAsset({ ...asset, kind: "video" }).then((c) => {
-                  const seconds = clipSeconds(c.length);
+                void Promise.all(assets.map((asset) => clipFromAsset({ ...asset, kind: "video" }))).then((cs) => {
                   const count = demoClips(runRef.current ?? run).length;
-                  insertClips([{ id: uid(), label: `Clip ${count + 1}`, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds }]);
+                  insertClips(cs.map((c, i) => {
+                    const seconds = clipSeconds(c.length);
+                    return { id: uid(), label: `Clip ${count + i + 1}`, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds };
+                  }));
                   setPicked([5]);
-                  setToast("Clip added");
-                }).catch(() => setToast("Couldn't add the clip. Try again."));
+                  setToast(cs.length > 1 ? `${cs.length} clips added` : "Clip added");
+                }).catch(() => setToast(assets.length > 1 ? "Couldn't add the clips. Try again." : "Couldn't add the clip. Try again."));
               }}
               onUseDemo={(demo) => {
                 // The demo becomes that one finished clip (its texts are in the picture), replacing every demo clip, so
