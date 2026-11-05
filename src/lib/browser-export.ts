@@ -1,5 +1,5 @@
 "use client";
-import { ALL_FORMATS, AudioBufferSource, BlobSource, BufferSource, BufferTarget, CanvasSource, EncodedPacketSink, EncodedVideoPacketSource, Input, Mp4OutputFormat, Output, VideoSampleSink, canEncodeAudio, canEncodeVideo, type InputVideoTrack } from "mediabunny";
+import { ALL_FORMATS, AudioBufferSource, BlobSource, BufferSource, BufferTarget, CanvasSource, EncodedPacketSink, EncodedVideoPacketSource, Input, Mp4OutputFormat, Output, Quality, VideoSampleSink, canEncodeAudio, canEncodeVideo, type InputVideoTrack } from "mediabunny";
 import { demoAt, exposurePower, contrastGamma, plan, type Look, type Spec } from "../../render/render.mjs";
 import { frameSchedule, frameTimes, mediaOrigin } from "../../render/frames.mjs";
 
@@ -11,6 +11,18 @@ import { frameSchedule, frameTimes, mediaOrigin } from "../../render/frames.mjs"
  */
 
 export type BrowserText = { png: string; x: number; y: number; start: number; end: number };
+
+/**
+ * 10 Mbps, the usual 1080p30 export (CapCut's recommended, Premiere's high preset). Asked as variable, a hardware
+ * encoder came in near half (5.4 Mbps measured, founder's Chrome 2026-11-05), so constant first; where the encoder
+ * can't do constant, variable with headroom.
+ */
+const STEADY = new Quality({ bitrate: 10e6, bitrateMode: "constant" });
+const LOOSE = new Quality({ bitrate: 14e6, bitrateMode: "variable" });
+async function pictureQuality(width: number, height: number): Promise<Quality | null> {
+  if (await canEncodeVideo("avc", { width, height, quality: STEADY })) return STEADY;
+  return (await canEncodeVideo("avc", { width, height, quality: LOOSE })) ? LOOSE : null;
+}
 const RATE = 48000;
 
 /** Chrome or Edge with a working H.264 + AAC encoder at the export size. */
@@ -21,7 +33,7 @@ export async function browserExportSupported(width: number, height: number): Pro
     if (typeof VideoEncoder === "undefined" || typeof VideoDecoder === "undefined" || typeof AudioEncoder === "undefined" || typeof OffscreenCanvas === "undefined") return false;
     if (!new OffscreenCanvas(1, 1).getContext("webgl2")) return false;
     const [video, audio] = await Promise.all([
-      canEncodeVideo("avc", { width, height, bitrate: 10e6 }),
+      pictureQuality(width, height).then(Boolean),
       canEncodeAudio("aac", { numberOfChannels: 2, sampleRate: RATE, bitrate: 160e3 }),
     ]);
     return video && audio;
@@ -280,7 +292,9 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
   }));
 
   const output = new Output({ format: new Mp4OutputFormat({ fastStart: "in-memory" }), target: new BufferTarget() });
-  const picture = new CanvasSource(canvas, { codec: "avc", bitrate: 10e6, keyFrameInterval: 2 });
+  const quality = await pictureQuality(W, H);
+  if (!quality) throw new Error("encoder");
+  const picture = new CanvasSource(canvas, { codec: "avc", quality, keyFrameInterval: 2 });
   const audio = new AudioBufferSource({ codec: "aac", bitrate: 160e3 });
   output.addVideoTrack(picture, { frameRate: fps });
   output.addAudioTrack(audio);
