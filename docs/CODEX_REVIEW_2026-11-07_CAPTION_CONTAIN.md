@@ -42,3 +42,48 @@ Adding `containTexts` after this mapping alone is insufficient: its start now be
 ## Validation scope
 
 Used a temporary Node harness with the installed TypeScript transpiler to execute repository `edit.ts`, `generation-edit.ts`, and `export-layers.ts`; the client dependency was reduced to its actual `runTexts` function and display constants. Reproduced the supplied-run changes, identity/idempotence, the 30 fps boundary mismatch, generation's 1.0–1.3 s resurrection, and a subminimum positive caption. Inspected preview, browser/server rendering, export validation, PATCH, generation storage/reconcile, and restore paths. No interactive browser session or actual media render was performed. Did not rerun build/lint/typecheck: the reported passing checks do not exercise these semantic failures.
+
+## Round 2
+
+**Verdict: blockers.** Reviewed HEAD `dc62726a23b209d133629cc3ac2ee922a5c82066`. The original numerical counterexamples pass, but the new exact start comparison destroys real captions in the supplied run, and generation still transfers captions in the old hook's final 50 ms onto the demo.
+
+### P1 — Exact start ownership truncates real captions to zero exported frames
+
+`containTexts` now compares millisecond-saved starts against exact clip offsets, while `snapTexts` still snaps to **rounded** offsets. A saved start just before an exact boundary is therefore assigned to the preceding clip and clamped to that boundary. Exact ends are necessary for export, but exact ownership comparisons without accommodating saved start precision are destructive.
+
+Reproduced with the supplied run and actual helpers:
+
+| Path | Caption | Before | After | Export frame range at 30 fps |
+| --- | --- | --- | --- | --- |
+| Direct `exportLayers` / containment | `my insta reels had no views😭` (`dk2vs5pf`) | 2.345–4.391 | 2.345–2.3454545454545452 | 70–69: no frames |
+| Load: `containTexts(snapTexts(...))` | `browse viral hooks` (`zpcf0le2`) | 4.391–7.295 | 4.390–4.390454545454546 | 132–131: no frames |
+
+The latter also affects the companion captions `on ` and `mavya.app`, which share its start. `snapTexts` moves their start to 4.390, the rounded start of their intended clip; containment then treats them as belonging to the preceding clip. The load handler persists these shortened ranges, and the PATCH normalization now also persists this classification. This is more serious than a transient preview issue: valid captions lose essentially their whole duration.
+
+Required: resolve ownership using the saved precision or explicit ownership, while preserving exact ends for frame quantization. Test the actual **load pipeline**, direct export, and PATCH normalization against all supplied captions. A “zero leaks” assertion must also verify that intended captions retain their expected visible frames; removing their visibility is not a successful fix.
+
+### P1 — The last 50 ms of a regenerated hook still become demo captions
+
+`retimeTexts` defines ownership as `t.start >= offset - 0.05 && t.start < offset + oldLen - 0.05`. This excludes starts in the old clip's final 50 ms, although those starts are inside that clip.
+
+Reran the original 2 s → 1 s generated-hook case with a different generated source and a following demo:
+
+| Original hook caption | `generationPatch` result | Clean reconcile | Dirty texts + adjust reconcile | `exportLayers` |
+| --- | --- | --- | --- | --- |
+| 1.900–2.000 | 0.700–1.000 | 0.700–1.000 | 0.700–1.000 | 0.700–1.000 |
+| 1.950–2.000 | **1.000–1.300** | **1.000–1.300** | **1.000–1.300** | **1.000–1.300** |
+| 1.980–2.000 | **1.000–1.300** | **1.000–1.300** | **1.000–1.300** | **1.000–1.300** |
+
+These are positive-duration inputs accepted by server validation; the editor's usual 0.3 s minimum is not a storage invariant, and containment itself permits shorter durations. The remapping still collapses the excluded caption onto 1.0 and pads it to 1.3. All subsequent containment assigns it to the demo. Required: include the entire actual old clip in the ownership decision, with a consistent policy for rounded boundary starts, rather than removing the final 50 ms from ownership.
+
+### Fixes verified and remaining scope
+
+- The 1.0166 s hook now retains end **1.0166**; its cut is frame **30**, and the caption's last frame is **29**. The original one-frame counterexample is fixed.
+- Gap case (hook 0–1, next clip starts at 2, caption 1.5–2.5) now returns **1.5–2.0**. The former gap overrun is fixed.
+- The original 1.9–2.0 generation example now returns **0.7–1.0**, including clean and dirty reconciliation. The neighboring cases above remain blockers.
+- Containment on the supplied run remains idempotent. Idempotence does not detect the lost captions above.
+- A caption at 1.016–1.4 on the 1.0166 s hook becomes a positive **0.0006 s** interval. Short positive durations remain allowed, and zero-frame export intervals remain possible. No server validation rejection is implied by that positive duration alone.
+- PATCH now normalizes merged texts for text, hook and demo changes, including timeline-only patches, and reuses the fetched run for hook/demo changes. This addresses the missing enforcement boundary in Round 1 by inspection, but uses the ownership logic responsible for the first blocker. No live authenticated PATCH request was performed.
+- Preview still consumes the supplied text ranges; generation normalization now covers both reconcile branches, but cannot recover captions already classified into the wrong clip. Undo/restore and normal saves likewise inherit the ownership problem. The previously noted `runRef` synchronization risk and brief unconstrained live-text preview window are unchanged; neither is needed to reproduce these blockers.
+
+Validation: reran the temporary TypeScript-transpilation harness against current repository helpers and the same supplied run JSON, including load-time snapping, direct export, generation, both reconciliation branches, gap containment, short-duration containment, and frame formulas. Client dependency isolation is as described in Round 1. No application code changes, interactive media render, or live API mutation; did not rerun the reported static/build checks. Only this review document was edited for Round 2. No commit or push performed.

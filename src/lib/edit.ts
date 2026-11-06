@@ -156,15 +156,20 @@ export function snapTexts(texts: TextLayer[], segs: Seg[], tol = 0.08): TextLaye
 /**
  * A text belongs to the clip it starts in and never runs past that clip's end (founder 2026-11-07: a hook caption
  * showed over the next clip after the hook was trimmed). A text starting in a gap ends where the next clip starts;
- * one past the video is left alone. The end is the exact edge, not rounded: the export rounds both to frames the
- * same way, while a rounded edge could show the text on the next clip's first frame (Codex 2026-11-07). Returns
- * `texts` itself when nothing changes.
+ * one past the video is left alone. Which clip a text starts in is judged in milliseconds, as starts are saved (a
+ * start of 2.345 on an edge at 2.34545 is the next clip's), while the end is clamped to the exact edge: the export
+ * rounds both to frames the same way, and a rounded edge could show the text on the next clip's first frame (Codex
+ * 2026-11-07). Returns `texts` itself when nothing changes.
  */
+export function ownedBy(start: number, offset: number, len: number): boolean {
+  const at = roundTime(start);
+  return at >= roundTime(offset) && at < roundTime(offset + len);
+}
 export function containTexts(texts: TextLayer[], segs: Seg[]): TextLayer[] {
   let moved = false;
   const next = texts.map((t) => {
-    const seg = segs.find((s) => t.start >= s.offset && t.start < s.offset + s.len);
-    const end = seg ? seg.offset + seg.len : segs.find((s) => s.offset > t.start)?.offset;
+    const seg = segs.find((s) => ownedBy(t.start, s.offset, s.len));
+    const end = seg ? seg.offset + seg.len : segs.find((s) => roundTime(s.offset) > roundTime(t.start))?.offset;
     if (end === undefined || t.end <= end) return t;
     moved = true;
     return { ...t, end };
@@ -195,7 +200,7 @@ export function retimeTexts(texts: TextLayer[], offset: number, from: Window, to
     let end = roundTime(map(t.end));
     // A text of this clip stays on it: one whose frames were cut away keeps the clip's last 0.3 s, never the next
     // clip (Codex 2026-11-07: a shorter regenerated hook moved a hook caption onto the demo).
-    const own = t.start >= offset - 0.05 && t.start < offset + oldLen - 0.05;
+    const own = ownedBy(t.start, offset, oldLen);
     if (own && start > offset + newLen - 0.3) start = roundTime(Math.max(offset, offset + newLen - 0.3));
     if (end - start < 0.3) end = roundTime(start + 0.3);
     if (own) end = Math.min(end, offset + newLen);
