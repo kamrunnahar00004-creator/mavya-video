@@ -23,7 +23,8 @@ const satoshi = localFont({
 const CLARITY_PROJECT_ID = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID ?? "x97det48lq";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+// Mono only shows hook timestamps on the reference page: loaded when used, not preloaded on every page (Codex 2026-11-06).
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], preload: false });
 export const metadata: Metadata = {
   title: "Mavya: viral hook + demo videos",
   description: "Steal hooks that already went viral, put an AI character in them, add your product demo.",
