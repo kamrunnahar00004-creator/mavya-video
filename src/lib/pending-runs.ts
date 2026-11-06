@@ -8,8 +8,10 @@ import type { Reference, Run } from "@/lib/types";
  * - `create`: New video opens the page at once and creates the video in the background. The id comes from the
  *   browser and the server create is an idempotent upsert, so retrying the same id never makes a second video.
  * - `prefetch`: pointing at a video's card starts loading its editor data.
- * The page uses an entry once (forgetLoad); unused entries are forgotten (create after 60 s, prefetch after 15 s), so
- * a later visit loads fresh data.
+ * The page uses an entry once and drops it, also when it is left (forgetLoad). A prefetch expires 10 s after the hover
+ * (whether or not it answered), stops after 4 s, and is dropped when the video is renamed or deleted (dropLoad); the
+ * page waits for it at most 2 s before loading the usual way (Codex 2026-11-06: a stalled request held the editor, and
+ * a rename after a hover opened the old title).
  */
 export type Loaded = { run: Run; source: Reference | null };
 export type Created = Loaded | { pricing: true } | { error: true; sourceRefId?: string };
@@ -19,8 +21,7 @@ const pending = new Map<string, Pending>();
 
 function keep(id: string, entry: Pending, ms: number) {
   pending.set(id, entry);
-  const job: Promise<unknown> = entry.job;
-  void job.then(() => setTimeout(() => { if (pending.get(id) === entry) pending.delete(id); }, ms));
+  setTimeout(() => { if (pending.get(id) === entry) pending.delete(id); }, ms);
 }
 
 /** Starts creating video `id` (with hook `sourceRefId` when the seller picked one). */
@@ -38,6 +39,7 @@ export function startCreate(id: string, sourceRefId?: string): Promise<Created> 
       return created.run?.id === id ? created : { error: true, sourceRefId };
     })
     .catch((): Created => ({ error: true, sourceRefId }));
+  // The page normally takes it at once; the create itself gives up after 30 s.
   keep(id, { kind: "create", job }, 60_000);
   return job;
 }
@@ -45,14 +47,19 @@ export function startCreate(id: string, sourceRefId?: string): Promise<Created> 
 /** Starts loading video `id`'s editor data (a card is pointed at). Never replaces a create in flight. */
 export function prefetchRun(id: string) {
   if (pending.has(id)) return;
-  const job = fetch(`/api/runs/${id}?view=editor`, { cache: "no-store" })
+  const job = fetch(`/api/runs/${id}?view=editor`, { cache: "no-store", signal: AbortSignal.timeout(4_000) })
     .then(async (res) => {
       if (!res.ok) return null;
       const loaded = (await res.json()) as Loaded;
       return loaded.run?.id === id ? loaded : null;
     })
     .catch(() => null);
-  keep(id, { kind: "prefetch", job }, 15_000);
+  keep(id, { kind: "prefetch", job }, 10_000);
+}
+
+/** The prefetched data for `id` is out of date (it was renamed or deleted): the next visit loads it fresh. */
+export function dropLoad(id: string) {
+  if (pending.get(id)?.kind === "prefetch") pending.delete(id);
 }
 
 /** What this tab already asked for video `id`, if anything. Kept until the page that used it calls forgetLoad. */

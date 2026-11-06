@@ -19,10 +19,19 @@ export const oldMasterKey = (id: string) => `media/${id.replace(/\.[^.]+$/, "")}
 
 
 const ready = new Map<string, number>();
+const checking = new Map<string, Promise<boolean>>();
 /** Whether this copy exists (a found copy is remembered; a missing one is checked again after a short while). */
 async function exists(key: string): Promise<boolean> {
   const until = ready.get(key);
   if (until !== undefined && until > Date.now()) return until === Infinity;
+  // Checks for the same copy at the same moment share one storage request (Codex 2026-11-06).
+  const running = checking.get(key);
+  if (running) return running;
+  const check = look(key).finally(() => checking.delete(key));
+  checking.set(key, check);
+  return check;
+}
+async function look(key: string): Promise<boolean> {
   const found = Boolean(await objectInfo(key).catch(() => null));
   if (ready.size > 5000) ready.clear();
   // A missing copy is checked again after 2 s (was 20 s): a copy finished just after a check shows up at once (Codex

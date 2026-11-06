@@ -190,7 +190,8 @@ async function work(id) {
 /**
  * Preview copies: a light 480p version of an uploaded video (render.mjs previewArgs) that the editor and phone
  * preview play. A 4K phone recording is ~46 Mbps; the copy is well under 1 Mbps and seeks at once.
- * Exports always read the original. Exports go first; copies are made while no export waits.
+ * The same pass makes the 1080x1920 working copy that exports of uploaded clips read. Copies go first, taking turns
+ * with waiting exports (next()).
  */
 /** @type {Map<string, {state: string, at: number, input?: string, output?: {url: string, contentType: string}, error?: string}>} */
 const previews = new Map();
@@ -231,10 +232,10 @@ async function next() {
   try {
     // Upload copies first: the editor plays them and an export of uploaded clips waits for their working copies anyway
     // (Codex 2026-11-06: a preview queued behind exports). Bounded, so a burst of uploads never holds an export back for
-    // long: a waiting export runs after every 3 copies in a row. Still one job at a time (the server has 512 MB).
+    // long: copies and waiting exports take turns, one each (a copy can take minutes). Still one job at a time (512 MB).
     let copiesInARow = 0;
     while (queue.length || previewQueue.length) {
-      if (previewQueue.length && (!queue.length || copiesInARow < 3)) {
+      if (previewQueue.length && (!queue.length || copiesInARow < 1)) {
         copiesInARow++;
         await makePreview(previewQueue.shift());
       } else {
@@ -260,7 +261,7 @@ setInterval(() => {
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? "/", "http://x");
-    if (url.pathname === "/health") return send(res, 200, { ok: true, protocol: 3, size: "1080x1920", queued: queue.length, busy });
+    if (url.pathname === "/health") return send(res, 200, { ok: true, protocol: 3, size: "1080x1920", queued: queue.length, copies: previewQueue.length, busy });
     if (!authed(req)) return send(res, 401, { error: "unauthorized" });
     if (req.method === "POST" && url.pathname === "/jobs") {
       const b = await body(req);

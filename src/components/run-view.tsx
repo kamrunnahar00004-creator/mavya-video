@@ -125,17 +125,22 @@ export function RunView() {
     }).catch(() => { if (alive) { setRefs(old => old ?? []); setToast("Library is unavailable. Try again."); } });
     // Data this tab already asked for: a create in flight (New video opened the page at once; it answers with the
     // editor's own projection) or a card hover prefetch, so the video is not loaded again (src/lib/pending-runs.ts).
-    const fresh = () => fetch(`/api/runs/${id}?view=editor`, { cache: "no-store" }).then(async response => {
-      if (!response.ok) throw Error("missing");
-      return await response.json() as { run: Run; source: Reference | null };
-    });
+    // A video just created in another tab may not be saved yet: a missing video is asked for twice more, 1 s apart.
+    const fresh = async (): Promise<{ run: Run; source: Reference | null }> => {
+      for (let attempt = 0; ; attempt++) {
+        const response = await fetch(`/api/runs/${id}?view=editor`, { cache: "no-store" });
+        if (response.ok) return await response.json() as { run: Run; source: Reference | null };
+        if (response.status !== 404 || attempt >= 2 || !alive) throw Error("missing");
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    };
     const known = peekLoad(id);
     let load: Promise<{ run: Run; source: Reference | null }>;
     if (known?.kind === "create") {
       load = known.job.then(created => {
+        forgetLoad(id, known);
         // Only the page that is still showing uses it (a development double effect, or a left page, does not).
         if (!alive) throw Error("left");
-        forgetLoad(id, known);
         if ("run" in created) return created;
         if ("pricing" in created) {
           window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/pricing" }));
@@ -144,10 +149,11 @@ export function RunView() {
         throw Error("not created");
       });
     } else if (known?.kind === "prefetch") {
-      load = known.job.then(loaded => {
-        if (!alive) throw Error("left");
+      // At most 2 s for the hover's request; a failed or slow one loads the usual way.
+      const late = new Promise<null>(resolve => setTimeout(() => resolve(null), 2_000));
+      load = Promise.race([known.job, late]).then(loaded => {
         forgetLoad(id, known);
-        // A failed prefetch loads the usual way, which shows the usual error if it fails again.
+        if (!alive) throw Error("left");
         return loaded ?? fresh();
       });
     } else load = fresh();

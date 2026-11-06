@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { LayoutGrid, List, Loader2, Plus, Trash2 } from "lucide-react";
 import { loadLibrary } from "@/lib/library-cache";
 import { fetchPage } from "@/lib/list-client";
-import { prefetchRun, startCreate } from "@/lib/pending-runs";
+import { dropLoad, prefetchRun, startCreate } from "@/lib/pending-runs";
 import { runSteps } from "@/lib/edit";
 import { fmtDate, type Reference, type Run } from "@/lib/types";
 
@@ -155,7 +155,10 @@ export function RunsList() {
 
   async function rename(r: Run, title: string) {
     setRuns((all) => all?.map((x) => (x.id === r.id ? { ...x, title } : x)) ?? null);
+    // Data the card's hover loaded has the old title: dropped before and after the save (src/lib/pending-runs.ts).
+    dropLoad(r.id);
     const response = await fetch(`/api/runs/${r.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title }) }).catch(() => null);
+    dropLoad(r.id);
     if (!response?.ok) {
       setRuns(all => all?.map(x => x.id === r.id && x.title === title ? { ...x, title: r.title } : x) ?? null);
       setError("Couldn't rename the video. Try again.");
@@ -165,7 +168,9 @@ export function RunsList() {
   async function remove(r: Run) {
     if (!confirm(`Delete "${titleOf(r)}"? This can't be undone.`)) return;
     setDeleting(r.id);
+    dropLoad(r.id);
     const response = await fetch(`/api/runs/${r.id}`, { method: "DELETE" }).catch(() => null);
+    dropLoad(r.id);
     setDeleting(null);
     if (!response?.ok) return setError("Couldn't delete the video. Try again.");
     setRuns((all) => all?.filter((x) => x.id !== r.id) ?? null);setError(null);
