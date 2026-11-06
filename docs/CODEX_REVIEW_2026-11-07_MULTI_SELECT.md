@@ -67,3 +67,33 @@ Other familiar desktop commands still absent from this handler include split-all
 - Local seeded server on port 3210 was reachable. Attempting the supplied script with Windows Node failed immediately with `WSL ... UtilBindVsockAnyPort ... socket failed 1`. Consequently I did not reproduce Claude's real mouse/keyboard tests, browser-native selection/cut behavior, drag/trim, or persistence/Undo in Chrome. Claude's script results remain prior evidence, not tests independently passed by this review.
 
 Ship after fixing the sound-selection deletion target and cut navigation, implementing the requested preview modifier-click behavior, and rerunning those browser cases plus multi-delete Undo/Redo and typing-focus checks.
+
+## Round 2 — 2026-11-07
+
+**Verdict: ship.** Reviewed HEAD `d7bac40c742679c207f2de5c186cbb60f05689d4`. The three Round 1 blockers are resolved; no new blocking defect found in the added Q/W or zoom paths. This verdict supersedes the earlier verdict for the current commit. Browser and production-build verification limits are stated below.
+
+### Original blockers
+
+1. **Stale group / wrong Delete target: fixed.** `editor-tools.tsx:1486` derives the operative group from `sel`, so clearing the clip/text selection makes retained keys inert. The Sound toolbar also explicitly clears the keys (`:1801`), and the sound selection callback clears both states. Returning to a clip/text through `pick` starts from the operative group, preventing old keys from reappearing. An executable check of the current `remove` body with `sel = null`, stale keys, and a selected sound called sound deletion once and group deletion zero times. Claude's reported “open Sound then Delete” test covers the chooser state; this additional direct check covers the selected-sound branch that caused the original finding.
+2. **Internal split navigation: fixed.** The cut list now includes `pieceSpans(g)` offsets (`editor-tools.tsx:572`), so internal cuts are represented with speed-aware timeline positions. A direct check of the current cut-list expression included an internal split at timeline 4 s for a clip starting at 3 s with speed 2. Both navigation directions use this same list. Gap/clip-edge handling is retained.
+3. **Preview modifier-click: fixed.** WholePlayer → WholeMedia → TextOverlay now passes the text selection callback. `run-preview.tsx:468` handles Ctrl, Cmd and Shift before reading drag geometry or installing movement listeners, and stops propagation/default behavior. Direct execution of this branch confirmed selection with `add = true` for all three modifiers. Ordinary preview dragging remains on its prior path; the phone preview and step 5 do not receive this optional selection callback.
+
+### New keys
+
+- **Q/W:** reviewed `trimTo` (`editor-tools.tsx:1635`) and its key dispatch. Direct checks passed the Text C sequence 9–12 → Q at 10 → W at 11 = 10–11; out-of-range and too-short no-ops; multi-selection no-op; speed-aware file-time conversion; leaving other pieces untouched; selected-piece mismatch and noneditable guards; and the magnet-off hold flag. Every accepted trim made one history call; rejected trims made none. The existing `onParts` path handles caption remapping, containment and persistence, while the existing snapshot restores the pre-trim state. Text trim uses `onPatchText`. Q/W retain the specified one-piece scope; they do not remove all earlier/later pieces of a split clip. With a sound selected and no clip/text selection, Q/W fall back to the video piece under the playhead, as the supplied specification permits.
+- **Keyboard zoom:** Ctrl/Cmd with `=`, `+` or `-` calls the same bounded 1–8 zoom update used by the toolbar. The existing typing, active-player and unrelated-dialog guards still run first, and handled keys prevent browser zoom. Step 5 has no zoom/trim callbacks, so it does not acquire these editor-only actions.
+- **Wheel zoom:** the editor-root listener is non-passive, calls `preventDefault` for Ctrl/Cmd wheel, and is removed on cleanup. Direct checks passed zoom in/out, bounds 1–8, and unmodified-wheel fallthrough. This intentionally intercepts modifier-wheel anywhere inside the editor, including settings fields; unlike keyboard shortcuts, it has no typing-target exemption. Horizontal-only events (`deltaY = 0`) take the zoom-out branch, a minor polish issue rather than a blocker.
+
+### Remaining limitations
+
+The prior nonblocking limitations remain: selecting every hook piece preserves the entire hook; Ctrl+A excludes sounds; group copy copies one item and group cut is disabled; Ctrl+Shift+B still aliases ordinary split; frame stepping is fixed at 30 fps with end clamping; initial delete state comes from the rendered run. Q/W and zoom close some parity gaps, but this is still not a complete CapCut shortcut implementation. The Round 1 statements that preview modifier-selection, internal-cut navigation, Q/W and zoom are missing are superseded by this round.
+
+### Validation
+
+- `npx tsc --noEmit`: passed.
+- Targeted ESLint on editor-tools, run-preview and run-view: passed.
+- Temporary direct harness using current extracted function bodies and actual timeline helpers: passed the selection/trim/navigation/wheel checks above. The original deletion assertions also passed again for grouped pieces, cross-clip deletions, gaps, both magnet modes, partial hook removal, text containment and one save. The original harness's final printed navigation example uses its old hard-coded cut formula; it is not a test of the corrected handler. The separate Round 2 check evaluates the current expression.
+- `npm run build`: **not independently verified this round**. Turbopack failed while processing CSS because its worker could not bind a port: `Operation not permitted (os error 1)`. This is a sandbox restriction, not evidence of a compilation defect. Claude reports a passing build outside this restriction.
+- Windows Node/CDP was attempted again and failed before Chrome testing with `WSL ... UtilBindVsockAnyPort ... socket failed 1`. Claude's reported fresh-seed Chrome results are supporting evidence, not independently reproduced results here. Full browser Undo/Redo, focus/native-browser behavior, drag/trim and persisted reload were not rerun by this reviewer.
+
+Only this review document was edited during Round 2. No application changes, commit or push.
