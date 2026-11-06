@@ -456,7 +456,7 @@ export function usePlaybackClaims(who: string, setPlaying: (v: boolean) => void)
 export const sizeLabel = (size: number) => Math.round(size * 10);
 
 /** Text layer positioned like on the phone. With `onMove`: drag to move, corner handle to resize. The parent needs `[container-type:size]` (text sizes are in cqh). */
-export const TextOverlay = memo(function TextOverlay({ x, onMove: onMoveProp, onPatch }: { x: TextLayer; onMove?: (p: { x?: number; y?: number; size?: number }) => void; onPatch?: (id: string, p: { x?: number; y?: number; size?: number }) => void }) {
+export const TextOverlay = memo(function TextOverlay({ x, onMove: onMoveProp, onPatch, onPick }: { x: TextLayer; onMove?: (p: { x?: number; y?: number; size?: number }) => void; onPatch?: (id: string, p: { x?: number; y?: number; size?: number }) => void; onPick?: (id: string, add?: boolean) => void }) {
   const onMove = onMoveProp ?? (onPatch ? (p: { x?: number; y?: number; size?: number }) => onPatch(x.id, p) : undefined);
   // While resizing: the size, shown next to the cursor.
   const [badge, setBadge] = useState<{ left: number; top: number; size: number } | null>(null);
@@ -464,6 +464,11 @@ export const TextOverlay = memo(function TextOverlay({ x, onMove: onMoveProp, on
     if (!onMove) return;
     e.preventDefault();
     e.stopPropagation();
+    // Ctrl/Cmd/Shift-click (the full editor): add it to the selection, no move (like the timeline).
+    if (onPick && (e.ctrlKey || e.metaKey || e.shiftKey)) {
+      onPick(x.id, true);
+      return;
+    }
     const holder = mode === "move" ? e.currentTarget : e.currentTarget.parentElement;
     const rect = holder?.parentElement?.getBoundingClientRect();
     if (!rect) return;

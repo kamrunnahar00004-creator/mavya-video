@@ -440,7 +440,7 @@ function usePlaybackTime(playback: PlaybackClock) {
   return useSyncExternalStore(playback.subscribe, playback.get, playback.get);
 }
 
-function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, onMove, onSplit, onAdd, onDelete, onUndo, onRedo, onCopy, onPaste, onCutSel, onSelectAll, claim = "whole", edit, toolbar, compact = false, autoFocus = false }: {
+function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, onMove, onSplit, onAdd, onDelete, onUndo, onRedo, onCopy, onPaste, onCutSel, onSelectAll, onTrimTo, onZoom, claim = "whole", edit, toolbar, compact = false, autoFocus = false }: {
   segs: Seg[];
   /** Shown next to the video (the selected sound's card, or the editor's settings for the selection). */
   side: React.ReactNode | ((playback: PlaybackClock) => React.ReactNode);
@@ -451,6 +451,10 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   onPaste?: (time: number) => void;
   onCutSel?: () => void;
   onSelectAll?: () => void;
+  /** Q / W: delete before / after the playhead. */
+  onTrimTo?: (time: number, side: "left" | "right") => void;
+  /** Ctrl + = / -: timeline zoom. */
+  onZoom?: (dir: 1 | -1) => void;
   edit?: TimelineEdit;
   /** Replaces the Cut / + Sound buttons (the full editor's tools); gets the playhead time. */
   toolbar?: (time: () => number) => React.ReactNode;
@@ -511,9 +515,9 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   // Keyboard, like CapCut: Space play/pause, Delete / Backspace removes the selection, S / Ctrl+B split, Ctrl+C / X / V
   // copy, cut, paste, Ctrl+A select all, Ctrl+Z undo, Ctrl+Shift+Z / Ctrl+Y redo, Left / Right one frame (Shift: 1 s),
   // Up / Down the previous / next cut, Home / End the start / end, Esc deselects (founder 2026-11-07).
-  const keys = useRef({ playing, onSplit, onDelete, onUndo, onRedo, onSelect, onCopy, onPaste, onCutSel, onSelectAll, segs });
+  const keys = useRef({ playing, onSplit, onDelete, onUndo, onRedo, onSelect, onCopy, onPaste, onCutSel, onSelectAll, onTrimTo, onZoom, segs });
   useEffect(() => {
-    keys.current = { playing, onSplit, onDelete, onUndo, onRedo, onSelect, onCopy, onPaste, onCutSel, onSelectAll, segs };
+    keys.current = { playing, onSplit, onDelete, onUndo, onRedo, onSelect, onCopy, onPaste, onCutSel, onSelectAll, onTrimTo, onZoom, segs };
   });
   // The last click was in this player: shortcuts keep working even when focus fell back to the page (e.g. after Delete).
   const active = useRef(Boolean(autoFocus));
@@ -549,7 +553,11 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
       else if (mod && e.key.toLowerCase() === "v" && k.onPaste) {
         setPlaying(false);
         k.onPaste(k.time);
-      } else if (mod && e.key.toLowerCase() === "x" && k.onCutSel) k.onCutSel();
+      } else if (!mod && (e.key.toLowerCase() === "q" || e.key.toLowerCase() === "w") && k.onTrimTo) {
+        setPlaying(false);
+        k.onTrimTo(k.time, e.key.toLowerCase() === "q" ? "left" : "right");
+      } else if (mod && (e.key === "=" || e.key === "+" || e.key === "-") && k.onZoom) k.onZoom(e.key === "-" ? -1 : 1);
+      else if (mod && e.key.toLowerCase() === "x" && k.onCutSel) k.onCutSel();
       else if (mod && e.key.toLowerCase() === "a" && k.onSelectAll) k.onSelectAll();
       else if (mod && e.key.toLowerCase() === "z") (e.shiftKey ? k.onRedo : k.onUndo)();
       else if (mod && e.key.toLowerCase() === "y") k.onRedo();
@@ -560,7 +568,8 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
         setT(Math.max(0, Math.min(total - 0.01, k.time + step)));
       } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
         setPlaying(false);
-        const cuts = [0, ...k.segs.flatMap((g) => [g.offset, g.offset + g.len]), total - 0.01];
+        // Every cut: clip edges and the split points inside a clip (S / Ctrl+B).
+        const cuts = [0, ...k.segs.flatMap((g) => [g.offset, ...pieceSpans(g).map((p) => g.offset + p.at), g.offset + g.len]), total - 0.01];
         const t = e.key === "ArrowUp" ? Math.max(0, ...cuts.filter((c) => c < k.time - 0.001)) : Math.min(total - 0.01, ...cuts.filter((c) => c > k.time + 0.001));
         setT(t);
       } else if (e.key === "Home" || e.key === "End") {
@@ -577,7 +586,7 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   const focusIn = (e: React.PointerEvent) => {
     if (!(e.target as HTMLElement).closest("input, textarea, select, button, a, [contenteditable]")) scope.current?.focus({ preventScroll: true });
   };
-  const videoBox = (cls: string, style?: React.CSSProperties) => <WholeMedia playback={playback} segs={segs} texts={texts} playing={playing} onTextMove={edit?.onTextMove} cls={cls} style={style} />;
+  const videoBox = (cls: string, style?: React.CSSProperties) => <WholeMedia playback={playback} segs={segs} texts={texts} playing={playing} onTextMove={edit?.onTextMove} onTextPick={edit?.onSelectText} cls={cls} style={style} />;
   const sideNode = typeof side === "function" ? side(playback) : side;
   const audio = <WholeAudio playback={playback} pieces={pieces} total={total} playing={playing} />;
   const controls = (
@@ -642,9 +651,9 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   );
 }
 
-function WholeMedia({ playback, segs, texts, playing, onTextMove, cls, style }: {
+function WholeMedia({ playback, segs, texts, playing, onTextMove, onTextPick, cls, style }: {
   playback: PlaybackClock; segs: Seg[]; texts: TextLayer[]; playing: boolean;
-  onTextMove?: TimelineEdit["onTextMove"]; cls: string; style?: React.CSSProperties;
+  onTextMove?: TimelineEdit["onTextMove"]; onTextPick?: TimelineEdit["onSelectText"]; cls: string; style?: React.CSSProperties;
 }) {
   const time = Math.min(usePlaybackTime(playback), Math.max(0.001, videoLength(segs)) - 0.001);
   const hit = segAt(segs, time);
@@ -657,7 +666,7 @@ function WholeMedia({ playback, segs, texts, playing, onTextMove, cls, style }: 
       ) : (
         <div className="absolute inset-0 flex items-center justify-center text-[12px] font-semibold text-white/40">{seg.id === "hook" ? "Your hook" : "Your demo"}</div>
       )}
-      {texts.filter((x) => x.text.trim() && showsAt(x, time)).map((x) => <TextOverlay key={x.id} x={x} onPatch={onTextMove} />)}
+      {texts.filter((x) => x.text.trim() && showsAt(x, time)).map((x) => <TextOverlay key={x.id} x={x} onPatch={onTextMove} onPick={onTextPick} />)}
     </div>
   );
 }
@@ -1471,8 +1480,24 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
   const [sel, setSel] = useState<{ kind: "clip"; seg: string; part: string } | { kind: "text"; id: string } | null>(null);
   // Several selected at once, like CapCut (Ctrl/Cmd/Shift-click, Ctrl+A): "t:<text id>" / "c:<clip id>:<piece id>". The
   // last one picked is also `sel` (its settings show on the right). Empty when one thing or nothing is selected.
-  const [multi, setMulti] = useState<string[]>([]);
+  const [multiKeys, setMulti] = useState<string[]>([]);
+  // Only while a clip or text is selected: picking a sound (which clears `sel`) can never leave an old group to delete
+  // (Codex 2026-11-07).
+  const multi = sel ? multiKeys : [];
   const [zoom, setZoom] = useState(1);
+  const editorRoot = useRef<HTMLDivElement>(null);
+  // Ctrl/Cmd + scroll zooms the timeline, like CapCut (not the page).
+  useEffect(() => {
+    const el = editorRoot.current;
+    if (!el) return;
+    const wheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      setZoom((z) => (e.deltaY < 0 ? Math.min(8, z * 2) : Math.max(1, z / 2)));
+    };
+    el.addEventListener("wheel", wheel, { passive: false });
+    return () => el.removeEventListener("wheel", wheel);
+  }, []);
   // Main track magnet (on by default, like CapCut): clips stay joined. Off: drag clips anywhere, shortening leaves space.
   const [magnet, setMagnet] = useState(() => !segs.some((s) => s.gap > 0));
   const [past, setPast] = useState<EditorSnap[]>([]);
@@ -1602,6 +1627,29 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
     } else onInsertClip({ ...copied.clip, id: uid() }, insertIndex(time));
   };
   const canCopy = Boolean(selText || (selSeg?.src && selSeg.editable));
+
+  /**
+   * Q / W, like CapCut: delete the part of the selected text, or of the selected clip piece (else the clip under the
+   * playhead), before (Q) or after (W) the playhead. Each keeps at least 0.1 s.
+   */
+  const trimTo = (time: number, side: "left" | "right") => {
+    if (multi.length > 1) return;
+    if (selText) {
+      if (side === "left" ? time <= selText.start || time >= selText.end - 0.1 : time >= selText.end || time <= selText.start + 0.1) return;
+      remember();
+      onPatchText(selText.id, side === "left" ? { start: r3(time) } : { end: r3(time) });
+      return;
+    }
+    const seg = selSeg ?? segs.find((x) => time >= x.offset && time < x.offset + x.len);
+    if (!seg || !seg.editable || !seg.src || time < seg.offset || time >= seg.offset + seg.len) return;
+    const { file, i } = fileAt(seg, time - seg.offset);
+    if (sel?.kind === "clip" && sel.seg === seg.id && seg.parts[i].id !== sel.part) return;
+    const p = seg.parts[i];
+    const sp = speedOf(seg.adjust);
+    if (side === "left" ? (p.end - file) / sp < 0.1 || file <= p.start : (file - p.start) / sp < 0.1 || file >= p.end) return;
+    remember();
+    onParts(seg.id, seg.parts.map((x, j) => (j === i ? (side === "left" ? { ...x, start: r3(file) } : { ...x, end: r3(file) }) : x)), !magnet);
+  };
 
   /** Delete the selection: a text, a clip piece (the last piece of a demo clip removes the clip), or a sound. */
   const remove = () => {
@@ -1750,6 +1798,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
         title="Add a sound at the playhead"
         onClick={() => {
           setSel(null);
+          setMulti([]);
           sounds.addAt(time());
         }}
         className={tool}
@@ -1784,7 +1833,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
   );
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Edit video" onPointerDownCapture={() => { gestureRemembered.current = false; }} onKeyDownCapture={(e) => { if (!e.repeat) gestureRemembered.current = false; }} className="fixed inset-0 z-40 flex flex-col bg-panel">
+    <div ref={editorRoot} role="dialog" aria-modal="true" aria-label="Edit video" onPointerDownCapture={() => { gestureRemembered.current = false; }} onKeyDownCapture={(e) => { if (!e.repeat) gestureRemembered.current = false; }} className="fixed inset-0 z-40 flex flex-col bg-panel">
       <header className="flex items-center gap-2 border-b border-line px-5 py-3">
         <h2 className="text-[16px] font-extrabold tracking-tight">Edit video</h2>
         <button type="button" onClick={onClose} className="btn-primary ml-auto px-4 py-2 text-[14px]">
@@ -1822,6 +1871,8 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
               remove();
             }}
             onSelectAll={selectAll}
+            onTrimTo={trimTo}
+            onZoom={(dir) => setZoom((z) => (dir > 0 ? Math.min(8, z * 2) : Math.max(1, z / 2)))}
             side={side}
             toolbar={toolbar}
             edit={{
