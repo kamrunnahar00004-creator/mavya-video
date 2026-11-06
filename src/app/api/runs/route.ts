@@ -25,7 +25,16 @@ export async function POST(request: Request) {
   try {
     const source = typeof body?.sourceRefId === "string" ? await getReference(body.sourceRefId, who) : null;
     if (body?.sourceRefId && !source) return Response.json({ error: "Hook not found." }, { status: 404 });
-    return Response.json(await createRun(who, body?.id as string | undefined, source ?? undefined), { status: 201 });
+    const run = await createRun(who, body?.id as string | undefined, source ?? undefined);
+    // ?view=editor: the editor's own projection ({ run, source }, as GET /api/runs/<id>?view=editor), so New video can
+    // open the page without loading the video again (src/lib/pending-runs.ts). A retried id returns the stored video,
+    // whose hook may differ from this request's.
+    if (new URL(request.url).searchParams.get("view") === "editor") {
+      const hook = run.sourceRefId ? (run.sourceRefId === source?.id ? source : await getReference(run.sourceRefId, who)) : null;
+      if (run.sourceRefId && !hook) return Response.json({ error: "Hook not found." }, { status: 404 });
+      return Response.json({ run, source: hook }, { status: 201, headers: { "Cache-Control": "private, no-store" } });
+    }
+    return Response.json(run, { status: 201 });
   } catch {
     return Response.json({ error: "Couldn't create the video. Try again." }, { status: 503 });
   }

@@ -5,18 +5,24 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { libraryMore, loadLibrary } from "@/lib/library-cache";
 import { RouteSkeleton } from "@/components/route-skeleton";
-import type { Reference, Run } from "@/lib/types";
+import type { Reference } from "@/lib/types";
 import { SourcePicker } from "@/components/source-picker";
+import { startCreate } from "@/lib/pending-runs";
 
 /** Viral library: the same hook grid as step 1, browsable without starting a video. */
 export function LibraryView() {
   const router = useRouter();
-  const creation = useRef<{ id: string; source: string } | null>(null);
   const busy = useRef(false);
   const [creating, setCreating] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
   const [refs, setRefs] = useState<Reference[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // New video leaves this page while the video is created; Next keeps the page and shows it again on Back, so its
+  // busy state resets as it is hidden (otherwise Back shows the loading skeleton for good).
+  useEffect(() => () => {
+    busy.current = false;
+    setCreating(false);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -32,28 +38,12 @@ export function LibraryView() {
   async function startWithHook(ref: Reference) {
     if (busy.current) return;
     busy.current = true;
-    if (creation.current && creation.current.source !== ref.id) {
-      setError("Retry the same hook to recover your video.");
-      busy.current = false;
-      return;
-    }
-    creation.current ??= { id: crypto.randomUUID(), source: ref.id };
     flushSync(() => setCreating(true));
-    router.prefetch(`/studio/${creation.current.id}`);
-    try {
-      const res = await fetch("/api/runs", { method: "POST", signal: AbortSignal.timeout(30_000), headers: { "content-type": "application/json" }, body: JSON.stringify({ id: creation.current.id, sourceRefId: ref.id }) });
-      if (res.status === 402) { window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/pricing" })); router.push("/pricing"); return; }
-      if (!res.ok) throw Error();
-      const run = await res.json() as Run;
-      window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: `/studio/${run.id}` }));
-      router.push(`/studio/${run.id}`);
-      creation.current = null;
-    } catch {
-      setError("Could not start a video with this hook");
-    } finally {
-      busy.current = false;
-      setCreating(false);
-    }
+    // Opens the new video at once; it is created on the server meanwhile (src/lib/pending-runs.ts).
+    const id = crypto.randomUUID();
+    void startCreate(id, ref.id);
+    window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: `/studio/${id}` }));
+    router.push(`/studio/${id}`);
   }
 
   if (creating) return <RouteSkeleton path="/studio/new" />;

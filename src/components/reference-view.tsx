@@ -9,6 +9,7 @@ import Link from "@/components/pending-link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ExternalLink, Loader2, RefreshCw, Scissors, Trash2, Wand2 } from "lucide-react";
 import { analyzeVideo } from "@/lib/analyze";
+import { startCreate } from "@/lib/pending-runs";
 import { PLATFORM_LABEL, ROLE_COLOR, ROLE_LABEL, fmtTime, fmtViews, type Analysis, type Reference, type Role } from "@/lib/types";
 
 export function ReferenceView() {
@@ -22,9 +23,14 @@ export function ReferenceView() {
   const [time, setTime] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const started = useRef(false);
-  const creation = useRef<string | null>(null);
   const actionLock = useRef(false);
   const [action, setAction] = useState<"create" | "delete" | null>(null);
+  // New video leaves this page while the video is created; Next keeps the page and shows it again on Back, so its
+  // busy state resets as it is hidden (otherwise Back shows the loading skeleton for good).
+  useEffect(() => () => {
+    actionLock.current = false;
+    setAction(null);
+  }, []);
 
   const save = useCallback(
     async (analysis: Analysis) => {
@@ -154,18 +160,11 @@ export function ReferenceView() {
             onClick={async () => {
               if (actionLock.current) return;
               actionLock.current = true; flushSync(() => setAction("create"));
-              creation.current ??= crypto.randomUUID();
-              router.prefetch(`/studio/${creation.current}`);
-              try {
-                const response = await fetch("/api/runs", { method: "POST", signal: AbortSignal.timeout(30_000), headers: { "content-type": "application/json" }, body: JSON.stringify({ id: creation.current, sourceRefId: id }) });
-                if (response.status === 402) { window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/pricing" })); router.push("/pricing"); return; }
-                if (!response.ok) throw Error();
-                const run = await response.json() as { id: string };
-                window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: `/studio/${run.id}` }));
-                router.push(`/studio/${run.id}`);
-                creation.current = null;
-              } catch { setError("Couldn't create the video. Try again."); }
-              finally { actionLock.current = false; setAction(null); }
+              // Opens the new video at once; it is created on the server meanwhile (src/lib/pending-runs.ts).
+              const runId = crypto.randomUUID();
+              void startCreate(runId, id);
+              window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: `/studio/${runId}` }));
+              router.push(`/studio/${runId}`);
             }}
             className="btn-primary px-3.5 py-1.5 text-[13.5px]"
           >

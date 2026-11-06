@@ -19,6 +19,7 @@ import { soundPieces } from "@/lib/sound";
 import { type Seg, clipGroup, clipSrc, demoClips, moveClipPiece, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, snapTexts, storeParts, timeline } from "@/lib/edit";
 
 import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
+import { forgetCreate, peekCreate, startCreate } from "@/lib/pending-runs";
 import { fmtTime, type DemoClip, type Frame, type Part, type Reference, type Run, type TextLayer, type TextPos } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
 import { ExportButton } from "@/components/export-button";
@@ -66,6 +67,9 @@ export function RunView() {
   const [refCursor, setRefCursor] = useState<string | null>(null);
   const [refs, setRefs] = useState<Reference[] | null>(null);
   const [missing, setMissing] = useState<string | null>(null);
+  /** A video New video opened before the server finished creating it, and the create failed: offer to retry. */
+  const [createFailed, setCreateFailed] = useState<{ id: string; sourceRefId?: string } | null>(null);
+  const [loadKey, setLoadKey] = useState(0);
   const [libraryOpen, setLibraryOpen] = useState(false);
   /** The My files tab to open on ("Check library": step 4 opens Generated, step 5 Demos). */
   const [libraryTab, setLibraryTab] = useState<"generated" | "demos" | undefined>(undefined);
@@ -119,9 +123,26 @@ export function RunView() {
       setRefs(old => [...(old ?? []).filter(r => !r.partial), ...page.items.filter(r => !(old ?? []).some(x => !x.partial && x.id === r.id))]);
       setRefCursor(page.next);
     }).catch(() => { if (alive) { setRefs(old => old ?? []); setToast("Library is unavailable. Try again."); } });
-    void fetch(`/api/runs/${id}?view=editor`, { cache: "no-store" }).then(async response => {
-      if (!response.ok) throw Error("missing");
-      const loaded = await response.json() as { run: Run; source: Reference | null };
+    // A video this tab is creating right now (New video opened it at once): its create answers with the editor's own
+    // projection, so the video is not loaded a second time (src/lib/pending-runs.ts).
+    const creating = peekCreate(id);
+    const load: Promise<{ run: Run; source: Reference | null }> = creating
+      ? creating.then(created => {
+          // Only the page that is still showing uses it (a development double effect, or a left page, does not).
+          if (!alive) throw Error("left");
+          forgetCreate(id, creating);
+          if ("run" in created) return created;
+          if ("pricing" in created) {
+            window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/pricing" }));
+            router.replace("/pricing");
+          } else if (alive) setCreateFailed({ id, sourceRefId: created.sourceRefId });
+          throw Error("not created");
+        })
+      : fetch(`/api/runs/${id}?view=editor`, { cache: "no-store" }).then(async response => {
+          if (!response.ok) throw Error("missing");
+          return await response.json() as { run: Run; source: Reference | null };
+        });
+    void load.then(loaded => {
       let data = loaded.run;
       if (!alive) return;
       const full = loaded.source;
@@ -139,7 +160,7 @@ export function RunView() {
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, loadKey, router]);
 
   useEffect(() => {
     if (!toast) return;
@@ -360,6 +381,29 @@ export function RunView() {
     return () => { window.removeEventListener("pagehide", flush); flush(); };
   }, [id]);
 
+  if (missing === id && createFailed?.id === id) {
+    return (
+      <div className="card flex h-full flex-col items-center justify-center gap-3 text-muted">
+        Couldn&apos;t create the video.
+        <button
+          type="button"
+          className="btn-primary px-4 py-2 text-[14px]"
+          onClick={() => {
+            // The same id: the server create is an idempotent upsert, so a retry never makes a second video.
+            void startCreate(id, createFailed.sourceRefId);
+            setCreateFailed(null);
+            setMissing(null);
+            setLoadKey((k) => k + 1);
+          }}
+        >
+          Try again
+        </button>
+        <Link href="/studio" className="font-semibold text-accent">
+          Back to videos
+        </Link>
+      </div>
+    );
+  }
   if (missing === id) {
     return (
       <div className="card flex h-full flex-col items-center justify-center gap-3 text-muted">
