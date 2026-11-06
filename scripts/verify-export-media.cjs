@@ -1,7 +1,8 @@
 // Offline synthetic media verification. No browser, playback, network or user files.
 const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{execFileSync}=require('node:child_process');
 async function main(){
- const {plan,stepArgs,finalArgs}=await import('../render/render.mjs');
+ const {plan,stepArgs,finalArgs,countArgs,countFrames,pieceHasSound,pieceSoundArgs}=await import('../render/render.mjs');
+ const {fillSoundFile}=await import('../render/sound-file.mjs');
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'mavya-verify-media-'));
  const ff=require('ffmpeg-static');
  const run=args=>execFileSync(ff,['-nostdin','-y','-v','error',...args],{timeout:60000,maxBuffer:8*1024*1024});
@@ -10,7 +11,15 @@ async function main(){
   run(['-f','lavfi','-i','color=black:s=720x1280:r=30.30:d=2.1','-f','lavfi','-i','sine=frequency=440:duration=2.1','-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p','-c:a','aac','-shortest',source]);
   run(['-f','lavfi','-i','color=red:s=40x40','-frames:v','1','-threads','1',png]);
   const spec={width:720,height:1280,fps:30,total:2,segments:[{gap:0,speed:1,volume:1,look:null,pieces:[{start:0,end:0.99},{start:0.99,end:2}]}],sounds:[],overlays:[{x:0,y:0,start:0,end:0.3},{x:0,y:0,start:0.99,end:1.4},{x:0,y:0,start:1.7,end:2}]};
-  const files=plan(spec).map((step,i)=>{const file=path.join(dir,`step${i}.mkv`);run(stepArgs(spec,step,{file:source,hasAudio:true,duration:2.1},file));return file;});
+  // Each piece as the render server makes it: frame count, its own fitted sound, then the piece (render/server.mjs).
+  const files=[];
+  for(const [i,step] of plan(spec).entries()){
+   const file=path.join(dir,`step${i}.mkv`),src={file:source,hasAudio:true,duration:2.1},counted=path.join(dir,`count${i}.txt`);
+   run(countArgs(spec,step,src,counted));
+   let sound;
+   if(pieceHasSound(spec,step,src)){const raw=path.join(dir,`sound${i}.raw`);sound=path.join(dir,`sound${i}.fit`);run(pieceSoundArgs(step,src,raw));await fillSoundFile(raw,sound,Math.round(step.len*48000));}
+   run(stepArgs(spec,step,src,file,countFrames(fs.readFileSync(counted,'utf8')),sound));files.push(file);
+  }
   const list=path.join(dir,'list.txt');fs.writeFileSync(list,files.map(file=>`file '${file}'`).join('\n'));
   const out=path.join(dir,'out.mp4');run(finalArgs(spec,list,{sounds:[],overlays:spec.overlays.map(()=>png)},out));
   for(const [at,red] of [[0.1,true],[0.5,false],[1.1,true],[1.5,false],[1.9,true]]){

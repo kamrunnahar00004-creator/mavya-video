@@ -42,7 +42,7 @@ assert.match(deletion, /d\.media_ids\.flatMap\(id => \[previewKey\(id\), oldPrev
   {
     const spec = { width: 720, height: 1280, fps: 30, total: 4, segments: [{ gap: 0, speed: 1, volume: 1, look: null, pieces: [{ start: 0, end: 2 }, { start: 2, end: 4, volume: 0.5, look: { brightness: 20 } }] }], sounds: [], overlays: [] };
     const steps = plan(spec);
-    const graph = (s) => stepArgs(spec, s, { file: 'x.mp4', hasAudio: true }, 'o.mkv').join(' ');
+    const graph = (s) => stepArgs(spec, s, { file: 'x.mp4', hasAudio: true }, 'o.mkv', s.frames, 'sound.raw').join(' ');
     assert.ok(!graph(steps[0]).includes('lutrgb') && graph(steps[0]).includes('volume=1'), 'first piece: the clip\'s look');
     assert.ok(graph(steps[1]).includes('lutrgb') && graph(steps[1]).includes('volume=0.5'), 'second piece: its own look and volume');
   }
