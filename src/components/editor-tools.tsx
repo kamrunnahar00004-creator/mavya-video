@@ -410,8 +410,11 @@ type TimelineEdit = {
   /** `${clip id}:${piece id}` */
   selClip: string | null;
   selText: string | null;
-  onSelectClip: (segId: string, partId: string) => void;
-  onSelectText: (id: string) => void;
+  /** Everything selected when several are ("t:<id>" / "c:<clip>:<piece>"); empty otherwise. */
+  selKeys: Set<string>;
+  /** add: Ctrl/Cmd/Shift was held (the item joins or leaves the selection). */
+  onSelectClip: (segId: string, partId: string, add?: boolean) => void;
+  onSelectText: (id: string, add?: boolean) => void;
   /** Piece i of a clip was trimmed to [a, b] (timeline seconds, inside its old window). */
   onClipTrim: (segId: string, i: number, a: number, b: number) => void;
   onTextTiming: (id: string, p: { start?: number; end?: number }) => void;
@@ -437,15 +440,17 @@ function usePlaybackTime(playback: PlaybackClock) {
   return useSyncExternalStore(playback.subscribe, playback.get, playback.get);
 }
 
-function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, onMove, onSplit, onAdd, onDelete, onUndo, onRedo, onCopy, onPaste, claim = "whole", edit, toolbar, compact = false, autoFocus = false }: {
+function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, onMove, onSplit, onAdd, onDelete, onUndo, onRedo, onCopy, onPaste, onCutSel, onSelectAll, claim = "whole", edit, toolbar, compact = false, autoFocus = false }: {
   segs: Seg[];
   /** Shown next to the video (the selected sound's card, or the editor's settings for the selection). */
   side: React.ReactNode | ((playback: PlaybackClock) => React.ReactNode);
   /** Playback id (one player plays at a time). */
   claim?: string;
-  /** Ctrl+C / Ctrl+V (the full editor). */
+  /** Ctrl+C / Ctrl+V / Ctrl+X / Ctrl+A (the full editor). */
   onCopy?: () => void;
   onPaste?: (time: number) => void;
+  onCutSel?: () => void;
+  onSelectAll?: () => void;
   edit?: TimelineEdit;
   /** Replaces the Cut / + Sound buttons (the full editor's tools); gets the playhead time. */
   toolbar?: (time: () => number) => React.ReactNode;
@@ -503,10 +508,12 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [playing, total, playback, setT]);
-  // Keyboard, like CapCut: Space play/pause, Delete removes the selected sound, S / Ctrl+B split, Ctrl+Z undo, Ctrl+Shift+Z redo, arrows move the playhead, Esc deselects.
-  const keys = useRef({ playing, onSplit, onDelete, onUndo, onRedo, onSelect, onCopy, onPaste });
+  // Keyboard, like CapCut: Space play/pause, Delete / Backspace removes the selection, S / Ctrl+B split, Ctrl+C / X / V
+  // copy, cut, paste, Ctrl+A select all, Ctrl+Z undo, Ctrl+Shift+Z / Ctrl+Y redo, Left / Right one frame (Shift: 1 s),
+  // Up / Down the previous / next cut, Home / End the start / end, Esc deselects (founder 2026-11-07).
+  const keys = useRef({ playing, onSplit, onDelete, onUndo, onRedo, onSelect, onCopy, onPaste, onCutSel, onSelectAll, segs });
   useEffect(() => {
-    keys.current = { playing, onSplit, onDelete, onUndo, onRedo, onSelect, onCopy, onPaste };
+    keys.current = { playing, onSplit, onDelete, onUndo, onRedo, onSelect, onCopy, onPaste, onCutSel, onSelectAll, segs };
   });
   // The last click was in this player: shortcuts keep working even when focus fell back to the page (e.g. after Delete).
   const active = useRef(Boolean(autoFocus));
@@ -542,12 +549,23 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
       else if (mod && e.key.toLowerCase() === "v" && k.onPaste) {
         setPlaying(false);
         k.onPaste(k.time);
-      } else if (mod && e.key.toLowerCase() === "z") (e.shiftKey ? k.onRedo : k.onUndo)();
+      } else if (mod && e.key.toLowerCase() === "x" && k.onCutSel) k.onCutSel();
+      else if (mod && e.key.toLowerCase() === "a" && k.onSelectAll) k.onSelectAll();
+      else if (mod && e.key.toLowerCase() === "z") (e.shiftKey ? k.onRedo : k.onUndo)();
       else if (mod && e.key.toLowerCase() === "y") k.onRedo();
       else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         setPlaying(false);
-        const step = (e.shiftKey ? 1 : 0.1) * (e.key === "ArrowLeft" ? -1 : 1);
+        // One frame (30 fps), like CapCut; Shift: one second.
+        const step = (e.shiftKey ? 1 : 1 / 30) * (e.key === "ArrowLeft" ? -1 : 1);
         setT(Math.max(0, Math.min(total - 0.01, k.time + step)));
+      } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        setPlaying(false);
+        const cuts = [0, ...k.segs.flatMap((g) => [g.offset, g.offset + g.len]), total - 0.01];
+        const t = e.key === "ArrowUp" ? Math.max(0, ...cuts.filter((c) => c < k.time - 0.001)) : Math.min(total - 0.01, ...cuts.filter((c) => c > k.time + 0.001));
+        setT(t);
+      } else if (e.key === "Home" || e.key === "End") {
+        setPlaying(false);
+        setT(e.key === "Home" ? 0 : total - 0.01);
       } else if (e.key === "Escape") k.onSelect(null);
       else return;
       e.preventDefault();
@@ -725,6 +743,11 @@ function WholeControls({ segs, texts, pieces, selected, total, playback, playing
     if (!rect || !edit) return;
     const drop = edit.onMoveClip;
     const shiftTo = edit.onShiftClip;
+    // Ctrl/Cmd/Shift-click adds it to (or takes it out of) the selection, like CapCut; no seek, no drag.
+    if (e.ctrlKey || e.metaKey || e.shiftKey) {
+      edit.onSelectClip(x.id, partId, true);
+      return;
+    }
     edit.onSelectClip(x.id, partId);
     const toT = (cx: number) => ((cx - rect.left) / rect.width) * width;
     onSeek(toT(e.clientX));
@@ -818,6 +841,11 @@ function WholeControls({ segs, texts, pieces, selected, total, playback, playing
   function dragText(e: React.PointerEvent, x: TextLayer, mode: "move" | "left" | "right") {
     const rect = area.current?.getBoundingClientRect();
     if (!rect || !edit) return;
+    if (e.ctrlKey || e.metaKey || e.shiftKey) {
+      e.stopPropagation();
+      edit.onSelectText(x.id, true);
+      return;
+    }
     edit.onSelectText(x.id);
     dragTextBar(e, rect, total, x, mode, [0, total, Math.min(playback.get(), total - 0.001), ...segs.map((g) => g.offset), ...texts.filter((o) => o.id !== x.id).flatMap((o) => [o.start, o.end])], edit.onTextTiming, setGuide, edit.onTextBegin, width);
   }
@@ -934,7 +962,9 @@ function WholeControls({ segs, texts, pieces, selected, total, playback, playing
                 // Magnet on: everything after slides along; off: only the rest of this clip does (the next clip stays, leaving space).
                 const shift = d && lo > d.lo + 0.001 && (edit.magnet || x.id === d.seg) ? d.cutL + d.cutR : 0;
                 const [a, b] = d?.key === key ? [lo, hi - d.cutL - d.cutR] : [lo - shift, hi - shift];
-                const on = edit.selClip === key;
+                const on = edit.selClip === key || edit.selKeys.has(`c:${key}`);
+                // Trim handles only on a single selection.
+                const handles = edit.selClip === key && !edit.selKeys.size;
                 const moving = Boolean(clipMove && (clipMove.whole ? clipMove.seg === x.id : clipMove.key === key));
                 const handle = "absolute inset-y-0 z-10 flex w-3 cursor-ew-resize touch-none items-center justify-center bg-ink";
                 // Frames across the piece, one every 32px, from the part of the file it plays (rounded to 0.5s so they are reused).
@@ -964,7 +994,7 @@ function WholeControls({ segs, texts, pieces, selected, total, playback, playing
                       <span className="truncate">{x.parts.length > 1 ? pieceName(name, pi) : name}</span>
                       {x.src && <span className="shrink-0 font-semibold tabular-nums text-white/75">{fmtTime(hi - lo)}</span>}
                     </span>
-                    {on && x.editable && (
+                    {handles && x.editable && (
                       <>
                         <span aria-label="Trim clip start" onPointerDown={(e) => trimClip(e, x.id, pi, key, lo, hi, "left")} className={`${handle} left-0`}>
                           <span className="h-3.5 w-0.5 rounded-full bg-white" />
@@ -1005,13 +1035,13 @@ function WholeControls({ segs, texts, pieces, selected, total, playback, playing
                     role="button"
                     tabIndex={0}
                     aria-label={`Text: ${x.text.trim() || "Text"}`}
-                    aria-pressed={edit.selText === x.id}
+                    aria-pressed={edit.selText === x.id || edit.selKeys.has(`t:${x.id}`)}
                     onPointerDown={(e) => dragText(e, x, "move")}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); edit.onSelectText(x.id); }
                     }}
                     title="Drag to move. Drag the ends to make it longer or shorter."
-                    className={`absolute inset-y-0 flex cursor-grab touch-none items-center gap-1 overflow-hidden rounded-md bg-texttrack-tint px-3.5 text-[10.5px] font-semibold text-texttrack outline-none active:cursor-grabbing ${edit.selText === x.id ? "ring-2 ring-inset ring-texttrack" : ""}`}
+                    className={`absolute inset-y-0 flex cursor-grab touch-none items-center gap-1 overflow-hidden rounded-md bg-texttrack-tint px-3.5 text-[10.5px] font-semibold text-texttrack outline-none active:cursor-grabbing ${edit.selText === x.id || edit.selKeys.has(`t:${x.id}`) ? "ring-2 ring-inset ring-texttrack" : ""}`}
                     style={{ left: pct(x.start), width: `calc(${pct(x.end)} - ${pct(x.start)})` }}
                   >
                     <Type className="h-3 w-3 shrink-0" />
@@ -1410,7 +1440,7 @@ type EditorSnap = { hook: Run["hook"]; demo: Run["demo"]; texts: TextLayer[]; so
  * The full editor (Edit under the phone): every clip, text and sound on one timeline, like CapCut but only what
  * Mavya does. Select something to change it on the right; Cut (S), Delete and Undo work on the selection.
  */
-export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, onParts, onPieceAdjust, onDeleteClip, onAddVideos, onInsertClip, onMoveClip, onShiftClip, onCloseGaps, onAdjust, onPatchText, onAddText, onRemoveText, onApplyAll, onPieces }: {
+export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRestore, onParts, onPieceAdjust, onDeleteClip, onDeleteMany, onAddVideos, onInsertClip, onMoveClip, onShiftClip, onCloseGaps, onAdjust, onPatchText, onAddText, onRemoveText, onApplyAll, onPieces }: {
   run: Run;
   source: Reference | null;
   segs: Seg[];
@@ -1423,6 +1453,8 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
   /** One piece's own settings in a Cut clip (everything but Speed). */
   onPieceAdjust: (clipId: string, partId: string, a: Partial<Adjust>) => void;
   onDeleteClip: (clipId: string, hold?: boolean) => void;
+  /** Several selected texts and clip pieces deleted in one step (one save, one Undo). */
+  onDeleteMany: (textIds: string[], pieces: { seg: string; part: string }[], hold?: boolean) => void;
   onShiftClip: (clipId: string, to: number) => void;
   onCloseGaps: () => void;
   /** Insert before demo clip `at`. */
@@ -1437,6 +1469,9 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
   onPieces: (pieces: SoundPiece[]) => void;
 }) {
   const [sel, setSel] = useState<{ kind: "clip"; seg: string; part: string } | { kind: "text"; id: string } | null>(null);
+  // Several selected at once, like CapCut (Ctrl/Cmd/Shift-click, Ctrl+A): "t:<text id>" / "c:<clip id>:<piece id>". The
+  // last one picked is also `sel` (its settings show on the right). Empty when one thing or nothing is selected.
+  const [multi, setMulti] = useState<string[]>([]);
   const [zoom, setZoom] = useState(1);
   // Main track magnet (on by default, like CapCut): clips stay joined. Off: drag clips anywhere, shortening leaves space.
   const [magnet, setMagnet] = useState(() => !segs.some((s) => s.gap > 0));
@@ -1468,6 +1503,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
     setFuture((f) => [...f, snap()]);
     onRestore(last);
     setSel(null);
+    setMulti([]);
   };
   const redo = () => {
     const next = future[future.length - 1];
@@ -1476,10 +1512,34 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
     setPast((p) => [...p, snap()]);
     onRestore(next);
     setSel(null);
+    setMulti([]);
   };
-  const pick = (next: typeof sel) => {
-    setSel(next);
+  type Sel = NonNullable<typeof sel>;
+  const keyOf = (s: Sel) => (s.kind === "text" ? `t:${s.id}` : `c:${s.seg}:${s.part}`);
+  const fromKey = (k: string): Sel => {
+    const [kind, a, b] = k.split(":");
+    return kind === "t" ? { kind: "text", id: a } : { kind: "clip", seg: a, part: b };
+  };
+  /** Select `next`; with `add` (Ctrl/Cmd/Shift held) it joins or leaves the selection instead, like CapCut. */
+  const pick = (next: typeof sel, add = false) => {
     sounds.select(null);
+    if (!add || !next) {
+      setMulti([]);
+      setSel(next);
+      return;
+    }
+    const k = keyOf(next);
+    const base = multi.length ? multi : sel ? [keyOf(sel)] : [];
+    const keys = base.includes(k) ? base.filter((x) => x !== k) : [...base, k];
+    setMulti(keys.length > 1 ? keys : []);
+    setSel(keys.length ? fromKey(keys[keys.length - 1]) : null);
+  };
+  /** Ctrl+A: every text and every clip piece. */
+  const selectAll = () => {
+    const keys = [...segs.filter((s) => s.src).flatMap((s) => s.parts.map((p) => `c:${s.id}:${p.id}`)), ...texts.map((t) => `t:${t.id}`)];
+    sounds.select(null);
+    setMulti(keys.length > 1 ? keys : []);
+    setSel(keys.length ? fromKey(keys[0]) : null);
   };
   const r3 = (x: number) => Math.round(x * 1000) / 1000;
   const selSeg = sel?.kind === "clip" ? segs.find((x) => x.id === sel.seg) : undefined;
@@ -1545,6 +1605,14 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
 
   /** Delete the selection: a text, a clip piece (the last piece of a demo clip removes the clip), or a sound. */
   const remove = () => {
+    if (multi.length > 1) {
+      const picked = multi.map(fromKey);
+      remember();
+      onDeleteMany(picked.flatMap((x) => (x.kind === "text" ? [x.id] : [])), picked.flatMap((x) => (x.kind === "clip" ? [{ seg: x.seg, part: x.part }] : [])), !magnet);
+      setSel(null);
+      setMulti([]);
+      return;
+    }
     if (selText) {
       remember();
       onRemoveText(selText.id);
@@ -1736,6 +1804,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
             selected={sel ? null : sounds.selId}
             onSelect={(id) => {
               setSel(null);
+              setMulti([]);
               sounds.select(id);
             }}
             onTrim={sounds.trimPiece}
@@ -1747,14 +1816,21 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
             onRedo={redo}
             onCopy={copy}
             onPaste={paste}
+            onCutSel={() => {
+              if (multi.length > 1 || !canCopy) return;
+              copy();
+              remove();
+            }}
+            onSelectAll={selectAll}
             side={side}
             toolbar={toolbar}
             edit={{
               zoom,
               selClip: sel?.kind === "clip" ? `${sel.seg}:${sel.part}` : null,
               selText: sel?.kind === "text" ? sel.id : null,
-              onSelectClip: (seg, part) => pick({ kind: "clip", seg, part }),
-              onSelectText: (id) => pick({ kind: "text", id }),
+              selKeys: new Set(multi),
+              onSelectClip: (seg, part, add) => pick({ kind: "clip", seg, part }, add),
+              onSelectText: (id, add) => pick({ kind: "text", id }, add),
               onClipTrim: (segId, i, a, b) => {
                 const seg = segs.find((x) => x.id === segId);
                 if (!seg) return;
