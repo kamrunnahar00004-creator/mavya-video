@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { LayoutGrid, List, Loader2, Plus, Trash2 } from "lucide-react";
 import { loadLibrary } from "@/lib/library-cache";
 import { fetchPage } from "@/lib/list-client";
-import { startCreate } from "@/lib/pending-runs";
+import { prefetchRun, startCreate } from "@/lib/pending-runs";
 import { runSteps } from "@/lib/edit";
 import { fmtDate, type Reference, type Run } from "@/lib/types";
 
@@ -246,7 +246,7 @@ export function RunsList() {
             {runs.map((r) => {
               const p = progress(r);
               return (
-                <Link prefetch={null} key={r.id} href={`/studio/${r.id}`} className="group block" onClick={(e) => editing === r.id && e.preventDefault()}>
+                <Link prefetch={null} key={r.id} href={`/studio/${r.id}`} className="group block" onPointerEnter={() => prefetchRun(r.id)} onFocus={() => prefetchRun(r.id)} onTouchStart={() => prefetchRun(r.id)} onClick={(e) => editing === r.id && e.preventDefault()}>
                   <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-[#1d1a2b] transition-transform group-hover:-translate-y-0.5">
                     <Cover run={r} />
                     <span className={`absolute left-2 top-2 rounded-md px-2 py-0.5 text-[12px] font-bold ${p.ready ? "bg-accent text-white" : "bg-white/90 text-text"}`}>{p.label}</span>
@@ -274,6 +274,9 @@ export function RunsList() {
                   prefetch={null}
                   key={r.id}
                   href={`/studio/${r.id}`}
+                  onPointerEnter={() => prefetchRun(r.id)}
+                  onFocus={() => prefetchRun(r.id)}
+                  onTouchStart={() => prefetchRun(r.id)}
                   onClick={(e) => editing === r.id && e.preventDefault()}
                   className="group grid grid-cols-[56px_minmax(0,1fr)_160px_110px_80px] items-center gap-4 border-b border-line px-4 py-2.5 last:border-b-0 hover:bg-raised"
                 >

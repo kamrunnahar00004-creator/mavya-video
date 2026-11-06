@@ -19,7 +19,7 @@ import { soundPieces } from "@/lib/sound";
 import { type Seg, clipGroup, clipSrc, demoClips, moveClipPiece, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, snapTexts, storeParts, timeline } from "@/lib/edit";
 
 import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
-import { forgetCreate, peekCreate, startCreate } from "@/lib/pending-runs";
+import { forgetLoad, peekLoad, startCreate } from "@/lib/pending-runs";
 import { fmtTime, type DemoClip, type Frame, type Part, type Reference, type Run, type TextLayer, type TextPos } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
 import { ExportButton } from "@/components/export-button";
@@ -123,25 +123,34 @@ export function RunView() {
       setRefs(old => [...(old ?? []).filter(r => !r.partial), ...page.items.filter(r => !(old ?? []).some(x => !x.partial && x.id === r.id))]);
       setRefCursor(page.next);
     }).catch(() => { if (alive) { setRefs(old => old ?? []); setToast("Library is unavailable. Try again."); } });
-    // A video this tab is creating right now (New video opened it at once): its create answers with the editor's own
-    // projection, so the video is not loaded a second time (src/lib/pending-runs.ts).
-    const creating = peekCreate(id);
-    const load: Promise<{ run: Run; source: Reference | null }> = creating
-      ? creating.then(created => {
-          // Only the page that is still showing uses it (a development double effect, or a left page, does not).
-          if (!alive) throw Error("left");
-          forgetCreate(id, creating);
-          if ("run" in created) return created;
-          if ("pricing" in created) {
-            window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/pricing" }));
-            router.replace("/pricing");
-          } else if (alive) setCreateFailed({ id, sourceRefId: created.sourceRefId });
-          throw Error("not created");
-        })
-      : fetch(`/api/runs/${id}?view=editor`, { cache: "no-store" }).then(async response => {
-          if (!response.ok) throw Error("missing");
-          return await response.json() as { run: Run; source: Reference | null };
-        });
+    // Data this tab already asked for: a create in flight (New video opened the page at once; it answers with the
+    // editor's own projection) or a card hover prefetch, so the video is not loaded again (src/lib/pending-runs.ts).
+    const fresh = () => fetch(`/api/runs/${id}?view=editor`, { cache: "no-store" }).then(async response => {
+      if (!response.ok) throw Error("missing");
+      return await response.json() as { run: Run; source: Reference | null };
+    });
+    const known = peekLoad(id);
+    let load: Promise<{ run: Run; source: Reference | null }>;
+    if (known?.kind === "create") {
+      load = known.job.then(created => {
+        // Only the page that is still showing uses it (a development double effect, or a left page, does not).
+        if (!alive) throw Error("left");
+        forgetLoad(id, known);
+        if ("run" in created) return created;
+        if ("pricing" in created) {
+          window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/pricing" }));
+          router.replace("/pricing");
+        } else setCreateFailed({ id, sourceRefId: created.sourceRefId });
+        throw Error("not created");
+      });
+    } else if (known?.kind === "prefetch") {
+      load = known.job.then(loaded => {
+        if (!alive) throw Error("left");
+        forgetLoad(id, known);
+        // A failed prefetch loads the usual way, which shows the usual error if it fails again.
+        return loaded ?? fresh();
+      });
+    } else load = fresh();
     void load.then(loaded => {
       let data = loaded.run;
       if (!alive) return;
