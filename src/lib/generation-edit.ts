@@ -1,4 +1,4 @@
-import { retimeTexts, timeline } from "@/lib/edit";
+import { containTexts, retimeTexts, timeline } from "@/lib/edit";
 import { DEFAULT_FONT } from "@/lib/studio-data";
 import { runTexts, TEXT_Y } from "@/lib/client";
 import { speedOf } from "@/lib/adjust";
@@ -26,11 +26,20 @@ export function generationPatch(run: Run, input: Run, generated: Generated, sugg
     ? { ...base, text: suggested && (!base.text || base.text === "How is this tool even legal?" || placeholders.includes(base.text)) ? suggested : base.text || suggested }
     : { id: "hook", text: suggested, start: 0, end: Math.round(generated.seconds / speed * 1000) / 1000, x: 50, y: TEXT_Y.top, size: 4.6, font: DEFAULT_FONT, color: "#ffffff", style: "outline" };
   if (hook.generated) versions.push(hook.generated);
-  return { hook: { ...hook, generated, versions: versions.slice(-50), start: 0, end: generated.seconds, parts: undefined, text: item.text }, texts: [item, ...texts.filter((t) => t.id !== "hook")] };
+  const nextHook = { ...hook, generated, versions: versions.slice(-50), start: 0, end: generated.seconds, parts: undefined, text: item.text };
+  // Each text inside its own clip on the new timeline (containTexts).
+  const all = [item, ...texts.filter((t) => t.id !== "hook")];
+  return { hook: nextHook, texts: containTexts(all, timeline({ ...run, hook: nextHook, texts: all }, null)) };
 }
 
 /** A completion snapshot must not erase edits still waiting for their debounce save. */
 export function reconcileGeneration(run: Run, updated: Run, dirty: { texts: boolean; adjust: boolean }): Run {
+  const result = reconcile(run, updated, dirty);
+  const texts = runTexts(result);
+  const contained = containTexts(texts, timeline(result, null));
+  return contained === texts ? result : { ...result, texts: contained };
+}
+function reconcile(run: Run, updated: Run, dirty: { texts: boolean; adjust: boolean }): Run {
   if (!dirty.texts && !dirty.adjust) return { ...run, hook: updated.hook, texts: updated.texts, project: null };
   const generated = updated.hook.generated;
   const local = generated ? generationPatch(run, run, generated, updated.hook.text) : { hook: run.hook, texts: runTexts(run) };

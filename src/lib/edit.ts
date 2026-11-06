@@ -155,16 +155,17 @@ export function snapTexts(texts: TextLayer[], segs: Seg[], tol = 0.08): TextLaye
 
 /**
  * A text belongs to the clip it starts in and never runs past that clip's end (founder 2026-11-07: a hook caption
- * showed over the next clip after the hook was trimmed). Texts starting in a gap or past the video are left alone.
- * Returns `texts` itself when nothing changes.
+ * showed over the next clip after the hook was trimmed). A text starting in a gap ends where the next clip starts;
+ * one past the video is left alone. The end is the exact edge, not rounded: the export rounds both to frames the
+ * same way, while a rounded edge could show the text on the next clip's first frame (Codex 2026-11-07). Returns
+ * `texts` itself when nothing changes.
  */
 export function containTexts(texts: TextLayer[], segs: Seg[]): TextLayer[] {
   let moved = false;
   const next = texts.map((t) => {
-    const seg = segs.find((s) => t.start >= s.offset - 0.0005 && t.start < s.offset + s.len - 0.0005);
-    if (!seg) return t;
-    const end = roundTime(seg.offset + seg.len);
-    if (t.end <= end + 0.0005) return t;
+    const seg = segs.find((s) => t.start >= s.offset && t.start < s.offset + s.len);
+    const end = seg ? seg.offset + seg.len : segs.find((s) => s.offset > t.start)?.offset;
+    if (end === undefined || t.end <= end) return t;
     moved = true;
     return { ...t, end };
   });
@@ -190,9 +191,14 @@ export function retimeTexts(texts: TextLayer[], offset: number, from: Window, to
     return offset + Math.max(0, Math.min(newLen, (file - to.start) / to.speed));
   };
   return texts.map((t) => {
-    const start = roundTime(map(t.start));
+    let start = roundTime(map(t.start));
     let end = roundTime(map(t.end));
+    // A text of this clip stays on it: one whose frames were cut away keeps the clip's last 0.3 s, never the next
+    // clip (Codex 2026-11-07: a shorter regenerated hook moved a hook caption onto the demo).
+    const own = t.start >= offset - 0.05 && t.start < offset + oldLen - 0.05;
+    if (own && start > offset + newLen - 0.3) start = roundTime(Math.max(offset, offset + newLen - 0.3));
     if (end - start < 0.3) end = roundTime(start + 0.3);
+    if (own) end = Math.min(end, offset + newLen);
     return { ...t, start, end };
   });
 }

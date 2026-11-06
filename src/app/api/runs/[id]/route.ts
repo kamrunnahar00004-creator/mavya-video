@@ -4,7 +4,8 @@ import type { Run } from "@/lib/types";
 import { validRunPatch } from "@/lib/server/run-validation";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { renderLimitError } from "@/lib/render-limits";
-import { timeline, videoLength } from "@/lib/edit";
+import { containTexts, timeline, videoLength } from "@/lib/edit";
+import { runTexts } from "@/lib/client";
 
 export async function GET(request: Request, ctx: RouteContext<"/api/runs/[id]">) {
   return readResponse(() => readGET(request, ctx));
@@ -36,8 +37,9 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/runs/[id]"
     if (bounds) return Response.json({ error: bounds }, { status: 400 });
   }
   if (!validRunPatch(body)) return Response.json({ error: "Invalid run sections" }, { status: 400 });
+  let current: Run | null | undefined;
   if (body?.hook || body?.demo) {
-    const current = await getRun(id, who);
+    current = await getRun(id, who);
     if (!current) return Response.json({ error: "Not found" }, { status: 404 });
     // The browser sends the whole hook section, and no action removes a generated clip. A save without one was made
     // before the clip landed (the script's hook line can arrive seconds after a reused clip): the clip and its timing
@@ -59,6 +61,16 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/runs/[id]"
   if (body.hook && typeof body.hook === "object") patch.hook = body.hook;
   if (body.demo && typeof body.demo === "object") patch.demo = body.demo;
   if (Array.isArray(body.texts)) patch.texts = body.texts;
+  // Every saved text stays inside the clip it starts in (containTexts), also when only the clips changed.
+  if (patch.texts || patch.hook || patch.demo) {
+    current ??= await getRun(id, who);
+    if (current) {
+      const merged = { ...current, ...patch } as Run;
+      const texts = runTexts(merged);
+      const contained = containTexts(texts, timeline(merged, null));
+      if (contained !== texts) patch.texts = contained;
+    }
+  }
   if (body.project === null || (body.project && typeof body.project === "object")) patch.project = body.project;
   // Screenshots of the seller's own product (uploaded images); the script reads them through the owner's media access.
   if (Array.isArray(body.productScreens)) patch.productScreens = body.productScreens;
