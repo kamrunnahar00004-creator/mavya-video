@@ -229,9 +229,18 @@ async function next() {
   if (busy) return;
   busy = true;
   try {
+    // Upload copies first: the editor plays them and an export of uploaded clips waits for their working copies anyway
+    // (Codex 2026-11-06: a preview queued behind exports). Bounded, so a burst of uploads never holds an export back for
+    // long: a waiting export runs after every 3 copies in a row. Still one job at a time (the server has 512 MB).
+    let copiesInARow = 0;
     while (queue.length || previewQueue.length) {
-      if (queue.length) await work(queue.shift());
-      else await makePreview(previewQueue.shift());
+      if (previewQueue.length && (!queue.length || copiesInARow < 3)) {
+        copiesInARow++;
+        await makePreview(previewQueue.shift());
+      } else {
+        copiesInARow = 0;
+        await work(queue.shift());
+      }
     }
   } finally { busy = false; }
 }

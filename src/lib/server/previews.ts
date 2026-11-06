@@ -25,7 +25,9 @@ async function exists(key: string): Promise<boolean> {
   if (until !== undefined && until > Date.now()) return until === Infinity;
   const found = Boolean(await objectInfo(key).catch(() => null));
   if (ready.size > 5000) ready.clear();
-  ready.set(key, found ? Infinity : Date.now() + 20_000);
+  // A missing copy is checked again after 2 s (was 20 s): a copy finished just after a check shows up at once (Codex
+  // 2026-11-06). The check is one storage HEAD request.
+  ready.set(key, found ? Infinity : Date.now() + 2_000);
   return found;
 }
 export const previewReady = (id: string) => exists(previewKey(id));
