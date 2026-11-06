@@ -415,6 +415,8 @@ type TimelineEdit = {
   /** add: Ctrl/Cmd/Shift was held (the item joins or leaves the selection). */
   onSelectClip: (segId: string, partId: string, add?: boolean) => void;
   onSelectText: (id: string, add?: boolean) => void;
+  /** A sound Ctrl/Cmd/Shift-clicked: it joins or leaves the selection. */
+  onSelectSound: (id: string) => void;
   /** Piece i of a clip was trimmed to [a, b] (timeline seconds, inside its old window). */
   onClipTrim: (segId: string, i: number, a: number, b: number) => void;
   onTextTiming: (id: string, p: { start?: number; end?: number }) => void;
@@ -440,7 +442,7 @@ function usePlaybackTime(playback: PlaybackClock) {
   return useSyncExternalStore(playback.subscribe, playback.get, playback.get);
 }
 
-function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, onMove, onSplit, onAdd, onDelete, onUndo, onRedo, onCopy, onPaste, onCutSel, onSelectAll, onTrimTo, onZoom, claim = "whole", edit, toolbar, compact = false, autoFocus = false }: {
+function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, onMove, onSplit, onAdd, onDelete, onUndo, onRedo, onCopy, onPaste, onCutSel, onSelectAll, onTrimTo, onZoom, onSplitAll, claim = "whole", edit, toolbar, compact = false, autoFocus = false }: {
   segs: Seg[];
   /** Shown next to the video (the selected sound's card, or the editor's settings for the selection). */
   side: React.ReactNode | ((playback: PlaybackClock) => React.ReactNode);
@@ -455,6 +457,8 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   onTrimTo?: (time: number, side: "left" | "right") => void;
   /** Ctrl + = / -: timeline zoom. */
   onZoom?: (dir: 1 | -1) => void;
+  /** Ctrl + Shift + B: split everything under the playhead. */
+  onSplitAll?: (time: number) => void;
   edit?: TimelineEdit;
   /** Replaces the Cut / + Sound buttons (the full editor's tools); gets the playhead time. */
   toolbar?: (time: () => number) => React.ReactNode;
@@ -515,9 +519,9 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
   // Keyboard, like CapCut: Space play/pause, Delete / Backspace removes the selection, S / Ctrl+B split, Ctrl+C / X / V
   // copy, cut, paste, Ctrl+A select all, Ctrl+Z undo, Ctrl+Shift+Z / Ctrl+Y redo, Left / Right one frame (Shift: 1 s),
   // Up / Down the previous / next cut, Home / End the start / end, Esc deselects (founder 2026-11-07).
-  const keys = useRef({ playing, onSplit, onDelete, onUndo, onRedo, onSelect, onCopy, onPaste, onCutSel, onSelectAll, onTrimTo, onZoom, segs });
+  const keys = useRef({ playing, onSplit, onDelete, onUndo, onRedo, onSelect, onCopy, onPaste, onCutSel, onSelectAll, onTrimTo, onZoom, onSplitAll, segs });
   useEffect(() => {
-    keys.current = { playing, onSplit, onDelete, onUndo, onRedo, onSelect, onCopy, onPaste, onCutSel, onSelectAll, onTrimTo, onZoom, segs };
+    keys.current = { playing, onSplit, onDelete, onUndo, onRedo, onSelect, onCopy, onPaste, onCutSel, onSelectAll, onTrimTo, onZoom, onSplitAll, segs };
   });
   // The last click was in this player: shortcuts keep working even when focus fell back to the page (e.g. after Delete).
   const active = useRef(Boolean(autoFocus));
@@ -546,6 +550,10 @@ function WholePlayer({ segs, texts, pieces, selected, side, onSelect, onTrim, on
         if (!k.playing) claimPlayback(claim);
         setPlaying(!k.playing);
       } else if (e.key === "Delete" || e.key === "Backspace") k.onDelete();
+      else if (mod && e.shiftKey && e.key.toLowerCase() === "b" && k.onSplitAll) {
+        setPlaying(false);
+        k.onSplitAll(k.time);
+      }
       else if ((!mod && e.key.toLowerCase() === "s") || (mod && e.key.toLowerCase() === "b")) {
         setPlaying(false);
         k.onSplit(k.time);
@@ -1090,7 +1098,9 @@ function WholeControls({ segs, texts, pieces, selected, total, playback, playing
           {pieces.map((p, i) => {
             if (rowOf(p) !== row) return null;
             const [a, b] = span(p, i);
-            const on = p.id === selected;
+            const on = p.id === selected || Boolean(edit?.selKeys.has(`s:${p.id}`));
+            // Trim handles only on a single selection.
+            const single = p.id === selected;
             // Touching the sound before / after on this row: square corners there, so the two read as one connected strip.
             const joinL = pieces.some((q, j) => j !== i && rowOf(q) === row && Math.abs(span(q, j)[1] - a) < 0.01);
             const joinR = pieces.some((q, j) => j !== i && rowOf(q) === row && Math.abs(span(q, j)[0] - b) < 0.01);
@@ -1113,6 +1123,7 @@ function WholeControls({ segs, texts, pieces, selected, total, playback, playing
                 }}
                 onPointerDown={(e) => {
                   e.stopPropagation();
+                  if (edit && (e.ctrlKey || e.metaKey || e.shiftKey)) return edit.onSelectSound(p.id);
                   onSelect(p.id);
                   moveSound(e, i);
                 }}
@@ -1121,7 +1132,7 @@ function WholeControls({ segs, texts, pieces, selected, total, playback, playing
               >
                 <Music className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">{p.name}</span>
-                {on && (
+                {single && (
                   <>
                     <span aria-label="Trim sound start" onPointerDown={(e) => trim(e, i, "left")} className={`${handle} left-0 ${joinL ? "" : "rounded-l-md"}`}>
                       <span className="h-3.5 w-0.5 rounded-full bg-white" />
@@ -1481,9 +1492,11 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
   // Several selected at once, like CapCut (Ctrl/Cmd/Shift-click, Ctrl+A): "t:<text id>" / "c:<clip id>:<piece id>". The
   // last one picked is also `sel` (its settings show on the right). Empty when one thing or nothing is selected.
   const [multiKeys, setMulti] = useState<string[]>([]);
-  // Only while a clip or text is selected: picking a sound (which clears `sel`) can never leave an old group to delete
-  // (Codex 2026-11-07).
-  const multi = sel ? multiKeys : [];
+  /** Ends any selection (clip, text and group). */
+  const clearSel = () => {
+    setSel(null);
+    setMulti([]);
+  };
   const [zoom, setZoom] = useState(1);
   const editorRoot = useRef<HTMLDivElement>(null);
   // Ctrl/Cmd + scroll zooms the timeline, like CapCut (not the page).
@@ -1504,7 +1517,9 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
   const [future, setFuture] = useState<EditorSnap[]>([]);
   const [uploading, setUploading] = useState(false);
   // Copied with Ctrl+C (or Copy): a text, or a clip piece (pasted as a new clip).
-  const [copied, setCopied] = useState<{ kind: "text"; t: TextLayer } | { kind: "clip"; clip: Omit<DemoClip, "id"> } | null>(null);
+  // A group keeps each item's place relative to the group's start (`rel`, seconds); its clips stay in timeline order.
+  type CopiedGroup = { kind: "group"; clips: Omit<DemoClip, "id">[]; texts: { t: TextLayer; rel: number }[]; sounds: { p: SoundPiece; rel: number; len: number }[] };
+  const [copied, setCopied] = useState<{ kind: "text"; t: TextLayer } | { kind: "clip"; clip: Omit<DemoClip, "id"> } | CopiedGroup | null>(null);
   const snap = (): EditorSnap => ({ hook: run.hook, demo: run.demo, texts, sounds: soundPieces(run, videoLen) });
   const remember = () => {
     setPast((p) => [...p.slice(-49), snap()]);
@@ -1527,8 +1542,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
     setPast((p) => p.slice(0, -1));
     setFuture((f) => [...f, snap()]);
     onRestore(last);
-    setSel(null);
-    setMulti([]);
+    clearSel();
   };
   const redo = () => {
     const next = future[future.length - 1];
@@ -1536,8 +1550,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
     setFuture((f) => f.slice(0, -1));
     setPast((p) => [...p, snap()]);
     onRestore(next);
-    setSel(null);
-    setMulti([]);
+    clearSel();
   };
   type Sel = NonNullable<typeof sel>;
   const keyOf = (s: Sel) => (s.kind === "text" ? `t:${s.id}` : `c:${s.seg}:${s.part}`);
@@ -1545,26 +1558,42 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
     const [kind, a, b] = k.split(":");
     return kind === "t" ? { kind: "text", id: a } : { kind: "clip", seg: a, part: b };
   };
-  /** Select `next`; with `add` (Ctrl/Cmd/Shift held) it joins or leaves the selection instead, like CapCut. */
-  const pick = (next: typeof sel, add = false) => {
+  // A group (several selected): "c:<clip>:<piece>", "t:<text>", "s:<sound>". It counts only while no single sound is
+  // selected on its own (a sound picked or added after it, whose selection clears `sel`, never leaves an old group to
+  // delete; Codex 2026-11-07). Every plain selection or deselection ends it (clearSel, pick).
+  const multi = multiKeys.length > 1 && !(sounds.choosing && sounds.pieces.length > 0) && (sel !== null || !sounds.selId) ? multiKeys : [];
+  /** The group's members as one list, or the single selection as one item. */
+  const current = () => (multi.length ? multi : sel ? [keyOf(sel)] : sounds.selId ? [`s:${sounds.selId}`] : []);
+  /** Toggle key `k` in the selection (Ctrl/Cmd/Shift-click). The last clip or text in it shows its settings. */
+  const toggle = (k: string) => {
+    const base = current();
+    const keys = base.includes(k) ? base.filter((x) => x !== k) : [...base, k];
     sounds.select(null);
-    if (!add || !next) {
+    const last = [...keys].reverse().find((x) => !x.startsWith("s:"));
+    if (keys.length === 1 && keys[0].startsWith("s:")) {
       setMulti([]);
-      setSel(next);
+      setSel(null);
+      sounds.select(keys[0].slice(2));
       return;
     }
-    const k = keyOf(next);
-    const base = multi.length ? multi : sel ? [keyOf(sel)] : [];
-    const keys = base.includes(k) ? base.filter((x) => x !== k) : [...base, k];
     setMulti(keys.length > 1 ? keys : []);
-    setSel(keys.length ? fromKey(keys[keys.length - 1]) : null);
+    setSel(last ? fromKey(last) : null);
   };
-  /** Ctrl+A: every text and every clip piece. */
+  /** Select `next`; with `add` (Ctrl/Cmd/Shift held) it joins or leaves the selection instead, like CapCut. */
+  const pick = (next: typeof sel, add = false) => {
+    if (add && next) return toggle(keyOf(next));
+    sounds.select(null);
+    setMulti([]);
+    setSel(next);
+  };
+  /** Ctrl+A: every clip piece, text and sound. */
   const selectAll = () => {
-    const keys = [...segs.filter((s) => s.src).flatMap((s) => s.parts.map((p) => `c:${s.id}:${p.id}`)), ...texts.map((t) => `t:${t.id}`)];
+    const keys = [...segs.filter((s) => s.src).flatMap((s) => s.parts.map((p) => `c:${s.id}:${p.id}`)), ...texts.map((t) => `t:${t.id}`), ...sounds.pieces.map((p) => `s:${p.id}`)];
     sounds.select(null);
     setMulti(keys.length > 1 ? keys : []);
-    setSel(keys.length ? fromKey(keys[0]) : null);
+    const first = keys.find((x) => !x.startsWith("s:"));
+    setSel(first ? fromKey(first) : null);
+    if (keys.length === 1 && keys[0].startsWith("s:")) sounds.select(keys[0].slice(2));
   };
   const r3 = (x: number) => Math.round(x * 1000) / 1000;
   const selSeg = sel?.kind === "clip" ? segs.find((x) => x.id === sel.seg) : undefined;
@@ -1607,26 +1636,110 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
     }
     return seg.id === "hook" ? 0 : i < 0 ? clips.length : time - seg.offset > seg.len / 2 ? i + 1 : i;
   };
+  /** A clip piece as a new clip to paste (its file window, settings and source). */
+  const clipCopy = (seg: Seg, partId: string): Omit<DemoClip, "id"> | null => {
+    if (!seg.src || !seg.editable) return null;
+    const part = seg.parts.find((x) => x.id === partId) ?? seg.parts[0];
+    const from = demoClips(run).find((c) => c.id === seg.id);
+    const name = seg.id === "hook" ? "Hook" : (from?.label ?? "Clip");
+    return { label: `${name} copy`, ...(from?.mediaId ? { mediaId: from.mediaId } : { src: seg.src }), name: from?.name ?? name, seconds: seg.seconds, start: part.start, end: part.end, adjust: seg.adjust };
+  };
   const copy = () => {
+    if (multi.length > 1) {
+      // The group: clips in timeline order, texts and sounds by their offset from the group's start.
+      const clips = multi.flatMap((k) => {
+        const x = fromKey(k);
+        if (x.kind !== "clip" || k.startsWith("s:")) return [];
+        const seg = segs.find((g) => g.id === x.seg);
+        const i = seg ? seg.parts.findIndex((p) => p.id === x.part) : -1;
+        return seg && i >= 0 ? [{ lo: seg.offset + pieceSpans(seg)[i].at, seg, part: x.part }] : [];
+      }).sort((a, b) => a.lo - b.lo);
+      const ts = multi.flatMap((k) => (k.startsWith("t:") ? texts.filter((t) => t.id === k.slice(2)) : []));
+      const ss = multi.flatMap((k) => {
+        const i = sounds.pieces.findIndex((p) => `s:${p.id}` === k);
+        return i >= 0 ? [{ p: sounds.pieces[i], end: pieceEnd(sounds.pieces, i, videoLen) }] : [];
+      });
+      const base = Math.min(...clips.map((c) => c.lo), ...ts.map((t) => t.start), ...ss.map((s) => s.p.at));
+      if (!Number.isFinite(base)) return;
+      setCopied({
+        kind: "group",
+        clips: clips.flatMap((c) => clipCopy(c.seg, c.part) ?? []),
+        texts: ts.map((t) => ({ t, rel: t.start - base })),
+        sounds: ss.map((s) => ({ p: s.p, rel: s.p.at - base, len: s.end - s.p.at })),
+      });
+      return;
+    }
     if (selText) setCopied({ kind: "text", t: selText });
-    else if (selSeg && sel?.kind === "clip" && selSeg.src && selSeg.editable) {
-      const part = selSeg.parts.find((x) => x.id === sel.part) ?? selSeg.parts[0];
-      const from = demoClips(run).find((c) => c.id === selSeg.id);
-      const name = selSeg.id === "hook" ? "Hook" : (from?.label ?? "Clip");
-      setCopied({ kind: "clip", clip: { label: `${name} copy`, ...(from?.mediaId ? { mediaId: from.mediaId } : { src: selSeg.src }), name: from?.name ?? name, seconds: selSeg.seconds, start: part.start, end: part.end, adjust: selSeg.adjust } });
+    else if (selSeg && sel?.kind === "clip") {
+      const clip = clipCopy(selSeg, sel.part);
+      if (clip) setCopied({ kind: "clip", clip });
     }
   };
   /** Paste at the playhead: a text keeps its look and length; a clip goes in at the nearest clip edge. */
   const paste = (time: number) => {
     if (!copied) return;
     remember();
+    if (copied.kind === "group") {
+      // Clips go in at the nearest clip edge, in order; texts and sounds keep their place from there (or from the
+      // playhead when the group has no clips).
+      let anchor = time;
+      if (copied.clips.length) {
+        const at = insertIndex(time);
+        const next = demoClips(run)[at];
+        anchor = next ? (segs.find((g) => g.id === next.id)?.offset ?? videoLen) : videoLen;
+        copied.clips.forEach((c, i) => onInsertClip({ ...c, id: uid() }, at + i));
+      }
+      for (const { t, rel } of copied.texts) {
+        const at = r3(anchor + rel);
+        onAddText(null, [at, r3(at + (t.end - t.start))], t.text, t);
+      }
+      if (copied.sounds.length) {
+        // Their own new row, so they never cut into the sounds already there.
+        const row = Math.max(-1, ...sounds.pieces.map(rowOf)) + 1;
+        onPieces([...sounds.pieces, ...copied.sounds.map(({ p, rel, len }) => ({ ...p, id: uid(), at: r3(anchor + rel), end: r3(anchor + rel + len), row }))].sort((a, b) => a.at - b.at));
+      }
+      return;
+    }
     if (copied.kind === "text") {
       const len = copied.t.end - copied.t.start;
       const at = r3(Math.max(0, Math.min(time, videoLen - 0.3)));
       onAddText(texts.some((x) => x.id === copied.t.id) ? copied.t.id : null, [at, r3(Math.min(videoLen, at + len))], copied.t.text, copied.t);
     } else onInsertClip({ ...copied.clip, id: uid() }, insertIndex(time));
   };
-  const canCopy = Boolean(selText || (selSeg?.src && selSeg.editable));
+  const canCopy = Boolean(multi.length > 1 || selText || (selSeg?.src && selSeg.editable));
+
+  /**
+   * Ctrl+Shift+B: split everything under the playhead at once, the clip, every text and every sound there (Ctrl+B
+   * splits only the selection or the clip).
+   */
+  const splitAll = (time: number) => {
+    const seg = segs.find((x) => time >= x.offset && time < x.offset + x.len);
+    let clipSplit: { id: string; parts: Part[] } | null = null;
+    if (seg?.editable) {
+      const { file, i } = fileAt(seg, time - seg.offset);
+      const p = seg.parts[i];
+      const sp = speedOf(seg.adjust);
+      if ((file - p.start) / sp > 0.2 && (p.end - file) / sp > 0.2) {
+        const second: Part = { id: uid(), start: r3(file), end: p.end, ...(p.adjust ? { adjust: p.adjust } : {}) };
+        clipSplit = { id: seg.id, parts: [...seg.parts.slice(0, i), { ...p, end: r3(file) }, second, ...seg.parts.slice(i + 1)] };
+      }
+    }
+    const ts = texts.filter((t) => time > t.start + 0.3 && time < t.end - 0.3);
+    const under = sounds.pieces.map((p, i) => ({ p, end: pieceEnd(sounds.pieces, i, videoLen) })).filter(({ p, end }) => time > p.at + 0.25 && time < end - 0.25);
+    if (!clipSplit && !ts.length && !under.length) return;
+    remember();
+    if (clipSplit) onParts(clipSplit.id, clipSplit.parts, !magnet);
+    for (const t of ts) {
+      onPatchText(t.id, { end: r3(time) });
+      onAddText(t.id, [r3(time), t.end], t.text);
+    }
+    if (under.length) {
+      const at = r3(time);
+      const cut = new Set(under.map((u) => u.p.id));
+      onPieces([...sounds.pieces.filter((p) => !cut.has(p.id)), ...under.flatMap(({ p, end }) => [{ ...p, end: at }, { ...p, id: uid(), at, end, start: round1(p.start + (at - p.at)) }])].sort((a, b) => a.at - b.at));
+    }
+    clearSel();
+  };
 
   /**
    * Q / W, like CapCut: delete the part of the selected text, or of the selected clip piece (else the clip under the
@@ -1654,17 +1767,18 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
   /** Delete the selection: a text, a clip piece (the last piece of a demo clip removes the clip), or a sound. */
   const remove = () => {
     if (multi.length > 1) {
-      const picked = multi.map(fromKey);
+      const picked = multi.filter((k) => !k.startsWith("s:")).map(fromKey);
+      const gone = new Set(multi.filter((k) => k.startsWith("s:")).map((k) => k.slice(2)));
       remember();
-      onDeleteMany(picked.flatMap((x) => (x.kind === "text" ? [x.id] : [])), picked.flatMap((x) => (x.kind === "clip" ? [{ seg: x.seg, part: x.part }] : [])), !magnet);
-      setSel(null);
-      setMulti([]);
+      if (picked.length) onDeleteMany(picked.flatMap((x) => (x.kind === "text" ? [x.id] : [])), picked.flatMap((x) => (x.kind === "clip" ? [{ seg: x.seg, part: x.part }] : [])), !magnet);
+      if (gone.size) onPieces(sounds.pieces.filter((p) => !gone.has(p.id)));
+      clearSel();
       return;
     }
     if (selText) {
       remember();
       onRemoveText(selText.id);
-      setSel(null);
+      clearSel();
     } else if (selSeg && sel?.kind === "clip") {
       if (selSeg.parts.length > 1) {
         remember();
@@ -1673,7 +1787,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
         remember();
         onDeleteClip(selSeg.id, !magnet);
       }
-      setSel(null);
+      clearSel();
     } else if (sounds.selId) sounds.deleteSelected();
   };
 
@@ -1797,8 +1911,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
         type="button"
         title="Add a sound at the playhead"
         onClick={() => {
-          setSel(null);
-          setMulti([]);
+          clearSel();
           sounds.addAt(time());
         }}
         className={tool}
@@ -1852,8 +1965,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
             pieces={sounds.pieces}
             selected={sel ? null : sounds.selId}
             onSelect={(id) => {
-              setSel(null);
-              setMulti([]);
+              clearSel();
               sounds.select(id);
             }}
             onTrim={sounds.trimPiece}
@@ -1866,10 +1978,11 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
             onCopy={copy}
             onPaste={paste}
             onCutSel={() => {
-              if (multi.length > 1 || !canCopy) return;
+              if (!canCopy) return;
               copy();
               remove();
             }}
+            onSplitAll={splitAll}
             onSelectAll={selectAll}
             onTrimTo={trimTo}
             onZoom={(dir) => setZoom((z) => (dir > 0 ? Math.min(8, z * 2) : Math.max(1, z / 2)))}
@@ -1882,6 +1995,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
               selKeys: new Set(multi),
               onSelectClip: (seg, part, add) => pick({ kind: "clip", seg, part }, add),
               onSelectText: (id, add) => pick({ kind: "text", id }, add),
+              onSelectSound: (id) => toggle(`s:${id}`),
               onClipTrim: (segId, i, a, b) => {
                 const seg = segs.find((x) => x.id === segId);
                 if (!seg) return;
@@ -1902,7 +2016,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
               onMoveClip: (segId, partId, beforeId) => {
                 remember();
                 onMoveClip(segId, partId, beforeId);
-                setSel(null);
+                clearSel();
               },
             }}
           />
