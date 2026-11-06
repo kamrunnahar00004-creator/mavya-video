@@ -87,3 +87,30 @@ These are positive-duration inputs accepted by server validation; the editor's u
 - Preview still consumes the supplied text ranges; generation normalization now covers both reconcile branches, but cannot recover captions already classified into the wrong clip. Undo/restore and normal saves likewise inherit the ownership problem. The previously noted `runRef` synchronization risk and brief unconstrained live-text preview window are unchanged; neither is needed to reproduce these blockers.
 
 Validation: reran the temporary TypeScript-transpilation harness against current repository helpers and the same supplied run JSON, including load-time snapping, direct export, generation, both reconciliation branches, gap containment, short-duration containment, and frame formulas. Client dependency isolation is as described in Round 1. No application code changes, interactive media render, or live API mutation; did not rerun the reported static/build checks. Only this review document was edited for Round 2. No commit or push performed.
+
+## Round 3
+
+**Verdict: ship.** Reviewed HEAD `a2ca6f3b47f55f1f4accb40843fba41ee33f6617`. Both Round 2 blockers are resolved in the rerun cases. No new blocking finding in this review.
+
+`ownedBy` now interprets saved starts and clip boundaries at the same millisecond precision in both containment and retiming. Keeping the end clamp exact preserves the prior frame-rounding fix. The new ownership test also includes captions in the old hook's final 50 ms.
+
+### Independent counterexample reruns
+
+- **All 13 supplied captions:** checked load (`containTexts(snapTexts(...))`), direct `exportLayers`, and PATCH normalization for **text-only, hook-only, and demo-only** bodies. All **65 caption/frame-range assertions passed**. Each resulting caption retains its original start frame and ends at the lesser of its original end frame and its intended clip's cut frame, minus one; none disappears or extends into the next clip. For the load path, snapped starts preserve those original frame numbers.
+- The three leaking hook captions now cover **0–69**; `my insta reels had no views😭` retains **70–131**; `browse viral hooks`, `on ` and `mavya.app` retain **132–218**. The Round 2 loss of those captions is fixed.
+- **Generation 2 s → 1 s:** hook captions starting at **1.900, 1.950, 1.980 and 1.999**, ending at 2.000, all become **0.700–1.000** in `generationPatch`, clean reconcile, dirty texts-plus-adjust reconcile, and `exportLayers`. No tested caption is resurrected on the demo.
+- **1.0166 s hook:** contained end remains **1.0166**, cut frame **30**, caption last frame **29**. The original one-frame leak remains fixed.
+- **Gap caption:** 1.5–2.5 with the next clip starting at 2 becomes **1.5–2.0**. The gap fix remains intact.
+- Containment of the supplied run remains idempotent. A valid extremely short interval can still quantize to no frames (the synthetic 1.016–1.0166 case); the supplied run no longer suffers accidental truncation to such intervals.
+
+### PATCH and interpretation of ownership
+
+Executed the actual current PATCH handler with isolated auth, storage, validation and render-limit dependencies. Each of the three body variants above read the stored run once, returned success, and passed all 13 frame assertions on the run captured by mocked `updateRun`. This exercises the route's merge and normalization code, including timeline-only bodies, rather than merely repeating the helper call. It is not an authenticated integration test; shape validation and database behavior were mocked, and no production data was changed.
+
+I agree that c2's exact-time ownership count is an artefact for the supplied `my insta reels` caption. Its saved start 2.345 is the millisecond representation of the demo edge at 2.3454545454545452, and both quantize to frame 70. Counting it as a hook caption contradicts its intended and rendered start frame. The independent assertions above use cumulative cut frames to determine the supplied captions' intended frame ranges, rather than using `ownedBy` itself as the expected-result oracle.
+
+### Scope and residual observations
+
+Preview and Undo/restore continue to rely on the normalized text state; export retains its own normalization guard. The previously documented brief live-edit preview window and structural stale-`runRef` risk remain unchanged and were not reproduced as persistent failures. They do not invalidate these fixes or the ship verdict. Start-based ownership still deliberately allows moving a caption to another clip, and shortening its range discards the excess duration.
+
+Validation used the temporary Node/installed-TypeScript harness against current repository helpers, with the actual `runTexts` implementation isolated from unrelated client dependencies, plus the actual PATCH handler as described above. Inspected HEAD and Claude's c3 harness; independently reran the counterexamples. No interactive browser playback, media encoding, live database writes, or additional build run; the supplied build result is not independently reverified. Only this review document was edited in the repository for Round 3. No commit or push performed.
