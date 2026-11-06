@@ -90,3 +90,35 @@ Enable Delete when the group contains deletable members, using the same selectio
 - This harness is not a mounted React/browser test and does not prove browser event scheduling, mouse/keyboard focus behavior, persistence after reload or actual media playback. Selection/Undo/Redo/chooser conclusions not identified as executable checks above are source inspection. Claude's Chrome results remain supplied evidence, not independently rerun results.
 
 Only the requested review document was created by this review. Fix the five findings, then rerun sound-only toolbar deletion, overlapping-row copy/paste, nonadjacent group cut/paste, gapped insertion, and middle insertion with synchronized captions/audio, including one-step Undo/Redo and reload.
+
+## Round 2 — 2026-11-07
+
+**Verdict: ship.** Reviewed HEAD `b9b75508ca15f1d28c92bdd0ed6d46139dcb3d4f`. All five Round 1 findings are resolved in the rerun reproductions. No new blocking defect found. This verdict supersedes the initial blockers verdict for this HEAD, subject to the verification limits below.
+
+### Reproductions rerun
+
+The updated temporary harness, `/tmp/groups-review-round2.cjs`, extracts the **current** copy, paste, insertion, selection and split functions and loads the actual timeline, containment and sound helpers. It models ordered functional state updates and save containment on cloned fixtures. The old harness's clipboard shape and defect assertions were updated for the new implementation; this was not a rerun of obsolete expected failures.
+
+1. **Nonadjacent clips: fixed.** Actual copy of green, orange and an orange caption at 9–12, then paste at End, produces the copied caption at **15–18**, on the packed orange copy. The clipboard retains clip `lo`/`len`, and `place` maps the layer's start to its copied clip. Additional assertions passed placement before, inside, between and after copied clips, including the between-clip cap and text-only spacing. A speed-2 copied clip retained its 1.5-second timeline length. Packing is now an explicit policy: unselected spaces are removed, while layers in those spaces follow the documented capped mapping.
+2. **Overlapping sound rows: fixed.** Actual copy/paste of sounds 0–6 on row 0 and 2–6 on row 1 at playhead 6 produces **6–12 on row 2** and **8–12 on row 3**. Both effective ends, evaluated with `pieceEnd`, remain 12. Distinct source rows map to distinct new rows above existing rows; source offsets and effective copied durations are retained.
+3. **Gap anchor: fixed.** Hook 0–3, two-second gap, green/caption 5–8: pasting green plus caption while inside the hook inserts both copies at **3–6**, and moves the original green/caption to **8–11**. Subtracting the next segment's gap makes the anchor agree with the actual inserted clip start. Caption containment no longer shortens this copied caption.
+4. **Downstream audio on insertion: fixed.** Pasting two 3-second clips before blue moves both the original caption and sound from **6–9 to 12–15**. This passed both with and without sounds in the copied group. Both inserted clips survive in order. Single-clip paste also moves both layers once, to 9–12; appending leaves existing sound positions unchanged. `insertClips` advances `runRef` with the shifted sounds before each subsequent insert. When paste adds sounds, its final sound save computes the same aggregate shift rather than restoring the original audio positions.
+5. **Toolbar Delete: fixed.** The actual `canDelete` expression evaluates true for a sound-only group with `sel = null` and no individual sound selected. Sound-only toggle/collapse still passes. The toolbar invokes the existing `remove` function, whose group branch handles sound IDs and takes one editor snapshot.
+
+### Ordering and remaining limits
+
+The new saves merge sounds alongside demo/text fields; they do not replace the pending functional text additions. Repeated insertion, including the final pasted-sounds merge, passed the direct update-order checks. Split-all was rerun at 4.533 seconds: both clip pieces, caption halves and sound halves survive, with one history call and one selection-clear call. Its inherited sound-source rounding to 4.5 seconds is unchanged.
+
+Selection/chooser/Escape and Undo/Redo code is unchanged apart from enabling group Delete. Source inspection still supports the Round 1 conclusions: toolbar Sound clears the old group, plain selection/Escape clears group keys, and editor snapshots include all four restored sections. These are not fresh browser Undo/Redo assertions.
+
+The existing limitations remain nonblocking for these fixes: single-sound copy/cut is unsupported, individual sound selection can survive `clearSel`, piece-specific visual overrides are not copied, and hook protection prevents cutting every selected hook piece. `shiftSounds` intentionally leaves sounds already playing across the insertion point in place; it moves pieces starting at/after the same 50 ms threshold used for captions. Direct checks passed that threshold, unchanged in-file source offsets and implicit sound ends. This is the stated insertion policy, not a claim that spanning audio is split or stretched.
+
+### Validation
+
+- `node /tmp/groups-review-round2.cjs`: passed all reproduction and additional assertions described above.
+- `npx tsc --noEmit`: passed.
+- `npx eslint src/components/editor-tools.tsx src/components/run-view.tsx src/lib/sound.ts`: passed.
+- `npm run build`: attempted, **not verified this round**. Turbopack failed while processing CSS because its worker could not bind a port: `Operation not permitted (os error 1)`. This is an environment restriction, not a demonstrated compilation defect. Claude's reported successful build remains supplied evidence.
+- No independent Chrome, media playback, persisted reload or mounted React test was performed. Claude's hk3/hk6 results are supporting evidence; the direct harness does not establish real-browser scheduling or focus behavior.
+
+Only this review document was edited. No application changes, commit or push.
