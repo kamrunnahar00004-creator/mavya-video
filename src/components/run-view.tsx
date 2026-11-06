@@ -16,7 +16,7 @@ import { type Adjust, speedOf } from "@/lib/adjust";
 import { reconcileGeneration } from "@/lib/generation-edit";
 import { soundPieces } from "@/lib/sound";
 
-import { type Seg, clipGroup, clipSrc, demoClips, moveClipPiece, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, snapTexts, storeParts, timeline } from "@/lib/edit";
+import { type Seg, clipGroup, clipSrc, containTexts, demoClips, moveClipPiece, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, snapTexts, storeParts, timeline } from "@/lib/edit";
 
 import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { forgetLoad, peekLoad, startCreate } from "@/lib/pending-runs";
@@ -164,8 +164,10 @@ export function RunView() {
       if (full) setRefs(old => [full, ...(old ?? []).filter(r => r.id !== full.id)]);
       else setRefs(old => old ?? []);
       // Texts a hair off a clip's edge (older 0.1s rounding) snap onto it, so captions start and end with their clip.
+      // ...and each text stays inside the clip it starts in (containTexts).
       const texts = runTexts(data);
-      const fixed = snapTexts(texts, timeline(data, full));
+      const segs = timeline(data, full);
+      const fixed = containTexts(snapTexts(texts, segs), segs);
       if (fixed !== texts) {
         data = { ...data, texts: fixed };
         void patchRun(id, { texts: fixed, project: null });
@@ -185,6 +187,12 @@ export function RunView() {
 
   const save = useCallback(
     (patch: Partial<Run>) => {
+      // Saved texts stay inside the clip each starts in, on the timeline this save makes (containTexts).
+      const cur = runRef.current;
+      if (patch.texts && cur?.id === id) {
+        const texts = containTexts(patch.texts, timeline({ ...cur, ...patch }, null));
+        if (texts !== patch.texts) patch = { ...patch, texts };
+      }
       setRun((r) => (r?.id === id ? { ...r, ...patch, project: null } : r));
       void patchRun(id, { ...patch, project: null });
     },
@@ -295,7 +303,9 @@ export function RunView() {
       saveTimer.current = null;
       const cur = runRef.current;
       if (!cur) return;
-      const texts = runTexts(cur);
+      // A text dragged past its clip's end ends at the clip's end (containTexts).
+      const texts = containTexts(runTexts(cur), timeline(cur, null));
+      if (texts !== runTexts(cur)) setRun((r) => (r?.id === cur.id ? { ...r, texts } : r));
       const h = texts.find((x) => x.id === "hook");
       void patchRun(id, { texts, hook: h ? { ...cur.hook, text: h.text } : cur.hook, project: null });
     }, 250);
@@ -312,7 +322,7 @@ export function RunView() {
         const after = speedOf(adjust);
         const texts = before === after ? runTexts(r) : remapTexts(runTexts(r), seg.offset, { parts: seg.parts, speed: before }, { parts: seg.parts, speed: after });
         const next = clipId === "hook" ? { ...r, hook: { ...r.hook, adjust } } : { ...r, demo: { ...r.demo, clips: demoClips(r).map((c) => (c.id === clipId ? { ...c, adjust } : c)) } };
-        return { ...next, texts };
+        return { ...next, texts: containTexts(texts, timeline(next, null)) };
       });
       if (adjustTimer.current) clearTimeout(adjustTimer.current);
       adjustTimer.current = setTimeout(() => {

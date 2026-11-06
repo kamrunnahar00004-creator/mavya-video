@@ -153,6 +153,24 @@ export function snapTexts(texts: TextLayer[], segs: Seg[], tol = 0.08): TextLaye
   return moved ? next : texts;
 }
 
+/**
+ * A text belongs to the clip it starts in and never runs past that clip's end (founder 2026-11-07: a hook caption
+ * showed over the next clip after the hook was trimmed). Texts starting in a gap or past the video are left alone.
+ * Returns `texts` itself when nothing changes.
+ */
+export function containTexts(texts: TextLayer[], segs: Seg[]): TextLayer[] {
+  let moved = false;
+  const next = texts.map((t) => {
+    const seg = segs.find((s) => t.start >= s.offset - 0.0005 && t.start < s.offset + s.len - 0.0005);
+    if (!seg) return t;
+    const end = roundTime(seg.offset + seg.len);
+    if (t.end <= end + 0.0005) return t;
+    moved = true;
+    return { ...t, end };
+  });
+  return moved ? next : texts;
+}
+
 type Window = { start: number; end: number; speed: number };
 
 /**

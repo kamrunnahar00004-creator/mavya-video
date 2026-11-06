@@ -1,8 +1,10 @@
 import { runTexts } from "@/lib/client";
-import { timeline, videoLength } from "@/lib/edit";
+import { containTexts, timeline, videoLength } from "@/lib/edit";
 import type { Run } from "@/lib/types";
 export function exportLayers(run: Run) {
- const total = videoLength(timeline(run, null).filter(s => s.src));
- return runTexts(run).map((t,i) => run.texts ? t : { ...t, id: `legacy-export-${i}` })
+ const segs = timeline(run, null);
+ const total = videoLength(segs.filter(s => s.src));
+ // Each text stays inside its own clip (containTexts), whatever older edits saved.
+ return containTexts(runTexts(run), segs).map((t,i) => run.texts ? t : { ...t, id: `legacy-export-${i}` })
   .filter(t => t.text.trim() && t.end > t.start && t.start < total && t.end > 0);
 }
