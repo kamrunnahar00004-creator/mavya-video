@@ -10,7 +10,8 @@ import { pipeline } from "node:stream/promises";
 import { ffmpegPath } from "@/lib/server/ffmpeg";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { deleteObject, putObject, signedGet } from "@/lib/server/r2";
-import { demoArgs, demoAt, finalArgs, plan, stepArgs, type Probe, type Spec } from "../../../render/render.mjs";
+import { countArgs, countFrames, demoArgs, demoAt, finalArgs, pieceHasSound, pieceSoundArgs, plan, stepArgs, type Probe, type Spec } from "../../../render/render.mjs";
+import { fillSoundFile } from "../../../render/sound-file.mjs";
 import { MAX_FILE_BYTES, MAX_JOB_BYTES, countOverlayPixels, validProbe } from "../../../render/limits.mjs";
 
 /**
@@ -116,7 +117,23 @@ export async function renderStep(job: string, i: number, until = Date.now() + 28
     if (left() <= 0) throw new Error("export step too late");
     const t1 = Date.now();
     const out = path.join(dir, "out.mkv");
-    await ffmpeg(stepArgs(p.spec, step, src, out), Math.max(1000, Math.min(270_000, left())));
+    // The piece's frames after its first frame-rate pass, spread over its planned frames (stepArgs).
+    let slots: number | undefined, sound: string | undefined;
+    if (src) {
+      const counted = path.join(dir, "count.txt");
+      await ffmpeg(countArgs(p.spec, step, src, counted), Math.max(1000, Math.min(120_000, left())));
+      slots = countFrames(await readFile(counted, "utf8"));
+      // Its own sound, stretched to exactly its length with the browser's code (render/sound.mjs).
+      if (pieceHasSound(p.spec, step, src)) {
+        const raw = path.join(dir, "sound.raw");
+        sound = path.join(dir, "sound.fit.raw");
+        if (left() <= 0) throw new Error("export step too late");
+        await ffmpeg(pieceSoundArgs(step, src, raw), Math.max(1000, Math.min(120_000, left())));
+        await fillSoundFile(raw, sound, Math.round(step.len * 48000));
+      }
+      if (left() <= 0) throw new Error("export step too late");
+    }
+    await ffmpeg(stepArgs(p.spec, step, src, out, slots, sound), Math.max(1000, Math.min(270_000, left())));
     const t2 = Date.now();
     // Past the coordinator's deadline nobody will join this piece: never leave it behind in storage.
     if (left() <= 0 || !(await payloadOf(job)) || left() <= 0) throw new Error("export step too late");

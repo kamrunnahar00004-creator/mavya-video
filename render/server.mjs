@@ -8,14 +8,15 @@
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdtemp, rm, writeFile, stat } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, stat, readFile } from "node:fs/promises";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID, timingSafeEqual, createHash } from "node:crypto";
 import ffmpegPath from "ffmpeg-static";
-import { demoArgs, demoAt, finalArgs, isHdr, plan, previewRuns, stepArgs } from "./render.mjs";
+import { countArgs, countFrames, demoArgs, demoAt, finalArgs, isHdr, pieceHasSound, pieceSoundArgs, plan, previewRuns, stepArgs } from "./render.mjs";
+import { fillSoundFile } from "./sound-file.mjs";
 
 const SECRET = process.env.RENDER_SECRET ?? "";
 const PORT = Number(process.env.PORT ?? 3200);
@@ -129,7 +130,22 @@ async function work(id) {
     const files = [];
     for (const [i, step] of steps.entries()) {
       const file = path.join(dir, `step${i}.mkv`);
-      await run(stepArgs(spec, step, step.kind === "piece" ? segments[step.si] : null, file),null,signal);
+      const src = step.kind === "piece" ? segments[step.si] : null;
+      // The piece's frames after its first frame-rate pass, spread over its planned frames (stepArgs).
+      let slots, sound;
+      if (src) {
+        const counted = path.join(dir, `count${i}.txt`);
+        await run(countArgs(spec, step, src, counted), null, signal);
+        slots = countFrames(await readFile(counted, "utf8"));
+        // Its own sound, stretched to exactly its length with the browser's code (render/sound.mjs).
+        if (pieceHasSound(spec, step, src)) {
+          const raw = path.join(dir, `sound${i}.raw`);
+          sound = path.join(dir, `sound${i}.fit.raw`);
+          await run(pieceSoundArgs(step, src, raw), null, signal);
+          await fillSoundFile(raw, sound, Math.round(step.len * 48000));
+        }
+      }
+      await run(stepArgs(spec, step, src, file, slots, sound),null,signal);
       files.push(file);
       job.progress = 0.05 + ((i + 1) / steps.length) * 0.6;
     }

@@ -188,12 +188,63 @@ export function demoAt(spec) {
 /** The demo part of a finished export: from its key frame at `at` to the end, picture only, copied as it is. */
 export const demoArgs = (input, out, at) => [...BASE, "-ss", String(at), "-i", input, "-map", "0:v:0", "-c", "copy", "-movflags", "+faststart", out];
 
-/** One step of the plan to an intermediate file. */
-export function stepArgs(spec, step, src, out) {
+/**
+ * Counts a piece's frames after the first frame-rate pass (trim, fps): the `slots` stepArgs spreads over the piece's
+ * planned frames. Writes one framecrc line per frame to `out`; count them with countFrames.
+ */
+export function countArgs(spec, step, src, out) {
+  return [...BASE, "-threads", "1", "-i", src.file, "-map", "0:v:0", "-vf", `trim=start=${r(step.start)}:end=${r(step.end)},setpts=PTS-STARTPTS,fps=${spec.fps},scale=2:2`, "-f", "framecrc", out];
+}
+/** The frame count in a countArgs file; throws on anything that is not a framecrc frame line. */
+export const countFrames = (text) => {
+  let n = 0;
+  for (const line of text.split("\n")) {
+    if (!line.trim() || line.startsWith("#")) continue;
+    if (!/^\s*0,\s*-?\d+,\s*-?\d+,\s*\d+,\s*\d+,\s*0x[0-9a-f]+/.test(line)) throw new Error("bad frame count");
+    n++;
+  }
+  return n;
+};
+
+/** Whether a piece step uses its clip's own sound (then the caller makes it with pieceSoundArgs and fillSoundFile). */
+export function pieceHasSound(spec, step, src) {
+  if (step.kind !== "piece" || !src?.hasAudio) return false;
+  const seg = spec.segments[step.si], own = seg.pieces[step.pi ?? 0] ?? {};
+  return (own.volume ?? seg.volume) > 0;
+}
+
+/**
+ * A piece's own sound, cut to the piece (never past its end), as raw 48 kHz stereo f32le: render/sound-file.mjs
+ * fillSoundFile then stretches it to exactly the piece's planned length with the browser's own code
+ * (render/sound.mjs), so both lanes make the same sound (Codex 2026-11-06: ffmpeg atempo ran up to 17 ms short and
+ * apad filled the gap with silence).
+ */
+export function pieceSoundArgs(step, src, out) {
+  return [...BASE, "-threads", "1", "-i", src.file, "-map", "0:a:0", "-af", `atrim=start=${r(step.start)}:end=${r(step.end)},asetpts=PTS-STARTPTS,${AF}`, "-f", "f32le", "-ac", "2", "-ar", "48000", out];
+}
+
+/**
+ * One step of the plan to an intermediate file. `slots`: the piece's countArgs frame count (0: the piece has no
+ * frame, rendered black for its length so the timeline never shifts). `sound`: the fillSoundFile output when
+ * pieceHasSound.
+ */
+export function stepArgs(spec, step, src, out, slots, sound) {
   const { width: W, height: H, fps } = spec;
   const frameOut = ["-r", String(fps), "-fps_mode", "cfr"];
   if (step.kind === "gap") {
     return [...BASE, "-f", "lavfi", "-i", `color=c=black:s=${W}x${H}:r=${fps}:d=${step.len}`, "-f", "lavfi", "-i", `anullsrc=r=48000:cl=stereo`, "-t", String(step.len), "-vf", "format=yuv420p,setsar=1", ...PIECE_OUT, ...frameOut, out];
+  }
+  if (!Number.isInteger(slots) || slots < 0) throw new Error("piece frame count missing");
+  const hasSound = pieceHasSound(spec, step, src);
+  if (hasSound && !sound) throw new Error("piece sound missing");
+  if (slots === 0) {
+    // No frame inside the piece (between two source frames, or past the file's end): black for exactly its length,
+    // with its own sound kept, as the browser does (Codex 2026-11-06).
+    if (!hasSound) return stepArgs(spec, { kind: "gap", frames: step.frames, len: step.len }, null, out);
+    const vol = spec.segments[step.si].pieces[step.pi ?? 0]?.volume ?? spec.segments[step.si].volume;
+    return [...BASE, "-f", "lavfi", "-i", `color=c=black:s=${W}x${H}:r=${fps}:d=${step.len}`, "-f", "f32le", "-ar", "48000", "-ch_layout", "stereo", "-i", sound,
+      "-filter_complex", `[0:v]format=yuv420p,setsar=1[v];[1:a]volume=${r(vol)},${AF},apad,atrim=duration=${step.len},asetpts=PTS-STARTPTS[a]`,
+      "-map", "[v]", "-map", "[a]", "-t", String(step.len), ...PIECE_OUT, ...frameOut, out];
   }
   const seg0 = spec.segments[step.si];
   // A piece of a Cut clip may carry its own look and sound; Speed is always the clip's.
@@ -212,7 +263,13 @@ export function stepArgs(spec, step, src, out) {
     // One frame rate before the look: zoompan makes one frame per input frame at `fps`.
     `fps=${fps}`,
     ...look(seg.look, step.start, W, H, fps),
-    ...(seg.speed !== 1 ? [`setpts=PTS/${seg.speed}`] : []),
+    // Spread the piece's own frames evenly over its planned frames: output n shows frame floor(n * slots / frames).
+    // setpts gives frame j the time ceil(j * frames / slots) in whole frames and fps keeps the last frame per time.
+    // The speed is the clip's, adjusted by under a frame for the timeline's rounding; the old setpts=PTS/speed
+    // truncated to whole frames, ran 1-2 frames short and held the last frame at the cut (founder 2026-11-06: clips
+    // join like CapCut's magnet, never showing trimmed-out frames). render/frames.mjs frameSchedule mirrors this.
+    `settb=1/${fps}`,
+    `setpts='ceil(N*${step.frames}/${slots})'`,
     `fps=${fps}`,
     "format=yuv420p",
     // Exactly the planned length (texts are timed to it), even if the file ends early.
@@ -220,10 +277,11 @@ export function stepArgs(spec, step, src, out) {
     `trim=duration=${len}`,
     "setpts=PTS-STARTPTS",
   ];
-  const a = src.hasAudio && seg.volume > 0
-    ? `[0:a]${[`atrim=start=${r(step.start)}:end=${r(step.end)}`, "asetpts=PTS-STARTPTS", ...(seg.speed !== 1 ? [`atempo=${seg.speed}`] : []), `volume=${r(seg.volume)}`, AF, "apad", `atrim=duration=${len}`, "asetpts=PTS-STARTPTS"].join(",")}[a]`
+  // The sound is already exactly the piece's length (fillSoundFile); apad/atrim only guard the sample count.
+  const a = hasSound
+    ? `[1:a]${[`volume=${r(seg.volume)}`, AF, "apad", `atrim=duration=${len}`, "asetpts=PTS-STARTPTS"].join(",")}[a]`
     : `anullsrc=r=48000:cl=stereo,atrim=duration=${len},${AF}[a]`;
-  return [...BASE, "-threads", "1", "-i", src.file, "-filter_complex", `[0:v]${v.join(",")}[v];${a}`, "-map", "[v]", "-map", "[a]", "-t", String(len), ...PIECE_OUT, ...frameOut, out];
+  return [...BASE, "-threads", "1", "-i", src.file, ...(hasSound ? ["-f", "f32le", "-ar", "48000", "-ch_layout", "stereo", "-i", sound] : []), "-filter_complex", `[0:v]${v.join(",")}[v];${a}`, "-map", "[v]", "-map", "[a]", "-t", String(len), ...PIECE_OUT, ...frameOut, out];
 }
 
 /**

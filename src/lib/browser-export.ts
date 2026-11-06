@@ -2,6 +2,7 @@
 import { ALL_FORMATS, AudioBufferSource, BlobSource, BufferSource, BufferTarget, CanvasSource, EncodedPacketSink, EncodedVideoPacketSource, Input, Mp4OutputFormat, Output, Quality, VideoSampleSink, canEncodeAudio, canEncodeVideo, type InputVideoTrack } from "mediabunny";
 import { demoAt, exposurePower, contrastGamma, plan, type Look, type Spec } from "../../render/render.mjs";
 import { frameSchedule, frameTimes, mediaOrigin } from "../../render/frames.mjs";
+import { fillSound } from "../../render/sound.mjs";
 
 /**
  * Export in the user's browser (founder 2026-11-04: CapCut exports in seconds, so ours must not take minutes). The
@@ -181,48 +182,6 @@ function curveAt(keys: NonNullable<Look["keys"]>, k: "zoom" | "panX" | "panY", F
 
 // ---------- sound ----------
 
-/** Pitch-keeping speed change (WSOLA), as ffmpeg's atempo does on the server. */
-export function tempo(chs: Float32Array[], speed: number): Float32Array[] {
-  if (speed === 1 || !chs[0].length) return chs;
-  const N = 2048, Hs = N / 2, Ha = Hs * speed, tol = 384, L = Hs;
-  const len = chs[0].length, outLen = Math.ceil(len / speed);
-  const win = new Float32Array(N).map((_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / N));
-  const mono = new Float32Array(len);
-  for (const c of chs) for (let i = 0; i < len; i++) mono[i] += c[i] / chs.length;
-  const out = chs.map(() => new Float32Array(outLen + N));
-  const norm = new Float32Array(outLen + N);
-  let prev = 0;
-  for (let m = 0; m * Hs < outLen; m++) {
-    const target = Math.round(m * Ha);
-    let best = target;
-    if (m > 0) {
-      const nat = prev + Hs;
-      let score = -Infinity;
-      for (let d = -tol; d <= tol; d += 2) {
-        const at = target + d;
-        if (at < 0 || at + L > len || nat + L > len) continue;
-        let s = 0;
-        for (let i = 0; i < L; i += 4) s += mono[at + i] * mono[nat + i];
-        if (s > score) { score = s; best = at; }
-      }
-    }
-    const o = m * Hs;
-    for (let i = 0; i < N; i++) {
-      const at = best + i;
-      if (at >= len) break;
-      const w = win[i];
-      for (let c = 0; c < chs.length; c++) out[c][o + i] += chs[c][at] * w;
-      norm[o + i] += w;
-    }
-    prev = best;
-  }
-  return out.map((c) => {
-    const r = new Float32Array(outLen);
-    for (let i = 0; i < outLen; i++) r[i] = norm[i] > 1e-3 ? c[i] / norm[i] : 0;
-    return r;
-  });
-}
-
 /**
  * A file's sound as stereo at 48 kHz, or null when the file has no sound. A sound that exists but can't be decoded
  * throws, so the export falls back to the server instead of finishing silent.
@@ -317,7 +276,9 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
       if (!src) continue;
       const a = Math.max(0, Math.round(st.start! * RATE)), b = Math.min(src[0].length, Math.round(st.end! * RATE));
       if (b <= a) continue;
-      const part = tempo(src.map((c) => c.subarray(a, b)), seg.speed);
+      // The piece's own sound stretched to exactly its planned length, never past its end (render/sound.mjs, the
+      // same code the server runs).
+      const part = fillSound(src.map((c) => c.subarray(a, b)), n);
       for (let c = 0; c < 2; c++) for (let i = 0; i < n && i < part[c].length && at + i < total; i++) mix[c][at + i] += part[c][i] * volume;
     }
     for (const s of spec.sounds) {

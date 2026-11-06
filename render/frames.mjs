@@ -1,5 +1,5 @@
 // Which source frame each output frame of a clip piece shows, exactly as stepArgs' ffmpeg chain picks it
-// (render.mjs: trim, setpts=PTS-STARTPTS, fps, look, setpts=PTS/speed, fps, tpad clone). Shared by the browser export
+// (render.mjs: trim, setpts=PTS-STARTPTS, fps, look, settb, setpts='ceil(N*frames/slots)', fps, tpad clone). Shared by the browser export
 // (src/lib/browser-export.ts) so both lanes show the same frames; checked against real ffmpeg by
 // scripts/frame-schedule-checks.cjs.
 
@@ -26,21 +26,21 @@ export function frameSchedule(pts, step, speed, fps) {
   // end of the last kept frame (its duration is the gap to the next source frame, or the previous gap at the end).
   const slotOf = kept.map((i) => near((pts[i] - p0) * fps));
   const lastIdx = kept[kept.length - 1];
-  const dur = lastIdx + 1 < pts.length ? pts[lastIdx + 1] - pts[lastIdx] : lastIdx > 0 ? pts[lastIdx] - pts[lastIdx - 1] : 1 / fps;
+  const own = pts.durations?.[lastIdx] ?? 0;
+  const dur = lastIdx + 1 < pts.length ? pts[lastIdx + 1] - pts[lastIdx] : own > 0 ? own : lastIdx > 0 ? pts[lastIdx] - pts[lastIdx - 1] : 1 / fps;
   const slots = Math.max(1, near((pts[lastIdx] + dur - p0) * fps));
   const inter = [];
   for (let j = 0, k = 0; j < slots; j++) {
     while (k + 1 < kept.length && slotOf[k + 1] <= j) k++;
     inter.push(kept[k]);
   }
-  // setpts=PTS/speed (truncated to whole 1/fps ticks), then fps again: output n shows the last slot at or before n.
-  // setpts moves the stream's end the same way, so the second fps stops at trunc(slots / speed) and drops a slot
-  // landing there. At speed 1 there is no setpts and slot n is output n. Past the end, tpad repeats the last frame.
-  const at = inter.map((_, j) => (speed === 1 ? j : Math.trunc(j / speed)));
-  const stop = Math.max(1, speed === 1 ? slots : Math.trunc(slots / speed));
+  // settb, setpts='ceil(N*frames/slots)', fps: the slots spread evenly over the planned frames, output n shows slot
+  // floor(n * slots / frames). Never a slot past the piece's end, and no held last frame at the cut while the piece
+  // has frames enough (founder 2026-11-06). `speed` is already in the planned frame count.
+  void speed;
   const source = [], slot = [];
-  for (let n = 0, j = 0; n < step.frames; n++) {
-    if (n < stop) while (j + 1 < inter.length && at[j + 1] <= n) j++;
+  for (let n = 0; n < step.frames; n++) {
+    const j = Math.min(slots - 1, Math.floor((n * slots) / step.frames));
     source.push(inter[j]);
     slot.push(j);
   }
@@ -64,19 +64,22 @@ export async function mediaOrigin(input) {
  * Presentation times (file time, ascending) of the source frames around a cut, from packet metadata: from the key
  * frame before the cut, in decode order, until the second key frame past its end (B-frames shown inside the cut can
  * come after a later frame in decode order, so stopping at the first late timestamp misses them). Takes a mediabunny
- * EncodedPacketSink.
- * @returns {Promise<number[]>}
+ * EncodedPacketSink. The array also carries `durations` (seconds, per time; 0 when the file gives none): ffmpeg's fps
+ * pass ends a piece at its last frame's own duration, not at the gap before it (Codex 2026-11-06: a VFR file whose
+ * last frame came 1 s after the one before it gave the browser 75 slots against ffmpeg's 45).
+ * @returns {Promise<number[] & { durations?: number[] }>}
  */
 export async function frameTimes(packets, origin, start, end) {
   const opts = { metadataOnly: true };
   const from = (await packets.getKeyPacket(origin + start, opts)) ?? (await packets.getFirstPacket(opts));
-  const pts = [];
-  if (!from) return pts;
+  const found = [];
+  if (!from) return Object.assign([], { durations: [] });
   let keysAfter = 0;
   for await (const p of packets.packets(from, undefined, opts)) {
     const t = p.timestamp - origin;
     if (p.type === "key" && t > end && ++keysAfter >= 2) break;
-    pts.push(t);
+    found.push([t, p.duration > 0 ? p.duration : 0]);
   }
-  return pts.sort((x, y) => x - y);
+  found.sort((x, y) => x[0] - y[0]);
+  return Object.assign(found.map((f) => f[0]), { durations: found.map((f) => f[1]) });
 }

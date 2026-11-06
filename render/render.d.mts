@@ -4,7 +4,11 @@ export type Probe = { file: string; hasAudio: boolean; duration: number | null }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Spec = { width: number; height: number; fps: number; total: number; segments: any[]; sounds: any[]; overlays: any[] };
 export function plan(spec: Spec): Step[];
-export function stepArgs(spec: Spec, step: Step, src: Probe | null, out: string): string[];
+export function stepArgs(spec: Spec, step: Step, src: Probe | null, out: string, slots?: number, sound?: string): string[];
+export function countArgs(spec: Spec, step: Step, src: Probe, out: string): string[];
+export function countFrames(text: string): number;
+export function pieceHasSound(spec: Spec, step: Step, src: Probe | null): boolean;
+export function pieceSoundArgs(step: Step, src: Probe, out: string): string[];
 export function finalArgs(spec: Spec, list: string, local: { sounds: Probe[]; overlays: string[] }, out: string): string[];
 export function previewArgs(input: string, out: string, master?: string, hdr?: boolean): string[];
 export const TONEMAP: string;
