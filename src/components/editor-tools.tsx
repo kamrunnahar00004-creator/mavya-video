@@ -13,7 +13,7 @@ import { waveform } from "@/lib/waveform";
 
 
 import { ADJUST_ROWS, type Adjust, type AdjustRow, type Motion, NO_ADJUST, fullAdjust, isAdjusted, keyAt, motionAt, moveKey, panBy, setMotion, speedOf, toggleKey, videoStyle } from "@/lib/adjust";
-import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundPieces, soundRows } from "@/lib/sound";
+import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, shiftSounds, soundName, soundPieces, soundRows } from "@/lib/sound";
 import type { Song } from "@/app/api/songs/route";
 import { type Seg, clipGroup, clipSrc, demoClips, fileAt, pieceAdjust, segAt, showsAt, videoLength, pieceSpans, relAt } from "@/lib/edit";
 
@@ -1518,7 +1518,9 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
   const [uploading, setUploading] = useState(false);
   // Copied with Ctrl+C (or Copy): a text, or a clip piece (pasted as a new clip).
   // A group keeps each item's place relative to the group's start (`rel`, seconds); its clips stay in timeline order.
-  type CopiedGroup = { kind: "group"; clips: Omit<DemoClip, "id">[]; texts: { t: TextLayer; rel: number }[]; sounds: { p: SoundPiece; rel: number; len: number }[] };
+  // Clips with their old timeline place (lo, len); texts and sounds with their old times, mapped onto the pasted
+  // clips at paste time so every layer stays on the clip it was on (Codex 2026-11-07).
+  type CopiedGroup = { kind: "group"; clips: { clip: Omit<DemoClip, "id">; lo: number; len: number }[]; base: number; texts: TextLayer[]; sounds: { p: SoundPiece; len: number }[] };
   const [copied, setCopied] = useState<{ kind: "text"; t: TextLayer } | { kind: "clip"; clip: Omit<DemoClip, "id"> } | CopiedGroup | null>(null);
   const snap = (): EditorSnap => ({ hook: run.hook, demo: run.demo, texts, sounds: soundPieces(run, videoLen) });
   const remember = () => {
@@ -1598,7 +1600,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
   const r3 = (x: number) => Math.round(x * 1000) / 1000;
   const selSeg = sel?.kind === "clip" ? segs.find((x) => x.id === sel.seg) : undefined;
   const selText = sel?.kind === "text" ? texts.find((x) => x.id === sel.id) : undefined;
-  const canDelete = Boolean(selText || (selSeg && (selSeg.parts.length > 1 || selSeg.id !== "hook")) || (!sel && sounds.selId));
+  const canDelete = Boolean(multi.length > 1 || selText || (selSeg && (selSeg.parts.length > 1 || selSeg.id !== "hook")) || (!sel && sounds.selId));
 
   /** ✂ at the playhead: the selected sound or text, else the clip under the playhead (two pieces, side by side). */
   const cut = (time: number) => {
@@ -1663,9 +1665,14 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
       if (!Number.isFinite(base)) return;
       setCopied({
         kind: "group",
-        clips: clips.flatMap((c) => clipCopy(c.seg, c.part) ?? []),
-        texts: ts.map((t) => ({ t, rel: t.start - base })),
-        sounds: ss.map((s) => ({ p: s.p, rel: s.p.at - base, len: s.end - s.p.at })),
+        clips: clips.flatMap((c) => {
+          const clip = clipCopy(c.seg, c.part);
+          const i = c.seg.parts.findIndex((p) => p.id === c.part);
+          return clip ? [{ clip, lo: c.lo, len: pieceSpans(c.seg)[i].len }] : [];
+        }),
+        base,
+        texts: ts,
+        sounds: ss.map((s) => ({ p: s.p, len: s.end - s.p.at })),
       });
       return;
     }
@@ -1680,23 +1687,46 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
     if (!copied) return;
     remember();
     if (copied.kind === "group") {
-      // Clips go in at the nearest clip edge, in order; texts and sounds keep their place from there (or from the
-      // playhead when the group has no clips).
+      // Clips go in back to back at the nearest clip edge; each text and sound keeps its place on the clip it was on
+      // (between copied clips: after the one before it; no clips: from the playhead).
+      const cs = copied.clips;
       let anchor = time;
-      if (copied.clips.length) {
+      let from = Infinity;
+      if (cs.length) {
         const at = insertIndex(time);
-        const next = demoClips(run)[at];
-        anchor = next ? (segs.find((g) => g.id === next.id)?.offset ?? videoLen) : videoLen;
-        copied.clips.forEach((c, i) => onInsertClip({ ...c, id: uid() }, at + i));
+        const nextClip = demoClips(run)[at];
+        const nextSeg = nextClip ? segs.find((g) => g.id === nextClip.id) : undefined;
+        // The pasted clips start where the clip before them ends (a gap stays before the clip that had it).
+        anchor = nextSeg ? nextSeg.offset - nextSeg.gap : videoLen;
+        from = nextSeg ? nextSeg.offset : Infinity;
+        cs.forEach((c, i) => onInsertClip({ ...c.clip, id: uid() }, at + i));
       }
-      for (const { t, rel } of copied.texts) {
-        const at = r3(anchor + rel);
+      const starts = cs.map((_, k) => anchor + cs.slice(0, k).reduce((t, c) => t + c.len, 0));
+      const place = (x: number) => {
+        if (!cs.length) return anchor + (x - copied.base);
+        const k = cs.findIndex((c) => x >= c.lo && x < c.lo + c.len);
+        if (k >= 0) return starts[k] + (x - cs[k].lo);
+        if (x < cs[0].lo) return Math.max(0, anchor + (x - cs[0].lo));
+        const j = cs.reduce((m, c, i) => (c.lo + c.len <= x ? i : m), 0);
+        const after = starts[j] + cs[j].len + (x - (cs[j].lo + cs[j].len));
+        return j + 1 < cs.length ? Math.min(after, starts[j + 1]) : after;
+      };
+      for (const t of copied.texts) {
+        const at = r3(place(t.start));
         onAddText(null, [at, r3(at + (t.end - t.start))], t.text, t);
       }
       if (copied.sounds.length) {
-        // Their own new row, so they never cut into the sounds already there.
-        const row = Math.max(-1, ...sounds.pieces.map(rowOf)) + 1;
-        onPieces([...sounds.pieces, ...copied.sounds.map(({ p, rel, len }) => ({ ...p, id: uid(), at: r3(anchor + rel), end: r3(anchor + rel + len), row }))].sort((a, b) => a.at - b.at));
+        // Each copied row gets a new row of its own, so overlapping sounds stay whole and never cut into others.
+        const first = Math.max(-1, ...sounds.pieces.map(rowOf)) + 1;
+        const rows = [...new Set(copied.sounds.map(({ p }) => rowOf(p)))].sort((a, b) => a - b);
+        const added = copied.sounds.map(({ p, len }) => {
+          const at = r3(place(p.at));
+          return { ...p, id: uid(), at, end: r3(at + len), row: first + rows.indexOf(rowOf(p)) };
+        });
+        // The sounds already there move with the inserted clips, as the insert itself moves them (shiftSounds).
+        const by = cs.reduce((t, c) => t + c.len, 0);
+        const existing = cs.length && run.sounds && Number.isFinite(from) ? shiftSounds(sounds.pieces, from, by) : sounds.pieces;
+        onPieces([...existing, ...added].sort((a, b) => a.at - b.at));
       }
       return;
     }

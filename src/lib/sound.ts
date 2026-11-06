@@ -49,6 +49,16 @@ export function soundPieces(run: Run, total: number): SoundPiece[] {
 
 export const rowOf = (p: SoundPiece) => p.row ?? 0;
 
+/**
+ * Clips of total length `by` went in at timeline time `from`: sounds that start there or later move with what comes
+ * after, like the texts (a sound already playing across the insert point stays). Used by every clip insert, so a
+ * paste that also writes sounds lands on the same result (Codex 2026-11-07).
+ */
+export function shiftSounds(pieces: SoundPiece[], from: number, by: number): SoundPiece[] {
+  const r = (x: number) => Math.round(x * 1000) / 1000;
+  return pieces.map((p) => (p.at >= from - 0.05 ? { ...p, at: r(p.at + by), ...(p.end !== undefined ? { end: r(p.end + by) } : {}) } : p));
+}
+
 /** Where sound i stops: its own end, the next sound on the same row, or the end of the video, whichever comes first. */
 export function pieceEnd(pieces: SoundPiece[], i: number, total: number) {
   const p = pieces[i];

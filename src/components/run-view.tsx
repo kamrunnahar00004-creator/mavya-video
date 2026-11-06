@@ -14,7 +14,7 @@ import { CHARACTERS, characterById } from "@/lib/characters";
 import { DEFAULT_FONT } from "@/lib/studio-data";
 import { type Adjust, speedOf } from "@/lib/adjust";
 import { reconcileGeneration } from "@/lib/generation-edit";
-import { soundPieces } from "@/lib/sound";
+import { soundPieces, shiftSounds } from "@/lib/sound";
 
 import { type Seg, clipGroup, clipSrc, containTexts, demoClips, moveClipPiece, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, snapTexts, storeParts, timeline } from "@/lib/edit";
 
@@ -767,8 +767,10 @@ export function RunView() {
     const by = timeline(nextRun, null).filter((g) => added.some((c) => c.id === g.id)).reduce((t, g) => t + g.gap + g.len, 0);
     const r = (x: number) => Math.round(x * 1000) / 1000;
     const texts = runTexts(cur).map((x) => (x.start >= from - 0.05 ? { ...x, start: r(x.start + by), end: r(x.end + by) } : x));
-    save({ demo: nextRun.demo, texts });
-    runRef.current = { ...cur, demo: nextRun.demo, texts };
+    // Sounds after the insert point move the same way (shiftSounds).
+    const sounds = cur.sounds && Number.isFinite(from) ? shiftSounds(cur.sounds, from, by) : cur.sounds;
+    save({ demo: nextRun.demo, texts, ...(sounds !== cur.sounds ? { sounds } : {}) });
+    runRef.current = { ...cur, demo: nextRun.demo, texts, sounds };
   };
   /** Move a demo clip to position `to`. Texts that sit on that clip (or any moved clip) go with it; texts across several clips keep their time. */
   const moveClip = (clipId: string, to: number) => {
