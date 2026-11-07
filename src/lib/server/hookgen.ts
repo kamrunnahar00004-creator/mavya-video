@@ -12,6 +12,7 @@ import { geminiJSON } from "@/lib/server/gemini";
 import { putObject, signedGet } from "@/lib/server/r2";
 import { libraryFile, mediaToFile } from "@/lib/server/store";
 import type { Reference, Run } from "@/lib/types";
+import { makeFirstFrame, VERDICT_SCHEMA, type Verdict } from "@/lib/server/first-frame";
 
 /**
  * Hook generation (founder decision 2026-10-23, after testing Veo, Wan Animate, H3 Recast and Kling side by side:
@@ -21,7 +22,9 @@ import type { Reference, Run } from "@/lib/types";
  * real motion.
  *   1. Gemini looks at the hook and the character and picks the outfit for THIS person (same colors and style;
  *      anything that does not suit them, like a halter on a man, becomes the closest equivalent).
- *   2. Gemini 3.1 Flash Image puts the character, in that outfit, into the hook's first frame: same scene, objects,
+ *   2. Gemini 3.1 Flash Image puts the character, in that outfit, into the hook's first frame (first-frame.ts: only the
+ *      person, with their own body, comes from the character photo; each frame is checked against the original and
+ *      made again when the room, light, framing, hands, expression or person are off): same scene, objects,
  *      pose, expression and light, natural nails, nothing added, no captions.
  *   3. Kling v3 Standard Motion Control (fal.ai) animates that frame with the ORIGINAL clip as the motion
  *      reference: same gestures, timing, gaze and mouth, one take, no captions (it draws from the clean frame).
@@ -152,21 +155,13 @@ async function outfitFor(clip: string, who: Character): Promise<string> {
   return String(plan.outfit ?? "").slice(0, 160) || "the same clothes as in the scene";
 }
 
-/** Gemini 3.1 Flash Image: the character, in the outfit, put into the hook's first frame. */
-async function swapFirstFrame(firstFrame: Buffer, who: Character, outfit: string): Promise<Buffer> {
-  const person = who.image ? "the person in IMAGE 2 (their face, hair, skin tone and body)" : `a person (${who.words})`;
-  const prompt = `Edit IMAGE 1: replace the person in it with ${person}, wearing ${outfit}. Keep everything else exactly as in IMAGE 1: every object they hold with the same shape, size and material, the same hand position, pose, head angle, gaze, the same facial expression at the same strength (mouth open or closed exactly as in IMAGE 1, no bigger smile or surprise), framing, camera angle, lighting, background and people behind them. Their hands have natural, unpolished nails and no rings. Remove all on-screen text and captions. Photorealistic phone selfie.`;
-  const parts = [
-    { text: "IMAGE 1 (the scene):" },
-    { inline_data: { mime_type: "image/jpeg", data: firstFrame.toString("base64") } },
-    ...(who.image ? [{ text: "IMAGE 2 (the new person):" }, { inline_data: { mime_type: who.image.mime, data: who.image.data } }] : []),
-    { text: prompt },
-  ];
+/** Gemini 3.1 Flash Image: the parts in, the image out. */
+async function geminiImage(parts: unknown[], ms = 180_000): Promise<Buffer> {
   const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent", {
     method: "POST",
     headers: { "x-goog-api-key": process.env.GEMINI_API_KEY ?? "", "content-type": "application/json" },
     body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "9:16" } } }),
-    signal: workSignal(180_000),
+    signal: workSignal(Math.max(1000, ms)),
   });
   const out = (await res.json().catch(() => null)) as { candidates?: { content?: { parts?: { inlineData?: { data?: string }; inline_data?: { data?: string } }[] } }[] } | null;
   const data = out?.candidates?.[0]?.content?.parts?.map((p) => p.inlineData?.data ?? p.inline_data?.data).find(Boolean);
@@ -181,6 +176,7 @@ async function swapFirstFrame(firstFrame: Buffer, who: Character, outfit: string
  */
 export const startHook = (run: Run, source: Reference | null, who: string, note?: string, simple = false) => withWorkBudget(() => startHookInner(run, source, who, note, simple));
 async function startHookInner(run: Run, source: Reference | null, who: string, note?: string, simple = false): Promise<string> {
+  const began = Date.now();
   const fix = note?.trim() ? ` Fix this from the last try: ${note.trim().slice(0, 200)}.` : "";
   const dir = await mkdtemp(path.join(tmpdir(), "mavya-hook-"));
   try {
@@ -194,7 +190,11 @@ async function startHookInner(run: Run, source: Reference | null, who: string, n
       const [outfit, reference] = await Promise.all([outfitFor(clip, character), motionReference(clip, dir)]);
       const first = path.join(dir, "first.jpg");
       await ff("-ss", "0.05", "-i", clip, "-frames:v", "1", "-q:v", "2", first);
-      const frame = await swapFirstFrame(await readFile(first), character, outfit);
+      const { frame } = await makeFirstFrame({
+        image: geminiImage,
+        judge: (parts, ms) => geminiJSON<Verdict>(parts as Parameters<typeof geminiJSON>[0], { schema: VERDICT_SCHEMA, temperature: 0, signal: workSignal(ms) }),
+        elapsed: () => Date.now() - began,
+      }, await readFile(first), character, outfit);
       const [imageUrl, videoUrl] = await Promise.all([share(frame, "jpg", who), share(reference, "mp4", who)]);
       return falSubmit(simple ? MOTION_FALLBACK : MOTION, {
         image_url: imageUrl,
