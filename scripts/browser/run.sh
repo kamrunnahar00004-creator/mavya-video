@@ -4,12 +4,12 @@
 # starts `next dev` on :3210 with accounts off, then drives Windows Chrome with Windows node. Never touches production.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-WORK="$(mktemp -d)"
-WIN_TMP="$(wslpath "$(cmd.exe /c 'echo %TEMP%' 2>/dev/null | tr -d '\r')")/mavya-browser-checks"
 # shellcheck source=lib.sh
 . "$ROOT/scripts/browser/lib.sh"
 SERVER=""
+WORK="$(mktemp -d)"
 trap cleanup EXIT
+WIN_TMP="$(wslpath "$(cmd.exe /c 'echo %TEMP%' 2>/dev/null | tr -d '\r')")/mavya-browser-checks"
 if ! port_free 3210; then echo "browser checks: port 3210 is in use; stop what runs there first"; exit 1; fi
 cd "$ROOT" && git ls-files -co --exclude-standard | grep -v '^\.env' | grep -v '^\.data/' | tar -cf - -T - | tar -xf - -C "$WORK"
 ln -s "$ROOT/node_modules" "$WORK/node_modules"

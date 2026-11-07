@@ -39,8 +39,12 @@ ok "kill -0 $$ 2>/dev/null" "stop_server with an empty id, 0 or 1 does nothing"
 
 # 6. port_free sees a listener.
 PORT=38211
-node -e "require('net').createServer().listen($PORT,'127.0.0.1')" & L=$!
-sleep 0.8
+# The listener says when it is listening (or fails loudly), instead of a fixed wait.
+READY=$(mktemp)
+node -e "require('net').createServer().listen($PORT,'127.0.0.1',()=>require('fs').writeFileSync('$READY','up')).on('error',e=>{console.error('listener failed:',e.message);process.exit(1)})" & L=$!
+for _ in $(seq 1 50); do [ -s "$READY" ] && break; kill -0 $L 2>/dev/null || break; sleep 0.1; done
+ok "[ -s '$READY' ]" "the port fixture's listener started (else this check cannot run here)"
+command rm -f "$READY"
 bash -c ". '$LIB'; port_free $PORT"; busy=$?
 kill $L; wait $L 2>/dev/null; sleep 0.3
 bash -c ". '$LIB'; port_free $PORT"; free=$?

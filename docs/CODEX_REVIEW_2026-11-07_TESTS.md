@@ -192,3 +192,37 @@ The Round 2 deferred font, worker-drain, full browser-export/stereo, partial-del
 ### Verification and scope
 
 `node --check scripts/browser/editor-browser-checks.mjs` and `bash -n scripts/browser/run.sh` passed. The cleanup failure above was independently reproduced. I did not run Chrome in this restricted environment; the reported **37 passing checks** and two browser mutation failures remain supplied evidence, consistent with the inspected assertions. I did not rerun unchanged offline suites or mutate product sources for this browser-only review. Only this report was appended; no commit or push.
+
+## Round 4
+
+**Verdict: ship.** Reviewed HEAD `82a99c0b780dfa0bf958302614d65cad17dc3155`, including `scripts/browser/lib.sh`, its checks, the runner and `package.json`. **R3-1 is closed.** No remaining blocker found for this regression-test/runner batch. This verdict retains the previously documented limits of the tests; it is not a new production/browser-export certification.
+
+### Cleanup and isolation
+
+- `cleanup` captures the entering status before other work, disables errexit, attempts server shutdown and work-folder removal, then explicitly exits with that original status. Expected cleanup-command failures no longer stop later cleanup or turn a passing run into failure.
+- `stop_server` refuses missing IDs and IDs at or below 1. Its TERM, liveness probes and eventual KILL target only the negative group ID supplied by the runner. Port-wide termination and the PID-zero fallback are gone.
+- The runner initializes SERVER before installing the trap and uses `exec setsid` in its noninteractive background subshell. Its recorded PID therefore identifies the new server session/process group in the supported invocation. Shutdown can reach descendants without targeting unrelated port owners.
+- The occupied-port preflight, live-spawned-PID check, expected-port log check and HTTP readiness check address the former accidental reuse of another local server. Startup timeout still fails explicitly. A fixed port is acceptable for this serialized local harness.
+- The seven shell checks are now part of `npm test`. Their cleanup-status, pre-start failure and process-group cases directly cover the Round 3 defect rather than merely checking syntax.
+
+### Independent verification
+
+Ran **`bash scripts/browser/lib-checks.sh`**. It exited **1**, reporting **1 of 7 FAILED**: the first six checks passed, including real throwaway process-group termination and preservation of the unrelated process. The final occupied/free-port check could not establish its listener because this sandbox rejects local sockets:
+
+```text
+Error: listen EPERM: operation not permitted 127.0.0.1:38211
+FAIL port_free: in use (0) then free (0)
+browser lib checks: 1 of 7 FAILED
+```
+
+The listener's attempted bind failed, so both probes observed no listener. This is an environmental verification limit, not evidence that the occupied-port implementation is incorrect. I do not claim seven independent passes here. `bash -n scripts/browser/lib.sh scripts/browser/lib-checks.sh scripts/browser/run.sh` passed. The reported full runner result—37 browser checks, exit 0, port free and work directory removed—remains supplied evidence; Chrome was not independently rerun.
+
+### Nonblocking follow-ups
+
+The shell port fixture uses a fixed sleep rather than waiting for a confirmed listening event. A slow Node startup or preoccupied fixture port can make that check misleading/flaky; have the listener signal readiness and report startup failure directly. This does not reopen the runner cleanup defect.
+
+The runner creates WORK and resolves the Windows temp path before installing its trap. A missing/failing WSL prerequisite at that early stage can leave an empty temporary directory; installing cleanup immediately after allocation would improve this failure path. It does not introduce process killing or a false browser-test pass.
+
+Fixed browser sleeps, fixed ports under serialized execution, the documented WSL/Windows platform and `next dev` scope, and effective-duration assertions delegated to shared-code tests remain nonblocking as assessed in Round 3. The other previously deferred coverage gaps retain their stated scope and assessment.
+
+Only this report was appended. No product or test source was changed, and no commit or push was made.
