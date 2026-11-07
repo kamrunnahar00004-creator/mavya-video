@@ -66,3 +66,10 @@ Verdict: ship or block.
 ## Outcome
 
 Codex: block, block, block (tie in the scores), then ship. Weights are room 12, light 6, others 1. first-frame-checks: 26.
+
+## Rounds 5-7
+
+- Eyes: a sameGaze check, plus a Kling eyes sentence. Face: a Kling sentence asking for the same expression intensity.
+- Caption removal (CLEAN_PROMPT) runs before the swap. The judge compares with the TRUE original, ignoring the caption area.
+- JUDGE_MS is 30 s: the real check takes 12-13 s, and at 15 s it timed out and the frame went unchecked.
+- Codex: ship. A live test still leaked the room on this hook in 3 of 3 tries; the next step is plain-backdrop character photos.

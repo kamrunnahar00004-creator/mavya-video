@@ -18,6 +18,12 @@ export type Verdict = { sameRoom: boolean; sameLight: boolean; sameFraming: bool
 export type FrameDeps = {
   /** Gemini image: the parts in, the image out, within `ms` milliseconds. */
   image: (parts: unknown[], ms: number) => Promise<Buffer>;
+  /**
+   * Gemini edit of the original frame alone: its on-screen text and caption boxes removed, nothing else changed. A
+   * caption in the frame made the swap redraw the whole picture (founder's hook 2026-11-07: 0 of 3 tries kept the
+   * room with the caption in, 3 of 4 without).
+   */
+  clean: (original: Buffer, ms: number) => Promise<Buffer>;
   /** Gemini judge: the parts in, a verdict out, within `ms` milliseconds. */
   judge: (parts: unknown[], ms: number) => Promise<Verdict>;
   /** Milliseconds since the hook started; retries stop when time runs short. */
@@ -35,9 +41,13 @@ export const FRAME_BUDGET_MS = 170_000;
 /** The longest one image may take, when there is time. */
 export const FIRST_TRY_MS = 150_000;
 /** The longest one check may take; also the time kept back for it when an image starts. */
-export const JUDGE_MS = 15_000;
-/** A retry starts only with this much left: an image (about 20 s) and its check, with room to spare. */
-export const RETRY_MIN_MS = 45_000;
+// 30 s: one check with three pictures and seven questions takes 5-15 s (measured 2026-11-07); at 15 s it timed out and
+// the frame went to Kling unchecked.
+export const JUDGE_MS = 30_000;
+/** The longest the caption removal may take. */
+export const CLEAN_MS = 40_000;
+/** A retry starts only with this much left: an image (about 20 s) and its check (up to JUDGE_MS). */
+export const RETRY_MIN_MS = 60_000;
 /** Below this, no check is started: the frame is kept as it is. */
 const MIN_CALL_MS = 3_000;
 export class FrameOutOfTime extends Error {}
@@ -60,17 +70,21 @@ export function swapPrompt(who: Who, outfit: string, fix = ""): string {
     `Edit IMAGE 1: replace only the person in it with ${person}, wearing ${outfit}. ${identity}` +
     "The result must look exactly like IMAGE 1 with only the person swapped: the same room, walls and everything behind them, the same light (color, brightness and direction), the same camera distance and framing (the head the same size and in the same place as in IMAGE 1), the same camera angle (the phone just as high or low, as far to the side, and tilted the same way, so the face is seen from the same direction as in IMAGE 1, not straight on unless IMAGE 1 is), " +
     "the same pose and head angle, the eyes looking exactly where they look in IMAGE 1 (into the camera lens if they do there), the same hands in the same places (if no hand is visible in IMAGE 1, no hand in the result), every object they hold with the same shape, size and material, the same facial expression at the same strength (mouth open or closed exactly as in IMAGE 1, no bigger smile or surprise). " +
-    "Their hands have natural, unpolished nails and no rings. Remove all on-screen text and captions. Photorealistic phone selfie." +
+    "Their hands have natural, unpolished nails and no rings. No on-screen text. Photorealistic phone selfie." +
     (fix ? ` The last try was wrong: ${fix.slice(0, 300)}. Fix that.` : "")
   );
 }
+
+/** The caption removal (deps.clean): the frame itself, only its text gone. */
+export const CLEAN_PROMPT =
+  "Remove the on-screen text and any caption box or sticker behind it. Change nothing else at all: the same person, face, hair, pose, hands, clothes, room, light, framing and camera angle. Fill the area behind the text with what would naturally be there.";
 
 /** The check. A described person (no photo) is judged against their description (Codex 2026-11-07: it had nothing). */
 export function judgePrompt(who: Who): string {
   const target = who.image ? "the person in IMAGE 2 (only the person: their face, hair and body)" : `a person matching this description: ${who.words.slice(0, 300)}`;
   const person = who.image ? "the face, hair and body (build, shape) are clearly the person in IMAGE 2" : "the person matches the description";
   return (
-    `IMAGE 1 is the original frame. IMAGE 3 is supposed to be IMAGE 1 with only the person replaced by ${target}. Check IMAGE 3 against IMAGE 1, strictly: ` +
+    `IMAGE 1 is the original frame. IMAGE 3 is supposed to be IMAGE 1 with only the person replaced by ${target}, and with IMAGE 1's on-screen text and caption boxes removed. Ignore that text and whatever is drawn where it was; check everything else in IMAGE 3 against IMAGE 1, strictly: ` +
     `sameRoom: the same room, walls and background${who.image ? ", nothing from IMAGE 2's surroundings" : ""}; sameLight: the same light color, brightness and direction; sameFraming: the same camera distance, head size and position; sameAngle: the same camera angle (seen from the same height, side and tilt, the head turned and tilted the same way); ` +
     `sameGaze: the eyes look in the same direction (into the lens if IMAGE 1's do); sameHands: hands in the same places (no hand that IMAGE 1 does not show); sameExpression: the same expression at the same strength; samePerson: ${person}. ` +
     "problem: one short sentence on what is wrong, or empty if nothing."
@@ -89,7 +103,14 @@ export const passes = (v: Verdict) => CHECKS.every((k) => v[k]);
 
 /** The first frame for Kling: made, checked, and made again with the problem named, keeping the best. */
 export async function makeFirstFrame(deps: FrameDeps, original: Buffer, who: Who, outfit: string): Promise<{ frame: Buffer; tries: number; verdict: Verdict | null }> {
-  const scene = { inline_data: { mime_type: "image/jpeg", data: original.toString("base64") } };
+  // The original without its captions; when that fails, the original as it is (the swap prompt still asks for no text).
+  const cleanMs = Math.min(CLEAN_MS, FRAME_BUDGET_MS - deps.elapsed() - RETRY_MIN_MS);
+  let base = original;
+  if (cleanMs >= MIN_CALL_MS) base = await deps.clean(original, cleanMs).catch(() => original);
+  const scene = { inline_data: { mime_type: "image/jpeg", data: base.toString("base64") } };
+  // The check compares with the TRUE original, captions and all (Codex 2026-11-07: against the cleaned frame, a change the
+  // cleaning made to the room or the face would pass unnoticed).
+  const truth = { inline_data: { mime_type: "image/jpeg", data: original.toString("base64") } };
   const person = who.image ? [{ text: "IMAGE 2 (the new person: face, hair and body only):" }, { inline_data: { mime_type: who.image.mime, data: who.image.data } }] : [];
   let best: { frame: Buffer; verdict: Verdict | null; score: number } | null = null;
   let fix = "", tries = 0;
@@ -115,7 +136,7 @@ export async function makeFirstFrame(deps: FrameDeps, original: Buffer, who: Who
     let verdict: Verdict | null = null;
     try {
       if (judgeMs < MIN_CALL_MS) throw new FrameOutOfTime("No time left to check the frame");
-      verdict = await deps.judge([{ text: "IMAGE 1 (the original):" }, scene, ...person, { text: "IMAGE 3 (the edit):" }, { inline_data: { mime_type: "image/jpeg", data: frame.toString("base64") } }, { text: judgePrompt(who) }], judgeMs);
+      verdict = await deps.judge([{ text: "IMAGE 1 (the original):" }, truth, ...person, { text: "IMAGE 3 (the edit):" }, { inline_data: { mime_type: "image/jpeg", data: frame.toString("base64") } }, { text: judgePrompt(who) }], judgeMs);
     } catch {
       // The check is a safeguard: when it fails or there is no time for it, the best frame so far (or this one) is kept.
       return best && best.score > 0 ? done() : { frame, tries, verdict: null };
