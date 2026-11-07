@@ -3,6 +3,7 @@ import { safeNext } from "@/lib/auth-next";
 import { allowance } from "@/lib/server/usage";
 import { getSessionUser } from "@/lib/supabase/server";
 import { billingRow } from "@/lib/server/billing-state";
+import { NEW_ACCOUNT_MS, SIGNUP_COOKIE, isNewSignup, signupEventId } from "@/lib/meta-pixel";
 
 /**
  * Where people land after signing in or signing up (password, Google or the email link).
@@ -10,9 +11,18 @@ import { billingRow } from "@/lib/server/billing-state";
  * continue to where they were going.
  */
 export async function GET(request: NextRequest) {
+  const user = await getSessionUser();
+  const response = await destination(request, user);
+  // A brand-new account: the Meta Pixel fires CompleteRegistration once on the next page (src/components/meta-pixel.tsx).
+  if (user && isNewSignup(user.created_at, Date.now())) {
+    response.cookies.set(SIGNUP_COOKIE, await signupEventId(user.id), { path: "/", maxAge: NEW_ACCOUNT_MS / 1000, sameSite: "lax", secure: true });
+  }
+  return response;
+}
+
+async function destination(request: NextRequest, user: Awaited<ReturnType<typeof getSessionUser>>) {
   const { searchParams, origin } = new URL(request.url);
   const next = safeNext(searchParams.get("next"), origin);
-  const user = await getSessionUser();
   if (!user) return NextResponse.redirect(`${origin}/?auth=login`);
   try {
     const a = await allowance(user.id);
