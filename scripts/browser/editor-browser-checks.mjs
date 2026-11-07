@@ -25,10 +25,15 @@ let n = 0;
 const pend = new Map(), handlers = [];
 ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.id && pend.has(m.id)) { pend.get(m.id)(m); pend.delete(m.id); } else handlers.forEach((h) => h(m)); };
 const send = (method, params = {}) => new Promise((res) => { const i = ++n; pend.set(i, res); ws.send(JSON.stringify({ id: i, method, params })); });
-const ev = async (expr) => (await send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true })).result?.result?.value;
+const ev = async (expr) => {
+  const m = await send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });
+  if (m.error || m.result?.exceptionDetails) throw Error(`page script failed: ${JSON.stringify(m.error ?? m.result.exceptionDetails).slice(0, 300)}`);
+  return m.result?.result?.value;
+};
 const waitFor = async (expr, ms = 30000) => { const t = Date.now(); while (Date.now() - t < ms) { if (await ev(expr)) return Date.now() - t; await sleep(50); } return -1; };
 const api = async (id = RID) => (await (await fetch(`${B}/api/runs/${id}?view=editor`, { cache: "no-store" })).json()).run;
-const until = async (pred, id = RID) => { for (let i = 0; i < 80; i++) { const r = await api(id); if (pred(r)) return r; await sleep(250); } return api(id); };
+// The saved run once `pred` holds; a timeout is a failed check (with the last state), never a silent pass.
+const until = async (pred, id = RID, what = "saved state") => { let r; for (let i = 0; i < 80; i++) { r = await api(id).catch(() => null); if (r && pred(r)) return r; await sleep(250); } check(false, `${what} never arrived: ${JSON.stringify(r)?.slice(0, 300)}`); return r ?? { texts: [], demo: { clips: [] }, sounds: [] }; };
 const box = (label) => ev(`(()=>{const e=[...document.querySelectorAll('[role=dialog] [role=button][aria-label]')].find(x=>x.getAttribute('aria-label')===${JSON.stringify(label)});if(!e)return null;const r=e.getBoundingClientRect();return {x:r.x+Math.min(40,r.width/2),y:r.y+r.height/2}})()`);
 const mouse = async (b, mods = 0) => { for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { type, x: b.x, y: b.y, button: "left", clickCount: 1, modifiers: mods }); };
 // A plain click redraws the side panel; wait for it before the next click (a human never clicks within 150 ms).
@@ -98,20 +103,25 @@ check(z0 === true && z1 === false && (await zoomOut()) === true, "Ctrl+= / Ctrl+
 
 // 3. A group, then a sound added: Delete must not remove the old group (Codex 2026-11-07).
 await seed(three(), texts4()); await open();
+await seed(three(), texts4(), [S("old", 0, 12, 0)]); await open();
 await click("Text: Text A"); await click("Text: Text B", CTRL);
-await ev(`[...document.querySelectorAll('[role=dialog] button')].find(b=>b.title==='Add a sound at the playhead').click()`); await sleep(800);
-await press("del"); await sleep(1500);
-check((await api()).texts.length === 4, "a sound added after a group: Delete keeps the group");
+check(JSON.stringify(await pressed()) === JSON.stringify(["Text: Text A", "Text: Text B"]), "stale group: the group is selected");
+// Pick a sound on its own after the group (what adding one ends with), then Delete.
+await click("Sound: old");
+check(JSON.stringify(await pressed()) === JSON.stringify(["Sound: old"]), "stale group: the sound alone is now selected");
+await press("del");
+r = await until((x) => (x.sounds ?? []).length === 0, RID, "the sound deleted");
+check(JSON.stringify(ids(r)) === JSON.stringify(["hook", "ta", "tb", "tc"]), `a sound picked after a group: Delete removes the sound, not the group (${ids(r)})`);
 
 // 4. Sounds in groups, Ctrl+A with sounds, group copy / cut / paste, Ctrl+Shift+B.
 await seed(three(), texts4(), [S("red", 0, 12, 0)]); await open();
 await press("a", CTRL); check((await pressed()).includes("Sound: red"), "Ctrl+A includes the sound");
 await press("del"); r = await until((x) => x.demo.clips.length === 0 && (x.sounds ?? []).length === 0);
-check(r.texts.length === 0 && (r.sounds ?? []).length === 0, "Delete removes clips, texts and the sound together");
+check(r.demo.clips.length === 0 && r.texts.length === 0 && (r.sounds ?? []).length === 0, "Delete removes clips, texts and the sound together");
 await press("z", CTRL); r = await until((x) => x.demo.clips.length === 3 && (x.sounds ?? []).length === 1);
 check(r.texts.length === 4, "one Undo brings everything back");
 await click("Text: Text A"); await click("Sound: red", CTRL);
-check((await pressed()).includes("Sound: red"), "Ctrl-click adds a sound to a group");
+check(JSON.stringify(await pressed()) === JSON.stringify(["Text: Text A", "Sound: red"]), `Ctrl-click adds a sound to the text's group (${await pressed()})`);
 await press("esc"); await click("Text: Text A"); await click("Text: Text B", CTRL); await press("c", CTRL);
 await press("esc"); await playhead(1); await press("v", CTRL);
 r = await until((x) => x.texts.length === 6);
@@ -131,8 +141,17 @@ r = await until((x) => x.demo.clips.length === 5 && x.texts.length === 2);
 check(r.texts.some((t) => t.start === 15 && t.end === 18), `non-adjacent clips: the caption lands on its clip's copy (${r.texts.map((t) => t.start)})`);
 await seed(three(), [], [S("s0", 0, 6, 0), S("s1", 2, 6, 1)]); await open();
 await playhead(6); await click("Sound: s0"); await click("Sound: s1", CTRL);
-check(await ev(`!document.querySelector('[role=dialog] button[title^="Delete"]')?.disabled`), "the Delete button works for a sound-only group");
-await press("c", CTRL); await press("esc"); await press("v", CTRL);
+check(JSON.stringify(await pressed()) === JSON.stringify(["Sound: s0", "Sound: s1"]), "two sounds selected");
+await press("c", CTRL);
+// The toolbar Delete button: it must exist, be enabled and delete both sounds (not only the keyboard key).
+const del = await ev(`(()=>{const b=document.querySelector('[role=dialog] button[title^="Delete the selection"]');if(!b||b.disabled||!b.offsetParent)return null;const r=b.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+check(Boolean(del), "the Delete button is there and enabled for a sound-only group");
+if (del) await mouse(del);
+r = await until((x) => (x.sounds ?? []).length === 0, RID, "both sounds deleted by the Delete button");
+check(r.demo.clips.length === 3, "the Delete button removed only the sounds");
+await press("z", CTRL);
+r = await until((x) => (x.sounds ?? []).length === 2, RID, "Undo restoring both sounds");
+await press("esc"); await playhead(6); await press("v", CTRL);
 r = await until((x) => (x.sounds ?? []).length === 4);
 const newRows = (r.sounds ?? []).filter((s) => !["s0", "s1"].includes(s.id));
 check(new Set(newRows.map((s) => s.row)).size === 2 && newRows.every((s) => s.end === 12), `overlapping sounds paste on two new rows at full length (${JSON.stringify(newRows.map((s) => [s.at, s.end, s.row]))})`);
@@ -167,12 +186,26 @@ const newVideo = async () => {
   return -1;
 };
 const warm = await newVideo(); // the first one also compiles the video page
+check(warm >= 0, "New video works once the page is ready");
+// Hold the create's answer: the page must open that video while the server has not answered yet.
 await send("Page.navigate", { url: `${B}/studio` });
 await waitFor(`[...document.querySelectorAll('button')].some(b=>b.textContent.includes('New video'))`, 120000); await sleep(1500);
-const openMs = await newVideo();
+await send("Fetch.enable", { patterns: [{ urlPattern: "*/api/runs?view=editor*", requestStage: "Request" }] });
+const held = [];
+const holder = (m) => { if (m.method === "Fetch.requestPaused" && m.params.request.method === "POST") held.push(m.params); };
+handlers.push(holder);
+await ev(`[...document.querySelectorAll('button')].find(b=>b.textContent.includes('New video')).click()`);
+const navMs = await waitFor(`location.pathname.startsWith('/studio/') && location.pathname.length > 20`, 10000);
+const heldId = held[0] ? JSON.parse(held[0].request.postData).id : null;
 const newId = await ev(`location.pathname.split('/').pop()`);
-check(warm >= 0 && openMs >= 0 && openMs < 1500, `New video opens its page at once (${openMs} ms after the click)`);
-check(Boolean((await until((x) => Boolean(x?.id), newId))?.id), "and the video is created on the server");
+check(held.length === 1 && navMs >= 0, `New video opens its page while the create is still unanswered (${navMs} ms, ${held.length} held)`);
+check(heldId === newId, "the page is the video being created (same id)");
+check((await ev(`document.body.innerText.includes("Couldn't")`)) === false, "no error while the create is pending");
+handlers.splice(handlers.indexOf(holder), 1);
+for (const h of held) await send("Fetch.continueRequest", { requestId: h.requestId });
+await send("Fetch.disable");
+check(Boolean((await until((x) => x?.id === newId, newId, "the created video"))?.id), "once answered, the video exists on the server");
+check((await waitFor(`!!document.querySelector('input') && !document.body.innerText.includes("Couldn't")`, 20000)) >= 0, "and the page shows it");
 await send("Fetch.enable", { patterns: [{ urlPattern: "*/api/runs?view=editor*", requestStage: "Request" }] });
 let failNext = true;
 const failer = async (m) => { if (m.method !== "Fetch.requestPaused") return; if (failNext && m.params.request.method === "POST") await send("Fetch.fulfillRequest", { requestId: m.params.requestId, responseCode: 503, body: Buffer.from("{}").toString("base64") }); else await send("Fetch.continueRequest", { requestId: m.params.requestId }); };

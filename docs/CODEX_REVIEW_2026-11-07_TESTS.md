@@ -84,3 +84,64 @@ The queue test reconstructs the loop rather than exercising the worker; it canno
 | Inserts moving sounds | Partial: `shiftSounds` only. Actual insert call site can be removed without failure. Add actual handler tests for single/group insertion at beginning, middle and end, including sounds beginning exactly at the insertion and sounds crossing it. |
 
 Release the extraction on its merits, but do not sign off this batch as “tests for every problem” until the silent async success and demonstrated integration/channel gaps are covered. No build/lint rerun was needed to establish these test failures; this review makes no new build or live-browser claim.
+
+## Round 2
+
+**Verdict: blockers for test sign-off.** HEAD `353d76d46e8e5bf8203dec8eb76e3fdee83ee531` fixes the asynchronous false pass and rejects all five previously surviving mutations at their new shared-code locations. The additional extraction is faithful on inspection. Two browser assertions still fail to establish the user behavior they claim to protect; correct those before claiming every raised problem is guarded. I found no new product-code blocker in this commit.
+
+### Independent verification
+
+- Ran the original `/tmp/mavya-test-mutations.py`: the first six mutations still fail. It then stops at its assertion that the old component-local race exists, because that expression moved. This is an obsolete harness target, not a test failure or a surviving mutation.
+- Retargeted the five moved/shared mutations in `/tmp/mavya-round2-mutations.py`, preserving the original mutation intent and restoring each file in `finally`. All five exit **1**:
+
+| Mutation at its current location | Observed assertion failure |
+| --- | --- |
+| Remove `late` from `pending-runs.pageLoad`'s race | “at 2 s it loads the usual way and shows that” |
+| Remove both `dropLoad(id)` calls from `changeRun` | “dropped before the save” |
+| Replace the insertion shift with `cur.sounds` in `edit-ops` | Blue's sound remains at 6–9 instead of moving to 12–15 |
+| Force pasted sounds to row zero in `selection` | “copied rows get new rows of their own (0,0)” |
+| Silence the second stretched-audio channel | Expected right-channel mean −0.25, measured 0 |
+
+- Repeated the never-settling `startCreate` mutation with the actual 60-second watchdog, allowing more than 60 seconds for the child process. See the final result below. The old auxiliary harness's 15-second subprocess limit is too short to observe this watchdog and must not be mistaken for a successful watchdog test.
+- Direct `finish` probes verify wrong count, explicit early `process.exit(0)`, and unresolved work all exit **1**; successful work with the expected count exits **0**. Shortened only the probe's supplied timeout to 100 ms. The actual speed suite expects **30**, not the historical 21 in the supplied description.
+- Baseline `npm test`: **38 caption + 33 editor + 30 speed + 112 sound/queue checks passed**. The frame suite then failed with `spawnSync .../ffmpeg EPERM`, including child `status: 0`, in this restricted environment. I do not report a fresh 602-case pass here; the supplied pass remains Claude's evidence.
+- `npx tsc --noEmit --incremental false`, browser-script syntax check and `bash -n scripts/browser/run.sh` passed. No new build or lint claim. Browser checks were inspected, not run, as requested for this socket-restricted sandbox. The supplied 29 passes and rename-disconnection failure were not independently reproduced.
+
+### Remaining browser acceptance blockers
+
+**B1 — P2: “New video opens at once” does not test navigation while creation is pending.** `scripts/browser/editor-browser-checks.mjs:161-175` times navigation against an unthrottled local POST and accepts anything below 1,500 ms. A regression that awaits a fast POST before navigating can satisfy both assertions. The later interception tests a failed create; it does not establish navigation before successful creation completes. Repeated clicks also restart the timing and can hide the first unresponsive click.
+
+Required check: intercept and hold the creation POST before its response, click once after explicit hydration/readiness, assert navigation to that exact requested ID and visible loading feedback **while the response remains held**, then release it and assert the editor displays that run. Mutation acceptance: restoring await-before-navigation must fail. Keep a generous bounded timeout for readiness, but establish ordering with the deferred response rather than a local speed threshold.
+
+**B2 — P2: the sound-only Delete-button test can pass with no button, and never clicks it.** At line 134, `!document.querySelector(...)?.disabled` evaluates to true when the selector returns null. An absent button passes the check labeled “the Delete button works.” An enabled button with a disconnected handler also passes, since the script proceeds to copy/paste instead of clicking Delete.
+
+Required check: require an existing, visible, enabled button, click it, assert both selected sound IDs disappear while clips/texts remain unchanged, then one Undo must restore both sounds. Mutation acceptance: remove the button or replace its click handler with a no-op; either must fail. The separate keyboard Delete test does not cover a toolbar button's wiring.
+
+### Other browser assertion weaknesses to tighten
+
+- `until` returns the last run on timeout; it does **not** fail its predicate. Some following checks omit part of that predicate. For example, lines 109–110 can pass with clips still present if texts and sounds disappeared. Make `until` throw with the last state, or repeat the complete predicate in the assertion. Do the same for unchecked `waitFor` results in setup.
+- The stale-group scenario at lines 99–104 checks that four texts remain, but never confirms that a sound was added, selected and then deleted. A broken Add sound button followed by inert Delete can pass. Assert the intermediate sound and final deletion, plus unchanged original text IDs/content.
+- The sound Ctrl-click case checks only that the sound is selected; it would accept replacing the text selection instead of joining it. Require both exact selected labels.
+- The overlapping-sounds case checks distinct row numbers and stored ends, not full effective playback duration or allocation after existing rows. Its new shared-code unit check does cover those helper properties; add them to the browser assertion when certifying actual paste assembly.
+- Fixed sleeps, coordinate/DOM-class selectors and fixed ports make the suite machine-sensitive. Prefer state-based waits, stable accessible targets and isolated ports. CDP `send`/`ev` should surface protocol errors and `exceptionDetails` explicitly instead of turning them into undefined values. The whole-script watchdog prevents a silent hang, but failures will otherwise be harder to diagnose.
+- `run.sh` is explicitly WSL/Windows-specific and starts **Next dev**, not a production build. A `CHROME` override alone does not make the shell runner portable. Its startup loop should fail explicitly when readiness times out, and cleanup should kill the actual server process tree. These are runner reliability improvements, not new product release blockers.
+
+### Extraction and repaired coverage
+
+The components visibly use `pageLoad`, `changeRun`, `insertClipsChange` and `pasteGroupLayers`. The insertion helper preserves ordering, label conversion, text/sound shift and save payload; merging its result into the live ref preserves unchanged sounds. Paste assembly preserves rounding, layer placement, new IDs, row allocation and existing-sound shift. `changeRun` now also invalidates on a rejected work promise through `finally`, a sensible strengthening. The create outcome mapping retains pricing/failure behavior and the consumer still rejects departed-page application. No unjustified behavior change found.
+
+The watchdog uses a real referenced timer and an exit listener, closing the original Node early-exit hole. The added stereo assertions catch the original lost-channel mutation. The chunked file test compares distinct channels over a final partial chunk against direct synthesis; it proves adapter ordering and sample agreement, not an independent oracle for synthesis itself. Both are worthwhile regression guards.
+
+### Do the explicitly deferred gaps block this round?
+
+| Deferred gap | Decision and required follow-up |
+| --- | --- |
+| Font preload/fallback checks absent from `npm test` | **Nonblocking for this extraction/test repair.** Existing repo font checks remain; fonts did not change here. Wire the applicable existing checks into the documented validation command and add current preload-policy coverage before claiming `npm test` alone covers fonts. |
+| Real worker drain with arrivals during work | **Nonblocking.** The worker extraction was already faithful and its code is unchanged in this round. Add a deferred-job integration test proving one active job, arrivals during await, alternation and recovery. Pure `nextJob` tests alone still do not prove worker wiring. |
+| Browser export → joined video with clip audio and distinct stereo | **Nonblocking for this round; required for a new end-to-end export certification.** The frame/server matrix and new stereo/file-adapter checks cover narrower layers. Add real browser export/decode checks for both channels and adjacent-cut audio/picture boundaries. |
+| Partial-piece deletion across two clips | **Nonblocking.** Single-clip partial deletion and multi-clip whole deletion exist, and deletion logic is unchanged here. Add the combined case with magnet on/off, speed, surviving piece IDs and caption positions. |
+| Regenerated-caption validity assertions | **Nonblocking assertion hardening.** Assert finite, nonnegative starts, positive duration and exact intended ownership/content. Clarification to Round 1: the full regeneration loop includes export, whose positive-duration filter means removing/zeroing that caption can already fail when the test dereferences the missing exported caption. The narrow `end <= 1` assertions are weak, but that does not mean every zero-duration mutation passes the complete suite. The standalone retime assertion remains weaker. |
+
+These deferrals do not reopen the repaired mutation blockers or show present product defects. B1 and B2 are specific gaps in the newly claimed browser regression coverage, not a demand to cover every conceivable interaction before shipping.
+
+Final mutation result: the actual never-settling create exited **1** with `speed-fix-checks: did not finish within 60000 ms (0 of 30 checks ran)`. The original auxiliary harness was also rerun: its hang mode reaches its obsolete 15-second Python timeout (source restored); its combined mode reaches the new right-channel assertion and fails. Its old component-target string replacements are no-ops after extraction, so the retargeted per-mutation results above are the meaningful evidence. Logs: `/tmp/mavya-round2-original.log`, `/tmp/mavya-round2-original-more.log`, `/tmp/mavya-round2-mutations.log` and `.json`. All source mutations were restored; only this report remains modified. No commit or push.

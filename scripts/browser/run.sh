@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 WORK="$(mktemp -d)"
 WIN_TMP="$(wslpath "$(cmd.exe /c 'echo %TEMP%' 2>/dev/null | tr -d '\r')")/mavya-browser-checks"
-trap 'kill "${SERVER:-0}" 2>/dev/null || true; rm -rf "$WORK"' EXIT
+trap 'pkill -P "${SERVER:-0}" 2>/dev/null; kill "${SERVER:-0}" 2>/dev/null; fuser -k 3210/tcp 2>/dev/null; rm -rf "$WORK"' EXIT
 cd "$ROOT" && git ls-files -co --exclude-standard | grep -v '^\.env' | grep -v '^\.data/' | tar -cf - -T - | tar -xf - -C "$WORK"
 ln -s "$ROOT/node_modules" "$WORK/node_modules"
 # Turbopack resolves the symlinked node_modules only with the root at /.
@@ -20,6 +20,7 @@ cat > "$WORK/.data/db.json" <<'JSON'
 JSON
 (cd "$WORK" && env -i HOME="$HOME" PATH="/usr/local/bin:/usr/bin:/bin:$(dirname "$(command -v node)")" npx next dev -p 3210 > "$WORK/dev.log" 2>&1) &
 SERVER=$!
-for i in $(seq 1 180); do curl -s -o /dev/null -w '%{http_code}' http://localhost:3210/studio | grep -q 200 && break; sleep 1; done
+ready=0; for i in $(seq 1 180); do if curl -s -o /dev/null -w '%{http_code}' http://localhost:3210/studio | grep -q 200; then ready=1; break; fi; sleep 1; done
+if [ "$ready" != 1 ]; then echo "browser checks: the local server never started (see $WORK/dev.log)"; tail -20 "$WORK/dev.log"; exit 1; fi
 mkdir -p "$WIN_TMP" && cp "$ROOT/scripts/browser/editor-browser-checks.mjs" "$WIN_TMP/"
 (cd "$WIN_TMP" && cmd.exe /c "node editor-browser-checks.mjs")
