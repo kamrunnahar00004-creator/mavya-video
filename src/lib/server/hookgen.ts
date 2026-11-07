@@ -12,7 +12,7 @@ import { geminiJSON } from "@/lib/server/gemini";
 import { putObject, signedGet } from "@/lib/server/r2";
 import { libraryFile, mediaToFile } from "@/lib/server/store";
 import type { Reference, Run } from "@/lib/types";
-import { CLEAN_PROMPT, makeFirstFrame, VERDICT_SCHEMA, type Verdict } from "@/lib/server/first-frame";
+import { makeFirstFrame, VERDICT_SCHEMA, type Verdict } from "@/lib/server/first-frame";
 
 /**
  * Hook generation (founder decision 2026-10-23, after testing Veo, Wan Animate, H3 Recast and Kling side by side:
@@ -47,13 +47,9 @@ const MIN_REFERENCE = 3;
 const LINK_SECONDS = 24 * 3600;
 
 const LOOK = "Real handheld phone selfie video, casual UGC, one continuous take. Natural five-finger hands. No text, captions, subtitles, stickers or watermarks anywhere on screen.";
-/**
- * Motion control: the reference clip is the performance to copy (founder 2026-10-23: as close to the original as possible).
- * The eyes sentence: founder 2026-11-07, the eyes must stay on the camera and follow the original's. The face sentence:
- * founder 2026-11-07, the expression must match the original 100%, nothing over or extra.
- */
+/** Motion control: the reference clip is the performance to copy (founder 2026-10-23: as close to the original as possible). */
 const MATCH =
-  "Copy the reference video's performance exactly and as closely as possible: the same gestures, hand positions and hand shapes, head moves, gaze direction, facial expressions at the same strength, mouth movements and timing, frame by frame. Add nothing, exaggerate nothing, no extra gestures, no overacting. The eyes follow the reference video's eyes exactly: they look into the camera lens whenever the reference's do, and look away only when, where and as far as the reference's do. The face matches the reference's in every frame: the same mouth shape, eyebrow position and eye opening at the same intensity, never bigger and never smaller; no smile, frown, surprise or other expression the reference does not show at that moment. Keep the same person, face, hair, outfit, held objects, room, framing and light as in the image for the whole video; no new objects.";
+  "Copy the reference video's performance exactly and as closely as possible: the same gestures, hand positions and hand shapes, head moves, gaze direction, facial expressions at the same strength, mouth movements and timing, frame by frame. Add nothing, exaggerate nothing, no extra gestures, no overacting. Keep the same person, face, hair, outfit, held objects, room, framing and light as in the image for the whole video; no new objects.";
 const NEGATIVE = "text, captions, subtitles, watermark, logo, cut, scene change, extra fingers, deformed hands, distorted face, morphing, exaggerated expressions, overacting";
 
 const exec = promisify(execFile);
@@ -196,9 +192,7 @@ async function startHookInner(run: Run, source: Reference | null, who: string, n
       await ff("-ss", "0.05", "-i", clip, "-frames:v", "1", "-q:v", "2", first);
       const { frame } = await makeFirstFrame({
         image: geminiImage,
-        clean: (original, ms) => geminiImage([{ inline_data: { mime_type: "image/jpeg", data: original.toString("base64") } }, { text: CLEAN_PROMPT }], ms),
-        // A failed check keeps the frame (first-frame.ts); logged so a check that keeps failing is seen.
-        judge: (parts, ms) => geminiJSON<Verdict>(parts as Parameters<typeof geminiJSON>[0], { schema: VERDICT_SCHEMA, temperature: 0, signal: workSignal(ms) }).catch((error) => { console.error("first frame check failed", String(error).slice(0, 200)); throw error; }),
+        judge: (parts, ms) => geminiJSON<Verdict>(parts as Parameters<typeof geminiJSON>[0], { schema: VERDICT_SCHEMA, temperature: 0, signal: workSignal(ms) }),
         elapsed: () => Date.now() - began,
       }, await readFile(first), character, outfit);
       const [imageUrl, videoUrl] = await Promise.all([share(frame, "jpg", who), share(reference, "mp4", who)]);

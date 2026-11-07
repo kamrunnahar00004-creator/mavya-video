@@ -9,23 +9,21 @@ process.chdir(path.join(__dirname, '..'));
 
 const ff = load('src/lib/server/first-frame.ts');
 let checks = 0;
-const EXPECTED = 33;
+const EXPECTED = 27;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 
-const PASS = { sameRoom: true, sameLight: true, sameFraming: true, sameAngle: true, sameGaze: true, sameHands: true, sameExpression: true, samePerson: true, problem: '' };
+const PASS = { sameRoom: true, sameLight: true, sameFraming: true, sameAngle: true, sameHands: true, sameExpression: true, samePerson: true, problem: '' };
 const ROOM = { ...PASS, sameRoom: false, sameLight: false, problem: "the bedroom from IMAGE 2 replaced the original's grey wall" };
 const HAND = { ...PASS, sameHands: false, problem: 'a raised hand that IMAGE 1 does not show' };
 const photo = Buffer.from('FULL-CHARACTER-PHOTO-WITH-BEDROOM');
 const original = Buffer.from('ORIGINAL-FIRST-FRAME');
-const cleaned = Buffer.from('ORIGINAL-WITHOUT-CAPTION');
 const b64 = (b) => b.toString('base64');
 
 /** Stand-in Gemini: frames numbered by try, verdicts from a script; records what was sent. */
-function fake(verdicts, { elapsed = () => 0, judgeThrows = false, imageThrowsOn = 0, cleanThrows = false } = {}) {
-  const sent = { images: [], judged: [], ms: [], judgeMs: [], cleaned: [] };
+function fake(verdicts, { elapsed = () => 0, judgeThrows = false, imageThrowsOn = 0 } = {}) {
+  const sent = { images: [], judged: [], ms: [], judgeMs: [] };
   let n = 0;
   const deps = {
-    clean: async (img, ms) => { sent.cleaned.push(ms); if (cleanThrows) throw new Error('clean down'); return cleaned; },
     image: async (parts, ms) => { sent.images.push(parts); sent.ms.push(ms); if (imageThrowsOn === sent.images.length) throw new Error('image down'); return Buffer.from(`FRAME-${++n}`); },
     judge: async (parts, ms) => { sent.judged.push(parts); sent.judgeMs.push(ms); if (judgeThrows) throw new Error('judge down'); return verdicts[Math.min(sent.judged.length - 1, verdicts.length - 1)]; },
     elapsed,
@@ -46,24 +44,6 @@ finish('first-frame-checks', EXPECTED, () => checks, async () => {
     ok(/The last try was wrong: a raised hand/.test(ff.swapPrompt(summer, 'x', 'a raised hand')), 'prompt: names what the last try got wrong');
     ok(!/IMAGE 2/.test(ff.swapPrompt({ image: null, words: 'a tall man with a beard' }, 'x')), 'described person: no IMAGE 2 in the prompt');
   }
-  // Founder 2026-11-07: the eyes stay on the camera and follow the original, in the first frame and in Kling's motion.
-  {
-    const src = fs.readFileSync('src/lib/server/hookgen.ts', 'utf8');
-    ok(/the eyes looking exactly where they look in IMAGE 1 \(into the camera lens if they do there\)/.test(ff.swapPrompt(summer, 'x')) && /sameGaze: the eyes look in the same direction/.test(ff.judgePrompt(summer)) && ff.VERDICT_SCHEMA.required.includes('sameGaze'), 'first frame: gaze asked for and checked');
-    ok(/The eyes follow the reference video's eyes exactly: they look into the camera lens whenever the reference's do/.test(src), 'Kling prompt: the eyes follow the original');
-    ok(/The face matches the reference's in every frame: the same mouth shape, eyebrow position and eye opening at the same intensity, never bigger and never smaller/.test(src), 'Kling prompt: the face matches the original, never over or under (founder 2026-11-07)');
-  }
-  // Founder's hook 2026-11-07: a caption in the original made the swap redraw the whole picture (0 of 3 tries kept the
-  // room). The caption is removed first, alone; when that fails the original is used.
-  {
-    const a = fake([PASS]);
-    await ff.makeFirstFrame(a.deps, original, summer, 'x');
-    ok(a.sent.cleaned.length === 1 && a.sent.cleaned[0] === ff.CLEAN_MS && datas(a.sent.images[0])[0] === b64(cleaned) && !/Remove all on-screen text/.test(texts(a.sent.images[0])), 'caption removed first, alone; the swap works on the clean frame');
-    const b = fake([PASS], { cleanThrows: true });
-    const r = await ff.makeFirstFrame(b.deps, original, summer, 'x');
-    ok(r.frame.toString() === 'FRAME-1' && datas(b.sent.images[0])[0] === b64(original), 'caption removal down: the original is used');
-    ok(/Remove the on-screen text and any caption box/.test(ff.CLEAN_PROMPT) && /Change nothing else at all/.test(ff.CLEAN_PROMPT), 'the removal prompt changes nothing else');
-  }
   // The whole character photo is sent, never a crop: their body stays theirs (founder 2026-11-07: a face crop would put
   // Summer's face on the hook person's body).
   {
@@ -71,8 +51,8 @@ finish('first-frame-checks', EXPECTED, () => checks, async () => {
     const r = await ff.makeFirstFrame(deps, original, summer, 'a red hoodie');
     const sentData = datas(sent.images[0]);
     ok(sentData.length === 2 && sentData[1] === b64(photo) && /face, hair and body/.test(texts(sent.images[0])), 'the whole photo is sent, as the person with their body');
-    ok(sentData[0] === b64(cleaned) && r.tries === 1 && r.frame.toString() === 'FRAME-1', 'passes first time: one try, that frame, on the caption-free original');
-    ok(datas(sent.judged[0]).includes(b64(original)) && !datas(sent.judged[0]).includes(b64(cleaned)) && datas(sent.judged[0]).includes(b64(Buffer.from('FRAME-1'))) && /face, hair and body/.test(texts(sent.judged[0])) && /Ignore that text and whatever is drawn where it was/.test(texts(sent.judged[0])), 'Codex 2026-11-07: the judge compares with the TRUE original (captions ignored), not the cleaned one');
+    ok(sentData[0] === b64(original) && r.tries === 1 && r.frame.toString() === 'FRAME-1', 'passes first time: one try, that frame');
+    ok(datas(sent.judged[0]).includes(b64(original)) && datas(sent.judged[0]).includes(b64(Buffer.from('FRAME-1'))) && /face, hair and body/.test(texts(sent.judged[0])), 'the judge sees the original and the edit, and checks the body');
   }
   // An uploaded photo goes in the same way, with its own type.
   {
