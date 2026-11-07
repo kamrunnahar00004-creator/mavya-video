@@ -145,3 +145,50 @@ The watchdog uses a real referenced timer and an exit listener, closing the orig
 These deferrals do not reopen the repaired mutation blockers or show present product defects. B1 and B2 are specific gaps in the newly claimed browser regression coverage, not a demand to cover every conceivable interaction before shipping.
 
 Final mutation result: the actual never-settling create exited **1** with `speed-fix-checks: did not finish within 60000 ms (0 of 30 checks ran)`. The original auxiliary harness was also rerun: its hang mode reaches its obsolete 15-second Python timeout (source restored); its combined mode reaches the new right-channel assertion and fails. Its old component-target string replacements are no-ops after extraction, so the retargeted per-mutation results above are the meaningful evidence. Logs: `/tmp/mavya-round2-original.log`, `/tmp/mavya-round2-original-more.log`, `/tmp/mavya-round2-mutations.log` and `.json`. All source mutations were restored; only this report remains modified. No commit or push.
+
+## Round 3
+
+**Verdict: blockers — one browser-runner cleanup defect.** Reviewed HEAD `2cbcf079269fca3ac85efce423a4a17c1b684409`. The Round 2 browser acceptance blockers **B1 and B2 are closed by inspection**. No product code changed, and I found no new product defect. The new cleanup trap must be corrected before signing off `npm run test:browser` as a reliable, isolated command.
+
+### Closed browser findings
+
+- **B1:** the script intercepts and holds the create POST, clicks once for the measured scenario, requires exactly one held request and navigation before release, and compares the requested ID with the URL ID. After release it waits for that run in storage and the page's input/no-error state. This establishes the ordering the previous local timing threshold could not. The final DOM assertion is broad (any input), but the held-request/ID/server checks establish the essential regression guard. Explicit editor readiness and title matching would strengthen it without blocking this round.
+- **B2:** the script requires the exact two selected sound labels; locates an existing, enabled toolbar Delete button with an `offsetParent`; clicks its coordinates using mouse events; waits for zero sounds; checks three clips remain; and waits for Undo to restore two sounds. Missing-button and no-op-handler cases now record failures. Checking restored IDs/content rather than only count would be useful hardening.
+- `until` now records a failure on timeout before returning fallback state, so downstream permissive assertions cannot erase the failure. Delete-all repeats its entire outcome predicate. `ev` throws on evaluate protocol errors and JavaScript exceptions. Sound modifier-selection checks the exact text-plus-sound labels.
+- The stale-group scenario now proves the two-text group exists, then proves a plain-picked sound is the sole active selection, deletes it and checks the original four text IDs remain. This is valid coverage of the stale-selection state. It does not certify the separate song-API/add-new-sound flow, and the report should retain that distinction.
+- Server startup now explicitly fails after its readiness deadline. The redundant first seed/open in the stale-group scenario can be removed later; it does not weaken the assertions.
+
+### R3-1 — P2: cleanup can fail a passing run and skip cleanup; process ownership is unverified
+
+`scripts/browser/run.sh:5,9` combines `set -euo pipefail` with this unguarded EXIT trap:
+
+```bash
+pkill -P "${SERVER:-0}" 2>/dev/null
+kill "${SERVER:-0}" 2>/dev/null
+fuser -k 3210/tcp 2>/dev/null
+rm -rf "$WORK"
+```
+
+These cleanup commands have ordinary nonzero outcomes: `pkill` when no matching child remains, `kill` when the parent has exited, and `fuser` when the port is already free after successful shutdown. Under `set -e`, the trap stops at that command. A successful browser run can therefore exit **1** and never reach `rm`. A failure path can leave processes/temp files behind as well. The old trap guarded its kill; the new trap removed that protection.
+
+**Independent, harmless reproduction:** ran the exact trap in a child Bash with process commands replaced by functions. With `pkill` and `kill` returning 0, `fuser` returning 1 (port already free), and `rm` replaced by a marker, an initial `exit 0` became **exit 1**, and the cleanup marker never ran. A separate failing-first-command probe likewise skipped subsequent cleanup. No real process was killed in these probes.
+
+There is also no ownership check on `fuser -k 3210/tcp`: it targets whichever process owns that port, not specifically this run's server. A port collision can make the readiness probe accept an existing `/studio` service instead of the temporary server; port-wide termination is not an isolation mechanism. The `${SERVER:-0}` fallback is also inappropriate before `SERVER` is set: `kill 0` targets the current process group.
+
+Required repair: capture and preserve the incoming exit status; guard cleanup operations that may legitimately find nothing; always attempt temp cleanup; and terminate only this run's recorded process tree/group, never an arbitrary port owner or PID zero. Reject an occupied port or use a verified dedicated port, and ensure readiness belongs to the spawned server. A fixed port is acceptable for a serialized local harness once collisions fail safely. Add small shell regression probes for success with an already-exited server, failure before SERVER assignment, cleanup-command failure, and an occupied port (using mocks where needed). Each must preserve the original result, finish cleanup and leave unrelated processes untouched.
+
+### Deferred limitations
+
+| Item | Blocks? |
+| --- | --- |
+| Fixed sleeps and coordinate/DOM selectors | **No.** They remain potential flakiness/maintenance costs; stronger outcome assertions and timeout failures prevent the original false passes. Prefer state-based waits over time. |
+| Fixed port | **Not intrinsically.** Concurrent runs may be unsupported. Unverified ownership and port-wide killing in R3-1 do block the current runner. |
+| WSL/Windows-specific runner | **No.** Its documented local platform scope is acceptable; it is not a portable CI command. |
+| `next dev` rather than production build | **No for these interaction tests.** Do not use their success to certify production loading/performance or hydration behavior. |
+| Effective duration of overlapping pasted sounds checked only in shared code | **No.** Existing unit coverage plus browser rows/end checks provides useful layered coverage. Add browser effective-end and row-allocation assertions before claiming full playback verification. |
+
+The Round 2 deferred font, worker-drain, full browser-export/stereo, partial-deletion and caption-validity gaps retain their nonblocking assessments for this round.
+
+### Verification and scope
+
+`node --check scripts/browser/editor-browser-checks.mjs` and `bash -n scripts/browser/run.sh` passed. The cleanup failure above was independently reproduced. I did not run Chrome in this restricted environment; the reported **37 passing checks** and two browser mutation failures remain supplied evidence, consistent with the inspected assertions. I did not rerun unchanged offline suites or mutate product sources for this browser-only review. Only this report was appended; no commit or push.
