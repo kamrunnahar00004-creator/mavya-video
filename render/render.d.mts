@@ -4,6 +4,10 @@ export type Probe = { file: string; hasAudio: boolean; duration: number | null }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Spec = { width: number; height: number; fps: number; total: number; segments: any[]; sounds: any[]; overlays: any[] };
 export function plan(spec: Spec): Step[];
+export function planLength(spec: Pick<Spec, "fps" | "segments">): number;
+export type FrameRange = { from: number; to: number; start: number; end: number };
+export function layout(spec: Spec): { steps: Step[]; segs: { gap: FrameRange; clip: FrameRange }[] };
+export function textFrames(spec: Spec, layoutOrNull: ReturnType<typeof layout> | null, text: { start: number; end: number; owner?: { seg: number; gap: boolean } | null }): { from: number; to: number };
 export function stepArgs(spec: Spec, step: Step, src: Probe | null, out: string, slots?: number, sound?: string): string[];
 export function countArgs(spec: Spec, step: Step, src: Probe, out: string): string[];
 export function countFrames(text: string): number;

@@ -20,7 +20,14 @@ export function frameSchedule(pts, step, speed, fps) {
   const start = ms(step.start), end = ms(step.end);
   const kept = [];
   for (let i = 0; i < pts.length; i++) if (pts[i] >= start - 1e-9 && pts[i] < end - 1e-9) kept.push(i);
-  if (!kept.length) return { source: new Array(step.frames).fill(-1), slot: new Array(step.frames).fill(0) };
+  if (!kept.length) {
+    // No frame starts inside the piece: the frame on screen at its start (the last one before it), held, as stepArgs
+    // does; no frame before it either: black (-1). frameTimes reads from the key frame before the start, so that
+    // frame is in `pts`.
+    let held = -1;
+    for (let i = 0; i < pts.length; i++) if (pts[i] < start - 1e-9 && (held < 0 || pts[i] > pts[held])) held = i;
+    return { source: new Array(step.frames).fill(held), slot: new Array(step.frames).fill(0) };
+  }
   const p0 = pts[kept[0]];
   // fps (first pass): slot j shows the last kept frame whose time rounds to a slot <= j. The stream ends at the
   // end of the last kept frame (its duration is the gap to the next source frame, or the previous gap at the end).
@@ -28,7 +35,11 @@ export function frameSchedule(pts, step, speed, fps) {
   const lastIdx = kept[kept.length - 1];
   const own = pts.durations?.[lastIdx] ?? 0;
   const dur = lastIdx + 1 < pts.length ? pts[lastIdx + 1] - pts[lastIdx] : own > 0 ? own : lastIdx > 0 ? pts[lastIdx] - pts[lastIdx - 1] : 1 / fps;
-  const slots = Math.max(1, near((pts[lastIdx] + dur - p0) * fps));
+  const slots = near((pts[lastIdx] + dur - p0) * fps);
+  // The frame-rate pass keeps none of the piece's frames (they all fit in under half an output frame): stepArgs
+  // then holds the first frame inside the piece (countFrames), so the browser does too (Codex 2026-11-07: at 240 fps
+  // it held the last one, a different picture).
+  if (slots < 1) return { source: new Array(step.frames).fill(kept[0]), slot: new Array(step.frames).fill(0) };
   const inter = [];
   for (let j = 0, k = 0; j < slots; j++) {
     while (k + 1 < kept.length && slotOf[k + 1] <= j) k++;

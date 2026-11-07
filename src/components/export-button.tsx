@@ -143,7 +143,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
       const out=[];
       for(const t of layers){
         const drawn=await textPng(t);
-        if(drawn)out.push({png:drawn.png,x:drawn.x,y:drawn.y,start:Math.max(0,t.start),end:Math.min(total,t.end)});
+        if(drawn)out.push({png:drawn.png,x:drawn.x,y:drawn.y,start:Math.max(0,t.start),end:Math.min(total,t.end),owner:t.owner});
       }
       return out;
     })();

@@ -165,6 +165,18 @@ export function ownedBy(start: number, offset: number, len: number): boolean {
   const at = roundTime(start);
   return at >= roundTime(offset) && at < roundTime(offset + len);
 }
+/**
+ * Which clip a text belongs to, as containTexts judges it: `seg` is the clip's index in `segs`; `gap` when the text
+ * starts in the empty space before that clip. null: before the first clip or past the last. The export puts the text
+ * on that clip's frames (render.mjs textFrames), so it never re-judges ownership from its own sums.
+ */
+export function textOwner(start: number, segs: Seg[]): { seg: number; gap: boolean } | null {
+  const own = segs.findIndex((s) => ownedBy(start, s.offset, s.len));
+  if (own >= 0) return { seg: own, gap: false };
+  const next = segs.findIndex((s) => roundTime(s.offset) > roundTime(start));
+  return next >= 0 && gapHolds(segs[next], start) ? { seg: next, gap: true } : null;
+}
+const gapHolds = (s: Seg, start: number) => s.gap > 0 && roundTime(start) >= roundTime(s.offset - s.gap);
 export function containTexts(texts: TextLayer[], segs: Seg[]): TextLayer[] {
   let moved = false;
   const next = texts.map((t) => {

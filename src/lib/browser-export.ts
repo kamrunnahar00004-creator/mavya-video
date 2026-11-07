@@ -1,6 +1,6 @@
 "use client";
 import { ALL_FORMATS, AudioBufferSource, BlobSource, BufferSource, BufferTarget, CanvasSource, EncodedPacketSink, EncodedVideoPacketSource, Input, Mp4OutputFormat, Output, Quality, VideoSampleSink, canEncodeAudio, canEncodeVideo, type InputVideoTrack } from "mediabunny";
-import { demoAt, exposurePower, contrastGamma, plan, type Look, type Spec } from "../../render/render.mjs";
+import { demoAt, exposurePower, contrastGamma, layout, plan, textFrames, type Look, type Spec } from "../../render/render.mjs";
 import { frameSchedule, frameTimes, mediaOrigin } from "../../render/frames.mjs";
 import { fillSound } from "../../render/sound.mjs";
 
@@ -11,7 +11,7 @@ import { fillSound } from "../../render/sound.mjs";
  * Chrome, Edge and Firefox 130+ (Safari is not tested yet: it uses the server export).
  */
 
-export type BrowserText = { png: string; x: number; y: number; start: number; end: number };
+export type BrowserText = { png: string; x: number; y: number; start: number; end: number; owner?: { seg: number; gap: boolean } | null };
 
 /**
  * Picture quality (founder 2026-11-05: an uploaded iPhone clip must come out looking like the original).
@@ -309,13 +309,15 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   gl.uniform1i(u("tex"), 0);
   const texts = await textsReady;
+  const where = layout(spec);
   const overlays = await Promise.all(texts.map(async (t) => {
     const img = await createImageBitmap(await (await fetch(t.png)).blob(), { premultiplyAlpha: "premultiply" });
     held.bitmaps.push(img);
     const tex = texture();
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-    // Same frames as finalArgs: from round(start*fps) to round(end*fps)-1.
-    return { tex, x: Math.round(t.x), y: Math.round(t.y), w: img.width, h: img.height, from: Math.round(t.start * fps), to: Math.round(t.end * fps) - 1 };
+    // Same frames as finalArgs (textFrames): only on the clip it belongs to; `to` here is the last frame shown.
+    const f = textFrames(spec, where, t);
+    return { tex, x: Math.round(t.x), y: Math.round(t.y), w: img.width, h: img.height, from: f.from, to: f.to - 1 };
   }));
 
   const output = new Output({ format: new Mp4OutputFormat({ fastStart: "in-memory" }), target: new BufferTarget() });

@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { exportLayers } from "@/lib/export-layers";
+import { exportLayers, exportWindow } from "@/lib/export-layers";
 import { billingRpc } from "@/lib/server/billing-state";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { advanceExport, cancelBrowserExport, exportJob } from "@/lib/server/export-jobs";
@@ -12,7 +12,7 @@ import { exportSource, masterKey } from "@/lib/server/previews";
 import { signedGet, signedPut } from "@/lib/server/r2";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 import { RENDER_LIMITS, renderLimitError } from "@/lib/render-limits";
-import { demoAt } from "../../../../../../render/render.mjs";
+import { demoAt, planLength } from "../../../../../../render/render.mjs";
 
 export const maxDuration = 300;
 // 720p: every source is 720p (Kling, library hooks); 1080p only added render time (founder 2026-10-24: as fast as possible).
@@ -86,9 +86,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   }
   const origin = new URL(request.url).origin;
   const segs = timeline(run, null).filter((s) => s.src);
-  const total = videoLength(segs);
-  if (!segs.length || total <= 0) return Response.json({ error: "Nothing to export yet." }, { status: 400 });
-  if (total > RENDER_LIMITS.seconds) return Response.json({ error: "Videos can be up to 3 minutes." }, { status: 400 });
+  const edited = videoLength(segs);
+  if (!segs.length || edited <= 0) return Response.json({ error: "Nothing to export yet." }, { status: 400 });
+  if (edited > RENDER_LIMITS.seconds) return Response.json({ error: "Videos can be up to 3 minutes." }, { status: 400 });
 
   const segments = [];
   // Every link at once (one by one took seconds for a 10-clip video). The hook always exports from its own file (it
@@ -114,6 +114,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
     });
   }
 
+  // The export's own length (whole planned frames), so the picture and the sound end together (render.mjs planLength).
+  const total = planLength({ fps: FPS, segments });
   const pieces = soundPieces(run, total);
   const sounds = [];
   const soundLinks = await Promise.all(pieces.map((p, i) => (pieceEnd(pieces, i, total) - p.at < 0.05 || p.volume <= 0 ? null : inputLink(p.src, who, origin))));
@@ -129,7 +131,10 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   for(const t of texts){
     if(typeof t.x!=="number"||typeof t.y!=="number"||!Number.isFinite(t.x)||!Number.isFinite(t.y)||t.x<0||t.x>W||t.y<0||t.y>H)return Response.json({error:"Invalid text position."},{status:400});
     const layer=expected.find(x=>x.id===t.id)!;
-    overlays.push({url:await mediaLink(t.mediaId as string,LINK_SECONDS),start:Math.max(0,layer.start),end:Math.min(total,layer.end),x:t.x,y:t.y});
+    // Nothing left of it inside the export's whole frames: left out (exportWindow).
+    const at=exportWindow(layer,total);
+    if(!at)continue;
+    overlays.push({url:await mediaLink(t.mediaId as string,LINK_SECONDS),start:at.start,end:at.end,owner:layer.owner,x:t.x,y:t.y});
   }
   const {mediaId}=newUpload("video/mp4"), job=randomUUID();
   // The demo part (after the hook) is saved as its own clip too (My files, Demos): its own file id.

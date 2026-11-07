@@ -154,7 +154,23 @@ const masterArgs = (input, master) => {
 
 /** The pieces to render, in order: black gaps and clip pieces, each with its on-screen length. */
 export function plan(spec) {
+  return layout(spec).steps;
+}
+
+/**
+ * The finished video's exact length: plan()'s frames over the frame rate. The editor adds clip lengths in another
+ * order and can land one frame off (4.0167 s against 121 frames), so the export uses this, not the editor's sum, for
+ * its total: the picture and the sound then end together on the last frame in both export lanes.
+ */
+export const planLength = (spec) => plan(spec).reduce((n, st) => n + st.frames, 0) / spec.fps;
+
+/**
+ * plan()'s steps plus where each segment sits: its empty space before it (`gap`) and its clip (`clip`), each as
+ * output frames [from, to) and as the timeline seconds plan() added up (in plan's own order, so they round the same).
+ */
+export function layout(spec) {
   const steps = [];
+  const segs = [];
   let seconds = 0, frames = 0;
   // Quantize the cumulative timeline, not each cut independently. Otherwise every fractional-frame cut rounds up
   // in its intermediate file and the final -t silently removes later clips. Sub-frame pieces may have no output frame.
@@ -166,10 +182,39 @@ export function plan(spec) {
     if (count > 0) steps.push({ ...step, frames: count, len: count / spec.fps });
   };
   spec.segments.forEach((seg, si) => {
+    const gap = { from: frames, start: seconds };
     if (seg.gap > 0) add({ kind: "gap" }, seg.gap);
+    const clip = { from: frames, start: seconds };
     seg.pieces.forEach((p, pi) => add({ kind: "piece", si, pi, start: p.start, end: p.end }, Math.max(0.05, p.end - p.start) / seg.speed));
+    segs.push({ gap: { ...gap, to: clip.from, end: clip.start }, clip: { ...clip, to: frames, end: seconds } });
   });
-  return steps;
+  return { steps, segs };
+}
+
+/**
+ * The output frames [from, to) a text shows on (founder 2026-11-07: a caption stays inside its own clip, 100% of the
+ * time). The text belongs to the clip (or the empty space) its start lies in, and shows only on that clip's frames as
+ * plan() made them, never one frame on a neighbour. Clip edges come from plan()'s own sums, which can differ from the
+ * editor's in the last digit (3.6675 against 3.6674999999999995), so a start within 1 ms before an edge belongs to the
+ * clip starting there (as the preview's showsAt judges it), a text starting within 1 ms of its clip's start starts on
+ * its first frame, and one ending within 1 ms of its clip's end ends on its last frame. A text starting outside every
+ * clip and space (before 0, past the end) keeps its plain rounded frames. `text.owner` (from the editor, see
+ * src/lib/edit.ts textOwner) decides the clip when given; null means outside every clip. Both export lanes use this.
+ */
+export function textFrames(spec, layoutOrNull, text) {
+  const { fps } = spec;
+  const segs = (layoutOrNull ?? layout(spec)).segs;
+  // The editor's own judgement when it sent one (src/lib/edit.ts textOwner; Codex 2026-11-07: judging again from
+  // plan()'s sums could hand a text on a clip's last millisecond to the next clip and show it nowhere).
+  const told = text.owner && segs[text.owner.seg] ? segs[text.owner.seg][text.owner.gap ? "gap" : "clip"] : undefined;
+  const own = text.owner === null ? undefined : told ?? segs.flatMap((s) => [s.gap, s.clip]).find((r) => text.start >= r.start - 0.001 && text.start < r.end - 0.001);
+  let from = Math.round(text.start * fps), to = Math.round(text.end * fps);
+  if (!own) return { from, to };
+  if (text.start <= own.start + 0.001) from = own.from;
+  if (text.end >= own.end - 0.001) to = own.to;
+  from = Math.min(Math.max(from, own.from), own.to);
+  to = Math.min(Math.max(to, from), own.to);
+  return { from, to };
 }
 
 /**
@@ -190,20 +235,37 @@ export const demoArgs = (input, out, at) => [...BASE, "-ss", String(at), "-i", i
 
 /**
  * Counts a piece's frames after the first frame-rate pass (trim, fps): the `slots` stepArgs spreads over the piece's
- * planned frames. Writes one framecrc line per frame to `out`; count them with countFrames.
+ * planned frames. A second stream counts the file's frames before the piece's start, for a piece with no frame of its
+ * own (it holds the last of them, stepArgs). Writes one framecrc line per frame to `out`; read it with countFrames.
  */
 export function countArgs(spec, step, src, out) {
-  return [...BASE, "-threads", "1", "-i", src.file, "-map", "0:v:0", "-vf", `trim=start=${r(step.start)}:end=${r(step.end)},setpts=PTS-STARTPTS,fps=${spec.fps},scale=2:2`, "-f", "framecrc", out];
+  // Each stream ends with one marker frame (countFrames does not count it): ffmpeg cannot open an output stream that
+  // never gets a frame, and either count may be 0.
+  const mark = (k) => `color=c=black:s=2x2:r=${spec.fps}:d=${r(1 / spec.fps)},format=yuv420p,setsar=1[m${k}]`;
+  const tail = "scale=2:2,format=yuv420p,setsar=1";
+  return [...BASE, "-threads", "1", "-i", src.file, "-filter_complex", `[0:v:0]split=3[a][b][c];[a]trim=start=${r(step.start)}:end=${r(step.end)},setpts=PTS-STARTPTS,fps=${spec.fps},${tail}[a1];${mark(0)};[a1][m0]concat=n=2:v=1:a=0[in];[b]trim=end=${r(step.start)},setpts=PTS-STARTPTS,${tail}[b1];${mark(1)};[b1][m1]concat=n=2:v=1:a=0[before];[c]trim=end=${r(step.end)},setpts=PTS-STARTPTS,${tail}[c1];${mark(2)};[c1][m2]concat=n=2:v=1:a=0[upto]`, "-map", "[in]", "-map", "[before]", "-map", "[upto]", "-fps_mode", "passthrough", "-f", "framecrc", out];
 }
-/** The frame count in a countArgs file; throws on anything that is not a framecrc frame line. */
+/**
+ * A countArgs file read as stepArgs' `slots`: the piece's own frame count after the frame-rate pass. When that is 0
+ * (a cut between two source frames; or one so short its only frames are dropped by the frame-rate pass, Codex
+ * 2026-11-07 at 120 fps; or past the file's end), minus (k + 1), where k is the frame stepArgs holds, counted from the
+ * file's start: the first frame inside the piece if it has one, else the last before it. 0: no frame at all (black).
+ * Throws on anything that is not a framecrc frame line.
+ */
 export const countFrames = (text) => {
-  let n = 0;
+  const n = [0, 0, 0];
   for (const line of text.split("\n")) {
     if (!line.trim() || line.startsWith("#")) continue;
-    if (!/^\s*0,\s*-?\d+,\s*-?\d+,\s*\d+,\s*\d+,\s*0x[0-9a-f]+/.test(line)) throw new Error("bad frame count");
-    n++;
+    const m = /^\s*([012]),\s*-?\d+,\s*-?\d+,\s*\d+,\s*\d+,\s*0x[0-9a-f]+/.exec(line);
+    if (!m) throw new Error("bad frame count");
+    n[+m[1]]++;
   }
-  return n;
+  // Less each stream's marker frame (countArgs); a file without all three markers is not a count.
+  if (n.some((x) => x < 1)) throw new Error("bad frame count");
+  const [inside, before, upto] = n.map((x) => x - 1);
+  if (inside > 0) return inside;
+  const k = upto > before ? before : before - 1;
+  return -(k + 1);
 };
 
 /** Whether a piece step uses its clip's own sound (then the caller makes it with pieceSoundArgs and fillSoundFile). */
@@ -224,9 +286,9 @@ export function pieceSoundArgs(step, src, out) {
 }
 
 /**
- * One step of the plan to an intermediate file. `slots`: the piece's countArgs frame count (0: the piece has no
- * frame, rendered black for its length so the timeline never shifts). `sound`: the fillSoundFile output when
- * pieceHasSound.
+ * One step of the plan to an intermediate file. `slots`: countFrames of the piece's countArgs file (a negative
+ * number: no source frame inside the piece, it holds the frame on screen at its start; 0: nothing to show, black).
+ * `sound`: the fillSoundFile output when pieceHasSound.
  */
 export function stepArgs(spec, step, src, out, slots, sound) {
   const { width: W, height: H, fps } = spec;
@@ -234,12 +296,12 @@ export function stepArgs(spec, step, src, out, slots, sound) {
   if (step.kind === "gap") {
     return [...BASE, "-f", "lavfi", "-i", `color=c=black:s=${W}x${H}:r=${fps}:d=${step.len}`, "-f", "lavfi", "-i", `anullsrc=r=48000:cl=stereo`, "-t", String(step.len), "-vf", "format=yuv420p,setsar=1", ...PIECE_OUT, ...frameOut, out];
   }
-  if (!Number.isInteger(slots) || slots < 0) throw new Error("piece frame count missing");
+  if (!Number.isInteger(slots)) throw new Error("piece frame count missing");
   const hasSound = pieceHasSound(spec, step, src);
   if (hasSound && !sound) throw new Error("piece sound missing");
   if (slots === 0) {
-    // No frame inside the piece (between two source frames, or past the file's end): black for exactly its length,
-    // with its own sound kept, as the browser does (Codex 2026-11-06).
+    // Nothing to show (no frame inside the piece and none before it): black for exactly its length, with its own
+    // sound kept, as the browser does (Codex 2026-11-06).
     if (!hasSound) return stepArgs(spec, { kind: "gap", frames: step.frames, len: step.len }, null, out);
     const vol = spec.segments[step.si].pieces[step.pi ?? 0]?.volume ?? spec.segments[step.si].volume;
     return [...BASE, "-f", "lavfi", "-i", `color=c=black:s=${W}x${H}:r=${fps}:d=${step.len}`, "-f", "f32le", "-ar", "48000", "-ch_layout", "stereo", "-i", sound,
@@ -251,17 +313,24 @@ export function stepArgs(spec, step, src, out, slots, sound) {
   const own = seg0.pieces[step.pi ?? 0] ?? {};
   const seg = { ...seg0, look: own.look ?? seg0.look, volume: own.volume ?? seg0.volume };
   const len = step.len;
+  // No source frame starts inside the piece (a cut shorter than the gap between two frames, Codex 2026-11-07: these
+  // showed black, a flash at the join): one frame, picked by its number in the file (countFrames: the first inside
+  // the piece, else the one on screen at its start), no buffering, held for the piece's length. render/frames.mjs
+  // frameSchedule mirrors this.
+  const held = slots < 0;
   const v = [
-    `trim=start=${r(step.start)}:end=${r(step.end)}`,
+    held ? `trim=end=${r(step.end)}` : `trim=start=${r(step.start)}:end=${r(step.end)}`,
     "setpts=PTS-STARTPTS",
+    ...(held ? [`select='eq(n,${-slots - 1})'`, "setpts=PTS-STARTPTS"] : []),
     // Cover the frame from the centre: crop the source to the frame's shape first, then scale. The same picture as
     // scaling up and cropping, without scaling the parts that are thrown away (a 4K landscape clip was scaled to
     // 3413x1920 per frame before; 2026-11-03).
     `crop='trunc(min(iw,ih*${W}/${H})/2)*2':'trunc(min(ih,iw*${H}/${W})/2)*2'`,
     `scale=${W}:${H}`,
     "setsar=1",
-    // One frame rate before the look: zoompan makes one frame per input frame at `fps`.
-    `fps=${fps}`,
+    // One frame rate before the look: zoompan makes one frame per input frame at `fps`. A held frame is one frame
+    // already (fps could drop it: at 120 fps it lasts under half an output frame, Codex 2026-11-07).
+    ...(held ? ["format=yuv420p"] : [`fps=${fps}`]),
     ...look(seg.look, step.start, W, H, fps),
     // Spread the piece's own frames evenly over its planned frames: output n shows frame floor(n * slots / frames).
     // setpts gives frame j the time ceil(j * frames / slots) in whole frames and fps keeps the last frame per time.
@@ -269,8 +338,8 @@ export function stepArgs(spec, step, src, out, slots, sound) {
     // truncated to whole frames, ran 1-2 frames short and held the last frame at the cut (founder 2026-11-06: clips
     // join like CapCut's magnet, never showing trimmed-out frames). render/frames.mjs frameSchedule mirrors this.
     `settb=1/${fps}`,
-    `setpts='ceil(N*${step.frames}/${slots})'`,
-    `fps=${fps}`,
+    // A held frame is repeated to the piece's planned frames, one per output frame.
+    ...(held ? [`loop=loop=${step.frames - 1}:size=1:start=0`, "setpts=N"] : [`setpts='ceil(N*${step.frames}/${slots})'`, `fps=${fps}`]),
     "format=yuv420p",
     // Exactly the planned length (texts are timed to it), even if the file ends early.
     `tpad=stop_mode=clone:stop_duration=${len}`,
@@ -298,8 +367,14 @@ export function finalArgs(spec, list, local, out) {
   let n = 1;
   // Matroska timestamps have millisecond precision. Normalize the joined stream before overlay's shortest check,
   // so timestamp jitter cannot drop the final frame or end a later overlay one frame early.
-  graph.push(`[0:v]fps=${fps},tpad=stop_mode=clone:stop_duration=1,trim=duration=${r(total)},setpts=PTS-STARTPTS[joined]`);
+  // Timestamps from frame numbers first: each piece has exactly its planned frames, but its file's length is saved in
+  // whole milliseconds and the concat demuxer adds those up, so over many short pieces the joined times drift (Codex
+  // 2026-11-07: 150 one-frame pieces, 26 frames showed the wrong clip and a caption sat over the next clip).
+  graph.push(`[0:v]settb=1/${fps},setpts=N,fps=${fps},tpad=stop_mode=clone:stop_duration=1,trim=duration=${r(total)},setpts=PTS-STARTPTS[joined]`);
+  // The sound likewise from its sample count: every piece's sound is exactly its planned samples (stepArgs).
+  graph.push(`[0:a]asetpts=N/SR/TB,${AF}[base]`);
   let v = "joined";
+  const where = layout(spec);
   spec.overlays.forEach((o, oi) => {
     // A text image is one frame. As a plain input, overlay dropped later-starting texts on real clips (2026-10-24:
     // the second text never appeared), so it is repeated into a steady stream at the video's frame rate that ends
@@ -309,15 +384,16 @@ export function finalArgs(spec, list, local, out) {
     args.push("-i", local.overlays[oi]);
     // A second past the end: the video, not the text, decides where the export ends (shortest), so no frame is lost.
     graph.push(`[${n++}:v]loop=loop=-1:size=1,setpts=N/${fps}/TB,trim=duration=${r(total + 1)}[t${oi}]`);
-    // On the same frames as the clips: plan() rounds every clip edge to a whole frame, so a text made for a clip
-    // (2.715 s against a clip starting on frame 81, 2.700 s) starts and ends on that frame, not one frame late.
-    const from = (Math.round(o.start * fps) - 0.5) / fps, to = (Math.round(o.end * fps) - 0.5) / fps;
+    // On its own clip's frames only (textFrames): a text made for a clip starts and ends on that clip's first and
+    // last frame, never one frame late and never on the next clip.
+    const f = textFrames(spec, where, o);
+    const from = (f.from - 0.5) / fps, to = (f.to - 0.5) / fps;
     graph.push(`[${v}][t${oi}]overlay=${Math.round(o.x)}:${Math.round(o.y)}:shortest=1:enable='between(t,${r(from)},${r(to)})'[o${oi}]`);
     v = `o${oi}`;
   });
   graph.push(`[${v}]format=yuv420p[vout]`);
 
-  const mix = ["[0:a]"];
+  const mix = ["[base]"];
   spec.sounds.forEach((s, si) => {
     const src = local.sounds[si];
     if (!src.hasAudio || s.dur <= 0.05 || s.volume <= 0) return;
@@ -334,7 +410,7 @@ export function finalArgs(spec, list, local, out) {
     graph.push(`[${n++}:a]${f.join(",")}[m${si}]`);
     mix.push(`[m${si}]`);
   });
-  graph.push(mix.length > 1 ? `${mix.join("")}amix=inputs=${mix.length}:duration=first:normalize=0,atrim=duration=${r(total)}[aout]` : `[0:a]${AF},atrim=duration=${r(total)}[aout]`);
+  graph.push(mix.length > 1 ? `${mix.join("")}amix=inputs=${mix.length}:duration=first:normalize=0,atrim=duration=${r(total)}[aout]` : `[base]atrim=duration=${r(total)}[aout]`);
 
   args.push(
     "-filter_complex", graph.join(";"),
