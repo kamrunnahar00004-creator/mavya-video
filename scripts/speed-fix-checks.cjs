@@ -3,10 +3,11 @@
 // the editor-projection create API, and the 2 s preview recheck with shared in-flight lookups. Offline.
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { load } = require('./check-module.cjs');
+const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
+const EXPECTED = 30;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 
 // Fake clock: setTimeout / AbortSignal.timeout run when `tick` passes their time.
@@ -20,7 +21,7 @@ function clock() {
 }
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
-(async () => {
+finish('speed-fix-checks', EXPECTED, () => checks, async () => {
   // 1. pending-runs: create, prefetch, expiry, drop.
   {
     const c = clock();
@@ -75,6 +76,43 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), { status
     void pr.startCreate('m');
     pr.prefetchRun('m');
     ok(pr.peekLoad('m')?.kind === 'create', 'prefetch leaves a create alone');
+  }
+
+  // 1b. The page's load (pageLoad, what the editor runs): a prefetch whose request ignores abort and never answers
+  //     still lets the page load the usual way at 2 s (Codex: the editor waited forever); creates map to the page's
+  //     outcomes; a left page applies nothing. changeRun drops hover data before and after a rename or delete.
+  {
+    const c = clock();
+    let freshCalls = 0;
+    const fetch = () => new Promise(() => {}); // ignores abort, never answers
+    const pr = load('src/lib/pending-runs.ts', {}, {}, { fetch, setTimeout: c.setTimeout, AbortSignal: { timeout: () => new AbortController().signal } });
+    const fresh = async () => { freshCalls++; return { run: { id: 'p', title: 'fresh' }, source: null }; };
+    pr.prefetchRun('p');
+    let page = null;
+    pr.pageLoad('p', fresh, () => true).then((v) => { page = v; });
+    await c.tick(1999);
+    ok(freshCalls === 0 && page === null, 'before 2 s the page still waits for the hover');
+    await c.tick(1);
+    ok(freshCalls === 1 && page?.loaded?.run.title === 'fresh', 'at 2 s it loads the usual way and shows that');
+    ok(pr.peekLoad('p') === undefined, 'the stalled hover entry is gone');
+    const c2 = clock();
+    const respond = {};
+    const pr2 = load('src/lib/pending-runs.ts', {}, {}, { fetch: (url) => Promise.resolve(respond[url]), setTimeout: c2.setTimeout, AbortSignal: c2.AbortSignal });
+    respond['/api/runs?view=editor'] = json({}, 402);
+    void pr2.startCreate('q');
+    ok((await pr2.pageLoad('q', fresh, () => true)).pricing === true, 'a create without a plan: the page goes to pricing');
+    respond['/api/runs?view=editor'] = json({}, 503);
+    void pr2.startCreate('w', '33333333-3333-4333-8333-333333333333');
+    ok((await pr2.pageLoad('w', fresh, () => true)).createFailed?.sourceRefId === '33333333-3333-4333-8333-333333333333', 'a failed create: Try again with its hook');
+    respond['/api/runs?view=editor'] = json({ run: { id: 'z' }, source: null }, 201);
+    void pr2.startCreate('z');
+    await pr2.pageLoad('z', fresh, () => false).then(() => ok(false, 'a left page must not apply'), (e) => ok(e.message === 'left', 'a left page applies nothing'));
+    ok(pr2.peekLoad('z') === undefined, 'even a left page uses up the entry (a later visit loads fresh)');
+    // Rename: a hover during the save is dropped too.
+    respond['/api/runs/v?view=editor'] = json({ run: { id: 'v', title: 'old' }, source: null });
+    pr2.prefetchRun('v');
+    await pr2.changeRun('v', async () => { ok(pr2.peekLoad('v') === undefined, 'dropped before the save'); pr2.prefetchRun('v'); return true; });
+    ok(pr2.peekLoad('v') === undefined, 'a hover during the save is dropped after it');
   }
 
   // 2. POST /api/runs?view=editor answers the editor's own projection; a retry returns the stored run's hook;
@@ -135,5 +173,4 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), { status
     ok(heads === 2, 'a found copy is remembered');
   }
 
-  console.log(`speed-fix-checks: ${checks} checks pass`);
-})().catch((e) => { console.error(e); process.exit(1); });
+});

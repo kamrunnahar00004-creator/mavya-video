@@ -13,8 +13,8 @@ import { waveform } from "@/lib/waveform";
 
 
 import { ADJUST_ROWS, type Adjust, type AdjustRow, type Motion, NO_ADJUST, fullAdjust, isAdjusted, keyAt, motionAt, moveKey, panBy, setMotion, speedOf, toggleKey, videoStyle } from "@/lib/adjust";
-import { activeGroup, groupPlacer, pastedRows, toggleInGroup } from "@/lib/selection";
-import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, shiftSounds, soundName, soundPieces, soundRows } from "@/lib/sound";
+import { activeGroup, pasteGroupLayers, toggleInGroup } from "@/lib/selection";
+import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundPieces, soundRows } from "@/lib/sound";
 import type { Song } from "@/app/api/songs/route";
 import { type Seg, clipGroup, clipSrc, demoClips, fileAt, pieceAdjust, segAt, showsAt, videoLength, pieceSpans, relAt } from "@/lib/edit";
 
@@ -1701,23 +1701,10 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
         from = nextSeg ? nextSeg.offset : Infinity;
         cs.forEach((c, i) => onInsertClip({ ...c.clip, id: uid() }, at + i));
       }
-      const place = groupPlacer(cs, copied.base, anchor);
-      for (const t of copied.texts) {
-        const at = r3(place(t.start));
-        onAddText(null, [at, r3(at + (t.end - t.start))], t.text, t);
-      }
-      if (copied.sounds.length) {
-        // Each copied row gets a new row of its own, so overlapping sounds stay whole and never cut into others.
-        const rowFor = pastedRows(sounds.pieces.map(rowOf), copied.sounds.map(({ p }) => rowOf(p)));
-        const added = copied.sounds.map(({ p, len }) => {
-          const at = r3(place(p.at));
-          return { ...p, id: uid(), at, end: r3(at + len), row: rowFor(rowOf(p)) };
-        });
-        // The sounds already there move with the inserted clips, as the insert itself moves them (shiftSounds).
-        const by = cs.reduce((t, c) => t + c.len, 0);
-        const existing = cs.length && run.sounds && Number.isFinite(from) ? shiftSounds(sounds.pieces, from, by) : sounds.pieces;
-        onPieces([...existing, ...added].sort((a, b) => a.at - b.at));
-      }
+      // Texts and sounds onto their clips' copies, sounds on rows of their own (selection.ts pasteGroupLayers).
+      const layers = pasteGroupLayers(copied, { anchor, from, existing: sounds.pieces, explicitSounds: Boolean(run.sounds), newId: uid });
+      for (const { t, start, end } of layers.texts) onAddText(null, [start, end], t.text, t);
+      if (layers.sounds) onPieces(layers.sounds);
       return;
     }
     if (copied.kind === "text") {

@@ -71,3 +71,43 @@ export function peekLoad(id: string): Pending | undefined {
 export function forgetLoad(id: string, entry: Pending) {
   if (pending.get(id) === entry) pending.delete(id);
 }
+
+/** What the video's page does with its data: show it, go to pricing, or offer Try again (a failed create). */
+export type PageLoad = { loaded: Loaded } | { pricing: true } | { createFailed: { sourceRefId?: string } };
+
+/**
+ * The video page's data: a create this tab started (New video), else a hover prefetch, which it waits for at most
+ * 2 s before loading the usual way (Codex 2026-11-06: a stalled prefetch held the editor), else the usual load
+ * (`fresh`). Entries are used once. Rejects "left" when the page is gone (`alive()` false), so it applies nothing.
+ */
+export function pageLoad(id: string, fresh: () => Promise<Loaded>, alive: () => boolean): Promise<PageLoad> {
+  const known = peekLoad(id);
+  if (known?.kind === "create") {
+    return known.job.then((created): PageLoad => {
+      forgetLoad(id, known);
+      if (!alive()) throw Error("left");
+      if ("run" in created) return { loaded: created };
+      if ("pricing" in created) return { pricing: true };
+      return { createFailed: { sourceRefId: created.sourceRefId } };
+    });
+  }
+  if (known?.kind === "prefetch") {
+    const late = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2_000));
+    return Promise.race([known.job, late]).then(async (loaded): Promise<PageLoad> => {
+      forgetLoad(id, known);
+      if (!alive()) throw Error("left");
+      return { loaded: loaded ?? (await fresh()) };
+    });
+  }
+  return fresh().then((loaded) => ({ loaded }));
+}
+
+/** Rename or delete: data a hover loaded for this video is out of date, before the change and after it lands. */
+export async function changeRun<T>(id: string, work: () => Promise<T>): Promise<T> {
+  dropLoad(id);
+  try {
+    return await work();
+  } finally {
+    dropLoad(id);
+  }
+}

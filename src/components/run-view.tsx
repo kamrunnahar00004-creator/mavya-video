@@ -14,13 +14,13 @@ import { CHARACTERS, characterById } from "@/lib/characters";
 import { DEFAULT_FONT } from "@/lib/studio-data";
 import { type Adjust, speedOf } from "@/lib/adjust";
 import { reconcileGeneration } from "@/lib/generation-edit";
-import { soundPieces, shiftSounds } from "@/lib/sound";
-import { deleteSelection, partsChange } from "@/lib/edit-ops";
+import { soundPieces } from "@/lib/sound";
+import { deleteSelection, insertClipsChange, partsChange } from "@/lib/edit-ops";
 
 import { type Seg, clipGroup, clipSrc, containTexts, demoClips, moveClipPiece, removeDemoClip, videoLength, remapTexts, retimeTexts, runSteps, shotList, snapTexts, timeline } from "@/lib/edit";
 
 import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
-import { forgetLoad, peekLoad, startCreate } from "@/lib/pending-runs";
+import { pageLoad, startCreate } from "@/lib/pending-runs";
 import { fmtTime, type DemoClip, type Frame, type Part, type Reference, type Run, type TextLayer, type TextPos } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
 import { ExportButton } from "@/components/export-button";
@@ -135,29 +135,15 @@ export function RunView() {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     };
-    const known = peekLoad(id);
-    let load: Promise<{ run: Run; source: Reference | null }>;
-    if (known?.kind === "create") {
-      load = known.job.then(created => {
-        forgetLoad(id, known);
-        // Only the page that is still showing uses it (a development double effect, or a left page, does not).
-        if (!alive) throw Error("left");
-        if ("run" in created) return created;
-        if ("pricing" in created) {
-          window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/pricing" }));
-          router.replace("/pricing");
-        } else setCreateFailed({ id, sourceRefId: created.sourceRefId });
-        throw Error("not created");
-      });
-    } else if (known?.kind === "prefetch") {
-      // At most 2 s for the hover's request; a failed or slow one loads the usual way.
-      const late = new Promise<null>(resolve => setTimeout(() => resolve(null), 2_000));
-      load = Promise.race([known.job, late]).then(loaded => {
-        forgetLoad(id, known);
-        if (!alive) throw Error("left");
-        return loaded ?? fresh();
-      });
-    } else load = fresh();
+    // pageLoad (src/lib/pending-runs.ts): a create this tab started, else a hover prefetch (at most 2 s), else fresh.
+    const load = pageLoad(id, fresh, () => alive).then((page) => {
+      if ("loaded" in page) return page.loaded;
+      if ("pricing" in page) {
+        window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/pricing" }));
+        router.replace("/pricing");
+      } else setCreateFailed({ id, sourceRefId: page.createFailed.sourceRefId });
+      throw Error("not created");
+    });
     void load.then(loaded => {
       let data = loaded.run;
       if (!alive) return;
@@ -716,22 +702,10 @@ export function RunView() {
   const insertClips = (added: DemoClip[], at?: number) => {
     const cur = runRef.current ?? run;
     if (cur.id !== id) return;
-    // A single demo turning into clips: "Your demo" becomes "Clip 1".
-    const before = demoClips(cur).map((c) => (added.length && c.label === "Your demo" ? { ...c, label: "Clip 1" } : c));
-    const pos = at === undefined ? before.length : Math.max(0, Math.min(before.length, at));
-    const clips = [...before.slice(0, pos), ...added, ...before.slice(pos)];
-    const nextRun: Run = { ...cur, demo: { ...cur.demo, mode: clips.length > 1 ? "clips" : "single", clips } };
-    // Texts from the insert point on move later by the new clips' length (at the end, nothing moves).
-    const old = timeline(cur, null);
-    const next = before.slice(pos).map((c) => old.find((g) => g.id === c.id)).find(Boolean);
-    const from = next ? next.offset : Infinity;
-    const by = timeline(nextRun, null).filter((g) => added.some((c) => c.id === g.id)).reduce((t, g) => t + g.gap + g.len, 0);
-    const r = (x: number) => Math.round(x * 1000) / 1000;
-    const texts = runTexts(cur).map((x) => (x.start >= from - 0.05 ? { ...x, start: r(x.start + by), end: r(x.end + by) } : x));
-    // Sounds after the insert point move the same way (shiftSounds).
-    const sounds = cur.sounds && Number.isFinite(from) ? shiftSounds(cur.sounds, from, by) : cur.sounds;
-    save({ demo: nextRun.demo, texts, ...(sounds !== cur.sounds ? { sounds } : {}) });
-    runRef.current = { ...cur, demo: nextRun.demo, texts, sounds };
+    // Texts and sounds from the insert point on move with what comes after (edit-ops insertClipsChange).
+    const change = insertClipsChange(cur, added, at);
+    save(change);
+    runRef.current = { ...cur, ...change };
   };
   /** Move a demo clip to position `to`. Texts that sit on that clip (or any moved clip) go with it; texts across several clips keep their time. */
   const moveClip = (clipId: string, to: number) => {

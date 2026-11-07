@@ -2,7 +2,7 @@
 // Regression checks for every case found that day, including Codex's three review rounds. Offline; no network.
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { load } = require('./check-module.cjs');
+const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 const adjust = load('src/lib/adjust.ts');
@@ -111,4 +111,4 @@ for (const start of [1.9, 1.95, 1.98, 1.999]) {
   })();
 }
 
-(module.exports.pending ?? Promise.resolve()).then(() => console.log(`caption-checks: ${checks} checks pass`)).catch((e) => { console.error(e); process.exit(1); });
+finish('caption-checks', 38, () => checks, () => module.exports.pending);

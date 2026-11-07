@@ -1,3 +1,6 @@
+import { rowOf, shiftSounds } from "@/lib/sound";
+import type { SoundPiece, TextLayer } from "@/lib/types";
+
 /**
  * The editor's group selection (Ctrl/Cmd/Shift-click, Ctrl+A), as pure functions so they can be tested. Keys:
  * "c:<clip>:<piece>", "t:<text>", "s:<sound>".
@@ -47,4 +50,31 @@ export function pastedRows(existingRows: number[], copiedRows: number[]): (row: 
   const first = Math.max(-1, ...existingRows) + 1;
   const rows = [...new Set(copiedRows)].sort((a, b) => a - b);
   return (row) => first + rows.indexOf(row);
+}
+
+/**
+ * A copied group's texts and sounds as pasted (the clips go in separately, back to back from `anchor`): each lands on
+ * the copy of the clip it was on (groupPlacer); copied sounds get rows of their own after the existing ones
+ * (pastedRows), so overlapping sounds keep their length; the existing sounds after the insert point `from` move by the
+ * pasted clips' length, as the insert itself moves them (shiftSounds). `sounds` is null when no sound was copied.
+ */
+export function pasteGroupLayers(
+  group: { clips: GroupClip[]; base: number; texts: TextLayer[]; sounds: { p: SoundPiece; len: number }[] },
+  at: { anchor: number; from: number; existing: SoundPiece[]; explicitSounds: boolean; newId: () => string },
+): { texts: { t: TextLayer; start: number; end: number }[]; sounds: SoundPiece[] | null } {
+  const r3 = (x: number) => Math.round(x * 1000) / 1000;
+  const place = groupPlacer(group.clips, group.base, at.anchor);
+  const texts = group.texts.map((t) => {
+    const start = r3(place(t.start));
+    return { t, start, end: r3(start + (t.end - t.start)) };
+  });
+  if (!group.sounds.length) return { texts, sounds: null };
+  const rowFor = pastedRows(at.existing.map(rowOf), group.sounds.map(({ p }) => rowOf(p)));
+  const added = group.sounds.map(({ p, len }) => {
+    const start = r3(place(p.at));
+    return { ...p, id: at.newId(), at: start, end: r3(start + len), row: rowFor(rowOf(p)) };
+  });
+  const by = group.clips.reduce((t, c) => t + c.len, 0);
+  const existing = group.clips.length && at.explicitSounds && Number.isFinite(at.from) ? shiftSounds(at.existing, at.from, by) : at.existing;
+  return { texts, sounds: [...existing, ...added].sort((a, b) => a.at - b.at) };
 }

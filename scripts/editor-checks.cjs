@@ -9,9 +9,9 @@ const adjust = load('src/lib/adjust.ts');
 const studio = { DEFAULT_FONT: 'TikTok Sans' };
 const client = load('src/lib/client.ts', { '@/lib/studio-data': studio });
 const edit = load('src/lib/edit.ts', { '@/lib/adjust': adjust });
-const ops = load('src/lib/edit-ops.ts', { '@/lib/adjust': adjust, '@/lib/client': client, '@/lib/edit': edit });
-const sel = load('src/lib/selection.ts');
 const sound = load('src/lib/sound.ts');
+const ops = load('src/lib/edit-ops.ts', { '@/lib/adjust': adjust, '@/lib/client': client, '@/lib/edit': edit, '@/lib/sound': sound });
+const sel = load('src/lib/selection.ts', { '@/lib/sound': sound });
 const { timeline } = edit;
 
 let checks = 0;
@@ -86,6 +86,35 @@ const three = () => [clip('g', 1), clip('b', 2), clip('o', 3)];
 {
   const moved = sound.shiftSounds([{ id: 'a', at: 0, end: 12, start: 0 }, { id: 'b', at: 6, end: 9, start: 1 }, { id: 'c', at: 9, start: 0 }], 6, 3);
   eq(moved.map((p) => [p.at, p.end, p.start]), [[0, 12, 0], [9, 12, 1], [12, undefined, 0]], 'from the insert point on they move by the inserted length; a sound playing across it stays');
+}
+
+// 6. The real insert (edit-ops insertClipsChange, what the editor saves): texts and sounds after the insert point
+//    move with what comes after; a sound playing across it stays; inserting at the end moves nothing.
+{
+  const run = { ...runOf(three(), [T('tb', 6, 9)]), sounds: [{ id: 'all', at: 0, end: 12, start: 0 }, { id: 'sb', at: 6, end: 9, start: 0, row: 1 }] };
+  let r = run;
+  for (const c of [clip('n1', 4), clip('n2', 5)]) r = { ...r, ...ops.insertClipsChange(r, [c], 1 + ['n1', 'n2'].indexOf(c.id)) };
+  eq(r.demo.clips.map((c) => c.id), ['g', 'n1', 'n2', 'b', 'o'], 'two inserts in one paste keep their order');
+  eq(r.texts.map((t) => [t.start, t.end]), [[12, 15]], "blue's caption moved 6 s");
+  eq(r.sounds.map((p) => [p.id, p.at, p.end]), [['all', 0, 12], ['sb', 12, 15]], "blue's sound moved 6 s; the sound across the insert point stayed");
+  const end = ops.insertClipsChange(run, [clip('n3', 4)]);
+  ok(end.sounds === undefined && end.texts[0].start === 6, 'inserting at the end moves nothing');
+}
+
+// 7. The real group paste layers (selection pasteGroupLayers, what the editor applies): rows apart, full lengths,
+//    texts onto their clips' copies, existing sounds after the insert point moved.
+{
+  let n = 0;
+  const existing = [{ id: 'e0', at: 0, end: 12, start: 0, row: 0 }, { id: 'e1', at: 9, end: 12, start: 0, row: 1 }];
+  const group = { clips: [{ lo: 3, len: 3 }, { lo: 9, len: 3 }], base: 3, texts: [T('tc', 9, 12)], sounds: [{ p: { id: 's0', at: 3, start: 0, row: 0 }, len: 3 }, { p: { id: 's1', at: 4, start: 0, row: 5 }, len: 2 }] };
+  const out = sel.pasteGroupLayers(group, { anchor: 6, from: 6, existing, explicitSounds: true, newId: () => 'new' + n++ });
+  eq(out.texts.map((x) => [x.t.id, x.start, x.end]), [['tc', 9, 12]], "orange's caption lands on the orange copy (6 + 3)");
+  const pasted = out.sounds.filter((p) => p.id.startsWith('new'));
+  ok(new Set(pasted.map((p) => p.row)).size === 2 && pasted.every((p) => p.row >= 2), `copied rows get new rows of their own (${pasted.map((p) => p.row)})`);
+  const all = out.sounds;
+  ok(pasted.every((p) => { const i = all.indexOf(p); return Math.abs(sound.pieceEnd(all, i, 30) - p.end) < 1e-9; }), 'every pasted sound plays its full length');
+  eq(all.filter((p) => !p.id.startsWith('new')).map((p) => [p.id, p.at]), [['e0', 0], ['e1', 15]], 'the existing sound after the insert point moved by the pasted clips (6 s)');
+  ok(sel.pasteGroupLayers({ ...group, sounds: [] }, { anchor: 6, from: 6, existing, explicitSounds: true, newId: () => 'x' }).sounds === null, 'no copied sounds: sounds untouched');
 }
 
 console.log(`editor-checks: ${checks} checks pass`);

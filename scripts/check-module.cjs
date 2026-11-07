@@ -6,3 +6,18 @@ exports.load=(file,stubs={},env={},globals={})=>{
   Buffer,Response,Request,URL,AbortSignal,TextEncoder,process:{env,cwd:()=>process.cwd()},setTimeout,clearTimeout,queueMicrotask,console:{error(){}},...globals
  },{filename:file});return module.exports;
 };
+/**
+ * Ends an async check file safely (Codex 2026-11-07: a never-settling promise let Node exit 0 with no checks run).
+ * Fails unless `work` settles within `ms` and exactly `expected` checks ran; `count()` reads the file's counter.
+ */
+exports.finish=(name,expected,count,work,ms=60000)=>{
+ let done=false;
+ process.exitCode=1;
+ const watchdog=setTimeout(()=>{console.error(`${name}: did not finish within ${ms} ms (${count()} of ${expected} checks ran)`);process.exit(1);},ms);
+ process.on('exit',()=>{if(!done){console.error(`${name}: exited before finishing (${count()} of ${expected} checks ran)`);process.exitCode=1;}});
+ Promise.resolve().then(work).then(()=>{
+  clearTimeout(watchdog);
+  if(count()!==expected){console.error(`${name}: ${count()} checks ran, expected ${expected}`);process.exit(1);}
+  done=true;process.exitCode=0;console.log(`${name}: ${count()} checks pass`);
+ },(e)=>{clearTimeout(watchdog);console.error(e);process.exit(1);});
+};
