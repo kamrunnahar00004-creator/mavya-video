@@ -47,9 +47,12 @@ const MIN_REFERENCE = 3;
 const LINK_SECONDS = 24 * 3600;
 
 const LOOK = "Real handheld phone selfie video, casual UGC, one continuous take. Natural five-finger hands. No text, captions, subtitles, stickers or watermarks anywhere on screen.";
-/** Motion control: the reference clip is the performance to copy (founder 2026-10-23: as close to the original as possible). */
+/**
+ * Motion control: the reference clip is the performance to copy (founder 2026-10-23: as close to the original as possible).
+ * The eyes sentence: founder 2026-11-07, the eyes must stay on the camera and follow the original's.
+ */
 const MATCH =
-  "Copy the reference video's performance exactly and as closely as possible: the same gestures, hand positions and hand shapes, head moves, gaze direction, facial expressions at the same strength, mouth movements and timing, frame by frame. Add nothing, exaggerate nothing, no extra gestures, no overacting. Keep the same person, face, hair, outfit, held objects, room, framing and light as in the image for the whole video; no new objects.";
+  "Copy the reference video's performance exactly and as closely as possible: the same gestures, hand positions and hand shapes, head moves, gaze direction, facial expressions at the same strength, mouth movements and timing, frame by frame. Add nothing, exaggerate nothing, no extra gestures, no overacting. The eyes follow the reference video's eyes exactly: they look into the camera lens whenever the reference's do, and look away only when, where and as far as the reference's do. Keep the same person, face, hair, outfit, held objects, room, framing and light as in the image for the whole video; no new objects.";
 const NEGATIVE = "text, captions, subtitles, watermark, logo, cut, scene change, extra fingers, deformed hands, distorted face, morphing, exaggerated expressions, overacting";
 
 const exec = promisify(execFile);

@@ -14,7 +14,7 @@
  */
 
 export type Who = { image: { data: string; mime: string } | null; words: string };
-export type Verdict = { sameRoom: boolean; sameLight: boolean; sameFraming: boolean; sameAngle: boolean; sameHands: boolean; sameExpression: boolean; samePerson: boolean; problem: string };
+export type Verdict = { sameRoom: boolean; sameLight: boolean; sameFraming: boolean; sameAngle: boolean; sameGaze: boolean; sameHands: boolean; sameExpression: boolean; samePerson: boolean; problem: string };
 export type FrameDeps = {
   /** Gemini image: the parts in, the image out, within `ms` milliseconds. */
   image: (parts: unknown[], ms: number) => Promise<Buffer>;
@@ -42,7 +42,7 @@ export const RETRY_MIN_MS = 45_000;
 const MIN_CALL_MS = 3_000;
 export class FrameOutOfTime extends Error {}
 
-const CHECKS = ["sameRoom", "sameLight", "sameFraming", "sameAngle", "sameHands", "sameExpression", "samePerson"] as const;
+const CHECKS = ["sameRoom", "sameLight", "sameFraming", "sameAngle", "sameGaze", "sameHands", "sameExpression", "samePerson"] as const;
 
 export const VERDICT_SCHEMA = {
   type: "OBJECT",
@@ -59,7 +59,7 @@ export function swapPrompt(who: Who, outfit: string, fix = ""): string {
   return (
     `Edit IMAGE 1: replace only the person in it with ${person}, wearing ${outfit}. ${identity}` +
     "The result must look exactly like IMAGE 1 with only the person swapped: the same room, walls and everything behind them, the same light (color, brightness and direction), the same camera distance and framing (the head the same size and in the same place as in IMAGE 1), the same camera angle (the phone just as high or low, as far to the side, and tilted the same way, so the face is seen from the same direction as in IMAGE 1, not straight on unless IMAGE 1 is), " +
-    "the same pose, head angle and gaze, the same hands in the same places (if no hand is visible in IMAGE 1, no hand in the result), every object they hold with the same shape, size and material, the same facial expression at the same strength (mouth open or closed exactly as in IMAGE 1, no bigger smile or surprise). " +
+    "the same pose and head angle, the eyes looking exactly where they look in IMAGE 1 (into the camera lens if they do there), the same hands in the same places (if no hand is visible in IMAGE 1, no hand in the result), every object they hold with the same shape, size and material, the same facial expression at the same strength (mouth open or closed exactly as in IMAGE 1, no bigger smile or surprise). " +
     "Their hands have natural, unpolished nails and no rings. Remove all on-screen text and captions. Photorealistic phone selfie." +
     (fix ? ` The last try was wrong: ${fix.slice(0, 300)}. Fix that.` : "")
   );
@@ -72,7 +72,7 @@ export function judgePrompt(who: Who): string {
   return (
     `IMAGE 1 is the original frame. IMAGE 3 is supposed to be IMAGE 1 with only the person replaced by ${target}. Check IMAGE 3 against IMAGE 1, strictly: ` +
     `sameRoom: the same room, walls and background${who.image ? ", nothing from IMAGE 2's surroundings" : ""}; sameLight: the same light color, brightness and direction; sameFraming: the same camera distance, head size and position; sameAngle: the same camera angle (seen from the same height, side and tilt, the head turned and tilted the same way); ` +
-    `sameHands: hands in the same places (no hand that IMAGE 1 does not show); sameExpression: the same expression at the same strength; samePerson: ${person}. ` +
+    `sameGaze: the eyes look in the same direction (into the lens if IMAGE 1's do); sameHands: hands in the same places (no hand that IMAGE 1 does not show); sameExpression: the same expression at the same strength; samePerson: ${person}. ` +
     "problem: one short sentence on what is wrong, or empty if nothing."
   );
 }
@@ -81,9 +81,9 @@ export function judgePrompt(who: Who): string {
  * How close a frame is. The hook's room and light matter most (founder 2026-11-07: the character's room must never leak
  * in), so when no try passes, a frame with the hook's room and light always wins over one without, whatever else.
  */
-// Room outweighs light and the five small checks together (12 > 6 + 5); light outweighs the five (6 > 5), so no tie
+// Room outweighs light and the six small checks together (14 > 7 + 6); light outweighs the six (7 > 6), so no tie
 // ever keeps a wrong-room or wrong-light frame over a right one (Codex 2026-11-07: 10 and 5 tied).
-const WEIGHT: Record<(typeof CHECKS)[number], number> = { sameRoom: 12, sameLight: 6, sameFraming: 1, sameAngle: 1, sameHands: 1, sameExpression: 1, samePerson: 1 };
+const WEIGHT: Record<(typeof CHECKS)[number], number> = { sameRoom: 14, sameLight: 7, sameFraming: 1, sameAngle: 1, sameGaze: 1, sameHands: 1, sameExpression: 1, samePerson: 1 };
 const score = (v: Verdict) => CHECKS.reduce((t, k) => t + (v[k] ? WEIGHT[k] : 0), 0);
 export const passes = (v: Verdict) => CHECKS.every((k) => v[k]);
 

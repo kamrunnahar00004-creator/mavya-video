@@ -9,10 +9,10 @@ process.chdir(path.join(__dirname, '..'));
 
 const ff = load('src/lib/server/first-frame.ts');
 let checks = 0;
-const EXPECTED = 26;
+const EXPECTED = 28;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 
-const PASS = { sameRoom: true, sameLight: true, sameFraming: true, sameAngle: true, sameHands: true, sameExpression: true, samePerson: true, problem: '' };
+const PASS = { sameRoom: true, sameLight: true, sameFraming: true, sameAngle: true, sameGaze: true, sameHands: true, sameExpression: true, samePerson: true, problem: '' };
 const ROOM = { ...PASS, sameRoom: false, sameLight: false, problem: "the bedroom from IMAGE 2 replaced the original's grey wall" };
 const HAND = { ...PASS, sameHands: false, problem: 'a raised hand that IMAGE 1 does not show' };
 const photo = Buffer.from('FULL-CHARACTER-PHOTO-WITH-BEDROOM');
@@ -43,6 +43,12 @@ finish('first-frame-checks', EXPECTED, () => checks, async () => {
     ok(/same room, walls and everything behind them/.test(p) && /same camera distance and framing/.test(p) && /if no hand is visible in IMAGE 1, no hand in the result/.test(p) && /wearing a red oversized hoodie/.test(p), 'prompt: room, framing, hands and clothes from the hook');
     ok(/The last try was wrong: a raised hand/.test(ff.swapPrompt(summer, 'x', 'a raised hand')), 'prompt: names what the last try got wrong');
     ok(!/IMAGE 2/.test(ff.swapPrompt({ image: null, words: 'a tall man with a beard' }, 'x')), 'described person: no IMAGE 2 in the prompt');
+  }
+  // Founder 2026-11-07: the eyes stay on the camera and follow the original, in the first frame and in Kling's motion.
+  {
+    const src = fs.readFileSync('src/lib/server/hookgen.ts', 'utf8');
+    ok(/the eyes looking exactly where they look in IMAGE 1 \(into the camera lens if they do there\)/.test(ff.swapPrompt(summer, 'x')) && /sameGaze: the eyes look in the same direction/.test(ff.judgePrompt(summer)) && ff.VERDICT_SCHEMA.required.includes('sameGaze'), 'first frame: gaze asked for and checked');
+    ok(/The eyes follow the reference video's eyes exactly: they look into the camera lens whenever the reference's do/.test(src), 'Kling prompt: the eyes follow the original');
   }
   // The whole character photo is sent, never a crop: their body stays theirs (founder 2026-11-07: a face crop would put
   // Summer's face on the hook person's body).

@@ -11,7 +11,10 @@ async function main(){
   // character's room must never leak into the hook; tested in first-frame-checks). Kling's models and prompts stay frozen.
   function visit(n){if(ts.isFunctionDeclaration(n)&&n.name?.getText(f)==='swapFirstFrame')return;if(ts.isVariableDeclaration(n)&&names.has(n.name.getText(f)))out.push(n.getText(f));if(ts.isPropertyAssignment(n)&&n.name.getText(f)==='text')out.push(n.initializer.getText(f));ts.forEachChild(n,visit);}visit(f);return out;
  }
- assert.deepEqual(prompts(fs.readFileSync('src/lib/server/hookgen.ts','utf8')),prompts(execFileSync('git',['show','0b013a7:src/lib/server/hookgen.ts'],{encoding:'utf8'})));
+ // The one approved change to the frozen Kling prompts since 0b013a7: the eyes sentence in MATCH (founder 2026-11-07).
+ const EYES=" The eyes follow the reference video's eyes exactly: they look into the camera lens whenever the reference's do, and look away only when, where and as far as the reference's do.";
+ const frozen=prompts(execFileSync('git',['show','0b013a7:src/lib/server/hookgen.ts'],{encoding:'utf8'})).map(x=>x.startsWith('MATCH =')?x.replace('no extra gestures, no overacting.','no extra gestures, no overacting.'+EYES):x);
+ assert.deepEqual(prompts(fs.readFileSync('src/lib/server/hookgen.ts','utf8')),frozen);
  const glob=fs.readdirSync('src/app/api',{recursive:true}).filter(x=>String(x).endsWith('route.ts'));
  for(const f of glob){const source=fs.readFileSync(`src/app/api/${f}`,'utf8');for(const m of source.matchAll(/maxDuration\s*=\s*(\d+)/g))assert.ok(Number(m[1])<=300,f);}
  assert.equal(JSON.parse(fs.readFileSync('vercel.json')).crons[0].schedule,'* * * * *');
