@@ -9,7 +9,8 @@
     "dev": "next dev -p 3100 -H 127.0.0.1",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node scripts/caption-checks.cjs && node scripts/editor-checks.cjs && node scripts/speed-fix-checks.cjs && node scripts/sound-queue-checks.cjs && node scripts/frame-schedule-checks.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1154.0",

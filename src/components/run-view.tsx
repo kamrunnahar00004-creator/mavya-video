@@ -15,8 +15,9 @@ import { DEFAULT_FONT } from "@/lib/studio-data";
 import { type Adjust, speedOf } from "@/lib/adjust";
 import { reconcileGeneration } from "@/lib/generation-edit";
 import { soundPieces, shiftSounds } from "@/lib/sound";
+import { deleteSelection, partsChange } from "@/lib/edit-ops";
 
-import { type Seg, clipGroup, clipSrc, containTexts, demoClips, moveClipPiece, removeDemoClip, videoLength, pieceSpans, remapTexts, retimeTexts, runSteps, shotList, snapTexts, storeParts, timeline } from "@/lib/edit";
+import { type Seg, clipGroup, clipSrc, containTexts, demoClips, moveClipPiece, removeDemoClip, videoLength, remapTexts, retimeTexts, runSteps, shotList, snapTexts, timeline } from "@/lib/edit";
 
 import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { forgetLoad, peekLoad, startCreate } from "@/lib/pending-runs";
@@ -576,54 +577,14 @@ export function RunView() {
     liveTexts((t) => t.filter((x) => x.id !== tid));
     commitTexts();
   };
-  /** A clip's pieces changed (trim or delete a piece, Undo; Cut on the hook). Texts follow the same frames; texts only on a deleted piece go with it. */
-  const partsChange = (r: Run, clipId: string, parts: Part[], hold = false): Pick<Run, "hook" | "demo" | "texts"> | null => {
-    const all = timeline(r, source);
-    const seg = all.find((x) => x.id === clipId);
-    if (!seg || !parts.length) return null;
-    const speed = speedOf(seg.adjust);
-    // Magnet off (hold): the clip after it stays where it is; the change goes into the empty space before it.
-    const after = all[all.indexOf(seg) + 1];
-    const keep = hold && Boolean(after);
-    const newLen = parts.reduce((t, x) => t + Math.max(0.05, x.end - x.start), 0) / speed;
-    const fix = (c: DemoClip) => (keep && c.id === after.id ? { ...c, gap: Math.round(Math.max(0, (c.gap ?? 0) + seg.len - newLen) * 1000) / 1000 } : c);
-    const spans = pieceSpans(seg);
-    let kept = runTexts(r);
-    for (let i = 0; i < seg.parts.length; i++) {
-      if (parts.some((q) => q.id === seg.parts[i].id)) continue;
-      const a = seg.offset + spans[i].at;
-      const b = a + spans[i].len;
-      kept = kept.filter((x) => x.start < a - 0.001 || x.end > b + 0.001);
-    }
-    const nextTexts = remapTexts(kept, seg.offset, { parts: seg.parts, speed }, { parts, speed }, keep);
-    const stored = storeParts(parts);
-    if (clipId === "hook") return { hook: { ...r.hook, ...stored }, demo: keep ? { ...r.demo, clips: demoClips(r).map(fix) } : r.demo, texts: nextTexts };
-    return { hook: r.hook, demo: { ...r.demo, clips: demoClips(r).map((c) => (c.id === clipId ? { ...c, ...stored } : fix(c))) }, texts: nextTexts };
-  };
   const setParts = (clipId: string, parts: Part[], hold = false) => {
-    const change = partsChange(run, clipId, parts, hold);
+    const change = partsChange(run, source, clipId, parts, hold);
     if (!change) return;
     if (clipId === "hook") save(change);
     else save({ demo: change.demo, texts: change.texts });
   };
-  /**
-   * Several selected things deleted at once (Ctrl/Cmd-click in the editor, then Delete, like CapCut): texts, and clip
-   * pieces (every piece of a demo clip removes the clip; the hook always keeps at least one piece). One save, one Undo.
-   */
-  const deleteMany = (textIds: string[], pieces: { seg: string; part: string }[], hold = false) => {
-    let r: Run = { ...run, texts: runTexts(run).filter((t) => !textIds.includes(t.id)) };
-    for (const segId of [...new Set(pieces.map((p) => p.seg))]) {
-      const seg = timeline(r, source).find((x) => x.id === segId);
-      if (!seg) continue;
-      const gone = new Set(pieces.filter((p) => p.seg === segId).map((p) => p.part));
-      const rest = seg.parts.filter((p) => !gone.has(p.id));
-      if (rest.length) {
-        const change = partsChange(r, segId, rest, hold);
-        if (change) r = { ...r, ...change };
-      } else if (segId !== "hook") r = { ...r, ...removeDemoClip(r, segId, runTexts(r), hold) };
-    }
-    save({ hook: r.hook, demo: r.demo, texts: runTexts(r) });
-  };
+  /** Several selected things deleted at once (edit-ops deleteSelection): one save, one Undo. */
+  const deleteMany = (textIds: string[], pieces: { seg: string; part: string }[], hold = false) => save(deleteSelection(run, source, textIds, pieces, hold));
   /** A generated hook goes in (new, or picked from My files with `extra` = the hook and character it was made from).
    *  The hook's length changes: texts follow (a text over the whole hook keeps covering it). The old one is kept in versions. */
   const applyGenerated = (generated: NonNullable<Run["hook"]["generated"]>, text: string, extra: Partial<Run["hook"]> = {}, sourceRefId?: string | null, blankText = false) => {

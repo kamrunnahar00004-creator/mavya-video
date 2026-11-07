@@ -17,6 +17,7 @@ import { randomUUID, timingSafeEqual, createHash } from "node:crypto";
 import ffmpegPath from "ffmpeg-static";
 import { countArgs, countFrames, demoArgs, demoAt, finalArgs, isHdr, pieceHasSound, pieceSoundArgs, plan, previewRuns, stepArgs } from "./render.mjs";
 import { fillSoundFile } from "./sound-file.mjs";
+import { nextJob } from "./queue.mjs";
 
 const SECRET = process.env.RENDER_SECRET ?? "";
 const PORT = Number(process.env.PORT ?? 3200);
@@ -230,12 +231,10 @@ async function next() {
   if (busy) return;
   busy = true;
   try {
-    // Upload copies first: the editor plays them and an export of uploaded clips waits for their working copies anyway
-    // (Codex 2026-11-06: a preview queued behind exports). Bounded, so a burst of uploads never holds an export back for
-    // long: copies and waiting exports take turns, one each (a copy can take minutes). Still one job at a time (512 MB).
+    // Copies first, taking turns with waiting exports (render/queue.mjs nextJob).
     let copiesInARow = 0;
-    while (queue.length || previewQueue.length) {
-      if (previewQueue.length && (!queue.length || copiesInARow < 1)) {
+    for (let kind = nextJob(queue.length, previewQueue.length, 0); kind; kind = nextJob(queue.length, previewQueue.length, copiesInARow)) {
+      if (kind === "copy") {
         copiesInARow++;
         await makePreview(previewQueue.shift());
       } else {

@@ -13,6 +13,7 @@ import { waveform } from "@/lib/waveform";
 
 
 import { ADJUST_ROWS, type Adjust, type AdjustRow, type Motion, NO_ADJUST, fullAdjust, isAdjusted, keyAt, motionAt, moveKey, panBy, setMotion, speedOf, toggleKey, videoStyle } from "@/lib/adjust";
+import { activeGroup, groupPlacer, pastedRows, toggleInGroup } from "@/lib/selection";
 import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, shiftSounds, soundName, soundPieces, soundRows } from "@/lib/sound";
 import type { Song } from "@/app/api/songs/route";
 import { type Seg, clipGroup, clipSrc, demoClips, fileAt, pieceAdjust, segAt, showsAt, videoLength, pieceSpans, relAt } from "@/lib/edit";
@@ -1563,13 +1564,12 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
   // A group (several selected): "c:<clip>:<piece>", "t:<text>", "s:<sound>". It counts only while no single sound is
   // selected on its own (a sound picked or added after it, whose selection clears `sel`, never leaves an old group to
   // delete; Codex 2026-11-07). Every plain selection or deselection ends it (clearSel, pick).
-  const multi = multiKeys.length > 1 && !(sounds.choosing && sounds.pieces.length > 0) && (sel !== null || !sounds.selId) ? multiKeys : [];
+  const multi = activeGroup(multiKeys, { selected: sel !== null, soundSelected: Boolean(sounds.selId), choosing: sounds.choosing, hasSounds: sounds.pieces.length > 0 });
   /** The group's members as one list, or the single selection as one item. */
   const current = () => (multi.length ? multi : sel ? [keyOf(sel)] : sounds.selId ? [`s:${sounds.selId}`] : []);
   /** Toggle key `k` in the selection (Ctrl/Cmd/Shift-click). The last clip or text in it shows its settings. */
   const toggle = (k: string) => {
-    const base = current();
-    const keys = base.includes(k) ? base.filter((x) => x !== k) : [...base, k];
+    const keys = toggleInGroup(current(), k);
     sounds.select(null);
     const last = [...keys].reverse().find((x) => !x.startsWith("s:"));
     if (keys.length === 1 && keys[0].startsWith("s:")) {
@@ -1701,27 +1701,17 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
         from = nextSeg ? nextSeg.offset : Infinity;
         cs.forEach((c, i) => onInsertClip({ ...c.clip, id: uid() }, at + i));
       }
-      const starts = cs.map((_, k) => anchor + cs.slice(0, k).reduce((t, c) => t + c.len, 0));
-      const place = (x: number) => {
-        if (!cs.length) return anchor + (x - copied.base);
-        const k = cs.findIndex((c) => x >= c.lo && x < c.lo + c.len);
-        if (k >= 0) return starts[k] + (x - cs[k].lo);
-        if (x < cs[0].lo) return Math.max(0, anchor + (x - cs[0].lo));
-        const j = cs.reduce((m, c, i) => (c.lo + c.len <= x ? i : m), 0);
-        const after = starts[j] + cs[j].len + (x - (cs[j].lo + cs[j].len));
-        return j + 1 < cs.length ? Math.min(after, starts[j + 1]) : after;
-      };
+      const place = groupPlacer(cs, copied.base, anchor);
       for (const t of copied.texts) {
         const at = r3(place(t.start));
         onAddText(null, [at, r3(at + (t.end - t.start))], t.text, t);
       }
       if (copied.sounds.length) {
         // Each copied row gets a new row of its own, so overlapping sounds stay whole and never cut into others.
-        const first = Math.max(-1, ...sounds.pieces.map(rowOf)) + 1;
-        const rows = [...new Set(copied.sounds.map(({ p }) => rowOf(p)))].sort((a, b) => a - b);
+        const rowFor = pastedRows(sounds.pieces.map(rowOf), copied.sounds.map(({ p }) => rowOf(p)));
         const added = copied.sounds.map(({ p, len }) => {
           const at = r3(place(p.at));
-          return { ...p, id: uid(), at, end: r3(at + len), row: first + rows.indexOf(rowOf(p)) };
+          return { ...p, id: uid(), at, end: r3(at + len), row: rowFor(rowOf(p)) };
         });
         // The sounds already there move with the inserted clips, as the insert itself moves them (shiftSounds).
         const by = cs.reduce((t, c) => t + c.len, 0);
