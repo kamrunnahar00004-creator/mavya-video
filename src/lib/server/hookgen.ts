@@ -49,7 +49,14 @@ const LINK_SECONDS = 24 * 3600;
 const LOOK = "Real handheld phone selfie video, casual UGC, one continuous take. Natural five-finger hands. No text, captions, subtitles, stickers or watermarks anywhere on screen.";
 /** Motion control: the reference clip is the performance to copy (founder 2026-10-23: as close to the original as possible). */
 const MATCH =
-  "Copy the reference video's performance exactly and as closely as possible: the same gestures, hand positions and hand shapes, head moves, gaze direction, facial expressions at the same strength, mouth movements and timing, frame by frame. Add nothing, exaggerate nothing, no extra gestures, no overacting. Keep the same person, face, hair, outfit, held objects, room, framing and light as in the image for the whole video; no new objects.";
+  "Copy the reference video's performance exactly and as closely as possible: the same gestures, hand positions and hand shapes, head moves, gaze direction, facial expressions at the same strength, mouth movements and timing, frame by frame. Add nothing, exaggerate nothing, no extra gestures, no overacting. Keep the same person, face, hair, outfit, held objects, room and light as in the image for the whole video; no new objects.";
+/**
+ * The camera moves as in the reference (founder 2026-11-08: a phone pulled closer came out as a flat digital zoom,
+ * because MATCH said to keep the same framing for the whole video; tested on Olivia + @blair.buildsthingss DaFCnEnNxTM,
+ * "PERFECT"). The image sets the starting framing only.
+ */
+const CAMERA =
+  "Copy the camera too: start with the image's framing, then make every camera move the reference video makes. If the phone is brought closer or pulled away, the camera physically moves, so the perspective and the background shift with it; if it zooms, it zooms; if it stays still, it stays still.";
 const NEGATIVE = "text, captions, subtitles, watermark, logo, cut, scene change, extra fingers, deformed hands, distorted face, morphing, exaggerated expressions, overacting";
 
 const exec = promisify(execFile);
@@ -201,7 +208,7 @@ async function startHookInner(run: Run, source: Reference | null, who: string, n
         video_url: videoUrl,
         character_orientation: "video",
         keep_original_sound: false,
-        prompt: `${MATCH} ${LOOK}${fix}`,
+        prompt: `${MATCH} ${CAMERA} ${LOOK}${fix}`,
       });
     }
 
