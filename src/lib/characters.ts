@@ -15,3 +15,10 @@ export const CHARACTERS = [
 ].map((id) => ({ id, name: id[0].toUpperCase() + id.slice(1), src: `/characters/${id}.jpg`, view: `/characters/view/${id}.webp`, thumb: `/characters/thumbs/${id}.jpg` }));
 
 export const characterById = (id: string | undefined) => CHARACTERS.find((c) => c.id === id) ?? null;
+
+/**
+ * When a character's photo was last replaced (founder 2026-11-08: Summer redone from a text description, without a
+ * reference photo, so hooks stop looking AI-made). Hooks made before it show the old face, so the hook cache
+ * (generation-jobs reuseHook) never serves them for this character.
+ */
+export const PHOTO_SINCE: Record<string, string> = { summer: "2026-11-08T06:40:00Z" };
