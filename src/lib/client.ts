@@ -1,5 +1,6 @@
 import type { Clip, Project, Reference, Run, Slot, TextLayer } from "@/lib/types";
 import { DEFAULT_FONT } from "@/lib/studio-data";
+import { touchesEdit } from "@/lib/edit-version";
 
 /** Hook remixes until the text model is connected: same energy, aimed at the product. */
 export function remixHook(original: string, product: string, audience: string): string[] {
@@ -96,6 +97,104 @@ export async function clipFromAsset(asset: { mediaId: string; name: string; kind
 type PendingSave = { patch: Partial<Run>; timer: ReturnType<typeof setTimeout>; done: ((run: Run | null) => void)[] };
 const pendingSaves = new Map<string, PendingSave>();
 const saveChains = new Map<string, Promise<Run | null>>();
+/**
+ * The version of each video this page's edits are based on (edit-version.ts): set when the video loads, moved on by
+ * each save the server takes. Sent with every editor save; the server refuses a save from an older copy.
+ */
+const editVersions = new Map<string, string | null>();
+/** The video loaded (or loaded again): later saves are based on this version. */
+export function setEditVersion(id: string, version: string | undefined | null) {
+  // A fresh copy: anything still queued, waiting or due for a retry is from the old one (the page waited for its own
+  // saves before loading, run-view) and is never sent under this version (Codex 2026-11-08).
+  saveGenerations.set(id, (saveGenerations.get(id) ?? 0) + 1);
+  const queued = pendingSaves.get(id);
+  if (queued) { clearTimeout(queued.timer); pendingSaves.delete(id); queued.done.forEach((resolve) => resolve(null)); }
+  editVersions.set(id, version ?? null);
+  // Save ids from the old copy prove nothing about this one (it may even be older than them; Codex 2026-11-08).
+  unanswered.delete(id);
+  ownSaveIds.delete(id);
+  suspended.delete(id);
+  refusedSections.delete(id);
+  generationOnly.delete(id);
+}
+/** The run sections this page has edited but the server has not confirmed yet (queued, waiting or in flight). */
+export function unsavedSections(id: string): Set<string> {
+  const keys = new Set<string>(Object.keys(pendingSaves.get(id)?.patch ?? {}));
+  for (const patch of sentPatches.get(id)?.values() ?? []) Object.keys(patch).forEach((k) => keys.add(k));
+  keys.delete("project");
+  return keys;
+}
+/**
+ * A generated hook landed: the server wrote the hook and captions and moved the version on in the same write (migration
+ * 0019). Every save this page had not sent yet was made from before it; sent now under the new version it would
+ * overwrite the generated hook, so all of them are cancelled (queued or waiting behind another request), and one
+ * that was already on its way and gets refused is dropped quietly. The page then saves its merged state again
+ * (run-view onGenerated, from unsavedSections), so no edit is lost (Codex 2026-11-08).
+ */
+export function adoptGeneratedVersion(id: string, version: string) {
+  editVersions.set(id, version);
+  suspended.delete(id);
+  generationOnly.delete(id);
+  saveGenerations.set(id, (saveGenerations.get(id) ?? 0) + 1);
+  const queued = pendingSaves.get(id);
+  if (!queued) return;
+  clearTimeout(queued.timer);
+  pendingSaves.delete(id);
+  queued.done.forEach((resolve) => resolve(null));
+}
+/**
+ * Videos whose copy on this page was refused, until the latest version is loaded (setEditVersion): edits made from the
+ * old copy meanwhile are dropped, never sent later under the new version (Codex 2026-11-08).
+ */
+const suspended = new Set<string>();
+/** Event sent when the server refused this page's save because the video changed elsewhere; detail: the video id. */
+export const STALE_RUN_EVENT = "mavya:run-stale";
+/**
+ * Ids of this page's editor saves whose answers never came (a network failure after sending): the server may have
+ * written one, so the retry names them and is taken if the video's version came from one of them (Codex 2026-11-08).
+ */
+const unanswered = new Map<string, string[]>();
+const newSaveId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`);
+/** The sections of this page's refused save and the edits dropped with it, kept for the page (takeRefusedSections). */
+const refusedSections = new Map<string, Set<string>>();
+/** The ids of this page's recent editor saves (the last 50), answered or not. */
+const ownSaveIds = new Map<string, string[]>();
+/**
+ * A generated hook's result may be taken (adoptGeneratedVersion) only if the generation followed this page's own
+ * version or one of its own saves: if another tab saved in between, its edits must not be saved over, so the page
+ * loads the latest instead (Codex 2026-11-08).
+ */
+export function generationFollows(id: string, updated: Pick<Run, "editSave" | "editPrev" | "editPrevSave">): boolean {
+  if (updated.editSave) return false;
+  // (A video from before versions: no version on either side, nothing saved in between.)
+  if ((updated.editPrev ?? null) === (editVersions.get(id) ?? null)) return true;
+  return Boolean(updated.editPrevSave && (ownSaveIds.get(id) ?? []).includes(updated.editPrevSave));
+}
+/**
+ * This page's copy is out of date and the page is loading the latest (run-view): every save it queued or has waiting is
+ * cancelled and editor saves pause until the latest version is in (setEditVersion), so none goes out under the new
+ * version (Codex 2026-11-08).
+ */
+export function abandonCopy(id: string) {
+  saveGenerations.set(id, (saveGenerations.get(id) ?? 0) + 1);
+  suspended.add(id);
+  const queued = pendingSaves.get(id);
+  if (!queued) return;
+  clearTimeout(queued.timer);
+  pendingSaves.delete(id);
+  queued.done.forEach((resolve) => resolve(null));
+}
+/** Every refusal since the last load said the newer version was only a finished generation's (byGeneration). */
+const generationOnly = new Map<string, boolean>();
+export const refusedByGeneration = (id: string): boolean => generationOnly.get(id) === true;
+/** The sections lost to a refusal, once: the page saves them again if a generated hook explains the refusal. */
+export function takeRefusedSections(id: string): Set<string> {
+  const keys = refusedSections.get(id) ?? new Set<string>();
+  refusedSections.delete(id);
+  return keys;
+}
+/** Bumped when a save is refused: saves queued before it are from the old copy and are never sent. */
+const saveGenerations = new Map<string, number>();
 
 /** Save status per run, for the "Saved" label: saving, saved, or error (a server or network failure is retried). */
 export type SaveState = "idle" | "saving" | "saved" | "error";
@@ -132,14 +231,60 @@ function flushRun(id: string) {
   sentPatches.set(id, sent);
   // retry: a server or network failure (a rejected edit, 4xx, would fail again the same way).
   let retry = false;
+  let refused = false;
+  let dropped = false;
+  const generation = saveGenerations.get(id) ?? 0;
+  const editing = touchesEdit(pending.patch);
+  const saveId = newSaveId();
+  /** The server answered: it did or did not write this save, so its id is no longer unanswered. */
+  const answered = () => unanswered.set(id, (unanswered.get(id) ?? []).filter((x) => x !== saveId));
   const operation = (saveChains.get(id) ?? Promise.resolve(null)).then(async () => {
+    // Queued from a copy the server already refused: not sent (the page is loading the latest version).
+    if ((saveGenerations.get(id) ?? 0) !== generation) {
+      dropped = true;
+      // Dropped with a refusal: the page may still save it again (takeRefusedSections).
+      if (suspended.has(id)) { const lost = refusedSections.get(id) ?? new Set<string>(); Object.keys(pending.patch).filter((k) => k !== "project").forEach((k) => lost.add(k)); refusedSections.set(id, lost); }
+      return null;
+    }
     try {
-      const body = JSON.stringify(pending.patch);
+      // Editor saves say which version they were made from, read now (after the saves before it landed), their own id
+      // and the ids of this page's saves whose answers never came.
+      if (editing) { const mine = unanswered.get(id) ?? []; unanswered.set(id, [...mine, saveId].slice(-20)); ownSaveIds.set(id, [...(ownSaveIds.get(id) ?? []), saveId].slice(-50)); }
+      const body = JSON.stringify(editing ? { ...pending.patch, base: editVersions.get(id) ?? null, save: saveId, mine: (unanswered.get(id) ?? []).filter((x) => x !== saveId) } : pending.patch);
       // Browsers reject keepalive bodies above their 64 KiB quota, even on an open page.
       const keepalive = new TextEncoder().encode(body).byteLength < 60000;
       const res = await fetch(`/api/runs/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body, keepalive });
-      if (res.ok) return (await res.json()) as Run;
+      if (res.ok) {
+        const saved = (await res.json()) as Run;
+        // Written and its answer read: the video holds this save, so no earlier unanswered one can be its version any
+        // more (only now: an answer lost while reading leaves the ids for the retry, Codex 2026-11-08).
+        if (editing) unanswered.delete(id);
+        // A version adopted meanwhile (a generated hook) is newer than this answer: keep it.
+        // Only an editor save moves this page's version: a rename's answer carries whatever version the video has
+        // (maybe another tab's), and this page's captions are not that version (Codex 2026-11-08).
+        if (editing && saved?.editVersion && (saveGenerations.get(id) ?? 0) === generation) editVersions.set(id, saved.editVersion);
+        return saved;
+      }
+      if (res.status === 409) {
+        answered();
+        const why = await res.json().catch(() => null) as { byGeneration?: boolean } | null;
+        // Sent before a generated hook was adopted: the page is saving its merged state again, nothing to do.
+        if ((saveGenerations.get(id) ?? 0) !== generation) { dropped = true; return null; }
+        // An older copy (the video changed in another tab or window): nothing queued from this copy is sent, and
+        // the page loads the latest version (run-view listens). Never retried.
+        refused = true;
+        generationOnly.set(id, (generationOnly.get(id) ?? true) && why?.byGeneration === true);
+        saveGenerations.set(id, generation + 1);
+        suspended.add(id);
+        const lost = new Set([...(refusedSections.get(id) ?? []), ...Object.keys(pending.patch)]);
+        const queued = pendingSaves.get(id);
+        if (queued) { Object.keys(queued.patch).forEach((k) => lost.add(k)); clearTimeout(queued.timer); pendingSaves.delete(id); queued.done.forEach((resolve) => resolve(null)); }
+        lost.delete("project");
+        refusedSections.set(id, lost);
+        return null;
+      }
       retry = res.status >= 500;
+      if (!retry) answered();
       const failure = await res.json().catch(() => null) as { error?: unknown } | null;
       if (typeof failure?.error === "string") setSaveState(id, "error", failure.error.slice(0, 200));
       return null;
@@ -161,6 +306,14 @@ function flushRun(id: string) {
       if (!pendingSaves.has(id) && !saveChains.has(id)) setSaveState(id, "saved");
       return;
     }
+    if (dropped) { setSaveState(id, "idle"); return; }
+    if (refused) {
+      setSaveState(id, "idle");
+      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STALE_RUN_EVENT, { detail: id }));
+      return;
+    }
+    // Its copy was replaced meanwhile (reload or a generated hook): never retried under the new version (Codex 2026-11-08).
+    if ((saveGenerations.get(id) ?? 0) !== generation) { setSaveState(id, "idle"); return; }
     setSaveState(id, "error", saveErrors.get(id));
     if (!retry) return;
     const stale = Object.fromEntries(Object.entries(pending.patch).filter(([k]) => !superseded.has(k))) as Partial<Run>;
@@ -174,6 +327,7 @@ function flushRun(id: string) {
 
 /** Keep live edits immediate, merge input bursts, and send writes in order per run. */
 export function patchRun(id: string, patch: Partial<Run>): Promise<Run | null> {
+  if (suspended.has(id) && touchesEdit(patch)) return Promise.resolve(null);
   if (saveStateOf(id) !== "error") setSaveState(id, "saving");
   return new Promise((resolve) => {
     const previous = pendingSaves.get(id);

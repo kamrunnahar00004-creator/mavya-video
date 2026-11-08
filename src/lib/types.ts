@@ -224,6 +224,14 @@ export type Run = {
   title: string;
   createdAt: string;
   updatedAt: string;
+  /** Changes on every editor save; a save from an older copy is refused (edit-version.ts). */
+  editVersion?: string;
+  /** The id of the editor save that made editVersion (edit-version.ts). */
+  editSave?: string | null;
+  /** Set by a finished generation: the version it followed (edit-version.ts byGeneration). */
+  editPrev?: string | null;
+  /** Set by a finished generation: the save id that made the version it followed. */
+  editPrevSave?: string | null;
   sourceRefId: string | null;
   hook: {
     mode: HookMode;

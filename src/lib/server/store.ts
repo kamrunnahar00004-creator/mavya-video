@@ -6,6 +6,7 @@ import path from "node:path";
 import { r2Enabled, downloadTo, objectSize, putObject, putObjectIfUnchanged, signedGet, signedPut } from "@/lib/server/r2";
 import { authEnabled, createSupabaseAdminClient } from "@/lib/supabase/server";
 import type { Asset, Reference, Run } from "@/lib/types";
+import { byGeneration, ownSaves, saveIdOf, staleEdit } from "@/lib/edit-version";
 
 /**
  * Every read and write of records and files goes through here.
@@ -246,6 +247,35 @@ export async function updateRun(id: string, patch: Partial<Omit<Run, "id" | "cre
   }
   const { data, error } = await db().rpc("mavya_patch_run", { p_user: who, p_run: id, p_patch: patch });
   if (error) throw error;
+  return data as Run | null;
+}
+
+/**
+ * An editor save (edit-version.ts): written only if the run is still at version `base`, compared under the row lock, and
+ * given a new version. "stale": the save was made from an older copy and nothing was written.
+ */
+export async function updateRunChecked(id: string, patch: Partial<Omit<Run, "id" | "createdAt">>, who: string, base: unknown, save: unknown = null, mine: unknown = []): Promise<Run | null | { stale: true; byGeneration: boolean }> {
+  const clean = { ...patch };
+  delete clean.editVersion;
+  delete clean.editSave;
+  delete clean.editPrev;
+  delete clean.editPrevSave;
+  if (!cloud()) {
+    let updated: Run | null | { stale: true; byGeneration: boolean } = null;
+    await writeDb((d) => {
+      const i = d.runs.findIndex((r) => r.id === id);
+      if (i < 0) return;
+      if (staleEdit(d.runs[i].editVersion, base, d.runs[i].editSave, mine)) { updated = { stale: true, byGeneration: byGeneration(d.runs[i], base) }; return; }
+      d.runs[i] = { ...d.runs[i], ...clean, editVersion: randomUUID(), editSave: saveIdOf(save), editPrev: null, editPrevSave: null, updatedAt: new Date().toISOString() };
+      updated = d.runs[i];
+    });
+    return updated;
+  }
+  const { data, error } = await db().rpc("mavya_patch_run", { p_user: who, p_run: id, p_patch: clean, p_base: typeof base === "string" ? base : null, p_check: true, p_save: saveIdOf(save), p_mine: ownSaves(mine) });
+  // Migration 0019 not applied yet (PostgREST: no such function): save as before; the route's own check still ran.
+  if (error && (error as { code?: string }).code === "PGRST202") return updateRun(id, clean, who);
+  if (error) throw error;
+  if (data && (data as { stale?: boolean }).stale === true) return { stale: true, byGeneration: (data as { byGeneration?: boolean }).byGeneration === true };
   return data as Run | null;
 }
 

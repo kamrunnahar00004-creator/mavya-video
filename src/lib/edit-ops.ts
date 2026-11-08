@@ -26,7 +26,15 @@ export function partsChange(r: Run, source: Reference | null, clipId: string, pa
     const b = a + spans[i].len;
     kept = kept.filter((x) => x.start < a - 0.001 || x.end > b + 0.001);
   }
-  const nextTexts = remapTexts(kept, seg.offset, { parts: seg.parts, speed }, { parts, speed }, keep);
+  let nextTexts = remapTexts(kept, seg.offset, { parts: seg.parts, speed }, { parts, speed }, keep);
+  // Magnet off and the clip grew past the space after it: the clips after it are pushed later by the overflow, so the
+  // texts on them go with them (founder 2026-11-08: a demo caption must stay on its clip). Texts of this clip stay.
+  const overflow = keep ? Math.max(0, newLen - seg.len - (after.gap ?? 0)) : 0;
+  if (overflow > 0.0005) {
+    const end = seg.offset + seg.len;
+    const later = new Set(kept.filter((t) => t.start >= end - 0.001).map((t) => t.id));
+    nextTexts = nextTexts.map((t) => (later.has(t.id) ? { ...t, start: Math.round((t.start + overflow) * 1000) / 1000, end: Math.round((t.end + overflow) * 1000) / 1000 } : t));
+  }
   const stored = storeParts(parts);
   if (clipId === "hook") return { hook: { ...r.hook, ...stored }, demo: keep ? { ...r.demo, clips: demoClips(r).map(fix) } : r.demo, texts: nextTexts };
   return { hook: r.hook, demo: { ...r.demo, clips: demoClips(r).map((c) => (c.id === clipId ? { ...c, ...stored } : fix(c))) }, texts: nextTexts };

@@ -2,8 +2,8 @@ const fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
 exports.load=(file,stubs={},env={},globals={})=>{
  const module={exports:{}};
  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{fileName:file,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true,jsx:ts.JsxEmit.ReactJSX}}).outputText,{
-  module,exports:module.exports,require(id){if(id==='server-only')return {};if(Object.hasOwn(stubs,id))return stubs[id];if(id==='@/lib/server/read-timing')return {readPhase:(_phase,work)=>work(),readResponse:work=>work()};if(id.endsWith('/render/constraints.json'))return require('../render/constraints.json');if(id==='@/lib/render-limits')return exports.load('src/lib/render-limits.ts');if(id==='@/lib/server/first-frame')return exports.load('src/lib/server/first-frame.ts');throw Error(`Unstubbed import: ${id}`);},
-  Buffer,Response,Request,URL,AbortSignal,TextEncoder,process:{env,cwd:()=>process.cwd()},setTimeout,clearTimeout,queueMicrotask,console:{error(){}},...globals
+  module,exports:module.exports,require(id){if(id==='server-only')return {};if(Object.hasOwn(stubs,id))return stubs[id];if(id==='@/lib/server/read-timing')return {readPhase:(_phase,work)=>work(),readResponse:work=>work()};if(id.endsWith('/render/constraints.json'))return require('../render/constraints.json');if(id==='@/lib/render-limits')return exports.load('src/lib/render-limits.ts');if(id==='@/lib/server/first-frame')return exports.load('src/lib/server/first-frame.ts');if(id==='@/lib/edit-version')return exports.load('src/lib/edit-version.ts');throw Error(`Unstubbed import: ${id}`);},
+  Buffer,Response,Request,URL,AbortSignal,TextEncoder,crypto:globalThis.crypto,process:{env,cwd:()=>process.cwd()},setTimeout,clearTimeout,queueMicrotask,console:{error(){}},...globals
  },{filename:file});return module.exports;
 };
 /**

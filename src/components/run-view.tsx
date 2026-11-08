@@ -19,7 +19,8 @@ import { deleteSelection, insertClipsChange, partsChange } from "@/lib/edit-ops"
 
 import { type Seg, clipGroup, clipSrc, containTexts, demoClips, moveClipPiece, removeDemoClip, videoLength, remapTexts, retimeTexts, runSteps, shotList, snapTexts, timeline } from "@/lib/edit";
 
-import { AVATAR_TONES, TEXT_Y, clipFromAsset, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
+import { AVATAR_TONES, STALE_RUN_EVENT, abandonCopy, adoptGeneratedVersion, generationFollows, refusedByGeneration, setEditVersion, takeRefusedSections, unsavedSections, TEXT_Y, clipFromAsset, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
+import { STALE_MESSAGE } from "@/lib/edit-version";
 import { pageLoad, startCreate } from "@/lib/pending-runs";
 import { fmtTime, type DemoClip, type Frame, type Part, type Reference, type Run, type TextLayer, type TextPos } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
@@ -136,7 +137,9 @@ export function RunView() {
       }
     };
     // pageLoad (src/lib/pending-runs.ts): a create this tab started, else a hover prefetch (at most 2 s), else fresh.
-    const load = pageLoad(id, fresh, () => alive).then((page) => {
+    // This page's own unsaved edits (left just before, or a save waiting to retry) land first, so the copy loaded below
+    // includes them; whatever still fails is from the old copy and is cancelled when it loads (setEditVersion).
+    const load = waitRunSaves(id).catch(() => false).then(() => pageLoad(id, fresh, () => alive)).then((page) => {
       if ("loaded" in page) return page.loaded;
       if ("pricing" in page) {
         window.dispatchEvent(new CustomEvent("mavya:navigate", { detail: "/pricing" }));
@@ -147,6 +150,8 @@ export function RunView() {
     void load.then(loaded => {
       let data = loaded.run;
       if (!alive) return;
+      // Saves from here on are based on this copy; one made from an older copy is refused (edit-version.ts).
+      setEditVersion(id, data.editVersion);
       const full = loaded.source;
       if (full) setRefs(old => [full, ...(old ?? []).filter(r => r.id !== full.id)]);
       else setRefs(old => old ?? []);
@@ -264,8 +269,17 @@ export function RunView() {
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const adjustTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Sections refused while a hook was generating, kept to save again once the generated hook arrives. */
+  const awaitingGeneration = useRef<Set<string> | null>(null);
   const onGenerated = useCallback((updated: Run) => {
-    const dirty = { texts: Boolean(saveTimer.current), adjust: Boolean(adjustTimer.current) };
+    // Edits not confirmed by the server yet count as unsaved too, not only those waiting for their debounce (a caption
+    // typed just before the hook landed must stay; Codex 2026-11-08).
+    const unsaved = unsavedSections(updated.id);
+    // Edits refused while this generation was finishing (the server had already moved the version on): saved again here.
+    // ...and everything dropped with them, also saves dropped after the refusal was reported (Codex 2026-11-08).
+    for (const k of awaitingGeneration.current ? [...awaitingGeneration.current, ...takeRefusedSections(updated.id)] : []) unsaved.add(k);
+    awaitingGeneration.current = null;
+    const dirty = { texts: Boolean(saveTimer.current) || unsaved.has("texts"), adjust: Boolean(adjustTimer.current) || unsaved.has("hook") };
     // Complete the merge before a debounce callback can snapshot the run, including at the same timer boundary.
     flushSync(() => setRun((r) => {
       if (r?.id !== updated.id) return r;
@@ -273,9 +287,56 @@ export function RunView() {
       runRef.current = next;
       return next;
     }));
+    // The server moved the video's version on with the new hook: this page's saves are based on it from now on, and the
+    // edits it had not saved yet are saved again from the merged state (adoptGeneratedVersion cancelled the old copies).
+    const cur = runRef.current;
+    if (updated.editVersion && cur?.id === updated.id && !generationFollows(updated.id, updated)) {
+      // Another tab saved while this hook was generating: this page's edits are from before it, so load the latest
+      // instead of saving them over the other tab's (Codex 2026-11-08).
+      abandonCopy(updated.id);
+      if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+      if (adjustTimer.current) { clearTimeout(adjustTimer.current); adjustTimer.current = null; }
+      setToast(STALE_MESSAGE);
+      setLoadKey((k) => k + 1);
+      return;
+    }
+    if (updated.editVersion && cur?.id === updated.id) {
+      adoptGeneratedVersion(updated.id, updated.editVersion);
+      const again = Object.fromEntries([...unsaved].map((k) => [k, k === "texts" ? runTexts(cur) : cur[k as keyof Run]]));
+      if (Object.keys(again).length) void patchRun(updated.id, { ...again, project: null });
+    }
   }, []);
-  const onGenerateFailed = useCallback(() => setPicked([4]), []);
+  const onGenerateFailed = useCallback(() => {
+    setPicked([4]);
+    // A refusal was waiting for this generation's result, which will not come: load the latest version instead.
+    if (awaitingGeneration.current) { awaitingGeneration.current = null; setLoadKey((k) => k + 1); }
+  }, []);
   const gen = useHookGeneration(id, onGenerated, onGenerateFailed);
+  const generating = useRef(false);
+  useEffect(() => { generating.current = gen.busy; }, [gen.busy]);
+  // The video changed in another tab or window: this copy is out of date, so load the latest instead of saving over it.
+  useEffect(() => {
+    const onStale = (e: Event) => {
+      if ((e as CustomEvent<string>).detail !== id) return;
+      // A hook is generating: its result moved the version on a moment before this save (Codex 2026-11-08). Not another
+      // copy, so nothing is reloaded: the edits are saved again on the generation's version when it arrives.
+      // Only when the server says the newer version is that generation's alone (another tab's edits are never saved over).
+      if (generating.current && refusedByGeneration(id)) {
+        // The refused sections are collected when the hook arrives (takeRefusedSections), including later drops.
+        const waiting = new Set(awaitingGeneration.current ?? []);
+        if (saveTimer.current || adjustTimer.current) ["hook", "demo", "texts"].forEach((k) => waiting.add(k));
+        awaitingGeneration.current = waiting;
+        return;
+      }
+      // Edits waiting to be saved are from the old copy: dropped, so none is sent once the latest version is in.
+      if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+      if (adjustTimer.current) { clearTimeout(adjustTimer.current); adjustTimer.current = null; }
+      setToast(STALE_MESSAGE);
+      setLoadKey((k) => k + 1);
+    };
+    window.addEventListener(STALE_RUN_EVENT, onStale);
+    return () => window.removeEventListener(STALE_RUN_EVENT, onStale);
+  }, [id]);
 
   /** Text edits from the preview: applied live, saved shortly after (coalesced). */
   const liveTexts = useCallback((fn: (t: TextLayer[]) => TextLayer[]) => setRun((r) => {
@@ -1189,6 +1250,8 @@ export function RunView() {
 
       {editing && (
         <VideoEditor
+          // A refused save loads the latest version (loadKey): a fresh editor, so Undo cannot bring back the old copy.
+          key={loadKey}
           run={run}
           source={source}
           segs={segs}

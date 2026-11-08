@@ -174,6 +174,8 @@ export async function advanceGeneration(who: string, id: string): Promise<void> 
       const patch = run ? generationPatch(run, job.input, generated, suggested, stolen) : {};
       const completed = await db().rpc("mavya_complete_generation", { p_user: who, p_job: job.id, p_token: job.lease_token, p_updated: run?.updatedAt ?? null, p_patch: patch, p_result: generated });
       if (completed.error) throw completed.error;
+      // The completion also gives the run a new editVersion in the same write (migration 0019), so a page still holding
+      // the old hook and captions cannot save over them; the page that started this takes the version with the result.
       if (completed.data && !completed.data.retry) return;
     }
     throw new Error("Run changed while completing generation");

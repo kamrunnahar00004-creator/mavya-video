@@ -1,11 +1,12 @@
 import { readResponse } from "@/lib/server/read-timing";
-import { deleteRun, getRun, getReference, updateRun } from "@/lib/server/store";
+import { deleteRun, getRun, getReference, updateRun, updateRunChecked } from "@/lib/server/store";
 import type { Run } from "@/lib/types";
 import { validRunPatch } from "@/lib/server/run-validation";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { renderLimitError } from "@/lib/render-limits";
 import { containTexts, timeline, videoLength } from "@/lib/edit";
 import { runTexts } from "@/lib/client";
+import { STALE_MESSAGE, byGeneration, staleEdit, touchesEdit } from "@/lib/edit-version";
 
 export async function GET(request: Request, ctx: RouteContext<"/api/runs/[id]">) {
   return readResponse(() => readGET(request, ctx));
@@ -55,6 +56,13 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/runs/[id]"
     if (bounds) return Response.json({ error: bounds }, { status: 400 });
   }
   if (!body) return Response.json({ error: "Bad request" }, { status: 400 });
+  // A save made from an older copy of the video (another tab or window) never overwrites newer edits (edit-version.ts).
+  const editing = touchesEdit(body);
+  if (editing) {
+    current ??= await getRun(id, who);
+    if (!current) return Response.json({ error: "Not found" }, { status: 404 });
+    if (staleEdit(current.editVersion, (body as { base?: unknown }).base, current.editSave, (body as { mine?: unknown }).mine)) return Response.json({ error: STALE_MESSAGE, stale: true, byGeneration: byGeneration(current, (body as { base?: unknown }).base) }, { status: 409 });
+  }
   const patch: Partial<Omit<Run, "id" | "createdAt">> = {};
   if (typeof body.title === "string") patch.title = body.title.trim().slice(0, 140) || "Untitled run";
   if (body.sourceRefId === null || typeof body.sourceRefId === "string") patch.sourceRefId = body.sourceRefId;
@@ -114,7 +122,10 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/runs/[id]"
       };
     }
   }
-  const run = await updateRun(id, patch, who);
+  // The check above answers fast; this one is the guarantee: compared again under the row lock as the save is written,
+  // so two copies saving at the same moment cannot both pass (Codex 2026-11-08).
+  const run = editing ? await updateRunChecked(id, patch, who, (body as { base?: unknown }).base, (body as { save?: unknown }).save, (body as { mine?: unknown }).mine) : await updateRun(id, patch, who);
+  if (run && "stale" in run) return Response.json({ error: STALE_MESSAGE, stale: true, byGeneration: run.byGeneration }, { status: 409 });
   return run ? Response.json(run) : Response.json({ error: "Not found" }, { status: 404 });
 }
 

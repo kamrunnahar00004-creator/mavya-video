@@ -92,7 +92,7 @@ for (const start of [1.9, 1.95, 1.98, 1.999]) {
   const stored = clone(runOf(hookOf(3), [clip('a', 1), clip('b', 2)], [T('h', 'hook line', 0, 3), T('t', 'demo', 3, 6)]));
   let saved = null;
   const route = load('src/app/api/runs/[id]/route.ts', {
-    '@/lib/server/store': { getRun: async () => clone(stored), getReference: async () => null, deleteRun: async () => true, updateRun: async (_id, patch) => { saved = patch; return { ...stored, ...patch }; } },
+    '@/lib/server/store': { getRun: async () => clone(stored), getReference: async () => null, deleteRun: async () => true, updateRun: async (_id, patch) => { saved = patch; return { ...stored, ...patch }; }, updateRunChecked: async (_id, patch) => { saved = patch; return { ...stored, ...patch }; } },
     '@/lib/types': {},
     '@/lib/server/run-validation': { validRunPatch: () => true },
     '@/lib/server/who': { currentUser: async () => 'u', signInFirst: () => Response.json({}, { status: 401 }) },
