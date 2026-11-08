@@ -10,6 +10,11 @@
  *     woman's face). The prompt takes ONLY the person from it: nothing of its room, light, clothes, pose or framing.
  *  2. Each frame is checked against the original (room, light, framing, hands, expression, identity) and made again,
  *     told what was wrong, up to MAX_TRIES while time allows. The best one is kept.
+ *  3. Never the wrong person (founder 2026-11-08): a test run's three frames all kept the original creator ("the
+ *     person from IMAGE 2 was not applied"), the best was kept anyway, and Kling animated the creator's real face. A
+ *     frame the check says is not the character never goes to Kling: a checked frame of the character always beats
+ *     one without; when no try has the character, ONE extra try is made (only then, so a normal hook takes no longer),
+ *     and if that fails too the hook fails with WrongPerson (refunded, no fallback) instead.
  * The steps are injected (deps) so the logic is tested without calling Gemini.
  */
 
@@ -25,6 +30,10 @@ export type FrameDeps = {
 };
 
 export const MAX_TRIES = 3;
+/** The one extra try made only when no try so far has the character in it. */
+export const PERSON_TRIES = MAX_TRIES + 1;
+/** What the customer sees when the character could not be put in the frame. */
+export const WRONG_PERSON_MESSAGE = "We couldn't put your character into this hook. Try again or choose another hook.";
 /**
  * The first frame's whole deadline, counted from the hook's start (deps.elapsed): every image and every check is cut to
  * what is left of it, so sharing the files and starting Kling (about 30 s) always fit in the hook's 210 s budget
@@ -43,6 +52,8 @@ export const RETRY_MIN_MS = 60_000;
 /** Below this, no check is started: the frame is kept as it is. */
 const MIN_CALL_MS = 3_000;
 export class FrameOutOfTime extends Error {}
+/** No frame the check accepted as the character: the hook must fail, never go to Kling with someone else's face. */
+export class WrongPerson extends Error { constructor() { super(WRONG_PERSON_MESSAGE); } }
 
 const CHECKS = ["sameRoom", "sameLight", "sameFraming", "sameAngle", "sameHands", "sameExpression", "samePerson"] as const;
 
@@ -95,9 +106,17 @@ export async function makeFirstFrame(deps: FrameDeps, original: Buffer, who: Who
   const person = who.image ? [{ text: "IMAGE 2 (the new person: face, hair and body only):" }, { inline_data: { mime_type: who.image.mime, data: who.image.data } }] : [];
   let best: { frame: Buffer; verdict: Verdict | null; score: number } | null = null;
   let fix = "", tries = 0;
-  const done = () => ({ frame: best!.frame, tries, verdict: best!.verdict });
+  // A checked frame of someone else is never sent on (founder 2026-11-08).
+  const done = () => {
+    if (best!.verdict && !best!.verdict.samePerson) throw new WrongPerson();
+    return { frame: best!.frame, tries, verdict: best!.verdict };
+  };
+  // The character first, then the closest: a frame with the character beats any frame without.
+  const rank = (v: Verdict) => (v.samePerson ? 1000 : 0) + score(v);
   const left = () => FRAME_BUDGET_MS - deps.elapsed();
-  while (tries < MAX_TRIES) {
+  // MAX_TRIES, plus one only when no try has had the character yet.
+  const limit = () => (best?.verdict?.samePerson ? MAX_TRIES : PERSON_TRIES);
+  while (tries < limit()) {
     if (best && left() < RETRY_MIN_MS) break;
     const imageMs = Math.min(FIRST_TRY_MS, left() - JUDGE_MS);
     if (imageMs < MIN_CALL_MS) {
@@ -119,13 +138,16 @@ export async function makeFirstFrame(deps: FrameDeps, original: Buffer, who: Who
       if (judgeMs < MIN_CALL_MS) throw new FrameOutOfTime("No time left to check the frame");
       verdict = await deps.judge([{ text: "IMAGE 1 (the original):" }, scene, ...person, { text: "IMAGE 3 (the edit):" }, { inline_data: { mime_type: "image/jpeg", data: frame.toString("base64") } }, { text: judgePrompt(who) }], judgeMs);
     } catch {
-      // The check is a safeguard: when it fails or there is no time for it, the best frame so far (or this one) is kept.
-      return best && best.score > 0 ? done() : { frame, tries, verdict: null };
+      // The check is a safeguard: when it fails or there is no time for it, the best frame so far is kept if it has
+      // the character; otherwise this unchecked frame (not known to be wrong) is kept rather than a known wrong one.
+      return best && best.score > 0 && best.verdict?.samePerson ? done() : { frame, tries, verdict: null };
     }
-    const s = score(verdict);
+    const s = rank(verdict);
     if (!best || s > best.score) best = { frame, verdict, score: s };
     if (passes(verdict)) break;
     fix = verdict.problem || CHECKS.filter((k) => !verdict![k]).join(", ");
+    // Past MAX_TRIES only the person matters: the extra try is told so.
+    if (tries >= MAX_TRIES && !best.verdict?.samePerson) fix = `the person is not the person in IMAGE 2 (or the description); put exactly that person in. ${fix}`;
   }
   return done();
 }

@@ -9,7 +9,7 @@ process.chdir(path.join(__dirname, '..'));
 
 const ff = load('src/lib/server/first-frame.ts');
 let checks = 0;
-const EXPECTED = 27;
+const EXPECTED = 38;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 
 const PASS = { sameRoom: true, sameLight: true, sameFraming: true, sameAngle: true, sameHands: true, sameExpression: true, samePerson: true, problem: '' };
@@ -85,7 +85,7 @@ finish('first-frame-checks', EXPECTED, () => checks, async () => {
   // Codex 2026-11-07: a wrong-light frame with every small check right tied with a right-light frame with none right.
   {
     const DIM = { ...PASS, sameLight: false, problem: 'golden light' };
-    const BARE = { ...PASS, sameFraming: false, sameAngle: false, sameHands: false, sameExpression: false, samePerson: false, problem: 'many small things' };
+    const BARE = { ...PASS, sameFraming: false, sameAngle: false, sameHands: false, sameExpression: false, problem: 'many small things' };
     const { deps } = fake([DIM, BARE, DIM]);
     const r = await ff.makeFirstFrame(deps, original, summer, 'x');
     ok(r.frame.toString() === 'FRAME-2', `the hook's light wins over every small check (kept ${r.frame})`);
@@ -143,6 +143,55 @@ finish('first-frame-checks', EXPECTED, () => checks, async () => {
     const { deps } = fake([PASS], { judgeThrows: true });
     const r = await ff.makeFirstFrame(deps, original, summer, 'x');
     ok(r.frame.toString() === 'FRAME-1' && r.tries === 1, 'judge down: frame kept, no retry');
+  }
+  // Founder 2026-11-08: three frames all kept the original creator, the best went to Kling anyway and the video showed
+  // the creator's real face. A frame the check calls someone else is never sent on.
+  {
+    const NOBODY = { ...PASS, samePerson: false, problem: 'The person from IMAGE 2 was not applied; the original subject remains' };
+    // Every try the wrong person: one extra try, then WrongPerson (nothing returned for Kling).
+    const a = fake([NOBODY]);
+    let err = null;
+    try { await ff.makeFirstFrame(a.deps, original, summer, 'x'); } catch (e) { err = e; }
+    ok(err instanceof ff.WrongPerson && err.message === ff.WRONG_PERSON_MESSAGE, 'never the character: fails with WrongPerson');
+    ok(ff.PERSON_TRIES === 4 && a.sent.images.length === 4 && a.sent.judged.length === 4, `one extra try only for the person (${a.sent.images.length} tries)`);
+    ok(/not the person in IMAGE 2/.test(texts(a.sent.images[3])) && !/not the person in IMAGE 2/.test(texts(a.sent.images[2])), 'the extra try is told the person is wrong');
+    // The extra try gets the character: it is used.
+    const b = fake([NOBODY, NOBODY, NOBODY, HAND]);
+    const r = await ff.makeFirstFrame(b.deps, original, summer, 'x');
+    ok(r.tries === 4 && r.frame.toString() === 'FRAME-4' && r.verdict === HAND, 'the extra try with the character is kept');
+    // Normal hooks take no longer: once a try has the character, still at most three tries.
+    const c = fake([HAND, HAND, HAND]);
+    const r2 = await ff.makeFirstFrame(c.deps, original, summer, 'x');
+    ok(r2.tries === 3 && c.sent.images.length === 3, 'with the character in a try: no extra try (no added time)');
+    // A frame with the character beats one with everything else right but someone else's face.
+    const WRONG = { ...PASS, samePerson: false, problem: 'not her' };
+    const LEAK = { ...PASS, sameRoom: false, sameLight: false, problem: 'her bedroom' };
+    const d = fake([WRONG, LEAK, WRONG]);
+    const r3 = await ff.makeFirstFrame(d.deps, original, summer, 'x');
+    ok(r3.frame.toString() === 'FRAME-2' && r3.tries === 3, `the character wins over a closer frame of someone else (kept ${r3.frame})`);
+    // No time for the extra try: fails rather than run long or send the wrong face.
+    let t = 0;
+    const e = fake([NOBODY], { elapsed: () => t });
+    const judge = e.deps.judge;
+    e.deps.judge = async (parts, ms) => { const v = await judge(parts, ms); if (e.sent.judged.length === 3) t = ff.FRAME_BUDGET_MS - ff.RETRY_MIN_MS + 1; return v; };
+    let err2 = null;
+    try { await ff.makeFirstFrame(e.deps, original, summer, 'x'); } catch (x) { err2 = x; }
+    ok(err2 instanceof ff.WrongPerson && e.sent.images.length === 3, 'no time for the extra try: WrongPerson, no fourth call');
+    // A failed retry after a wrong-person frame: WrongPerson, not the wrong frame.
+    const f = fake([NOBODY], { imageThrowsOn: 2 });
+    let err3 = null;
+    try { await ff.makeFirstFrame(f.deps, original, summer, 'x'); } catch (x) { err3 = x; }
+    ok(err3 instanceof ff.WrongPerson, 'failed retry after the wrong person: WrongPerson');
+    // The check down after a wrong-person frame: the new unchecked frame, never the known wrong one.
+    const g = fake([NOBODY, PASS]);
+    const gj = g.deps.judge;
+    g.deps.judge = async (parts, ms) => { if (g.sent.judged.length === 1) throw new Error('judge down'); return gj(parts, ms); };
+    const r4 = await ff.makeFirstFrame(g.deps, original, summer, 'x');
+    ok(r4.frame.toString() === 'FRAME-2' && r4.verdict === null, 'check down after the wrong person: the unchecked frame, not the wrong one');
+    // The job fails and refunds at once, with this message, and does not run the fallback (more minutes, same frame).
+    const jobs = fs.readFileSync('src/lib/server/generation-jobs.ts', 'utf8');
+    ok(/else if \(error instanceof WrongPerson\) await transition\(job, "failed", error\.message\);\n\s+else await transition\(job, job\.fallback_used \? "failed" : "fallback"\);/.test(jobs), 'job: WrongPerson fails at once, no fallback');
+    ok(/import \{ WrongPerson \} from "@\/lib\/server\/first-frame";/.test(jobs) && fs.readFileSync('src/lib/server/hookgen.ts', 'utf8').includes('const { frame } = await makeFirstFrame({'), 'job and hookgen are wired to it');
   }
   // hookgen uses it: the whole photo, the checked frame to Kling, the old one-shot swap and the crop gone.
   {
