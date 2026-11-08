@@ -6,4 +6,6 @@
 export const APPROVED_HOOK_CLIPS: readonly string[] = [
   // Olivia + @blair.buildsthingss DaFCnEnNxTM ("nerdy guy at work…"), camera prompt test, founder: "PERFECT".
   "cc4afb16-d2cc-446f-b9fa-ba09688dc4df",
+  // Sienna + @creativewithankita100 (typing sleepily, then gasps and pushes up her sleep mask), founder: "good".
+  "3980486e-aac4-4c6c-b4cb-e651a5d56f86",
 ];

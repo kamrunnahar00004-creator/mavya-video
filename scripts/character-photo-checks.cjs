@@ -35,7 +35,7 @@ ok(/const clip = await libraryFile\("hooks", code, dir\);\s*\n\s*if \(clip\) ret
 
 // The hook cache serves only founder-approved clips (founder 2026-11-08).
 const cache = load('src/lib/hook-cache.ts');
-ok(cache.APPROVED_HOOK_CLIPS.length === 1 && cache.APPROVED_HOOK_CLIPS[0] === 'cc4afb16-d2cc-446f-b9fa-ba09688dc4df', 'approved: only the PERFECT Olivia clip');
+ok(JSON.stringify([...cache.APPROVED_HOOK_CLIPS]) === JSON.stringify(['cc4afb16-d2cc-446f-b9fa-ba09688dc4df', '3980486e-aac4-4c6c-b4cb-e651a5d56f86']), 'approved: the PERFECT Olivia clip and the Sienna keyboard clip');
 ok(/\.is\("note", null\)\.in\("id", \[\.\.\.APPROVED_HOOK_CLIPS\]\)/.test(jobs) && /if \(!APPROVED_HOOK_CLIPS\.length\) return null;/.test(jobs), 'the cache only serves approved clips');
 
 if (checks !== EXPECTED) { console.error(`character-photo-checks: ${checks} checks ran, expected ${EXPECTED}`); process.exit(1); }
