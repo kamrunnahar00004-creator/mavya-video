@@ -63,7 +63,7 @@ const REUSE_TASK = /^cache(?:\/([0-9]+(?:\.[0-9]+)?))?\|([0-9a-f-]{36})$/i;
 const REUSE_POOL = 5;
 /** The usual Generate screen runs this long from the click, then the clip appears. */
 const REUSE_SHOW_MS = 3500;
-type ReuseRow = { id: string; result: GenerationJob["result"]; start: unknown; end: unknown };
+type ReuseRow = { id: string; result: GenerationJob["result"] };
 
 /** Copies a matching earlier clip to this job's file and returns its task id; null = generate normally. */
 async function reuseHook(job: GenerationJob, who: string): Promise<string | null> {
@@ -76,11 +76,13 @@ async function reuseHook(job: GenerationJob, who: string): Promise<string | null
     if (!curated.data) return null;
     // Only clips made with the character's current photo (PHOTO_SINCE): an older one shows a face that is gone.
     const since = PHOTO_SINCE[hook.face.id] ?? "1970-01-01T00:00:00Z";
-    const { data, error } = await db().from("generations").select("id, result, start:input->hook->start, end:input->hook->end")
+    const { data, error } = await db().from("generations").select("id, result")
       .eq("state", "done").eq("input->>sourceRefId", sourceRefId).eq("input->hook->face->>kind", "character").eq("input->hook->face->>id", hook.face.id)
       .gte("created_at", since).is("note", null).order("created_at", { ascending: false }).limit(20);
     if (error) throw error;
-    const same = ((data ?? []) as unknown as ReuseRow[]).filter((row) => (row.start ?? null) === (hook.start ?? null) && (row.end ?? null) === (hook.end ?? null)).slice(0, REUSE_POOL);
+    // The trim does not matter (founder 2026-11-08): a library hook always sends the library's whole hook clip to the
+    // video model (hookgen hookVideo), so every clip of this hook and character fits, and the seller trims it after.
+    const same = ((data ?? []) as unknown as ReuseRow[]).slice(0, REUSE_POOL);
     // Newest few, in random order: when a combination has several clips, sellers do not all get the same one.
     for (const row of same.map((x) => ({ x, order: Math.random() })).sort((a, b) => a.order - b.order).map((y) => y.x)) {
       const file = row.result?.src.match(/^\/api\/media\/([0-9a-f-]{36}\.mp4)$/)?.[1];

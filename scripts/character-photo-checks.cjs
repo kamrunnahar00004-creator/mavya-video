@@ -9,7 +9,7 @@ const { load } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 8;
+const EXPECTED = 10;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const ff = require(path.join(process.cwd(), 'node_modules/ffmpeg-static'));
 const size = (file) => { try { execFileSync(ff, ['-hide_banner', '-i', file], { stdio: 'pipe' }); } catch (e) { const m = String(e.stderr).match(/, (\d{3,4})x(\d{3,4})/); return m ? `${m[1]}x${m[2]}` : null; } return null; };
@@ -27,6 +27,11 @@ ok(Number.isFinite(since) && since >= Date.parse('2026-11-08T06:00:00Z'), 'Summe
 const jobs = fs.readFileSync('src/lib/server/generation-jobs.ts', 'utf8');
 ok(/const since = PHOTO_SINCE\[hook\.face\.id\] \?\? "1970-01-01T00:00:00Z";/.test(jobs), 'the hook cache looks up the character\'s photo time');
 ok(/\.eq\("input->hook->face->>id", hook\.face\.id\)\s*\n\s*\.gte\("created_at", since\)/.test(jobs), 'and reuses only clips made after it');
+
+// The hook cache ignores the trim (founder 2026-11-08): a library hook always sends its whole hook clip to the model.
+ok(/const same = \(\(data \?\? \[\]\) as unknown as ReuseRow\[\]\)\.slice\(0, REUSE_POOL\);/.test(jobs) && !/row\.start|row\.end|input->hook->start|input->hook->end/.test(jobs), 'the hook cache does not match on the trim');
+const hookgen = fs.readFileSync('src/lib/server/hookgen.ts', 'utf8');
+ok(/const clip = await libraryFile\("hooks", code, dir\);\s*\n\s*if \(clip\) return clip;/.test(hookgen), 'because a library hook always uses its whole library clip, whatever the trim');
 
 if (checks !== EXPECTED) { console.error(`character-photo-checks: ${checks} checks ran, expected ${EXPECTED}`); process.exit(1); }
 console.log(`character-photo-checks: ${checks} checks pass`);
