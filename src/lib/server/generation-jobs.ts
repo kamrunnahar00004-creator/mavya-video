@@ -2,7 +2,7 @@ import "server-only";
 import { accountClosing } from "@/lib/server/account-state";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { adminUser } from "@/lib/server/usage";
-import { cloud, getRun, mediaAccess, registerMedia } from "@/lib/server/store";
+import { cloud, getRun, getRunStored, mediaAccess, registerMedia } from "@/lib/server/store";
 import { copyObject, objectInfo, putObject } from "@/lib/server/r2";
 import { HookStartUncertain, checkHook, startHook } from "@/lib/server/hookgen";
 import { WrongPerson } from "@/lib/server/first-frame";
@@ -180,7 +180,8 @@ export async function advanceGeneration(who: string, id: string): Promise<void> 
     // usually done before the clip) replaces them; text the seller typed stays.
     const stolen = [job.reference?.recipe?.onScreenText?.[0]?.text, job.reference?.title].filter((x): x is string => Boolean(x));
     for (let i = 0; i < 5; i++) {
-      const run = await getRun(job.run_id, who);
+      // Also a video deleted (hidden) while its hook was generating: the paid hook lands on it, so My files keeps it.
+      const run = await getRunStored(job.run_id, who);
       const script = run?.script?.refId === (job.reference?.id ?? null) ? run?.script : job.input.script?.refId === (job.reference?.id ?? null) ? job.input.script : null;
       const suggested = job.input.hook.source === "describe" ? "" : script?.hookText || stolen[0] || "";
       const patch = run ? generationPatch(run, job.input, generated, suggested, stolen) : {};

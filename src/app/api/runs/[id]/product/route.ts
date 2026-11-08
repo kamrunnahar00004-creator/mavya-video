@@ -75,6 +75,8 @@ export async function DELETE(_request: Request, ctx: RouteContext<"/api/runs/[id
   const { id } = await ctx.params;
   const who = await currentUser();
   if (!who) return signInFirst();
+  // A deleted video (hidden, kept for My files) takes no changes.
+  if (!(await getRun(id, who))) return Response.json({ error: "Not found" }, { status: 404 });
   const updated = await updateRun(id, { product: null, script: null }, who);
   return updated ? Response.json(updated) : Response.json({ error: "Not found" }, { status: 404 });
 }

@@ -167,17 +167,30 @@ export async function deleteReference(id: string, who: string): Promise<void> {
 
 type RunRow = { id: string; user_id: string; data: Run; created_at: string; updated_at: string };
 
-export async function listRuns(who: string): Promise<Run[]> {
-  if (!cloud()) return [...(await readDb()).runs].sort(newest);
-  const { data, error } = await db().from("runs").select("data").eq("user_id", who).order("created_at", { ascending: false }).limit(1000);
+/** The user's videos, never one they deleted (Delete video hides it; My files still reads it). */
+export async function listRuns(who: string, withDeleted = false): Promise<Run[]> {
+  if (!cloud()) return [...(await readDb()).runs].filter((r) => withDeleted || !r.deletedAt).sort(newest);
+  let query = db().from("runs").select("data").eq("user_id", who);
+  if (!withDeleted) query = query.is("data->>deletedAt", null);
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(1000);
   if (error) throw error;
   return (data as Pick<RunRow, "data">[]).map((r) => r.data);
 }
 
 export async function getRun(id: string, who: string): Promise<Run | null> {
-  if (!cloud()) return (await readDb()).runs.find((r) => r.id === id) ?? null;
+  if (!cloud()) { const r = (await readDb()).runs.find((x) => x.id === id); return r && !r.deletedAt ? r : null; }
   if (!/^[0-9a-f-]{36}$/.test(id)) return null;
   const { data, error } = await readPhase("sql", async () => await db().from("runs").select("data").eq("id", id).eq("user_id", who).maybeSingle<Pick<RunRow, "data">>());
+  if (error) throw error;
+  // A deleted video is gone for every page and action; only My files reads it (fileSources).
+  return data?.data && !data.data.deletedAt ? data.data : null;
+}
+
+/** A video even if it was deleted (hidden): only for finishing work already started on it (a generation). */
+export async function getRunStored(id: string, who: string): Promise<Run | null> {
+  if (!cloud()) return (await readDb()).runs.find((x) => x.id === id) ?? null;
+  if (!/^[0-9a-f-]{36}$/.test(id)) return null;
+  const { data, error } = await db().from("runs").select("data").eq("id", id).eq("user_id", who).maybeSingle<Pick<RunRow, "data">>();
   if (error) throw error;
   return data?.data ?? null;
 }
@@ -190,11 +203,11 @@ async function lastProduct(who: string): Promise<Pick<Run, "product" | "productN
   type Carried = { product: Run["product"]; notes?: string | null; screens?: string[] | null };
   let found: Carried | null = null;
   if (!cloud()) {
-    const r = (await readDb()).runs.filter((x) => x.product?.brief).sort((a, b) => (b.product!.at > a.product!.at ? 1 : -1))[0];
+    const r = (await readDb()).runs.filter((x) => x.product?.brief && !x.deletedAt).sort((a, b) => (b.product!.at > a.product!.at ? 1 : -1))[0];
     found = r ? { product: r.product, notes: r.productNotes, screens: r.productScreens } : null;
   } else {
     const { data, error } = await db().from("runs").select("product:data->product, notes:data->productNotes, screens:data->productScreens")
-      .eq("user_id", who).not("data->product->>at", "is", null).order("data->product->>at", { ascending: false }).limit(1).maybeSingle<Carried>();
+      .eq("user_id", who).is("data->>deletedAt", null).not("data->product->>at", "is", null).order("data->product->>at", { ascending: false }).limit(1).maybeSingle<Carried>();
     if (error) console.error("last product", error);
     found = data ?? null;
   }
@@ -279,14 +292,21 @@ export async function updateRunChecked(id: string, patch: Partial<Omit<Run, "id"
   return data as Run | null;
 }
 
+/**
+ * Delete video: the video leaves the lists and every page, but stays stored so My files keeps the hooks, characters,
+ * sounds, uploads and generated hooks it used (founder 2026-11-09: videos deleted because their clips were wrong took
+ * those files with them). Under the row lock, like every save. Deleting the account still removes it.
+ */
 export async function deleteRun(id: string, who: string): Promise<void> {
+  const at = new Date().toISOString();
   if (!cloud()) {
     await writeDb((d) => {
-      d.runs = d.runs.filter((r) => r.id !== id);
+      const r = d.runs.find((x) => x.id === id);
+      if (r) r.deletedAt = at;
     });
     return;
   }
-  const { error } = await db().from("runs").delete().eq("id", id).eq("user_id", who);
+  const { error } = await db().rpc("mavya_patch_run", { p_user: who, p_run: id, p_patch: { deletedAt: at } });
   if (error) throw error;
 }
 

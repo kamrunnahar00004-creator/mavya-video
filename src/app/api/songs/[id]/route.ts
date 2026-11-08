@@ -32,8 +32,10 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/songs/[id]
     const audio = await boundedFetch(track.preview, {}, 10 * 1024 * 1024, 15_000);
     if (!audio.ok) throw new Error("download failed");
     const name = `${track.title ?? "Song"} · ${track.artist?.name ?? ""}`.slice(0, 120);
-    const file = new File([await audio.arrayBuffer()], `${name}.mp3`, { type: "audio/mpeg" });
-    const { mediaId } = await saveMedia(file, false, who);
+    // Saved as an asset named without a file extension: My files lists it under Music as a song, with its name, even
+    // after the video that used it is deleted (founder 2026-11-09).
+    const file = new File([await audio.arrayBuffer()], name, { type: "audio/mpeg" });
+    const { mediaId } = await saveMedia(file, true, who);
     return Response.json({ mediaId, name });
   } catch {
     return Response.json({ error: "Could not get this song" }, { status: 502 });

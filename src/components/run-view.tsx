@@ -1215,7 +1215,7 @@ export function RunView() {
               onUseUpload={(assets) => {
                 // One or several uploads (My files' multi-select): added at the end, in the order they were listed.
                 setLibraryOpen(false);
-                void Promise.all(assets.map((asset) => clipFromAsset({ ...asset, kind: "video" }))).then((cs) => {
+                void Promise.all(assets.map((asset) => clipFromAsset({ ...asset, kind: asset.kind === "image" ? "image" : "video" }))).then((cs) => {
                   const count = demoClips(runRef.current ?? run).length;
                   insertClips(cs.map((c, i) => {
                     const seconds = clipSeconds(c.length);

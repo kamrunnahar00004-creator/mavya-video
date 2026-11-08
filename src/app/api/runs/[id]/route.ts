@@ -7,6 +7,7 @@ import { renderLimitError } from "@/lib/render-limits";
 import { containTexts, timeline, videoLength } from "@/lib/edit";
 import { runTexts } from "@/lib/client";
 import { STALE_MESSAGE, byGeneration, staleEdit, touchesEdit } from "@/lib/edit-version";
+import { pickedWith } from "@/lib/my-files";
 
 export async function GET(request: Request, ctx: RouteContext<"/api/runs/[id]">) {
   return readResponse(() => readGET(request, ctx));
@@ -56,6 +57,9 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/runs/[id]"
     if (bounds) return Response.json({ error: bounds }, { status: 400 });
   }
   if (!body) return Response.json({ error: "Bad request" }, { status: 400 });
+  // Every save needs a live video: a deleted one (hidden, kept for My files) takes no edits, not even a new title.
+  current ??= await getRun(id, who);
+  if (!current) return Response.json({ error: "Not found" }, { status: 404 });
   // A save made from an older copy of the video (another tab or window) never overwrites newer edits (edit-version.ts).
   const editing = touchesEdit(body);
   if (editing) {
@@ -121,6 +125,13 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/runs/[id]"
         ...(typeof s.length === "number" ? { length: num(s.length, 0, 3600, 0) } : {}),
       };
     }
+  }
+  // My files lists every hook, character and sound ever picked, also after it is replaced (founder 2026-11-09).
+  // The video's current picks go in first (Codex 2026-11-09: a video from before this history lost them on replace).
+  if (current && (patch.sourceRefId !== undefined || patch.hook || patch.sounds || patch.sound !== undefined)) {
+    const seeded = pickedWith(current.picked, current, current.updatedAt);
+    const picked = pickedWith(seeded ?? current.picked, patch, new Date().toISOString()) ?? seeded;
+    if (picked) patch.picked = picked;
   }
   // The check above answers fast; this one is the guarantee: compared again under the row lock as the save is written,
   // so two copies saving at the same moment cannot both pass (Codex 2026-11-08).

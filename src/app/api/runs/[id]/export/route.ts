@@ -143,7 +143,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   // Browser export: which picture setting the user's browser used and the rate it reached (browser-export.ts), to check
   // production files (Codex 2026-11-05).
   const encoder=mode==="local"&&typeof body?.encoder==="string"&&/^[\w .-]{1,80}$/.test(body.encoder)?body.encoder:null;
-  const meta={who,runId:id,mediaId,seconds:Math.round(total*10)/10,...(encoder?{encoder}:{}),...(demoMedia?{demoMediaId:demoMedia,demoSeconds:Math.round((total-at!)*10)/10}:{})};
+  // The demo's texts, as placed in it (My files lists each demo once: same clips and same texts = same demo).
+  const demoTexts=demoMedia?JSON.stringify(expected.filter(t=>t.end>at!+0.05).map(t=>({...t,id:undefined,owner:undefined,start:Math.round((t.start-at!)*100)/100,end:Math.round((t.end-at!)*100)/100}))).slice(0,20000):null;
+  const meta={who,runId:id,mediaId,seconds:Math.round(total*10)/10,...(encoder?{encoder}:{}),...(demoMedia?{demoMediaId:demoMedia,demoSeconds:Math.round((total-at!)*10)/10,demoTexts}:{})};
   const demoSize=typeof body?.demoSize==="number"&&Number.isInteger(body.demoSize)&&body.demoSize>0&&body.demoSize<=300*1024*1024?body.demoSize:null;
   const payload={id:job,spec,output:{url:await mediaUploadLink(mediaId,"video/mp4",LINK_SECONDS),contentType:"video/mp4"},meta,
     ...(demoMedia&&mode!=="local"?{demo:{url:await mediaUploadLink(demoMedia,"video/mp4",LINK_SECONDS),contentType:"video/mp4"}}:{}),

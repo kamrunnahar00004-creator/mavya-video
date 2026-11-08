@@ -51,6 +51,8 @@ export async function listPage(kind: Kind, who: string, request: Request) {
     for (let batch = 0; batch < (size === ALL_REFERENCES ? 8 : 1) && rows.length < size; batch++) {
       let query = createSupabaseAdminClient().from(table).select(kind === "assets" ? "media_id,name,kind,created_at" : kind === "references" ? (compact ? compactSelect : refSummary ? "id,owner,created_at,refStyle:data->ai->style," + refKeys.map(k => k + ":data->" + k).join(",") : "id,owner,data,created_at") : runSelect ?? (summary ? "id,created_at,title:data->>title,updatedAt:data->>updatedAt,sourceRefId:data->>sourceRefId,hook:data->hook,demo:data->demo,product:data->product,sounds:data->sounds,sound:data->sound" : "id,data,created_at"));
       query = kind === "references" ? curatedOnly ? query.eq("owner", "curated") : query.or(`owner.eq.curated,user_id.eq.${who}`) : query.eq("user_id", who);
+      // A deleted video is hidden from every list (Delete video keeps it stored for My files).
+      if (kind === "runs") query = query.is("data->>deletedAt", null);
       if (batchAfter) query = query.or(`created_at.lt.${batchAfter.at},and(created_at.eq.${batchAfter.at},${idKey}.lt.${batchAfter.id})`);
       const { data, error } = await readPhase("sql", async () => await query.order("created_at", { ascending: false }).order(idKey, { ascending: false }).limit(Math.min(size - rows.length, DATABASE_BATCH)));
       if (error) throw error;

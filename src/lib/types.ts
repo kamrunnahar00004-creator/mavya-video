@@ -226,6 +226,10 @@ export type Run = {
   updatedAt: string;
   /** Changes on every editor save; a save from an older copy is refused (edit-version.ts). */
   editVersion?: string;
+  /** Set by Delete video: the video leaves the lists, but My files keeps what it used and made (founder 2026-11-09). */
+  deletedAt?: string;
+  /** Every hook, character and sound ever picked in this video, also ones replaced since (My files). Server-kept. */
+  picked?: { refs?: { id: string; at: string }[]; faces?: { face: Face; at: string }[]; sounds?: { kind: SoundPiece["kind"]; src: string; name: string; refId?: string; at: string }[] };
   /** The id of the editor save that made editVersion (edit-version.ts). */
   editSave?: string | null;
   /** Set by a finished generation: the version it followed (edit-version.ts byGeneration). */

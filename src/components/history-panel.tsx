@@ -2,7 +2,7 @@
 import { MediaVideo } from "@/components/media-video";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { fetchPage } from "@/lib/list-client";
+import { buildFiles, faceKey, type Entry, type FileSources } from "@/lib/my-files";
 import { claimPlayback, usePlaybackClaims } from "@/components/run-preview";
 import { Check, CirclePlus, Download, Film, FolderOpen, Loader2, MoreVertical, Music, Pause, Play, Trash2, X } from "lucide-react";
 import { characterById } from "@/lib/characters";
@@ -42,10 +42,6 @@ const FILTERS: Record<Tab, { id: string; label: string }[]> = {
   exports: [],
 };
 
-/** One thing in the history: when, from which video, which filter it belongs to, and the thing itself. */
-type Entry<T> = { key: string; at: string; runId?: string; runTitle?: string; hookText?: string; kind: string; value: T };
-
-const title = (r: Run) => (r.title === "Untitled run" ? "Untitled video" : r.title);
 
 /**
  * "My files": the history of everything ever used or made, across all videos, newest first: hooks (library or
@@ -70,12 +66,8 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
   onUseDemo: (demo: { src: string; seconds: number }, from: Run) => void;
   onUseSound: (p: SoundPiece) => void;
 }) {
-  const [cursors, setCursors] = useState<(string | null)[]>([]);
-  const [historyRefs, setHistoryRefs] = useState<Reference[]>([]);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
-  const [runs, setRuns] = useState<Run[] | null>(null);
-  const [assets, setAssets] = useState<Asset[]>([]);
+  const [sources, setSources] = useState<FileSources | null>(null);
   const [tab, setTab] = useState<Tab>(initialTab ?? "generated");
   // Nothing plays in the grid: a click opens it in a popup (a library hook opens its detail popup).
   const [playing, setPlaying] = useState<Playing | null>(null);
@@ -94,102 +86,23 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     return () => { alive = false; };
   }, []);
 
+  // Everything at once (founder 2026-11-09: only the first 24 uploads loaded, the rest behind a button above the header).
   useEffect(() => {
     let alive = true;
-    Promise.all([fetchPage<Run>("/api/runs?view=history"), fetchPage<Asset>("/api/assets"), fetchPage<Reference>("/api/references?view=cards")])
-      .then(([rs, as, hs]) => {
-        if (!alive) return;
-        setRuns(rs.items); setAssets(as.items); setHistoryRefs(hs.items);
-        setCursors([rs.next, as.next, hs.next]); setListError(null);
-      })
+    fetch("/api/files", { signal: AbortSignal.timeout(20_000) })
+      .then(async (r) => { if (!r.ok) throw Error(); return (await r.json()) as FileSources; })
+      .then((s) => { if (alive) { setSources(s); setListError(null); } })
       .catch(() => { if (alive) setListError("List is unavailable. Try again."); });
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [refreshKey]);
 
-  async function loadMore() {
-    setLoadingMore(true);
-    try {
-      const [rs, as, hs] = await Promise.all([
-        cursors[0] ? fetchPage<Run>("/api/runs?view=history", cursors[0]) : null,
-        cursors[1] ? fetchPage<Asset>("/api/assets", cursors[1]) : null,
-        cursors[2] ? fetchPage<Reference>("/api/references?view=cards", cursors[2]) : null
-      ]);
-      if (rs) setRuns(old => [...(old ?? []), ...rs.items]);
-      if (as) setAssets(old => [...old, ...as.items]);
-      if (hs) setHistoryRefs(old => [...old, ...hs.items]);
-      setCursors([rs?.next ?? null, as?.next ?? null, hs?.next ?? null]); setListError(null);
-    } catch { setListError("List is unavailable. Try again."); }
-    finally { setLoadingMore(false); }
-  }
-  const availableRefs = [...new Map([...historyRefs, ...refs].map(r => [r.id, r])).values()];
-  // The open video as it is now (its saved copy may be a moment behind).
-  const all = runs ? [run, ...runs.filter((r) => r.id !== run.id)] : [run];
-  const from = (r: Run) => ({ runId: r.id, runTitle: title(r) });
-
-  const hooks: Entry<Reference>[] = [];
-  const seenHook = new Set<string>();
-  for (const r of [...all].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
-    const ref = availableRefs.find((x) => x.id === r.sourceRefId);
-    if (!ref || seenHook.has(ref.id)) continue;
-    seenHook.add(ref.id);
-    hooks.push({ key: `hook:${ref.id}`, at: r.updatedAt, ...from(r), kind: ref.owner === "user" ? "upload" : "library", value: ref });
-  }
-  for (const ref of availableRefs) if (ref.owner === "user" && ref.mediaId && !seenHook.has(ref.id)) hooks.push({ key: `hook:${ref.id}`, at: ref.createdAt, kind: "upload", value: ref });
-
-  const faces: Entry<Face>[] = [];
-  const seenFace = new Set<string>();
-  const faceKey = (f: Face) => (f.kind === "photo" ? `photo:${f.mediaId}` : f.kind === "ai" ? `ai:${f.index}` : f.kind === "character" ? `character:${f.id}` : `described:${f.text}`);
-  for (const r of [...all].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
-    const f = r.hook.face;
-    if (!f || seenFace.has(faceKey(f))) continue;
-    seenFace.add(faceKey(f));
-    faces.push({ key: `face:${faceKey(f)}`, at: r.updatedAt, ...from(r), kind: f.kind === "photo" ? "photo" : "character", value: f });
-  }
-  for (const a of assets) {
-    if (a.kind !== "image" || seenFace.has(`photo:${a.mediaId}`)) continue;
-    seenFace.add(`photo:${a.mediaId}`);
-    faces.push({ key: `face:photo:${a.mediaId}`, at: a.createdAt, kind: "photo", value: { kind: "photo", mediaId: a.mediaId } });
-  }
-
-  // Reusing something in another video never lists it twice: each file once, under the video it was first made in.
-  const oldestFirst = [...all].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-
-  // Each generated hook once (picking one in another video does not make a copy).
-  const generated: Entry<{ g: Generated; run: Run }>[] = [];
-  const seenGen = new Set<string>();
-  for (const r of oldestFirst) {
-    for (const g of [...(r.hook.versions ?? []), ...(r.hook.generated ? [r.hook.generated] : [])]) {
-      if (seenGen.has(g.src)) continue;
-      seenGen.add(g.src);
-      generated.push({ key: `generated:${g.src}`, at: g.at, ...from(r), kind: "all", value: { g, run: r } });
-    }
-  }
-
-  // The demo part of every exported video (founder 2026-11-04): one finished clip, texts in, no sound, to reuse
-  // under other hooks.
-  const demos: Entry<{ demo: { src: string; seconds: number }; run: Run }>[] = [];
-  for (const r of all) for (const x of r.exports ?? []) if (x.demo) demos.push({ key: `demo:${x.demo.src}`, at: x.at, ...from(r), kind: "all", value: { demo: x.demo, run: r } });
+  const runs = sources?.runs ?? null;
+  // Hook cards: the live library's (with their covers) over the saved ones.
+  const files = buildFiles({ ...(sources ?? { runs: [], generations: [], exports: [], assets: [] }), refs: [...new Map([...(sources?.refs ?? []), ...refs].map((r) => [r.id, r])).values()] }, run);
+  const { hooks, faces, generated, demos, uploads, music, exports } = files;
   const demoNow = demoClips(run).length === 1 ? clipSrc(demoClips(run)[0]) : null;
   const soundsNow = new Set((run.sounds ?? (run.sound ? [run.sound] : [])).map((p) => p.src));
-
-  // Every video the seller uploaded, whether or not a video still uses it.
-  const uploads: Entry<Asset>[] = assets.filter((a) => a.kind === "video").map((a) => ({ key: `upload:${a.mediaId}`, at: a.createdAt, kind: "all", value: a }));
   const usedNow = new Set([...demoClips(run).map((c) => c.mediaId), run.hook.generated?.src.split("/").pop()]);
-
-  const music: Entry<SoundPiece>[] = [];
-  const seenSound = new Set<string>();
-  for (const r of oldestFirst) {
-    for (const p of r.sounds ?? (r.sound ? [{ id: "main", at: 0, row: 0, ...r.sound }] : [])) {
-      if (seenSound.has(p.src)) continue;
-      seenSound.add(p.src);
-      music.push({ key: `music:${p.src}`, at: r.updatedAt, ...from(r), kind: p.kind, value: p });
-    }
-  }
-
-  const exports: Entry<NonNullable<Run["exports"]>[number]>[] = [];
-  for (const r of all) for (const x of r.exports ?? []) exports.push({ key: `export:${x.src}`, at: x.at, ...from(r), hookText: r.hook?.text, kind: "all", value: x });
 
   // Removed from My files (Delete in the ⋮ menu) are left out everywhere here.
   const shown = <T,>(list: Entry<T>[]) => list.filter((x) => !prefs.hidden.includes(x.key));
@@ -318,9 +231,12 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           const use = () => onUseUpload([x.value]);
           const on = selected.includes(x.key);
           return (
-            <Card key={x.key} onOpen={() => setPlaying({ clips: [{ src, start: 0 }], sound: true, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, x.value.name)} meta={meta(x)}
+            <Card key={x.key} onOpen={x.value.kind === "image" ? undefined : () => setPlaying({ clips: [{ src, start: 0 }], sound: true, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, x.value.name)} meta={meta(x)}
               selected={selecting ? on : undefined} onSelect={() => { setConfirmDelete(false); setSelected((k) => (on ? k.filter((y) => y !== x.key) : [...k, x.key])); }}>
-              <Still src={src} />
+              {x.value.kind === "image" ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
+              ) : <Still src={src} />}
             </Card>
           );
         })}
@@ -358,7 +274,6 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
   return (
     <div className="card flex h-full w-[600px] max-w-[calc(100vw-24px)] flex-col overflow-hidden">
       {listError && <p role="alert" className="px-5 py-2 text-red-500">{listError}</p>}
-      {cursors.some(Boolean) && <button type="button" className="btn-secondary m-3 px-4 py-2" disabled={loadingMore} onClick={() => void loadMore()}>Load more</button>}
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <div className="flex items-center gap-2 text-[15px] font-bold">
           <FolderOpen className="h-[18px] w-[18px] text-muted" />

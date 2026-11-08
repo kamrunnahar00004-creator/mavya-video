@@ -20,6 +20,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/g
   const body = await request.json().catch(() => null) as { key?: unknown; note?: unknown } | null;
   if (typeof body?.key !== "string" || !uuid(body.key)) return Response.json({ error: "Invalid request." }, { status: 400 });
   try {
+    // A deleted video (Delete video only hides it) takes no new generation: no quota used, no paid work started.
+    if (!(await getRun(id, who))) return Response.json({ error: "Not found" }, { status: 404 });
     const reserved = await reserveGeneration(who, id, body.key, typeof body.note === "string" ? body.note.slice(0, 300) : undefined);
     if (reserved.error === "quota") return Response.json({ error: reserved.allowance?.limit === 0 ? "Choose a plan to make AI hooks." : "You've used this month's AI hooks. Upgrade for more.", needsPlan: true }, { status: 402 });
     if (reserved.error === "attempts") return Response.json({ error: "Too many failed tries today. Try again tomorrow or contact us." }, { status: 429 });
