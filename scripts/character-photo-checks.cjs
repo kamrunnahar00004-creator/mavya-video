@@ -9,7 +9,7 @@ const { load } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 10;
+const EXPECTED = 12;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const ff = require(path.join(process.cwd(), 'node_modules/ffmpeg-static'));
 const size = (file) => { try { execFileSync(ff, ['-hide_banner', '-i', file], { stdio: 'pipe' }); } catch (e) { const m = String(e.stderr).match(/, (\d{3,4})x(\d{3,4})/); return m ? `${m[1]}x${m[2]}` : null; } return null; };
@@ -32,6 +32,11 @@ ok(/\.eq\("input->hook->face->>id", hook\.face\.id\)\s*\n\s*\.gte\("created_at",
 ok(/const same = \(\(data \?\? \[\]\) as unknown as ReuseRow\[\]\)\.slice\(0, REUSE_POOL\);/.test(jobs) && !/row\.start|row\.end|input->hook->start|input->hook->end/.test(jobs), 'the hook cache does not match on the trim');
 const hookgen = fs.readFileSync('src/lib/server/hookgen.ts', 'utf8');
 ok(/const clip = await libraryFile\("hooks", code, dir\);\s*\n\s*if \(clip\) return clip;/.test(hookgen), 'because a library hook always uses its whole library clip, whatever the trim');
+
+// The hook cache serves only founder-approved clips (founder 2026-11-08).
+const cache = load('src/lib/hook-cache.ts');
+ok(cache.APPROVED_HOOK_CLIPS.length === 1 && cache.APPROVED_HOOK_CLIPS[0] === 'cc4afb16-d2cc-446f-b9fa-ba09688dc4df', 'approved: only the PERFECT Olivia clip');
+ok(/\.is\("note", null\)\.in\("id", \[\.\.\.APPROVED_HOOK_CLIPS\]\)/.test(jobs) && /if \(!APPROVED_HOOK_CLIPS\.length\) return null;/.test(jobs), 'the cache only serves approved clips');
 
 if (checks !== EXPECTED) { console.error(`character-photo-checks: ${checks} checks ran, expected ${EXPECTED}`); process.exit(1); }
 console.log(`character-photo-checks: ${checks} checks pass`);

@@ -7,6 +7,7 @@ import { copyObject, objectInfo, putObject } from "@/lib/server/r2";
 import { HookStartUncertain, checkHook, startHook } from "@/lib/server/hookgen";
 import { generationPatch } from "@/lib/generation-edit";
 import { PHOTO_SINCE } from "@/lib/characters";
+import { APPROVED_HOOK_CLIPS } from "@/lib/hook-cache";
 import type { Reference, Run } from "@/lib/types";
 
 export type GenerationJob = {
@@ -74,11 +75,13 @@ async function reuseHook(job: GenerationJob, who: string): Promise<string | null
     const curated = await db().from("library").select("id").eq("id", sourceRefId).eq("owner", "curated").maybeSingle();
     if (curated.error) throw curated.error;
     if (!curated.data) return null;
+    // Only clips the founder approved are served (src/lib/hook-cache.ts).
+    if (!APPROVED_HOOK_CLIPS.length) return null;
     // Only clips made with the character's current photo (PHOTO_SINCE): an older one shows a face that is gone.
     const since = PHOTO_SINCE[hook.face.id] ?? "1970-01-01T00:00:00Z";
     const { data, error } = await db().from("generations").select("id, result")
       .eq("state", "done").eq("input->>sourceRefId", sourceRefId).eq("input->hook->face->>kind", "character").eq("input->hook->face->>id", hook.face.id)
-      .gte("created_at", since).is("note", null).order("created_at", { ascending: false }).limit(20);
+      .gte("created_at", since).is("note", null).in("id", [...APPROVED_HOOK_CLIPS]).order("created_at", { ascending: false }).limit(20);
     if (error) throw error;
     // The trim does not matter (founder 2026-11-08): a library hook always sends the library's whole hook clip to the
     // video model (hookgen hookVideo), so every clip of this hook and character fits, and the seller trims it after.
