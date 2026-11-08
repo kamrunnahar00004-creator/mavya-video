@@ -13,6 +13,7 @@ import { putObject, signedGet } from "@/lib/server/r2";
 import { libraryFile, mediaToFile } from "@/lib/server/store";
 import type { Reference, Run } from "@/lib/types";
 import { makeFirstFrame, VERDICT_SCHEMA, type Verdict } from "@/lib/server/first-frame";
+import { parseTask, referenceArgs, restoreArgs, slowFactor, withSlow } from "@/lib/short-hook";
 
 /**
  * Hook generation (founder decision 2026-10-23, after testing Veo, Wan Animate, H3 Recast and Kling side by side:
@@ -136,13 +137,18 @@ async function hookVideo(run: Run, source: Reference | null, who: string, dir: s
   return out;
 }
 
-/** The motion reference: the clip without sound, held on its last frame up to MIN_REFERENCE seconds. */
-async function motionReference(clip: string, dir: string): Promise<Buffer> {
+/**
+ * The motion reference: the clip without sound. A clip under 3 s is slowed to 3.2 s of real motion (short-hook.ts:
+ * Kling refuses less, and a frozen frame does not count); `factor` undoes it on the result. One whose length cannot be
+ * read is held on its last frame up to MIN_REFERENCE seconds, as before.
+ */
+async function motionReference(clip: string, dir: string): Promise<{ bytes: Buffer; factor: number }> {
   const out = path.join(dir, "reference.mp4");
   const len = mp4Seconds(await readFile(clip)) ?? 0;
-  const hold = len < MIN_REFERENCE ? ["-vf", `tpad=stop_mode=clone:stop_duration=${MIN_REFERENCE}`, "-t", String(MIN_REFERENCE)] : ["-t", "30"];
-  await ff("-i", clip, "-an", ...hold, "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-pix_fmt", "yuv420p", out);
-  return readFile(out);
+  const factor = slowFactor(len);
+  const video = factor > 1 ? referenceArgs(factor) : len < MIN_REFERENCE ? ["-vf", `tpad=stop_mode=clone:stop_duration=${MIN_REFERENCE}`, "-t", String(MIN_REFERENCE)] : referenceArgs(1);
+  await ff("-i", clip, "-an", ...video, "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-pix_fmt", "yuv420p", out);
+  return { bytes: await readFile(out), factor };
 }
 
 const OUTFIT_SCHEMA = { type: "OBJECT", properties: { outfit: { type: "STRING" } }, required: ["outfit"] };
@@ -202,14 +208,15 @@ async function startHookInner(run: Run, source: Reference | null, who: string, n
         judge: (parts, ms) => geminiJSON<Verdict>(parts as Parameters<typeof geminiJSON>[0], { schema: VERDICT_SCHEMA, temperature: 0, signal: workSignal(ms) }),
         elapsed: () => Date.now() - began,
       }, await readFile(first), character, outfit);
-      const [imageUrl, videoUrl] = await Promise.all([share(frame, "jpg", who), share(reference, "mp4", who)]);
-      return falSubmit(simple ? MOTION_FALLBACK : MOTION, {
+      const [imageUrl, videoUrl] = await Promise.all([share(frame, "jpg", who), share(reference.bytes, "mp4", who)]);
+      // A slowed short clip: the task id carries the factor so the result is sped back to the original length.
+      return withSlow(await falSubmit(simple ? MOTION_FALLBACK : MOTION, {
         image_url: imageUrl,
         video_url: videoUrl,
         character_orientation: "video",
         keep_original_sound: false,
         prompt: `${MATCH} ${CAMERA} ${LOOK}${fix}`,
-      });
+      }), reference.factor);
     }
 
     // A described hook: no original motion to follow.
@@ -259,7 +266,7 @@ export function mp4Seconds(buf: Buffer): number | null {
 
 /** Where a generation is; when it is done, the video itself (fal's link expires). */
 export async function checkHook(taskId: string): Promise<HookTask> {
-  const [model, id] = taskId.split("|");
+  const { model, id, factor } = parseTask(taskId);
   if (!model || !id || !/^[\w./-]+$/.test(model) || !/^[\w-]+$/.test(id)) return { state: "failed", error: "Unknown generation." };
   // fal's queue paths use the app (owner/name), not the full model path.
   const app = model.split("/").slice(0, 2).join("/");
@@ -282,10 +289,25 @@ export async function checkHook(taskId: string): Promise<HookTask> {
   }
   const res = await fetch(body!.video!.url!, { signal: AbortSignal.timeout(60_000) });
   if (!res.ok) throw new Error("Couldn't download the result");
-  const video = Buffer.from(await res.arrayBuffer());
+  const generated = Buffer.from(await res.arrayBuffer());
+  // A short hook was slowed for the model: back to the original speed and length (short-hook.ts).
+  const video = factor > 1 ? await restoreSpeed(generated, factor) : generated;
   const seconds = mp4Seconds(video) ?? await probeSeconds(video);
   if (seconds === null) throw new Error("Generated video duration is unavailable");
   return { state: "done", video, seconds };
+}
+
+/** The generated clip sped up by `factor` (undoing a short hook's slowdown), without sound like every hook clip. */
+async function restoreSpeed(video: Buffer, factor: number): Promise<Buffer> {
+  const dir = await mkdtemp(path.join(tmpdir(), "mavya-speed-"));
+  try {
+    const file = path.join(dir, "in.mp4"), out = path.join(dir, "out.mp4");
+    await writeFile(file, video);
+    await exec(await ffmpegPath(), ["-nostdin", "-v", "error", "-y", "-i", file, "-an", ...restoreArgs(factor), "-c:v", "libx264", "-crf", "16", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-movflags", "+faststart", out], { timeout: 60_000 });
+    return await readFile(out);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 /** Length read by ffmpeg when the MP4 header could not be read directly (Codex V10: never guess a motion hook's length). */
