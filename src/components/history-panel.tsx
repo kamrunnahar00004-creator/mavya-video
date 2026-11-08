@@ -7,6 +7,7 @@ import { claimPlayback, usePlaybackClaims } from "@/components/run-preview";
 import { Check, CirclePlus, Download, Film, FolderOpen, Loader2, MoreVertical, Music, Pause, Play, Trash2, X } from "lucide-react";
 import { characterById } from "@/lib/characters";
 import { clipSrc, demoClips } from "@/lib/edit";
+import { downloadHref, exportFileName } from "@/lib/export-name";
 import { AVATAR_TONES } from "@/lib/client";
 import { fmtDate, fmtTime, type Asset, type Reference, type Run, type SoundPiece } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
@@ -42,7 +43,7 @@ const FILTERS: Record<Tab, { id: string; label: string }[]> = {
 };
 
 /** One thing in the history: when, from which video, which filter it belongs to, and the thing itself. */
-type Entry<T> = { key: string; at: string; runId?: string; runTitle?: string; kind: string; value: T };
+type Entry<T> = { key: string; at: string; runId?: string; runTitle?: string; hookText?: string; kind: string; value: T };
 
 const title = (r: Run) => (r.title === "Untitled run" ? "Untitled video" : r.title);
 
@@ -188,7 +189,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
   }
 
   const exports: Entry<NonNullable<Run["exports"]>[number]>[] = [];
-  for (const r of all) for (const x of r.exports ?? []) exports.push({ key: `export:${x.src}`, at: x.at, ...from(r), kind: "all", value: x });
+  for (const r of all) for (const x of r.exports ?? []) exports.push({ key: `export:${x.src}`, at: x.at, ...from(r), hookText: r.hook?.text, kind: "all", value: x });
 
   // Removed from My files (Delete in the ⋮ menu) are left out everywhere here.
   const shown = <T,>(list: Entry<T>[]) => list.filter((x) => !prefs.hidden.includes(x.key));
@@ -342,7 +343,8 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           <Card
             key={x.key}
             onOpen={() => setPlaying({ clips: [{ src: x.value.src, start: 0 }], sound: true })}
-            download={x.value.src}
+            download={downloadHref(x.value.src, exportFileName(x.hookText, x.value.at))}
+            downloadName={exportFileName(x.hookText, x.value.at)}
             {...actions(x.key, `${x.runTitle} · ${fmtTime(x.value.seconds)}`)}
             meta={meta(x)}
           >
@@ -441,10 +443,10 @@ function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-3 gap-3">{children}</div>;
 }
 
-type ItemActions = { name: string; onRename: (name: string) => void; onDelete: () => void; onUse?: () => void; inUse?: boolean; download?: string };
+type ItemActions = { name: string; onRename: (name: string) => void; onDelete: () => void; onUse?: () => void; inUse?: boolean; download?: string; /** The saved file's name, without ".mp4". */ downloadName?: string };
 
 /** The ⋮ menu on an item: Use (unless it is in use), Download (exports), Delete (removes it from My files). Renaming is a click on the name. */
-function ItemMenu({ onUse, inUse, download, onDelete, dark = true }: Omit<ItemActions, "name" | "onRename"> & { dark?: boolean }) {
+function ItemMenu({ onUse, inUse, download, downloadName, onDelete, dark = true }: Omit<ItemActions, "name" | "onRename"> & { dark?: boolean }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -463,7 +465,7 @@ function ItemMenu({ onUse, inUse, download, onDelete, dark = true }: Omit<ItemAc
       {open && (
         <div role="menu" className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-lg border border-line bg-panel py-1 shadow-[0_8px_24px_rgba(0,0,0,0.14)]">
           {onUse && !inUse && <button type="button" role="menuitem" onClick={run(onUse)} className={item}><CirclePlus className="h-3.5 w-3.5" />Use</button>}
-          {download && <a role="menuitem" href={download} download onClick={() => setOpen(false)} className={item}><Download className="h-3.5 w-3.5" />Download</a>}
+          {download && <a role="menuitem" href={download} download={downloadName ? `${downloadName}.mp4` : true} onClick={() => setOpen(false)} className={item}><Download className="h-3.5 w-3.5" />Download</a>}
           <button type="button" role="menuitem" onClick={run(onDelete)} className={`${item} text-red-600`}><Trash2 className="h-3.5 w-3.5" />Delete</button>
         </div>
       )}
@@ -502,7 +504,7 @@ function NameLine({ name, editing, onEdit, onDone }: { name: string; editing: bo
 
 /** A history item: the picture (9:16, or square for faces; `onOpen` plays it in a popup), a green check when this video uses it, ⋮ for Use / Rename / Delete. */
 /** `selected` set (true/false) = Select mode: a click ticks the card instead of playing it, and the ⋮ menu hides. */
-function Card({ children, meta, name, onRename, onDelete, onUse, inUse = false, download, onOpen, square = false, selected, onSelect }: ItemActions & { children: React.ReactNode; meta: React.ReactNode; onOpen?: () => void; square?: boolean; selected?: boolean; onSelect?: () => void }) {
+function Card({ children, meta, name, onRename, onDelete, onUse, inUse = false, download, downloadName, onOpen, square = false, selected, onSelect }: ItemActions & { children: React.ReactNode; meta: React.ReactNode; onOpen?: () => void; square?: boolean; selected?: boolean; onSelect?: () => void }) {
   const [renaming, setRenaming] = useState(false);
   const selecting = selected !== undefined && !!onSelect;
   const open = selecting ? onSelect : onOpen;
@@ -535,7 +537,7 @@ function Card({ children, meta, name, onRename, onDelete, onUse, inUse = false, 
         )}
         {!selecting && (
           <div className="absolute right-1 top-1">
-            <ItemMenu onUse={onUse} inUse={inUse} download={download} onDelete={onDelete} />
+            <ItemMenu onUse={onUse} inUse={inUse} download={download} downloadName={downloadName} onDelete={onDelete} />
           </div>
         )}
       </div>

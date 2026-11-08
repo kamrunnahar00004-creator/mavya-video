@@ -6,6 +6,7 @@ import { Download, Loader2, X } from "lucide-react";
 import { uploadFile, waitRunSaves } from "@/lib/client";
 import { pollDelay, waitForPoll } from "@/lib/polling";
 import { exportLayers } from "@/lib/export-layers";
+import { downloadHref, exportFileName } from "@/lib/export-name";
 import { renderLimitError } from "@/lib/render-limits";
 import { timeline, videoLength } from "@/lib/edit";
 import { soundPieces } from "@/lib/sound";
@@ -182,7 +183,8 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
   }
 
   const busy = progress !== null;
-  const name = (run.title && run.title !== "Untitled run" ? run.title : "mavya-video").replace(/[^\w -]/g, "").trim().slice(0, 60) || "mavya-video";
+  // The hook's first words and the export's time (export-name.ts), so two downloads never share a name.
+  const name = done ? exportFileName(run.hook.text, done.at) : "";
   return (
     <>
       <button
@@ -205,7 +207,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
               </button>
             </div>
             <MediaVideo src={done.src} controls autoPlay playsInline className="mt-4 aspect-[9/16] max-h-[60vh] w-full rounded-xl bg-black object-contain" />
-            <a href={done.src.startsWith("blob:")?done.src:`${done.src}?download=${encodeURIComponent(name)}`} download={`${name}.mp4`} className="btn-primary mt-4 w-full py-2.5 text-[14px]">
+            <a href={downloadHref(done.src, name)} download={`${name}.mp4`} className="btn-primary mt-4 w-full py-2.5 text-[14px]">
               <Download className="h-4 w-4" />
               Download
             </a>
