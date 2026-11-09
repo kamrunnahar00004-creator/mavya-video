@@ -7,12 +7,25 @@ import { uploadFile, waitRunSaves } from "@/lib/client";
 import { pollDelay, waitForPoll } from "@/lib/polling";
 import { exportLayers } from "@/lib/export-layers";
 import { downloadHref, exportFileName } from "@/lib/export-name";
+import { exportClockLabel } from "@/lib/export-clock";
 import { renderLimitError } from "@/lib/render-limits";
 import { timeline, videoLength } from "@/lib/edit";
 import { soundPieces } from "@/lib/sound";
 import type { Run } from "@/lib/types";
 
 type Done = { src: string; seconds: number; at: string };
+
+const clockNow = () => Date.now();
+
+/** The button's timer while exporting (export-clock.ts); ticks only while it is shown. */
+function ExportClock({ startedAt, progress }: { startedAt: number; progress: number }) {
+  const [now, setNow] = useState(startedAt);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, []);
+  return <>{exportClockLabel((now - startedAt) / 1000, progress)}</>;
+}
 
 /** The export route refused, with a message meant for the user. */
 class ServerSaid extends Error {}
@@ -25,6 +38,9 @@ class ServerSaid extends Error {}
 export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { run: Run; beforeExport: () => Promise<void>; ready: boolean; onToast: (msg: string) => void; onDone: (x: Done) => void }) {
   const [progress, setProgress] = useState<number | null>(null);
   const [done, setDone] = useState<Done | null>(null);
+  // The timer on the button (export-clock.ts): from the click, or from when a running export was found again.
+  const [startedAt, setStartedAt] = useState(0);
+  const busy = progress !== null;
   const alive = useRef(true);
   // Leaving the page stops a browser export (downloads, rendering, upload) and frees its video.
   const lifetime = useRef<AbortController | null>(null);
@@ -48,7 +64,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
   useEffect(()=>{
     let stop=false;
     void fetch(`/api/runs/${run.id}/export`,{cache:"no-store",signal:AbortSignal.timeout(30_000)}).then(r=>r.ok?r.json():null).then(reply=>{
-      if(!stop&&!blocked.current&&reply?.job){blocked.current=true;setProgress(0);setJobId(reply.job);}
+      if(!stop&&!blocked.current&&reply?.job){blocked.current=true;setStartedAt(clockNow());setProgress(0);setJobId(reply.job);}
     }).catch(()=>undefined);
     return ()=>{stop=true;};
   },[run.id]);
@@ -78,7 +94,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
 
   async function start() {
     if(blocked.current)return;
-    blocked.current=true;setProgress(0);
+    blocked.current=true;setStartedAt(clockNow());setProgress(0);
     if(local.current){URL.revokeObjectURL(local.current);local.current=null;}
     try{
       await beforeExport();
@@ -182,7 +198,6 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
     return "started";
   }
 
-  const busy = progress !== null;
   // The hook's first words and the export's time (export-name.ts), so two downloads never share a name.
   const name = done ? exportFileName(run.hook.text, done.at) : "";
   return (
@@ -192,10 +207,10 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
         disabled={!ready || busy}
         title={ready ? undefined : "Generate the hook and add a demo first"}
         onClick={() => void start()}
-        className="btn-primary ml-1 min-w-[112px] px-4 py-2 text-[14px] tabular-nums"
+        className="btn-primary ml-1 min-w-[150px] px-4 py-2 text-[14px] tabular-nums"
       >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-        {busy ? (progress > 0.03 ? `${Math.round(progress * 100)}%` : "Exporting") : "Export"}
+        {busy ? <ExportClock startedAt={startedAt} progress={progress} /> : "Export"}
       </button>
       {done && (
         <div role="dialog" aria-modal="true" aria-labelledby="export-title" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && setDone(null)}>
