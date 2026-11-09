@@ -1,5 +1,6 @@
 "use client";
 import { MediaVideo } from "@/components/media-video";
+import { ThumbImg } from "@/components/thumb-img";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Eye, Heart, Link as LinkIcon, Loader2, Upload, X } from "lucide-react";
 import { analyzeVideo } from "@/lib/analyze";
@@ -453,7 +454,8 @@ export function Thumb({ r, className }: { r: Reference; className?: string }) {
       // eslint-disable-next-line @next/next/no-img-element
       <img src={thumb} alt="" loading="lazy" decoding="async" onError={() => setFailed(old => old.includes(thumb) ? old : [...old.slice(-3), thumb])} className={`object-cover ${className ?? ""}`} />
     );
-  if (r.mediaId) return <MediaVideo src={`/api/media/${r.mediaId}#t=0.5`} muted preload="metadata" className={`object-cover ${className ?? ""}`} />;
+  // An uploaded hook: its still picture, never a video in a list (thumbOf).
+  if (r.mediaId) return <ThumbImg src={`/api/media/${r.mediaId}`} className={`object-cover ${className ?? ""}`} />;
   return (
     <span className={`flex items-center justify-center bg-raised text-soft ${className ?? ""}`}>
       <LinkIcon className="h-4 w-4" />

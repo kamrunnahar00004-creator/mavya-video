@@ -2,6 +2,7 @@
 import { flushSync } from "react-dom";
 import { RouteSkeleton } from "@/components/route-skeleton";
 import { MediaVideo } from "@/components/media-video";
+import { ThumbImg } from "@/components/thumb-img";
 
 import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "@/components/pending-link";
@@ -19,6 +20,7 @@ import { deleteSelection, insertClipsChange, partsChange } from "@/lib/edit-ops"
 
 import { type Seg, clipGroup, clipSrc, containTexts, demoClips, moveClipPiece, removeDemoClip, videoLength, remapTexts, retimeTexts, runSteps, shotList, snapTexts, timeline } from "@/lib/edit";
 
+import { loadFiles } from "@/lib/files-client";
 import { AVATAR_TONES, STALE_RUN_EVENT, abandonCopy, adoptGeneratedVersion, generationFollows, refusedByGeneration, setEditVersion, takeRefusedSections, unsavedSections, TEXT_Y, clipFromAsset, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
 import { STALE_MESSAGE } from "@/lib/edit-version";
 import { pageLoad, startCreate } from "@/lib/pending-runs";
@@ -30,7 +32,10 @@ import dynamic from "next/dynamic";
 import { SourcePicker, UploadDrop, Thumb } from "@/components/source-picker";
 import { libraryMore, loadLibrary } from "@/lib/library-cache";
 import { fetchPage } from "@/lib/list-client";
-const HistoryPanel = dynamic(() => import("@/components/history-panel").then(m => m.HistoryPanel));
+const loadHistoryPanel = () => import("@/components/history-panel");
+const HistoryPanel = dynamic(() => loadHistoryPanel().then(m => m.HistoryPanel));
+/** Hovering My files fetches its code and its list, so the click opens it at once (founder 2026-11-09). */
+const warmFiles = () => { void loadHistoryPanel(); void loadFiles().catch(() => undefined); };
 import { ProductStep, newHookLines, readProduct, writeScript } from "@/components/product-step";
 import { RunPreview, claimPlayback } from "@/components/run-preview";
 
@@ -854,7 +859,7 @@ export function RunView() {
         </Link>
         <TitleInput value={run.title === "Untitled run" ? "Untitled video" : run.title} onSave={(title) => save({ title })} />
         <SaveStatus id={run.id} />
-        <button type="button" onClick={() => { setLibraryTab(undefined); setLibraryOpen(true); }} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-muted hover:bg-raised hover:text-text">
+        <button type="button" onPointerEnter={warmFiles} onFocus={warmFiles} onClick={() => { setLibraryTab(undefined); setLibraryOpen(true); }} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-muted hover:bg-raised hover:text-text">
           <FolderOpen className="h-4 w-4" />
           My files
         </button>
@@ -1543,7 +1548,7 @@ function CharacterBrowser({ current, onPick, onPickFace, onClose }: { current: H
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={c ? c.thumb : f.kind === "photo" ? `/api/media/${f.mediaId}` : ""} alt={name} loading="lazy" className="absolute inset-0 h-full w-full object-cover object-top" />
                       ) : still ? (
-                        <MediaVideo src={`${still}#t=0.5`} muted playsInline preload="metadata" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+                        <ThumbImg src={still} className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
                       ) : (
                         <span className="absolute inset-0 flex items-center justify-center text-[28px] font-black text-accent">&ldquo;</span>
                       )}

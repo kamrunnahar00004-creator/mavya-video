@@ -1,7 +1,7 @@
 "use client";
 import { flushSync } from "react-dom";
 import { RouteSkeleton } from "@/components/route-skeleton";
-import { MediaVideo } from "@/components/media-video";
+import { ThumbImg } from "@/components/thumb-img";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "@/components/pending-link";
@@ -27,23 +27,9 @@ function Cover({ run, source }: { run: Run; source?: Reference }) {
   return null;
 }
 
-/** Keep the same visible tile, without retaining a decoder for offscreen rows. */
+/** The generated hook's still picture (thumbOf): a list never decodes videos. */
 function TileVideo({ src }: { src: string }) {
-  const box = useRef<HTMLSpanElement>(null);
-  const [near, setNear] = useState(false);
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    if (typeof IntersectionObserver === "undefined") {
-      let alive = true;
-      queueMicrotask(() => { if (alive) setNear(true); });
-      return () => { alive = false; };
-    }
-    const observer = new IntersectionObserver(([entry]) => setNear(entry.isIntersecting), { rootMargin: "200px" });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-  return <span ref={box} className="absolute inset-0">{near && <MediaVideo src={src} muted preload="metadata" className="absolute inset-0 h-full w-full object-cover" />}</span>;
+  return <ThumbImg src={src} className="absolute inset-0 h-full w-full object-cover" />;
 }
 
 /** Progress as a short label: "Ready", or the next step to do. */

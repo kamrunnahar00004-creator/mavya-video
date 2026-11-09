@@ -1,8 +1,9 @@
 "use client";
-import { MediaVideo } from "@/components/media-video";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { buildFiles, faceKey, type Entry, type FileSources } from "@/lib/my-files";
+import { loadFiles, peekFiles } from "@/lib/files-client";
+import { ThumbImg } from "@/components/thumb-img";
 import { claimPlayback, usePlaybackClaims } from "@/components/run-preview";
 import { Check, CirclePlus, Download, Film, FolderOpen, Loader2, MoreVertical, Music, Pause, Play, Trash2, X } from "lucide-react";
 import { characterById } from "@/lib/characters";
@@ -67,7 +68,9 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
   onUseSound: (p: SoundPiece) => void;
 }) {
   const [listError, setListError] = useState<string | null>(null);
-  const [sources, setSources] = useState<FileSources | null>(null);
+  // The last list at once (read on hover of My files), then refreshed.
+  const [sources, setSources] = useState<FileSources | null>(peekFiles);
+  const opened = useRef(false);
   const [tab, setTab] = useState<Tab>(initialTab ?? "generated");
   // Nothing plays in the grid: a click opens it in a popup (a library hook opens its detail popup).
   const [playing, setPlaying] = useState<Playing | null>(null);
@@ -89,8 +92,11 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
   // Everything at once (founder 2026-11-09: only the first 24 uploads loaded, the rest behind a button above the header).
   useEffect(() => {
     let alive = true;
-    fetch("/api/files", { signal: AbortSignal.timeout(20_000) })
-      .then(async (r) => { if (!r.ok) throw Error(); return (await r.json()) as FileSources; })
+    // On opening, a read started by hovering My files is used; one that finished before is refreshed (the list may have
+    // changed). A refresh (refreshKey: something was added) always reads afresh (Codex 2026-11-09).
+    const fresh = opened.current ? true : Boolean(peekFiles());
+    opened.current = true;
+    loadFiles(fresh)
       .then((s) => { if (alive) { setSources(s); setListError(null); } })
       .catch(() => { if (alive) setListError("List is unavailable. Try again."); });
     return () => { alive = false; };
@@ -98,7 +104,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
 
   const runs = sources?.runs ?? null;
   // Hook cards: the live library's (with their covers) over the saved ones.
-  const files = buildFiles({ ...(sources ?? { runs: [], generations: [], exports: [], assets: [] }), refs: [...new Map([...(sources?.refs ?? []), ...refs].map((r) => [r.id, r])).values()] }, run);
+  const files = useMemo(() => buildFiles({ ...(sources ?? { runs: [], generations: [], exports: [], assets: [] }), refs: [...new Map([...(sources?.refs ?? []), ...refs].map((r) => [r.id, r])).values()] }, run), [sources, refs, run]);
   const { hooks, faces, generated, demos, uploads, music, exports } = files;
   const demoNow = demoClips(run).length === 1 ? clipSrc(demoClips(run)[0]) : null;
   const soundsNow = new Set((run.sounds ?? (run.sound ? [run.sound] : [])).map((p) => p.src));
@@ -231,7 +237,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           const use = () => onUseUpload([x.value]);
           const on = selected.includes(x.key);
           return (
-            <Card key={x.key} onOpen={x.value.kind === "image" ? undefined : () => setPlaying({ clips: [{ src, start: 0 }], sound: true, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, x.value.name)} meta={meta(x)}
+            <Card key={x.key} onOpen={x.value.kind === "image" ? undefined : () => setPlaying({ clips: [{ src: `${src}?preview=1`, start: 0 }], sound: true, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, x.value.name)} meta={meta(x)}
               selected={selecting ? on : undefined} onSelect={() => { setConfirmDelete(false); setSelected((k) => (on ? k.filter((y) => y !== x.key) : [...k, x.key])); }}>
               {x.value.kind === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -464,22 +470,13 @@ function Card({ children, meta, name, onRename, onDelete, onUse, inUse = false, 
   );
 }
 
-/** A still frame, never playing; it loads only once scrolled into view (a long list stays light). */
-function Still({ src, at = 0.5 }: { src: string; at?: number }) {
-  const box = useRef<HTMLSpanElement>(null);
-  const [near, setNear] = useState(false);
-  useEffect(() => {
-    const el = box.current;
-    if (!el || near) return;
-    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) setNear(true); }, { rootMargin: "200px" });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [near]);
-  return (
-    <span ref={box} className="pointer-events-none absolute inset-0">
-      {near && <MediaVideo src={`${src}#t=${at}`} muted playsInline preload="metadata" className="h-full w-full object-cover" />}
-    </span>
-  );
+/**
+ * A still picture of the video (founder 2026-11-09: My files was slow and the screen went black): a small JPEG made
+ * once on the server (/api/media/<id>/thumb), never a video. Every card used to decode the original (4K HDR phone
+ * clips) in a <video>; an HDR video can switch a Windows screen's display mode. Loaded when scrolled near.
+ */
+function Still({ src }: { src: string; at?: number }) {
+  return <ThumbImg src={src} className="pointer-events-none absolute inset-0 h-full w-full object-cover" />;
 }
 
 /** The popup: plays the video (a demo: its pieces back to back) once, with Use under it. Esc or a click outside closes. */

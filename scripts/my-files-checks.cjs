@@ -177,7 +177,7 @@ finish('my-files-checks', EXPECTED, () => checks, async () => {
   // saved song is kept as an asset with its name.
   {
     const panel = fs.readFileSync('src/components/history-panel.tsx', 'utf8');
-    ok(panel.includes('fetch("/api/files"') && panel.includes('buildFiles(') && !/fetchPage|Load more|cursors/.test(panel), 'My files reads /api/files whole, no paging');
+    ok(panel.includes('loadFiles(') && fs.readFileSync('src/lib/files-client.ts', 'utf8').includes('fetch("/api/files"') && panel.includes('buildFiles(') && !/fetchPage|Load more|cursors/.test(panel), 'My files reads /api/files whole, no paging');
     const server = fs.readFileSync('src/lib/server/my-files.ts', 'utf8');
     ok(/from\("generations"\)[\s\S]*eq\("state", "done"\)/.test(server) && /from\("export_jobs"\)[\s\S]*eq\("state", "done"\)/.test(server), 'the server reads finished generations and export jobs');
     ok((server.match(/every\(\(a, b\) => db\.from\(/g) ?? []).length === 6 && (server.match(/\.range\(a, b\)\)/g) ?? []).length === 6 && !/\.limit\(/.test(server), 'every source is read whole, batch by batch (Codex 2026-11-09: a 2000 cap dropped older files)');

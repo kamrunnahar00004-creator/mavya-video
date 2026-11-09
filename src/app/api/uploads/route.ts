@@ -3,6 +3,7 @@ import { cloud, extFor, isMediaId } from "@/lib/server/store";
 import { startUpload, finishUpload, expireUploads } from "@/lib/server/uploads";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { requestPreview } from "@/lib/server/previews";
+import { thumbLink } from "@/lib/server/thumbs";
 export const maxDuration = 300;
 export async function POST(request: Request) {
  if (!cloud()) return Response.json({ error: "Direct uploads need storage" }, { status: 501 });
@@ -22,6 +23,8 @@ export async function POST(request: Request) {
    const done = await finishUpload(who, b.mediaId, mime, b.asset === true ? String(b.name ?? "Upload").slice(0,200) : null);
    // A video gets its light preview copy straight away, so the editor plays smoothly from the start.
    if (mime.startsWith("video/")) after(() => requestPreview(done.mediaId));
+   // And its still picture for lists (My files), so it is ready the first time they open.
+   if (mime.startsWith("video/")) after(() => thumbLink(done.mediaId).then(() => undefined, (error) => console.error("upload thumb", error)));
    return Response.json(done);
   }
   return Response.json({ error: "Bad upload." }, { status: 400 });
