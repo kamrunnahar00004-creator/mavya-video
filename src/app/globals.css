@@ -1,38 +1,52 @@
 @import "tailwindcss";
 
 /*
- * Mavya studio. Neutral off-white ground, true-black ink, one accent (Mavya violet, the founder's pick)
- * only on the main action and the active state.
+ * Mavya studio (founder pick, 2026-11-10). Light blue-white ground, navy ink, one accent (strong blue)
+ * only on the main action and the active state. Square corners everywhere: every Tailwind radius is 0
+ * (see the @theme block below); rounded-full stays round only for true circles (avatars, toggles,
+ * colour swatches, slider thumbs) and the phone mockups.
  * The primary button keeps its ink border and hard shadow (brand signature); everything else is flat.
- * Cool greys with a faint violet cast, so the accent belongs to them.
- * One analogous family around the violet: blue on its cool side, magenta on its warm side.
- * Timeline tracks use them, like an editor: video in ink, text in blue, sound in magenta.
+ * Blue is deeper than a sky blue so white-on-blue text and blue text pass WCAG AA (5.0:1 on white, 4.8:1 on the ground).
+ * Timeline tracks: video in ink, text in steel blue, sound in teal.
  * Red only for errors and deleting.
  */
 :root {
-  --bg: #f3f3f8;
+  --bg: #f7fafc;
   --panel: #ffffff;
-  --raised: #f7f7fb;
-  --hover: #ebeaf3;
-  --line: #e3e2ec;
-  --line-strong: #cfcedb;
-  --text: #15121f;
-  --muted: #4d4a5e;
-  --soft: #928fa6;
-  --accent: #7b4cfa;
-  --accent-hover: #6d3ef0;
-  --accent-active: #5b2fd6;
+  --raised: #f2f5f8;
+  --hover: #eaeff4;
+  --line: #e2e8ee;
+  --line-strong: #c9d2dc;
+  --text: #1c2633;
+  --muted: #4b5767;
+  --soft: #6b7685;
+  --accent: #1c74b4;
+  --accent-hover: #18669e;
+  --accent-active: #145686;
   --accent-ink: #ffffff;
-  --accent-tint: #7b4cfa17;
-  --accent-line: #7b4cfa66;
-  --ink: #15121f;
-  --deep: #2e1065;
+  --accent-tint: #1c74b41a;
+  --accent-line: #1c74b466;
+  --ink: #1c2633;
+  --deep: #1c2633;
   --yellow: #ffc700;
-  --text-track: #2a5bd7;
-  --text-track-tint: #e2ebfd;
-  --sound-track: #b02f86;
-  --sound-track-tint: #f9e3f1;
+  --text-track: #3b5a7a;
+  --text-track-tint: #e4ecf4;
+  --sound-track: #237264;
+  --sound-track-tint: #dff2ee;
+  --sound-track-hover: #d0ebe4;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Square corners: every rounded-* utility except rounded-full resolves to 0. */
+@theme {
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
 }
 
 @theme inline {
@@ -57,6 +71,7 @@
   --color-texttrack-tint: var(--text-track-tint);
   --color-soundtrack: var(--sound-track);
   --color-soundtrack-tint: var(--sound-track-tint);
+  --color-soundtrack-hover: var(--sound-track-hover);
   --font-sans: var(--font-satoshi);
   --font-mono: var(--font-geist-mono);
 }
@@ -103,13 +118,13 @@ input[type="range"] {
   outline-offset: 2px;
 }
 
-/* Primary action (the founder's signature): violet, 2px ink border, hard offset shadow that presses in. */
+/* Primary action (the founder's signature): accent blue, 2px ink border, hard offset shadow that presses in. */
 @utility btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  border-radius: 8px;
+  border-radius: 0;
   border: 2px solid var(--ink);
   background: var(--accent);
   color: #ffffff;
@@ -131,7 +146,7 @@ input[type="range"] {
 }
 
 @utility card {
-  border-radius: 16px;
+  border-radius: 0;
   border: 1px solid var(--line);
   background: var(--panel);
 }
@@ -180,7 +195,7 @@ input[type="range"] {
   to { background-position: 200% 0; }
 }
 .shimmer {
-  background: linear-gradient(90deg, #ebeaf3 0%, #f7f7fb 50%, #ebeaf3 100%);
+  background: linear-gradient(90deg, var(--hover) 0%, var(--raised) 50%, var(--hover) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.2s linear infinite;
 }
@@ -218,8 +233,9 @@ input[type="range"] {
 
 /* Landing page (2026-10-17): Geist type for a calmer, more premium read; colours stay the brand's own.
    Secondary text is a little darker than in the app so it passes WCAG AA (4.9:1 on the page). */
-.landing-theme {
-  --soft: #6b6780;
+/* Landing: square corners even on arbitrary radii; only phone frames, screens, notches and window dots opt out with .keep-round. */
+.landing-theme *:not(.keep-round) {
+  border-radius: 0 !important;
 }
 .landing-theme,
 .landing-theme h1,

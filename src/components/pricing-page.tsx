@@ -163,7 +163,7 @@ function PlanButton({ plan, cycle, viewer }: { plan: Plan; cycle: BillingCycle; 
 function PlanCard({ plan, cycle, viewer }: { plan: Plan; cycle: BillingCycle; viewer: Viewer }) {
   const price = priceOf(plan, cycle);
   return (
-    <div className={`flex flex-col rounded-2xl bg-panel p-6 ${plan.popular ? "border-2 border-accent shadow-[0_1px_2px_rgba(21,18,31,0.04),0_16px_40px_-16px_rgba(123,76,250,0.35)]" : "border border-line"}`}>
+    <div className={`flex flex-col rounded-2xl bg-panel p-6 ${plan.popular ? "border-2 border-accent shadow-[0_1px_2px_rgba(21,18,31,0.04),0_16px_40px_-16px_rgba(31,122,187,0.35)]" : "border border-line"}`}>
       <span className="flex h-6 items-start">{plan.popular && <span className="rounded-md bg-accent px-2 py-0.5 text-[11.5px] font-semibold text-white">Most popular</span>}</span>
       <p className="text-[17px] font-semibold">{plan.name}</p>
       <p className="mt-1 min-h-[40px] text-[13.5px] text-muted">{plan.line}</p>
@@ -182,14 +182,14 @@ function BusinessCard() {
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
   return (
-    <div className="relative flex flex-col overflow-hidden rounded-2xl bg-[#15121f] p-6 text-white">
-      <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 h-[260px] w-[260px] rounded-full bg-[radial-gradient(closest-side,rgba(123,76,250,0.45),transparent)]" />
-      <span className="relative flex h-6 items-start"><span className="rounded-md bg-white/12 px-2 py-0.5 text-[11.5px] font-semibold text-[#b69cff]">{BUSINESS.line}</span></span>
+    <div className="relative flex flex-col overflow-hidden rounded-2xl bg-[#1c2633] p-6 text-white">
+      <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 h-[260px] w-[260px] rounded-full bg-[radial-gradient(closest-side,rgba(31,122,187,0.45),transparent)]" />
+      <span className="relative flex h-6 items-start"><span className="rounded-md bg-white/12 px-2 py-0.5 text-[11.5px] font-semibold text-[#8fd0f5]">{BUSINESS.line}</span></span>
       <p className="relative text-[17px] font-semibold">{BUSINESS.name}</p>
       <p className="relative mt-1 min-h-[40px] text-[13.5px] text-white/70">We run your short-form for you</p>
       <p className="relative mt-4 text-[30px] font-semibold leading-[1.05] tracking-[-0.03em]">{BUSINESS.price}</p>
       <p className="relative mt-1.5 text-[12.5px] text-white/60">Minimum applies</p>
-      <button type="button" onClick={() => setOpen(true)} className={`${cardBtn} relative mt-5 cursor-pointer bg-white text-[#15121f] hover:bg-white/90`}>
+      <button type="button" onClick={() => setOpen(true)} className={`${cardBtn} relative mt-5 cursor-pointer bg-white text-[#1c2633] hover:bg-white/90`}>
         Contact us
         <ArrowRight className="h-4 w-4" />
       </button>
@@ -199,7 +199,7 @@ function BusinessCard() {
         <ul className="space-y-2.5">
           {BUSINESS.features.map((f) => (
             <li key={f} className="flex items-start gap-2.5 text-[14px] leading-snug text-white/85">
-              <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#b69cff]" aria-hidden />
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#8fd0f5]" aria-hidden />
               {f}
             </li>
           ))}
@@ -350,8 +350,8 @@ function CostStack() {
     <div ref={ref} className="mx-auto max-w-[560px]">
       <h2 className="text-center text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]">One tool instead of six.</h2>
       <div className="relative mt-10">
-        <div aria-hidden className="pointer-events-none absolute -inset-10 bg-[radial-gradient(50%_50%_at_50%_50%,rgba(123,76,250,0.14)_0%,transparent_100%)]" />
-        <div className="relative rounded-2xl border border-line bg-panel p-6 shadow-[0_0_0_1px_rgba(21,18,31,0.03),0_24px_48px_-20px_rgba(21,18,31,0.2),0_60px_120px_-40px_rgba(123,76,250,0.3)] sm:p-8">
+        <div aria-hidden className="pointer-events-none absolute -inset-10 bg-[radial-gradient(50%_50%_at_50%_50%,rgba(31,122,187,0.14)_0%,transparent_100%)]" />
+        <div className="relative rounded-2xl border border-line bg-panel p-6 shadow-[0_0_0_1px_rgba(21,18,31,0.03),0_24px_48px_-20px_rgba(21,18,31,0.2),0_60px_120px_-40px_rgba(31,122,187,0.3)] sm:p-8">
           <div className="flex items-center justify-between border-b border-dashed border-line-strong pb-4">
             <span className="text-[15px] font-semibold">Without Mavya</span>
             <span className="text-[13px] text-soft">per month</span>

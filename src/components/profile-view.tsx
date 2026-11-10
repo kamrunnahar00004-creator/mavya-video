@@ -137,7 +137,7 @@ export function ProfileView() {
         </section>
 
       {confirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#15121f]/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && setConfirm(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1c2633]/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && setConfirm(false)}>
           <div role="alertdialog" aria-modal="true" aria-labelledby="del-title" className="w-full max-w-[420px] rounded-2xl bg-panel p-6 shadow-[0_24px_64px_-16px_rgba(21,18,31,0.45)]">
             <h2 id="del-title" className="text-[19px] font-bold">Delete your account?</h2>
             <p className="mt-2 text-[14px] text-muted">Your videos, uploads and plan are removed for good. This can&apos;t be undone.</p>
@@ -161,7 +161,7 @@ export function ProfileView() {
   );
 }
 
-/** The profile picture, or initials on violet. */
+/** The profile picture, or initials on the accent colour. */
 export function Avatar({ profile, className = "h-8 w-8 text-[12px]" }: { profile: Profile; className?: string }) {
   return profile.avatar ? (
     // eslint-disable-next-line @next/next/no-img-element

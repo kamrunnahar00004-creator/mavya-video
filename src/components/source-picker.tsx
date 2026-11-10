@@ -432,7 +432,7 @@ export function UploadDrop({ onAdded }: { onAdded: (r: Reference) => void }) {
         }}
         className={`flex h-48 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed transition-colors ${drag ? "border-accent bg-accent-tint" : "border-line-strong bg-panel hover:border-accent hover:bg-accent-tint/40"} ${busy ? "pointer-events-none" : ""}`}
       >
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-tint text-accent">
+        <span className="flex h-12 w-12 items-center justify-center rounded-none bg-accent-tint text-accent">
           {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
         </span>
         <span className="text-[15px] font-bold">{busy ? "Uploading" : "Drop a video or click to upload"}</span>

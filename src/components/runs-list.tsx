@@ -234,7 +234,7 @@ export function RunsList() {
               const p = progress(r);
               return (
                 <Link prefetch={null} key={r.id} href={`/studio/${r.id}`} className="group block" onPointerEnter={() => prefetchRun(r.id)} onFocus={() => prefetchRun(r.id)} onTouchStart={() => prefetchRun(r.id)} onClick={(e) => editing === r.id && e.preventDefault()}>
-                  <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-[#1d1a2b] transition-transform group-hover:-translate-y-0.5">
+                  <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-[#243142] transition-transform group-hover:-translate-y-0.5">
                     <Cover run={r} />
                     <span className={`absolute left-2 top-2 rounded-md px-2 py-0.5 text-[12px] font-bold ${p.ready ? "bg-accent text-white" : "bg-white/90 text-text"}`}>{p.label}</span>
                     <div className="absolute right-2 top-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">{actions(r, true)}</div>
@@ -267,14 +267,14 @@ export function RunsList() {
                   onClick={(e) => editing === r.id && e.preventDefault()}
                   className="group grid grid-cols-[56px_minmax(0,1fr)_160px_110px_80px] items-center gap-4 border-b border-line px-4 py-2.5 last:border-b-0 hover:bg-raised"
                 >
-                  <div className="relative h-[72px] w-[40px] overflow-hidden rounded-md bg-[#1d1a2b]">
+                  <div className="relative h-[72px] w-[40px] overflow-hidden rounded-md bg-[#243142]">
                     <Cover run={r} />
                   </div>
                   <Title run={r} editing={editing === r.id} onEdit={(on) => setEditing(on ? r.id : null)} onRename={(t) => void rename(r, t)} className="text-[14.5px] font-semibold" />
                   <div className="flex items-center gap-2.5">
                     <div className="flex gap-1">
                       {Array.from({ length: p.total }, (_, i) => (
-                        <span key={i} className={`h-1.5 w-4 rounded-full ${i < p.done ? "bg-accent" : "bg-hover"}`} />
+                        <span key={i} className={`h-1.5 w-4 rounded-none ${i < p.done ? "bg-accent" : "bg-hover"}`} />
                       ))}
                     </div>
                     <span className={`text-[13px] ${p.ready ? "font-semibold text-accent" : "text-muted"}`}>{p.ready ? "Ready" : `${p.done}/${p.total}`}</span>

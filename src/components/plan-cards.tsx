@@ -10,7 +10,7 @@ export function PlanCards({ action, current, cycle = "monthly", extra }: { actio
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {PLANS.map((plan) => (
         <div key={plan.id} className={`relative flex flex-col rounded-2xl border bg-panel p-6 ${plan.popular ? "border-accent ring-1 ring-accent" : "border-line"}`}>
-          {plan.popular && <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-accent px-2.5 py-0.5 text-[12px] font-bold text-white">Most popular</span>}
+          {plan.popular && <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-none bg-accent px-2.5 py-0.5 text-[12px] font-bold text-white">Most popular</span>}
           <div className="flex items-center gap-2">
             <h3 className="text-[18px] font-bold">{plan.name}</h3>
             {current === plan.id && <span className="rounded-md border border-line-strong px-2 py-0.5 text-[12px] font-semibold text-muted">Current</span>}

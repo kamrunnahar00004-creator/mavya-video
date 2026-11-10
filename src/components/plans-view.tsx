@@ -91,11 +91,11 @@ export function PlansView() {
             )
           }
           extra={
-            <div className="flex flex-col rounded-2xl bg-[#15121f] p-6 text-white">
+            <div className="flex flex-col rounded-2xl bg-[#1c2633] p-6 text-white">
               <h3 className="text-[18px] font-bold text-white!">{BUSINESS.name}</h3>
               <p className="mt-4 text-[30px] font-semibold leading-none tracking-[-0.03em]">{BUSINESS.price}</p>
               <p className="mt-2 text-[13.5px] text-white/65">Minimum applies</p>
-              <button type="button" onClick={() => setContact(true)} className="mt-5 flex w-full items-center justify-center rounded-lg bg-white py-2.5 text-[14px] font-bold text-[#15121f] hover:bg-white/90">
+              <button type="button" onClick={() => setContact(true)} className="mt-5 flex w-full items-center justify-center rounded-lg bg-white py-2.5 text-[14px] font-bold text-[#1c2633] hover:bg-white/90">
                 Contact us
               </button>
               <div className="mt-6 border-t border-white/10 pt-5">
@@ -103,7 +103,7 @@ export function PlansView() {
                 <ul className="mt-3 space-y-2.5">
                   {BUSINESS.features.map((f) => (
                     <li key={f} className="flex gap-2.5 text-[14px] leading-snug text-white/90">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#b69cff]" strokeWidth={2.6} />
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#8fd0f5]" strokeWidth={2.6} />
                       {f}
                     </li>
                   ))}
@@ -118,7 +118,7 @@ export function PlansView() {
       </p>
 
       {confirm && current && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#15121f]/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && setConfirm(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1c2633]/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && setConfirm(null)}>
           <div role="alertdialog" aria-modal="true" aria-labelledby="change-title" className="w-full max-w-[420px] rounded-2xl bg-panel p-6 shadow-[0_24px_64px_-16px_rgba(21,18,31,0.45)]">
             <h2 id="change-title" className="text-[19px] font-bold">Switch to {confirm.name}?</h2>
             <p className="mt-2 text-[14px] text-muted">

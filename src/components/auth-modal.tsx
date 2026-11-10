@@ -198,7 +198,7 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-soft hover:bg-raised hover:text-text"
+          className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-none text-soft hover:bg-raised hover:text-text"
         >
           <X className="h-5 w-5" aria-hidden="true" />
         </button>

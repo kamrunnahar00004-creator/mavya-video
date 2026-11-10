@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { LoopVideo } from "@/components/loop-video";
 
 const clock = (s: number) => `0:${String(Math.floor(s)).padStart(2, "0")}`;
-const LIGHT_VIOLET = "#b69cff";
+const LIGHT_VIOLET = "#8fd0f5";
 
 /**
  * Landing: what a hook + demo video is, shown with a real one, on a dark surface so the videos carry the colour.
@@ -38,15 +38,15 @@ export function HookDemoExplainer({ src, poster, strip, hookEnd, length }: { src
   const hookPct = (hookEnd / length) * 100;
   const inHook = t < hookEnd;
   return (
-    <div className="relative overflow-hidden rounded-[28px] bg-[#15121f] text-white">
-      <div aria-hidden className="pointer-events-none absolute -left-40 -top-40 h-[640px] w-[640px] rounded-full bg-[radial-gradient(closest-side,rgba(123,76,250,0.38),transparent)]" />
-      <div aria-hidden className="pointer-events-none absolute -bottom-48 right-0 h-[560px] w-[560px] rounded-full bg-[radial-gradient(closest-side,rgba(123,76,250,0.16),transparent)]" />
+    <div className="relative overflow-hidden rounded-[28px] bg-[#1c2633] text-white">
+      <div aria-hidden className="pointer-events-none absolute -left-40 -top-40 h-[640px] w-[640px] rounded-full bg-[radial-gradient(closest-side,rgba(74,168,224,0.38),transparent)]" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-48 right-0 h-[560px] w-[560px] rounded-full bg-[radial-gradient(closest-side,rgba(74,168,224,0.16),transparent)]" />
       <div className="relative grid items-center gap-14 px-6 py-14 sm:px-12 sm:py-16 lg:grid-cols-[auto_1fr] lg:gap-20 lg:px-16 lg:py-20">
         <div className="mx-auto w-[250px]">
-          <div className="relative rounded-[38px] bg-[#0b0910] p-[7px] shadow-[0_40px_80px_-30px_rgba(0,0,0,0.8)] ring-1 ring-white/10">
-            <div className="relative aspect-[9/19.5] overflow-hidden rounded-[31px] bg-black">
+          <div className="keep-round relative rounded-[38px] bg-[#0b0910] p-[7px] shadow-[0_40px_80px_-30px_rgba(0,0,0,0.8)] ring-1 ring-white/10">
+            <div className="keep-round relative aspect-[9/19.5] overflow-hidden rounded-[31px] bg-black">
               <video ref={ref} poster={poster} muted loop playsInline preload="none" aria-label="A hook + demo video" className="absolute inset-0 h-full w-full object-cover" />
-              <span className="absolute left-1/2 top-2.5 h-[18px] w-[72px] -translate-x-1/2 rounded-full bg-black" />
+              <span className="keep-round absolute left-1/2 top-2.5 h-[18px] w-[72px] -translate-x-1/2 rounded-full bg-black" />
               <span className={`absolute bottom-3 left-3 rounded-full px-2.5 py-1 text-[11px] font-bold text-white transition-colors duration-300 ${inHook ? "bg-accent" : "bg-black/60"}`}>{inHook ? "Hook" : "Demo"}</span>
             </div>
           </div>

@@ -223,7 +223,7 @@ export function ReferenceView() {
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Finding the hook and cuts
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-raised">
+              <div className="h-1.5 overflow-hidden rounded-none bg-raised">
                 <div className="h-full bg-accent transition-[width]" style={{ width: `${Math.round(progress * 100)}%` }} />
               </div>
             </div>

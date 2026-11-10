@@ -395,7 +395,7 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
             <TrimmedVideo src={seg.id === "hook" ? seg.src : previewOf(seg.src)} parts={seg.parts} rate={speed} adjust={fullShown} onTime={setFullT} />
             {local.filter((x) => x.text.trim() && showsAt(x, fullT)).map((x) => <TextOverlay key={x.id} x={x} onPatch={onPatch} />)}
           </div>
-          <button type="button" aria-label="Close" onClick={() => setFull(false)} className="absolute right-6 top-6 rounded-full bg-white/90 p-2 text-ink hover:bg-white">
+          <button type="button" aria-label="Close" onClick={() => setFull(false)} className="absolute right-6 top-6 rounded-none bg-white/90 p-2 text-ink hover:bg-white">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -669,7 +669,7 @@ function WholeMedia({ playback, segs, texts, playing, onTextMove, onTextPick, cl
   const seg = hit ?? segs[segs.length - 1];
   const { file: at, i: piece } = fileAt(seg, time - seg.offset);
   return (
-    <div className={`relative aspect-[9/16] overflow-hidden rounded-2xl border border-line bg-[#14121f] [container-type:size] ${cls}`} style={style}>
+    <div className={`relative aspect-[9/16] overflow-hidden rounded-2xl border border-line bg-[#1c2633] [container-type:size] ${cls}`} style={style}>
       {!hit ? null : seg.src ? (
         <SegmentVideos segs={segs} seg={seg} at={at} piece={piece} playing={playing} />
       ) : (
@@ -1003,7 +1003,7 @@ function WholeControls({ segs, texts, pieces, selected, total, playback, playing
                       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); edit.onSelectClip(x.id, part.id); }
                     }}
                     title={x.id === "hook" && x.parts.length === 1 ? undefined : "Drag to move"}
-                    className={`absolute inset-y-0 flex items-center gap-1 overflow-hidden px-3.5 text-[10.5px] font-bold outline-none ${x.id === "hook" && x.parts.length === 1 ? "" : "cursor-grab active:cursor-grabbing"} ${si || pi ? "border-l-2 border-panel" : "rounded-l-md"} ${x.id === "hook" ? "bg-[#221d33] text-white" : si % 2 ? "bg-[#dfdde9] text-text" : "bg-[#d2d0df] text-text"} ${on ? "z-10 ring-2 ring-inset ring-accent" : ""} ${moving ? "z-30 opacity-80 shadow-lg" : ""}`}
+                    className={`absolute inset-y-0 flex items-center gap-1 overflow-hidden px-3.5 text-[10.5px] font-bold outline-none ${x.id === "hook" && x.parts.length === 1 ? "" : "cursor-grab active:cursor-grabbing"} ${si || pi ? "border-l-2 border-panel" : "rounded-l-md"} ${x.id === "hook" ? "bg-[#243142] text-white" : si % 2 ? "bg-[#dfe5ec] text-text" : "bg-[#d0d8e1] text-text"} ${on ? "z-10 ring-2 ring-inset ring-accent" : ""} ${moving ? "z-30 opacity-80 shadow-lg" : ""}`}
                     style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})`, transform: moving && clipMove ? `translateX(${clipMove.dx}px)` : undefined }}
                   >
                     {x.src && count > 0 && <Filmstrip src={x.src} times={times} frame={FRAME} />}
@@ -1035,7 +1035,7 @@ function WholeControls({ segs, texts, pieces, selected, total, playback, playing
             <div
               key={x.id}
               title={x.label}
-              className={`absolute inset-y-0 flex min-w-0 items-center border-white px-1.5 ${i ? "border-l-2" : ""} ${x.id === "hook" ? "bg-[#221d33] text-white" : !x.src ? "bg-hover text-soft" : i % 2 ? "bg-[#dfdde9] text-text" : "bg-[#d2d0df] text-text"}`}
+              className={`absolute inset-y-0 flex min-w-0 items-center border-white px-1.5 ${i ? "border-l-2" : ""} ${x.id === "hook" ? "bg-[#243142] text-white" : !x.src ? "bg-hover text-soft" : i % 2 ? "bg-[#dfe5ec] text-text" : "bg-[#d0d8e1] text-text"}`}
               style={{ left: pct(x.offset), width: pct(x.len) }}
             >
               <span className="truncate">{x.id === "hook" ? "Hook" : x.src ? x.label : "Demo"}</span>
@@ -1128,7 +1128,7 @@ function WholeControls({ segs, texts, pieces, selected, total, playback, playing
                   onSelect(p.id);
                   moveSound(e, i);
                 }}
-                className={`absolute inset-y-0 flex cursor-grab touch-none items-center gap-1.5 overflow-hidden rounded-md px-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent text-[10.5px] font-bold active:cursor-grabbing ${joinL ? "rounded-l-none" : ""} ${joinR ? "rounded-r-none border-r border-white" : ""} ${on ? "bg-soundtrack text-white" : "bg-soundtrack-tint text-soundtrack hover:bg-[#f3cfe6]"}`}
+                className={`absolute inset-y-0 flex cursor-grab touch-none items-center gap-1.5 overflow-hidden rounded-md px-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent text-[10.5px] font-bold active:cursor-grabbing ${joinL ? "rounded-l-none" : ""} ${joinR ? "rounded-r-none border-r border-white" : ""} ${on ? "bg-soundtrack text-white" : "bg-soundtrack-tint text-soundtrack hover:bg-soundtrack-hover"}`}
                 style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})` }}
               >
                 <Music className="h-3.5 w-3.5 shrink-0" />
@@ -1166,7 +1166,7 @@ function WholeTransport({ playback, total, playing, pieces, onPlay, onSplit, onA
   const underPlayhead = pieces.some((p, i) => t > p.at + 0.25 && t < pieceEnd(pieces, i, total) - 0.25);
   return (
       <div className="mb-2 flex items-center gap-2">
-        <button type="button" onClick={onPlay} title="Play / pause (Space)" className="btn-primary h-7 w-7 rounded-full p-0" aria-label={playing ? "Pause" : "Play"}>
+        <button type="button" onClick={onPlay} title="Play / pause (Space)" className="btn-primary h-7 w-7 p-0" aria-label={playing ? "Pause" : "Play"}>
           {playing ? <Pause className="h-3.5 w-3.5" fill="currentColor" /> : <Play className="ml-0.5 h-3.5 w-3.5" fill="currentColor" />}
         </button>
         <span className="whitespace-nowrap text-[12.5px] tabular-nums text-muted">
@@ -1383,7 +1383,7 @@ function useSounds(run: Run, source: Reference | null, videoLen: number, onPiece
       ) : sel ? (
       <div className="rounded-2xl border border-line bg-panel">
         <div className="flex items-center gap-3 px-4 py-3.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-soundtrack-tint text-soundtrack">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-none bg-soundtrack-tint text-soundtrack">
             <Music className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
@@ -2423,7 +2423,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
                     {busy === c.id ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
                   </span>
                 )}
-                <span className={`absolute left-1.5 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold ${filmed ? "bg-black/60 text-white" : "bg-raised text-muted"}`}>{i + 1}</span>
+                <span className={`absolute left-1.5 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-none px-1 text-[11px] font-bold ${filmed ? "bg-black/60 text-white" : "bg-raised text-muted"}`}>{i + 1}</span>
                 {len ? <span className={`absolute bottom-1.5 right-1.5 rounded px-1 text-[11px] font-semibold tabular-nums ${filmed ? "bg-black/60 text-white" : "text-soft"}`}>{filmed ? `${len.toFixed(1)}s` : `~${len}s`}</span> : null}
               </button>
               <p className="mt-1.5 line-clamp-2 text-[12.5px] leading-tight text-muted">{c.label}</p>
@@ -2865,7 +2865,7 @@ function ClipControls({ label, src, speed = 1, playing, onPlay, t, len, pieces, 
   return (
     <div className="w-full rounded-2xl border border-line bg-panel p-3">
       <div className="mb-2 flex items-center gap-2">
-        <button type="button" onClick={onPlay} className="btn-primary h-7 w-7 rounded-full p-0" aria-label={playing ? "Pause" : "Play"}>
+        <button type="button" onClick={onPlay} className="btn-primary h-7 w-7 p-0" aria-label={playing ? "Pause" : "Play"}>
           {playing ? <Pause className="h-3.5 w-3.5" fill="currentColor" /> : <Play className="ml-0.5 h-3.5 w-3.5" fill="currentColor" />}
         </button>
         <span className="text-[12.5px] tabular-nums text-muted">
@@ -2933,7 +2933,7 @@ function ClipControls({ label, src, speed = 1, playing, onPlay, t, len, pieces, 
                     onDelete();
                   }
                 }}
-                className={`absolute inset-y-0 flex items-center overflow-hidden px-4 text-[10.5px] font-bold text-white outline-none ${dim && !count ? "bg-[#a39eb5]" : "bg-[#221d33]"} ${i > 0 ? "border-l-2 border-panel" : ""} ${on ? "ring-2 ring-inset ring-accent" : ""}`}
+                className={`absolute inset-y-0 flex items-center overflow-hidden px-4 text-[10.5px] font-bold text-white outline-none ${dim && !count ? "bg-[#647487]" : "bg-[#243142]"} ${i > 0 ? "border-l-2 border-panel" : ""} ${on ? "ring-2 ring-inset ring-accent" : ""}`}
                 style={{ left: pct(pa), width: `calc(${pct(pb)} - ${pct(pa)})` }}
               >
                 {src && count > 0 && <Filmstrip src={src} times={times} frame={FRAME} />}
@@ -3033,7 +3033,7 @@ function ClipControls({ label, src, speed = 1, playing, onPlay, t, len, pieces, 
                 >
                   <Type className="h-3 w-3 shrink-0" />
                   <span className="truncate">{x.text.trim() || (x.id === "hook" ? "Hook text" : "Text")}</span>
-                  {/* Clear end caps (purple, unlike the clip trimmer's black ones) so the start and end are easy to grab and to line up. */}
+                  {/* Clear end caps (accent blue, unlike the clip trimmer's black ones) so the start and end are easy to grab and to line up. */}
                   <span aria-label="Text start" onPointerDown={(e) => dragText(e, x, "left")} className="absolute inset-y-0 left-0 flex w-2.5 cursor-ew-resize touch-none items-center justify-center rounded-l-md bg-texttrack">
                     <span className="h-2.5 w-px rounded-full bg-white" />
                   </span>
@@ -3080,8 +3080,8 @@ export function GenerateProgress({ photo, who, startedAt, estimate }: { photo: s
           <span key={stage} className="fade-in text-[13px] font-bold">{stage}</span>
           <span className="text-[12.5px] tabular-nums text-white/80">{clock}</span>
         </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15">
-          <div className="h-full rounded-full bg-accent transition-[width] duration-200" style={{ width: `${progress * 100}%` }} />
+        <div className="mt-2 h-1.5 overflow-hidden rounded-none bg-white/15">
+          <div className="h-full rounded-none bg-accent transition-[width] duration-200" style={{ width: `${progress * 100}%` }} />
         </div>
         <div className="mt-1.5 text-[11.5px] text-white/60">About {estimate < 60 ? `${estimate} sec` : `${Math.round(estimate / 60)} min`}</div>
       </div>

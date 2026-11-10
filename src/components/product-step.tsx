@@ -150,7 +150,7 @@ export function ProductStep({ product, reading, host, error, failedUrl, onAnalyz
           />
           <div className="flex items-center justify-between px-2.5 pb-2.5">
             <span className="group/add relative">
-              <button type="button" onClick={() => picker.current?.click()} disabled={adding || files.length >= 5} aria-label="Add a screenshot or a screen recording" className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted hover:border-accent hover:text-accent disabled:opacity-50">
+              <button type="button" onClick={() => picker.current?.click()} disabled={adding || files.length >= 5} aria-label="Add a screenshot or a screen recording" className="flex h-9 w-9 items-center justify-center rounded-none border border-line text-muted hover:border-accent hover:text-accent disabled:opacity-50">
                 {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               </button>
               <span role="tooltip" className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-ink px-2 py-1 text-[12px] font-semibold text-white opacity-0 transition-opacity group-hover/add:opacity-100 group-focus-within/add:opacity-100">
@@ -158,7 +158,7 @@ export function ProductStep({ product, reading, host, error, failedUrl, onAnalyz
               </span>
             </span>
             <input ref={picker} type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/quicktime,video/webm" multiple className="hidden" onChange={(e) => void addFiles(e.target.files).then(() => (e.target.value = ""))} />
-            <button type="button" onClick={() => { onSend(text); setDirty(false); }} disabled={!dirty || writing || reading} aria-label="Send" title="Send" className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-white hover:opacity-90 disabled:opacity-35">
+            <button type="button" onClick={() => { onSend(text); setDirty(false); }} disabled={!dirty || writing || reading} aria-label="Send" title="Send" className="flex h-9 w-9 items-center justify-center rounded-none bg-accent text-white hover:opacity-90 disabled:opacity-35">
               {writing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
             </button>
           </div>

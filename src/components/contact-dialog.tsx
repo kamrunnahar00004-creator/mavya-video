@@ -44,7 +44,7 @@ export function ContactDialog({ open, onClose }: { open: boolean; onClose: () =>
 
   const field = "w-full rounded-lg border border-line-strong bg-panel px-3 py-2.5 text-[15px] text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#15121f]/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1c2633]/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div role="dialog" aria-modal="true" aria-labelledby="contact-title" className="relative w-full max-w-[460px] rounded-2xl bg-panel p-6 text-left text-text shadow-[0_24px_64px_-16px_rgba(21,18,31,0.45)] sm:p-7">
         <button type="button" onClick={onClose} aria-label="Close" className="absolute right-3 top-3 flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-soft hover:bg-raised hover:text-text">
           <X className="h-5 w-5" />

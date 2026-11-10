@@ -139,7 +139,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
   };
   const actions = (key: string, fallback: string) => ({ name: nameOf(key, fallback), onRename: (name: string) => changePref(key, { name }), onDelete: () => changePref(key, { hidden: true }) });
 
-  const chip = (on: boolean) => `rounded-full border px-3 py-1 text-[12.5px] font-semibold ${on ? "border-ink bg-ink text-white" : "border-line text-muted hover:border-line-strong hover:text-text"}`;
+  const chip = (on: boolean) => `rounded-none border px-3 py-1 text-[12.5px] font-semibold ${on ? "border-ink bg-ink text-white" : "border-line text-muted hover:border-line-strong hover:text-text"}`;
   const meta = (x: Entry<unknown>) => (
     <div className="mt-1 truncate text-[11.5px] text-soft" title={x.runTitle}>
       {x.runTitle ? `${x.runTitle} · ` : ""}
@@ -380,7 +380,7 @@ function ItemMenu({ onUse, inUse, download, downloadName, onDelete, dark = true 
   const run = (fn: () => void) => () => { setOpen(false); fn(); };
   return (
     <div ref={box} className="relative">
-      <button type="button" aria-label="More" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={`flex h-7 w-7 items-center justify-center rounded-full ${dark ? "bg-black/55 text-white hover:bg-black/70" : "text-muted hover:bg-raised hover:text-text"}`}>
+      <button type="button" aria-label="More" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={`flex h-7 w-7 items-center justify-center rounded-none ${dark ? "bg-black/55 text-white hover:bg-black/70" : "text-muted hover:bg-raised hover:text-text"}`}>
         <MoreVertical className="h-4 w-4" />
       </button>
       {open && (
@@ -442,7 +442,7 @@ function Card({ children, meta, name, onRename, onDelete, onUse, inUse = false, 
               </span>
             ) : (
             <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/25">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100">
+              <span className="flex h-10 w-10 items-center justify-center rounded-none bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100">
                 <Play className="ml-0.5 h-4 w-4" fill="currentColor" />
               </span>
             </span>
@@ -548,7 +548,7 @@ function SoundRow({ p, meta, name, onUse, inUse = false, onRename, onDelete }: I
           if (playing) a.pause();
           else { claimPlayback(who); void a.play().catch(() => setPlaying(false)); }
         }}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-soundtrack-tint text-soundtrack"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-none bg-soundtrack-tint text-soundtrack"
       >
         {playing ? <Pause className="h-4 w-4" fill="currentColor" /> : <Play className="ml-0.5 h-4 w-4" fill="currentColor" />}
       </button>

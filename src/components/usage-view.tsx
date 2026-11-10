@@ -17,8 +17,8 @@ export function UsageView() {
           <p className="text-[15px] font-bold">AI video hooks</p>
           <p className="text-[14px] font-semibold tabular-nums text-muted">{error ? "Unavailable" : usage?.billingStatus === "past_due" ? "Payment due" : !loaded ? "..." : unlimited ? `${used} used` : plan ? `${used} / ${limit}` : "No plan"}</p>
         </div>
-        <span className="mt-3 block h-2 overflow-hidden rounded-full bg-raised">
-          <span className={`block h-full rounded-full ${pct >= 100 ? "bg-red-600" : "bg-accent"}`} style={{ width: `${pct}%` }} />
+        <span className="mt-3 block h-2 overflow-hidden rounded-none bg-raised">
+          <span className={`block h-full rounded-none ${pct >= 100 ? "bg-red-600" : "bg-accent"}`} style={{ width: `${pct}%` }} />
         </span>
         {error && <button className={`${BTN_OUTLINE} mt-4`} onClick={()=>void reload()}>Retry</button>}
         {usage?.billingStatus === "past_due" && <Link href="/settings/billing" className={`${BTN_OUTLINE} mt-4`}>Update payment</Link>}

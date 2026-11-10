@@ -15,12 +15,12 @@ const STARS = (
 ).map(([x, y, r]) => star(x, y, r)).join("");
 
 /**
- * The Mavya mark: a violet tile with a rocket taking off, a trail of stars behind it (going viral).
- * `inverted`: white tile, violet rocket (for use on violet).
+ * The Mavya mark: an accent-blue tile with a rocket taking off, a trail of stars behind it (going viral).
+ * `inverted`: white tile, accent rocket (for use on the accent colour).
  */
 export function MavyaMark({ className = "h-8 w-8", inverted = false }: { className?: string; inverted?: boolean }) {
-  const tile = inverted ? "#ffffff" : "#7b4cfa";
-  const ink = inverted ? "#7b4cfa" : "#ffffff";
+  const tile = inverted ? "#ffffff" : "var(--accent)";
+  const ink = inverted ? "var(--accent)" : "#ffffff";
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden>
       <rect width="32" height="32" rx="9" fill={tile} />

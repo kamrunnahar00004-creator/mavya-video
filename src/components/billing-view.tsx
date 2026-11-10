@@ -74,7 +74,7 @@ export function BillingView() {
         <div className={`${card} p-5 text-[14px] text-muted`}>{waiting ? "Confirming your payment..." : "Loading..."}</div>
       ) : !sub || !plan ? (
         <div className={`${card} flex flex-wrap items-center gap-4 p-5`}>
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-raised">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-none bg-raised">
             <Zap className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -89,7 +89,7 @@ export function BillingView() {
         <>
           <section className={card}>
             <div className="flex flex-wrap items-center gap-4 p-5">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-tint text-accent">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-none bg-accent-tint text-accent">
                 <Zap className="h-5 w-5" />
               </span>
               <div className="min-w-0 flex-1">
@@ -200,7 +200,7 @@ export function BillingView() {
       )}
 
       {cancel && plan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#15121f]/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && setCancel(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1c2633]/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && setCancel(false)}>
           <div role="alertdialog" aria-modal="true" aria-labelledby="cancel-title" className="w-full max-w-[420px] rounded-2xl bg-panel p-6 shadow-[0_24px_64px_-16px_rgba(21,18,31,0.45)]">
             <h2 id="cancel-title" className="text-[19px] font-bold">Cancel your {plan.name} plan?</h2>
             <p className="mt-2 text-[14px] text-muted">

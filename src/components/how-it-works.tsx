@@ -6,7 +6,7 @@ import { ArrowRight, Film, Lock, Music, PenLine, Search, Upload } from "lucide-r
 
 /*
  * How it works, in the Etsy Mavya "Research" layout (2026-10-17): the steps on the left, the active one marked
- * by a violet rail that fills while the steps advance on their own (every 7 s, paused on hover, stopped once a
+ * by an accent rail that fills while the steps advance on their own (every 7 s, paused on hover, stopped once a
  * step is clicked); on the right, that step's screen in a browser window. The screens are drawn in code from
  * real material (library covers, the AI cast, a real demo video); they illustrate the app, they are not live.
  */
@@ -108,7 +108,6 @@ export function HowItWorks() {
 
           <div className="relative">
             <div aria-hidden className="pointer-events-none absolute -inset-16 bg-[radial-gradient(rgba(21,18,31,0.11)_1px,transparent_1px)] [background-size:20px_20px] [mask-image:radial-gradient(ellipse_at_center,black_35%,transparent_72%)]" />
-            <div aria-hidden className="pointer-events-none absolute -inset-12 bg-[radial-gradient(50%_45%_at_55%_50%,rgba(123,76,250,0.16)_0%,transparent_100%)]" />
             <div id="hiw-panel" role="tabpanel" key={current.key} className="relative animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none">
               <AppWindow url={current.url}>
                 <div className="flex flex-col overflow-hidden text-left sm:h-[640px]">
@@ -127,12 +126,12 @@ export function HowItWorks() {
 
 function AppWindow({ url, children }: { url: string; children: React.ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-[18px] bg-panel shadow-[0_0_0_1px_rgba(21,18,31,0.07),0_1px_2px_rgba(21,18,31,0.05),0_24px_48px_-20px_rgba(21,18,31,0.22),0_60px_120px_-40px_rgba(123,76,250,0.35)]">
+    <div className="overflow-hidden rounded-[18px] border border-line bg-panel">
       <div className="flex items-center gap-3 border-b border-line bg-raised/80 px-4 py-3">
         <span className="flex gap-2" aria-hidden>
-          <span className="h-3 w-3 rounded-full bg-[#ff5f57] ring-1 ring-inset ring-black/10" />
-          <span className="h-3 w-3 rounded-full bg-[#febc2e] ring-1 ring-inset ring-black/10" />
-          <span className="h-3 w-3 rounded-full bg-[#28c840] ring-1 ring-inset ring-black/10" />
+          <span className="keep-round h-3 w-3 rounded-full bg-[#ff5f57] ring-1 ring-inset ring-black/10" />
+          <span className="keep-round h-3 w-3 rounded-full bg-[#febc2e] ring-1 ring-inset ring-black/10" />
+          <span className="keep-round h-3 w-3 rounded-full bg-[#28c840] ring-1 ring-inset ring-black/10" />
         </span>
         <span className="mx-auto flex w-[min(360px,60%)] items-center justify-center gap-1.5 truncate rounded-lg bg-panel px-3 py-1.5 text-[12.5px] text-muted shadow-[0_0_0_1px_rgba(21,18,31,0.06)]"><Lock className="h-3 w-3 shrink-0 text-soft" />{url}</span>
         <span className="w-[42px]" aria-hidden />
@@ -204,7 +203,7 @@ function LibraryPanel() {
             key={x.code}
             type="button"
             onClick={() => pick(i)}
-            className={`grid w-full cursor-pointer grid-cols-[1fr_64px_56px] items-center gap-3 rounded-lg px-2.5 py-1.5 text-left transition-colors ${i === sel ? "bg-accent-tint" : "hover:bg-raised"}`}
+            className={`grid w-full cursor-pointer grid-cols-[1fr_64px_56px] items-center gap-3 rounded-lg px-2.5 py-1.5 text-left transition-colors ${i === sel ? "bg-accent-tint shadow-[inset_2px_0_0_var(--accent)]" : "hover:bg-raised"}`}
           >
             <span className="flex min-w-0 items-center gap-2.5">
               <span className="h-[30px] w-[17px] shrink-0 rounded-[4px] bg-cover bg-center" style={{ backgroundImage: `url(/landing/lib-${x.code}.webp)` }} />
@@ -254,7 +253,7 @@ function Facts({ items }: { items: [string, string][] }) {
 /** Every step screen: a big 9:16 media column on the left, the facts and the list on the right. */
 const BODY = "mt-6 grid min-h-0 flex-1 grid-cols-1 items-start gap-6 sm:grid-cols-[280px_minmax(0,1fr)] sm:grid-rows-[minmax(0,1fr)] sm:gap-9";
 const FADE_IN = "animate-[hiw-fade_380ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none";
-const MEDIA = "relative mx-auto aspect-[9/16] w-full max-w-[240px] overflow-hidden sm:max-w-none rounded-2xl bg-ink shadow-[0_24px_48px_-20px_rgba(21,18,31,0.55)] ring-1 ring-black/5";
+const MEDIA = "relative mx-auto aspect-[9/16] w-full max-w-[240px] overflow-hidden sm:max-w-none rounded-2xl bg-ink ring-1 ring-black/5 sm:aspect-auto sm:h-full";
 const TAG = "rounded-full px-2 py-0.5 text-[12px] font-semibold";
 
 /*
@@ -376,12 +375,9 @@ function DemoPanel() {
           </div>
           <p className="mt-3 text-[22px] font-semibold tracking-[-0.015em]">{shot.title}</p>
           <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{shot.text}</p>
-          {/* the caption that goes on screen, shown the way it looks in the video */}
-          <span className="mt-4 flex w-fit max-w-full items-start gap-2 rounded-lg bg-ink py-1.5 pl-2 pr-3 text-[14px] font-bold leading-snug text-white">
-            <span className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 text-[10.5px] font-semibold text-white/80">On screen</span>
-            <span className="min-w-0 pt-px">{shot.onScreen}</span>
-          </span>
-          <Facts items={[["Length", `${Math.round(shot.to - shot.from)}s`], ["Camera", shot.camera]]} />
+          {/* the caption that goes on screen; quiet, because the video beside it already shows it */}
+          <p className="mt-3 text-[13.5px] leading-snug text-muted"><span className="font-semibold text-soft">On screen: </span>{shot.onScreen}</p>
+          <Facts items={[["Camera", shot.camera]]} />
         </div>
 
       <div className="mt-auto grid grid-cols-[28px_1fr_48px] gap-3 border-b border-line px-2 pb-2 text-[12px] font-semibold text-soft">
@@ -391,7 +387,7 @@ function DemoPanel() {
       </div>
       <div className="mt-1">
         {SHOTS.map((x, i) => (
-          <button key={x.title} type="button" onClick={() => seek(i)} className={`grid w-full cursor-pointer grid-cols-[28px_1fr_48px] items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors ${i === at ? "bg-accent-tint" : "hover:bg-raised"}`}>
+          <button key={x.title} type="button" onClick={() => seek(i)} className={`grid w-full cursor-pointer grid-cols-[28px_1fr_48px] items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors ${i === at ? "bg-accent-tint shadow-[inset_2px_0_0_var(--accent)]" : "hover:bg-raised"}`}>
             <span className={`text-[13px] font-semibold tabular-nums ${i === at ? "text-accent" : "text-soft"}`}>{i === 0 ? "H" : i}</span>
             <span className={`truncate text-[13.5px] ${i === at ? "font-semibold text-text" : "text-muted"}`}>{x.title}</span>
             <span className="text-right text-[13px] tabular-nums text-muted">{Math.round(x.to - x.from)}s</span>
@@ -409,11 +405,11 @@ function DemoPanel() {
  * options below that cycle: trending songs, the hook's own sound, your own file.
  */
 const SOUNDS = [
-  { title: "Dracula", by: "JENNIE", type: "Trending", art: "linear-gradient(135deg,#7b4cfa,#b02f86)" },
-  { title: "The hook's original sound", by: "Copied from the viral video", type: "Hook sound", art: "linear-gradient(135deg,#15121f,#4b3a8c)" },
-  { title: "APT.", by: "ROSÉ & Bruno Mars", type: "Trending", art: "linear-gradient(135deg,#b02f86,#f4b860)" },
-  { title: "Die With A Smile", by: "Lady Gaga & Bruno Mars", type: "Trending", art: "linear-gradient(135deg,#2a5bd7,#7b4cfa)" },
-  { title: "Your own sound", by: "Any audio or video file", type: "Upload", art: "linear-gradient(135deg,#4d4a5e,#928fa6)" },
+  { title: "Dracula", by: "JENNIE", type: "Trending", art: "linear-gradient(135deg,#4aa8e0,#1f7abb)" },
+  { title: "The hook's original sound", by: "Copied from the viral video", type: "Hook sound", art: "linear-gradient(135deg,#1c2633,#2c4a6b)" },
+  { title: "APT.", by: "ROSÉ & Bruno Mars", type: "Trending", art: "linear-gradient(135deg,#2c4a6b,#4aa8e0)" },
+  { title: "Die With A Smile", by: "Lady Gaga & Bruno Mars", type: "Trending", art: "linear-gradient(135deg,#1f7abb,#8fd0f5)" },
+  { title: "Your own sound", by: "Any audio or video file", type: "Upload", art: "linear-gradient(135deg,#4b5767,#9aa5b3)" },
 ];
 function SoundPanel() {
   const [sel, pick] = useCycle(SOUNDS.length, 3200);
@@ -427,7 +423,7 @@ function SoundPanel() {
       </div>
 
       <div className={BODY}>
-        <div key={x.title} className={`relative flex h-full min-h-0 w-full flex-col items-center justify-center gap-4 overflow-hidden rounded-2xl shadow-[0_24px_48px_-20px_rgba(21,18,31,0.55)] ${FADE_IN}`} style={{ background: x.art }}>
+        <div key={x.title} className={`relative flex h-full min-h-0 w-full flex-col items-center justify-center gap-4 overflow-hidden rounded-2xl ${FADE_IN}`} style={{ background: x.art }}>
           {x.type === "Upload" ? <Upload className="h-12 w-12 text-white" /> : x.type === "Hook sound" ? <Film className="h-12 w-12 text-white" /> : <Music className="h-12 w-12 text-white" />}
           <span aria-hidden className="flex h-10 items-end gap-[4px]">
             {[18, 30, 14, 36, 22, 28, 16, 32, 20].map((h, i) => (
@@ -458,7 +454,7 @@ function SoundPanel() {
       </div>
       <div className="mt-1">
         {SOUNDS.map((o, i) => (
-          <button key={o.title} type="button" onClick={() => pick(i)} className={`grid w-full cursor-pointer grid-cols-[1fr_90px] items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors ${i === sel ? "bg-accent-tint" : "hover:bg-raised"}`}>
+          <button key={o.title} type="button" onClick={() => pick(i)} className={`grid w-full cursor-pointer grid-cols-[1fr_90px] items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors ${i === sel ? "bg-accent-tint shadow-[inset_2px_0_0_var(--accent)]" : "hover:bg-raised"}`}>
             <span className="flex min-w-0 items-center gap-2.5">
               <span className="h-[26px] w-[26px] shrink-0 rounded-md" style={{ background: o.art }} />
               <span className={`truncate text-[13px] ${i === sel ? "font-semibold text-text" : "text-muted"}`}>{o.title} <span className="font-normal text-soft">· {o.by}</span></span>

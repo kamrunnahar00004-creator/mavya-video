@@ -153,14 +153,14 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
                 )}
               </>
             ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-[#14121f] text-[12px] font-semibold text-white/40">{seg.id === "hook" ? "Your hook" : "Your demo"}</div>
+              <div className="absolute inset-0 flex items-center justify-center bg-[#1c2633] text-[12px] font-semibold text-white/40">{seg.id === "hook" ? "Your hook" : "Your demo"}</div>
             )}
             {seg.id === "hook" && hookCover}
             {texts.filter((x) => x.text.trim() && showsAt(x, time)).map((x) => <TextOverlay key={x.id} x={x} />)}
             </div>
             {!playing && (
               <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white">
+                <span className="flex h-14 w-14 items-center justify-center rounded-none bg-black/45 text-white">
                   <Play className="ml-1 h-6 w-6" fill="currentColor" />
                 </span>
               </span>
@@ -181,7 +181,7 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
             if (!playing) claimPlayback("phone");
             setPlaying((p) => !p);
           }}
-          className="btn-primary h-8 w-8 shrink-0 rounded-full p-0"
+          className="btn-primary h-8 w-8 shrink-0 p-0"
           aria-label={playing ? "Pause" : "Play"}
         >
           {playing ? <Pause className="h-3.5 w-3.5" fill="currentColor" /> : <Play className="ml-0.5 h-3.5 w-3.5" fill="currentColor" />}
@@ -191,12 +191,12 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
           e.preventDefault(); e.stopPropagation(); setPlaying(false);
           setT(e.key === "Home" ? 0 : e.key === "End" ? total - 0.01 : Math.max(0, Math.min(total - 0.01, time + (e.key === "ArrowRight" ? 0.1 : -0.1))));
         }} onPointerDown={scrub} className="relative h-6 min-w-0 flex-1 cursor-pointer touch-none focus-visible:outline-2 focus-visible:outline-accent">
-          <div className="absolute inset-x-0 top-1/2 flex h-1.5 -translate-y-1/2 gap-[2px] overflow-hidden rounded-full">
+          <div className="absolute inset-x-0 top-1/2 flex h-1.5 -translate-y-1/2 gap-[2px] overflow-hidden rounded-none">
             {segs.map((x) => (
               <span key={x.id} className="absolute h-full bg-line" style={{ left: `${(x.offset / total) * 100}%`, width: `${(x.len / total) * 100}%` }} />
             ))}
           </div>
-          <div className="pointer-events-none absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-accent" style={{ width: `${(time / total) * 100}%` }} />
+          <div className="pointer-events-none absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-none bg-accent" style={{ width: `${(time / total) * 100}%` }} />
           <span className="pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-accent shadow" style={{ left: `${(time / total) * 100}%` }} />
         </div>
         <span className="shrink-0 text-[12.5px] tabular-nums text-muted">

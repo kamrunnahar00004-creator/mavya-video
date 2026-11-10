@@ -1413,7 +1413,7 @@ function CharacterStep({ face, mode, onMode, onFace }: { face: Hook["face"] | nu
               }}
               className={`flex h-44 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed transition-colors ${drag ? "border-accent bg-accent-tint" : "border-line-strong hover:border-accent hover:bg-accent-tint/40"} ${busy ? "pointer-events-none" : ""}`}
             >
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-tint text-accent">{busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}</span>
+              <span className="flex h-12 w-12 items-center justify-center rounded-none bg-accent-tint text-accent">{busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}</span>
               <span className="text-[15px] font-bold">{busy ? "Uploading" : "Drop a photo or click to upload"}</span>
               {!busy && <span className="text-[12.5px] text-soft">A clear photo of the face, JPG or PNG</span>}
               <input type="file" accept="image/jpeg,image/png" className="hidden" onChange={(e) => void upload(e.target.files?.[0])} />
@@ -1593,7 +1593,7 @@ function CharacterBrowser({ current, onPick, onPickFace, onClose }: { current: H
 
       {shown && viewing !== null && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-6" onClick={(e) => { e.stopPropagation(); setViewing(null); }}>
-          <button type="button" aria-label="Previous" onClick={(e) => { e.stopPropagation(); setViewing((viewing - 1 + CHARACTERS.length) % CHARACTERS.length); }} className="absolute left-6 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-3 text-ink hover:bg-white">
+          <button type="button" aria-label="Previous" onClick={(e) => { e.stopPropagation(); setViewing((viewing - 1 + CHARACTERS.length) % CHARACTERS.length); }} className="absolute left-6 top-1/2 -translate-y-1/2 rounded-none bg-white/90 p-3 text-ink hover:bg-white">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="fade-in flex max-h-full flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
@@ -1615,10 +1615,10 @@ function CharacterBrowser({ current, onPick, onPickFace, onClose }: { current: H
               </button>
             </div>
           </div>
-          <button type="button" aria-label="Next" onClick={(e) => { e.stopPropagation(); setViewing((viewing + 1) % CHARACTERS.length); }} className="absolute right-6 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-3 text-ink hover:bg-white">
+          <button type="button" aria-label="Next" onClick={(e) => { e.stopPropagation(); setViewing((viewing + 1) % CHARACTERS.length); }} className="absolute right-6 top-1/2 -translate-y-1/2 rounded-none bg-white/90 p-3 text-ink hover:bg-white">
             <ArrowLeft className="h-5 w-5 rotate-180" />
           </button>
-          <button type="button" aria-label="Close" onClick={(e) => { e.stopPropagation(); setViewing(null); }} className="absolute right-6 top-6 rounded-full bg-white/90 p-2 text-ink hover:bg-white">
+          <button type="button" aria-label="Close" onClick={(e) => { e.stopPropagation(); setViewing(null); }} className="absolute right-6 top-6 rounded-none bg-white/90 p-2 text-ink hover:bg-white">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -1647,7 +1647,7 @@ function lookBefore(texts: TextLayer[], at: number): TextLayer | undefined {
   return before[0] ?? texts[0];
 }
 
-/** The outlined button next to a step's main button (the other ways to do the step); violet when its panel is open. */
+/** The outlined button next to a step's main button (the other ways to do the step); accent blue when its panel is open. */
 const optionBtn = (on: boolean) =>
   `flex items-center gap-1.5 rounded-lg border px-3.5 py-2.5 text-[14px] font-semibold ${on ? "border-accent bg-accent-tint text-accent" : "border-line-strong bg-panel text-text hover:border-accent hover:text-accent"}`;
 
@@ -2007,7 +2007,7 @@ function NoteField({ label, placeholder, value, onSave, rows = 2, chips, submitL
                 setText(c);
                 onSave(c);
               }}
-              className="rounded-full border border-line px-3 py-1 text-[12.5px] font-medium text-muted hover:border-accent hover:text-accent"
+              className="rounded-none border border-line px-3 py-1 text-[12.5px] font-medium text-muted hover:border-accent hover:text-accent"
             >
               {c}
             </button>
@@ -2032,8 +2032,8 @@ function HookTiming({ duration, start, end, onChange }: { duration: number; star
     <div className="rounded-2xl bg-raised/70 px-4 py-3.5">
       <Label right={<span className="text-[12.5px] font-bold text-accent">{round1(end - start)}s hook</span>}>Hook timing</Label>
       <div className="relative h-6">
-        <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-hover" />
-        <div className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-accent" style={{ left: pct(start), width: pct(end - start) }} />
+        <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-none bg-hover" />
+        <div className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-none bg-accent" style={{ left: pct(start), width: pct(end - start) }} />
         {(["start", "end"] as const).map((k) => (
           <input
             key={k}

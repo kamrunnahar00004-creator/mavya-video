@@ -22,10 +22,10 @@ const HERO = [
 /** A phone playing a library video whole, with its view count. */
 function Phone({ lib, views, className = "" }: { lib: string; views: string; className?: string }) {
   return (
-    <div className={`relative w-[180px] shrink-0 rounded-[32px] xl:w-[190px] bg-ink p-[6px] shadow-[0_30px_60px_-24px_rgba(21,18,31,0.55)] ${className}`}>
-      <div className="relative aspect-[9/19.5] overflow-hidden rounded-[28px] bg-[#14121f]">
+    <div className={`keep-round relative w-[180px] shrink-0 rounded-[32px] xl:w-[190px] bg-ink p-[6px] shadow-[0_30px_60px_-24px_rgba(21,18,31,0.55)] ${className}`}>
+      <div className="keep-round relative aspect-[9/19.5] overflow-hidden rounded-[28px] bg-[#1c2633]">
         <LoopVideo src={`/landing/lib-${lib}.mp4`} poster={`/landing/lib-${lib}.webp`} className="absolute inset-0 h-full w-full object-cover" />
-        <span className="absolute left-1/2 top-2.5 h-4 w-16 -translate-x-1/2 rounded-full bg-black" />
+        <span className="keep-round absolute left-1/2 top-2.5 h-4 w-16 -translate-x-1/2 rounded-full bg-black" />
         <span className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10.5px] font-bold text-white">
           <Play className="h-2.5 w-2.5" fill="currentColor" />
           {views} views
@@ -54,8 +54,8 @@ export function Landing() {
 
       {/* Hero: text left (semibold, three clean lines), the three phones fanned right, both in the first screen */}
       <section className="relative overflow-hidden">
-        {/* violet glow behind the phones, a little stronger, so the dark card below feels like a continuation */}
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[600px] bg-[radial-gradient(46%_58%_at_72%_32%,rgba(123,76,250,0.2)_0%,transparent_100%)] [mask-image:linear-gradient(to_bottom,transparent,black_180px)]" />
+        {/* blue glow behind the phones, a little stronger, so the dark card below feels like a continuation */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[600px] bg-[radial-gradient(46%_58%_at_72%_32%,rgba(74,168,224,0.2)_0%,transparent_100%)] [mask-image:linear-gradient(to_bottom,transparent,black_180px)]" />
         <div className="relative mx-auto grid max-w-[1160px] items-center gap-12 px-5 pb-24 pt-16 lg:grid-cols-[1.1fr_1fr] lg:pt-24">
           <div>
             <h1 className="text-[40px] font-semibold leading-[1.12] tracking-[-0.035em] sm:text-[48px]">
@@ -109,8 +109,8 @@ export function Landing() {
 
       {/* Last call */}
       <section className="px-5 pb-20">
-        <div className="relative mx-auto flex max-w-[1120px] flex-col items-center overflow-hidden rounded-[28px] bg-[#15121f] px-6 py-20 text-center">
-          <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 h-[460px] w-[760px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-[radial-gradient(closest-side,rgba(123,76,250,0.38),transparent)]" />
+        <div className="relative mx-auto flex max-w-[1120px] flex-col items-center overflow-hidden rounded-[28px] bg-[#1c2633] px-6 py-20 text-center">
+          <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 h-[460px] w-[760px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-[radial-gradient(closest-side,rgba(74,168,224,0.38),transparent)]" />
           <h2 className="relative max-w-[640px] text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px] text-white!">Start with a hook that already went viral.</h2>
           <Link href="/studio" className="btn-primary relative mt-8 h-12 px-7 text-[16px]">
             Sign up
