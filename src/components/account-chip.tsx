@@ -5,22 +5,34 @@ import Link from "@/components/pending-link";
 import { Avatar } from "@/components/profile-view";
 import { NO_PROFILE, PROFILE_EVENT, displayName, type Profile } from "@/lib/profile";
 import { planById, type PlanId } from "@/lib/plans";
+import { newestWrites } from "@/lib/account-loader";
+
+// The last values this page saw: a remounted chip (moving between the studio and Settings) shows them at once
+// while it refreshes. Memory only; signing out reloads the page, so they never outlive the session.
+// Only the newest request writes them, even from a chip that has unmounted.
+const lastProfile = newestWrites<Profile>();
+const lastPlan = newestWrites<string>();
 
 /** Bottom of the sidebar: who is signed in and their plan; opens Settings. Updates when the profile is saved. */
 export function AccountChip() {
-  const [profile, setProfile] = useState<Profile>(NO_PROFILE);
-  const [plan, setPlan] = useState<string | null>(null);
+  const [profile, setProfile] = useState<Profile>(lastProfile.get() ?? NO_PROFILE);
+  const [plan, setPlan] = useState<string | null>(lastPlan.get());
   useEffect(() => {
     let alive = true;
+    const profileTicket = lastProfile.ticket();
     fetch("/api/profile")
       .then((r) => { if (!r.ok) throw Error("Profile unavailable"); return r.json() as Promise<Profile>; })
-      .then((p) => alive && setProfile(p))
+      .then((p) => { if (lastProfile.write(profileTicket, p) && alive) setProfile(p); })
       .catch(() => undefined);
+    const planTicket = lastPlan.ticket();
     fetch("/api/usage")
       .then((r) => (r.ok ? (r.json() as Promise<{ plan: PlanId | null }>) : null))
-      .then((u) => alive && setPlan(u?.plan ? `${planById(u.plan).name} plan` : "No plan"))
-      .catch(() => alive && setPlan("No plan"));
-    const update = (e: Event) => setProfile((e as CustomEvent<Profile>).detail);
+      .then((u) => {
+        const text = u?.plan ? `${planById(u.plan).name} plan` : "No plan";
+        if (u ? lastPlan.write(planTicket, text) && alive : alive) setPlan(u ? text : lastPlan.get() ?? text);
+      })
+      .catch(() => alive && setPlan(lastPlan.get() ?? "No plan"));
+    const update = (e: Event) => { const p = (e as CustomEvent<Profile>).detail; lastProfile.write(lastProfile.ticket(), p); setProfile(p); };
     window.addEventListener(PROFILE_EVENT, update);
     return () => {
       alive = false;

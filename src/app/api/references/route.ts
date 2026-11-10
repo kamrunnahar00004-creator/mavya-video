@@ -32,7 +32,21 @@ async function readGET(request: Request) {
     }
     return response;
   };
-  if (view === "catalog" || view === "cards") return respond(refs);
+  if (view === "catalog") {
+    const response = respond(refs);
+    // The curated catalog is the same for every account. Let the browser keep it (never a shared CDN cache):
+    // fresh for 5 minutes, then shown at once while a background request refreshes it (founder 2026-11-10:
+    // "anything to make it faster"). A curator's edit bypasses this cache (library-cache.ts). Continuations stay fresh.
+    // Vary: Cookie keeps a saved copy inside one signed-in session: signing out, or another account, misses it and
+    // goes through the sign-in check (Codex). At most 25 minutes old in total: signed media links can arrive with
+    // only 30 minutes left (r2.ts reuses them for half their hour).
+    if (!query.get("cursor")) {
+      response.headers.set("Cache-Control", "private, max-age=300, stale-while-revalidate=1200");
+      response.headers.set("Vary", "Cookie");
+    }
+    return response;
+  }
+  if (view === "cards") return respond(refs);
   if (view === "covers") return respond(refs.map((r) => ({ id: r.id, thumbUrl: r.analysis?.segments[0]?.thumb ?? r.thumbUrl })));
   if (view === "studio") {
     // Curation history and model explanations never appear in the studio.

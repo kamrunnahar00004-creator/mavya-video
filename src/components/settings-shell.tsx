@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "@/components/pending-link";
 import { usePathname } from "next/navigation";
 import { BarChart3, ChevronLeft, CreditCard, LayoutList, LogOut, User } from "lucide-react";
 import { AUTH_ENABLED, signOut } from "@/lib/profile";
+import { accountLoader, newestWrites } from "@/lib/account-loader";
 import { planById, type BillingCycle, type Plan, type PlanId } from "@/lib/plans";
 
 /*
@@ -97,32 +98,43 @@ export type Billing = {
 
 const get = <T,>(url: string) => fetch(url, { cache: "no-store", signal: AbortSignal.timeout(15_000) }).then((r) => (r.ok ? (r.json() as Promise<T>) : null)).catch(() => null);
 
+// The last usage this page loaded: the Usage page opened again shows it at once and refreshes it in the background
+// (founder 2026-11-10: faster clicks). Memory only; signing out reloads the page. Pages with billing (Plans, Billing)
+// never start from it: their buttons act on the plan, so they always wait for a fresh snapshot (Codex).
+// A change always calls reload(), which shows the loading state and fetches fresh.
+// Only the newest request writes it, even from a page that has since closed.
+const lastUsage = newestWrites<Usage>();
+
 /** The plan with usage (and, with `billing`, the card and invoices). `reload` after a change. */
 export function useAccount({ billing: withBilling = false } = {}) {
-  const [usage, setUsage] = useState<Usage | null>(null);
+  const seen = withBilling ? null : lastUsage.get();
+  const [usage, setUsage] = useState<Usage | null>(seen);
   const [billing, setBilling] = useState<Billing | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(Boolean(seen));
   const [error, setError] = useState(false);
-  const inFlight=useRef<Promise<{usage:Usage|null;billing:Billing|null}>|null>(null);
-  const reload = useCallback(() => {
-    if(inFlight.current)return inFlight.current;
-    setLoaded(false); setError(false);
-    const operation=(async()=>{
-      const [u,b]=await Promise.all([get<Usage>("/api/usage"),withBilling?get<Billing>("/api/billing"):null]);
-      setError(!u||(withBilling&&!b));
-      if(u)setUsage(u);
-      if(b)setBilling(b);
-      setLoaded(true);
-      return {usage:u,billing:b};
-    })();
-    inFlight.current=operation;
-    void operation.finally(()=>{if(inFlight.current===operation)inFlight.current=null;});
-    return operation;
-  },[withBilling]);
+  const load = useMemo(() => accountLoader(
+    async () => {
+      const ticket = lastUsage.ticket();
+      const [u, b] = await Promise.all([get<Usage>("/api/usage"), withBilling ? get<Billing>("/api/billing") : null]);
+      if (u) lastUsage.write(ticket, u);
+      return { usage: u, billing: b };
+    },
+    {
+      begin: () => { setLoaded(false); setError(false); },
+      commit: ({ usage: u, billing: b }) => {
+        setError(!u || (withBilling && !b));
+        if (u) setUsage(u);
+        if (b) setBilling(b);
+        setLoaded(true);
+      },
+    },
+  ), [withBilling]);
+  const reload = useCallback(() => load(false), [load]);
+  const quietOnMount = useRef(Boolean(seen));
   useEffect(() => {
-    // Fetch on mount; the setState calls happen after the await.
-    void reload();
-  }, [reload]);
+    // Fetch on mount; the setState calls happen after the await. Already showing the last account: refresh quietly.
+    void load(quietOnMount.current);
+  }, [load]);
   const plan: Plan | null = usage?.plan ? planById(usage.plan) : billing?.subscription ? planById(billing.subscription.plan) : null;
   return { usage, billing, plan, loaded, error, reload };
 }
