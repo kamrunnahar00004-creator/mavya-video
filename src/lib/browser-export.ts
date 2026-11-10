@@ -1,5 +1,5 @@
 "use client";
-import { ALL_FORMATS, AudioBufferSource, BlobSource, BufferSource, BufferTarget, CanvasSource, EncodedPacketSink, EncodedVideoPacketSource, Input, Mp4OutputFormat, Output, Quality, VideoSampleSink, canEncodeAudio, canEncodeVideo, type InputVideoTrack } from "mediabunny";
+import { ALL_FORMATS, AudioBufferSource, BlobSource, BufferSource, BufferTarget, EncodedPacketSink, EncodedVideoPacketSource, Input, Mp4OutputFormat, Output, Quality, VideoSample, VideoSampleSink, VideoSampleSource, canEncodeAudio, canEncodeVideo, type InputVideoTrack } from "mediabunny";
 import { demoAt, exposurePower, contrastGamma, layout, plan, textFrames, type Look, type Spec } from "../../render/render.mjs";
 import { frameSchedule, frameTimes, mediaOrigin } from "../../render/frames.mjs";
 import { fillSound } from "../../render/sound.mjs";
@@ -146,14 +146,15 @@ function makeGl(canvas: OffscreenCanvas) {
   const prog = gl.createProgram()!;
   gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS));
   gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS));
+  // The same place as the standard-range pass (makeYuv), which draws with this same buffer.
+  gl.bindAttribLocation(prog, 0, "p");
   gl.linkProgram(prog);
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog) ?? "program");
   gl.useProgram(prog);
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-  const loc = gl.getAttribLocation(prog, "p");
-  gl.enableVertexAttribArray(loc);
-  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
   const u = (n: string) => gl.getUniformLocation(prog, n);
   const texture = () => {
     const t = gl.createTexture()!;
@@ -164,7 +165,98 @@ function makeGl(canvas: OffscreenCanvas) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     return t;
   };
-  return { gl, u, texture, video: texture() };
+  return { gl, prog, u, texture, video: texture() };
+}
+
+/**
+ * Standard-range video (founder 2026-11-10: exports looked too contrasty and saturated in Windows Media Player).
+ * Fed canvas frames, Chrome's hardware encoder wrote full-range YUV (0-255) with no colour description in the stream;
+ * a player that ignores the full-range flag crushes the darks and adds ~11% saturation. CapCut, phones and our server
+ * exports write standard (limited, 16-235) BT.709. So each finished frame is converted here, on the GPU, to exactly
+ * that (I420: Y, then U, then V planes), and the encoder gets those bytes as they are: no encoder-chosen conversion.
+ */
+export const BT709_LIMITED: VideoColorSpaceInit = { primaries: "bt709", transfer: "bt709", matrix: "bt709", fullRange: false };
+const YUV_FS = `#version 300 es
+precision highp float;
+precision highp int;
+uniform sampler2D rgb;
+uniform int W, H;
+out vec4 o;
+const vec3 K = vec3(0.2126, 0.7152, 0.0722);
+vec3 px(int x, int y) { return texelFetch(rgb, ivec2(x, H - 1 - y), 0).rgb; }
+// One byte of the I420 frame: the Y plane (W x H), then U, then V (W/2 x H/2 each).
+float at(int b) {
+  int plane = W * H, quarter = plane / 4;
+  if (b < plane) return 16.0 + 219.0 * dot(px(b % W, b / W), K);
+  int c = b - plane, v = c >= quarter ? 1 : 0;
+  c -= v * quarter;
+  int cx = (c % (W / 2)) * 2, cy = (c / (W / 2)) * 2;
+  vec3 m = (px(cx, cy) + px(cx + 1, cy) + px(cx, cy + 1) + px(cx + 1, cy + 1)) * 0.25;
+  float y = dot(m, K);
+  return v == 0 ? 128.0 + 224.0 * (m.b - y) / 1.8556 : 128.0 + 224.0 * (m.r - y) / 1.5748;
+}
+void main() {
+  int b = (int(gl_FragCoord.y) * (W / 4) + int(gl_FragCoord.x)) * 4;
+  o = floor(clamp(vec4(at(b), at(b + 1), at(b + 2), at(b + 3)), 0.0, 255.0) + 0.5) / 255.0;
+}`;
+
+/**
+ * Turns what the canvas shows into one standard-range BT.709 I420 frame (yuvFrame). The packed bytes come out in
+ * I420 order: rows of W/4 RGBA pixels, H x 1.5 rows.
+ */
+function makeYuv(gl: WebGL2RenderingContext, W: number, H: number) {
+  if (W % 8 || H % 2) throw new Error("frame size");
+  const shader = (type: number, src: string) => {
+    const sh = gl.createShader(type)!;
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh) ?? "shader");
+    return sh;
+  };
+  const prog = gl.createProgram()!;
+  gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS));
+  gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, YUV_FS));
+  gl.bindAttribLocation(prog, 0, "p");
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog) ?? "program");
+  const tex = (w: number, h: number, format: number) => {
+    const t = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, format, w, h);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    return t;
+  };
+  // RGB8: the canvas has no alpha (makeGl), and WebGL refuses to copy it into a texture that has one.
+  const source = tex(W, H, gl.RGB8), packed = tex(W / 4, (H * 3) / 2, gl.RGBA8);
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, packed, 0);
+  if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("framebuffer");
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  const bytes = new Uint8Array((W * H * 3) / 2);
+  return {
+    /** The canvas's current picture as I420 bytes (the returned array is reused for every frame). */
+    read(main: WebGLProgram) {
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, source);
+      gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, W, H);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.useProgram(prog);
+      gl.uniform1i(gl.getUniformLocation(prog, "rgb"), 0);
+      gl.uniform1i(gl.getUniformLocation(prog, "W"), W);
+      gl.uniform1i(gl.getUniformLocation(prog, "H"), H);
+      gl.viewport(0, 0, W / 4, (H * 3) / 2);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      gl.readPixels(0, 0, W / 4, (H * 3) / 2, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
+      // A failed copy or draw would encode a black frame: stop instead (the next encoder setting is tried).
+      if (gl.getError() !== gl.NO_ERROR) throw new Error("webgl yuv");
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.useProgram(main);
+      gl.viewport(0, 0, W, H);
+      return bytes;
+    },
+  };
 }
 
 /** Smooth (ease in-out) keyframe value at file time F, as curve() in render.mjs. */
@@ -211,8 +303,8 @@ type Held = { output?: Output; inputs: Input[]; gl?: WebGL2RenderingContext; bit
  * while the encoder itself fails (configure, encode or flush); the files are downloaded once for all tries. A source
  * that can't be downloaded or read, cancellation, or every setting failing throws.
  */
-export async function browserExport(spec: Spec, textsReady: BrowserText[] | Promise<BrowserText[]>, onProgress: (p: number) => void, signal?: AbortSignal): Promise<{ video: Blob; demo: Blob | null; encoder: string }> {
-  const settings = await pictureSettings(spec.width, spec.height);
+export async function browserExport(spec: Spec, textsReady: BrowserText[] | Promise<BrowserText[]>, onProgress: (p: number) => void, signal?: AbortSignal, /** Checks only: just this encoder setting (its label). */ only?: string): Promise<{ video: Blob; demo: Blob | null; encoder: string }> {
+  const settings = (await pictureSettings(spec.width, spec.height)).filter((p) => !only || p.label === only);
   if (!settings.length) throw new Error("encoder");
   await ensureAac();
   // Download every file once, all at once; the picture starts as soon as the first clip is in.
@@ -302,8 +394,9 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
 
   // Picture.
   const canvas = new OffscreenCanvas(W, H);
-  const { gl, u, texture, video } = makeGl(canvas);
+  const { gl, prog, u, texture, video } = makeGl(canvas);
   held.gl = gl;
+  const yuv = makeYuv(gl, W, H);
   gl.viewport(0, 0, W, H);
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -322,7 +415,7 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
 
   const output = new Output({ format: new Mp4OutputFormat({ fastStart: "in-memory" }), target: new BufferTarget() });
   // QP mode: mediabunny puts the quantizer on every frame (the demo key frame below keeps it).
-  const picture = new CanvasSource(canvas, {
+  const picture = new VideoSampleSource({
     codec: "avc", quality: setting.quality, keyFrameInterval: 2, latencyMode: "quality",
     fullCodecString: setting.fullCodecString, hardwareAcceleration: setting.hardwareAcceleration,
   });
@@ -348,7 +441,9 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
     gl.uniform1i(u("mode"), 0);
     // A lost GPU context draws nothing: stop rather than encode black frames.
     if (gl.isContextLost()) throw new Error("webgl context lost");
-    await picture.add(n / fps, 1 / fps, n === demoFrame ? { keyFrame: true } : undefined);
+    // Standard-range BT.709 bytes (makeYuv), encoded as they are.
+    const frame = new VideoSample(yuv.read(prog), { format: "I420", codedWidth: W, codedHeight: H, timestamp: n / fps, duration: 1 / fps, colorSpace: BT709_LIMITED });
+    try { await picture.add(frame, n === demoFrame ? { keyFrame: true } : undefined); } finally { frame.close(); }
     n++;
     onProgress(0.03 + (n / frameCount) * 0.92);
     signal?.throwIfAborted();
@@ -443,12 +538,10 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
   onProgress(1);
   const buffer = (output.target as BufferTarget).buffer;
   if (!buffer) throw new Error("empty");
-  // Chrome's hardware encoders write BT.709 into the H.264 stream; the software encoder writes sRGB, and the file's
-  // colour box must then say the same (Codex 2026-11-05), so it is relabelled only for the hardware ones.
-  const soft = setting.hardwareAcceleration === "prefer-software";
-  const raw = new Uint8Array(buffer), file = soft ? raw : bt709(raw);
+  // Every encoder now gets standard-range BT.709 frames (makeYuv); the file's colour box says exactly that.
+  const file = bt709(new Uint8Array(buffer));
   // The demo part: never a reason to fail the export.
-  const demo = at === null ? null : await cutDemo(file, at, fps, !soft).catch(() => null);
+  const demo = at === null ? null : await cutDemo(file, at, fps).catch(() => null);
   const mbps = (file.length * 8) / Math.max(0.1, spec.total) / 1e6;
   // Whole-file rate (picture, sound and container).
   const encoder = `${setting.label} ${mbps.toFixed(1)}mbps-file ${BUILD}`;
@@ -456,7 +549,7 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
 }
 
 /** The demo part of the finished video (from its key frame at `at`), picture only, packets copied as they are. */
-async function cutDemo(file: Uint8Array<ArrayBuffer>, at: number, fps: number, relabel: boolean): Promise<Blob | null> {
+async function cutDemo(file: Uint8Array<ArrayBuffer>, at: number, fps: number): Promise<Blob | null> {
   const input = new Input({ source: new BufferSource(file.buffer), formats: ALL_FORMATS });
   try {
     const track = await input.getPrimaryVideoTrack();
@@ -477,22 +570,22 @@ async function cutDemo(file: Uint8Array<ArrayBuffer>, at: number, fps: number, r
     source.close();
     await output.finalize();
     const out = (output.target as BufferTarget).buffer;
-    return out ? new Blob([relabel ? bt709(new Uint8Array(out)) : new Uint8Array(out)], { type: "video/mp4" }) : null;
+    return out ? new Blob([bt709(new Uint8Array(out))], { type: "video/mp4" }) : null;
   } finally {
     input.dispose();
   }
 }
 
 /**
- * The browser labels a canvas video's colour curve sRGB; the server's videos (and the clips) say BT.709, and some
- * players (QuickTime, iPhone) show the two a little differently. Relabel the file's colour box to BT.709.
+ * The file's colour box says what the frames are (makeYuv): BT.709 primaries, curve and matrix, standard range, like
+ * CapCut's and the server's exports. Whatever the encoder or mediabunny wrote there is overwritten.
  */
-function bt709(file: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
-  // 'colr' + 'nclx', then primaries, transfer, matrix (16 bits each).
+export function bt709(file: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
+  // 'colr' + 'nclx', then primaries, transfer, matrix (16 bits each), then the full-range bit (top bit).
   for (let i = 0; i + 14 < file.length; i++) {
     if (file[i] === 0x63 && file[i + 1] === 0x6f && file[i + 2] === 0x6c && file[i + 3] === 0x72 && file[i + 4] === 0x6e && file[i + 5] === 0x63 && file[i + 6] === 0x6c && file[i + 7] === 0x78) {
-      file[i + 10] = 0;
-      file[i + 11] = 1;
+      file.set([0, 1, 0, 1, 0, 1], i + 8);
+      file[i + 14] &= 0x7f;
       break;
     }
   }
