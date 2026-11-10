@@ -31,7 +31,7 @@ const theme = css.match(/@theme \{([^}]*)\}/);
 ok(theme && ['xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl'].every((r) => new RegExp(`--radius-${r}: 0;`).test(theme[1])), 'every Tailwind radius is 0');
 ok(/@utility btn-primary \{[^}]*border-radius: 0;/.test(css) && /@utility card \{\s*border-radius: 0;/.test(css), 'the primary button and cards are square');
 
-const files = fs.readdirSync('src', { recursive: true }).filter((f) => /\.(tsx|ts|css)$/.test(f)).map((f) => path.join('src', f));
+const files = fs.readdirSync('src', { recursive: true }).filter((f) => /\.(tsx|ts|css|svg)$/.test(f)).map((f) => path.join('src', f));
 // The old violet, its lilac greys and the old track colours.
 const violet = /#(7b4cfa|6d3ef0|5b2fd6|b69cff|15121f|14121f|1d1a2b|2e1065|f3f3f8|f7f7fb|ebeaf3|e3e2ec|cfcedb|4d4a5e|928fa6|6b6780|2a5bd7|e2ebfd|b02f86|f9e3f1|f3cfe6|221d33|dfdde9|d2d0df|a39eb5)\b|rgba\(123, ?76, ?250/i;
 // Caption colours are the seller's content, not the app's chrome.
