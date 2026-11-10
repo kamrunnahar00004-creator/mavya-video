@@ -1,6 +1,6 @@
 // Faster pages (founder 2026-11-10: "anything to make it faster. do it"). From Japan, the hook library list cost
 // 0.5-1.4 s on every Videos/Library load and profile/usage were fetched again on every click. Now: the browser keeps
-// the curated catalog (private, 5 min fresh, then stale-while-revalidate), an edit bypasses that cache, the request
+// the curated catalog (private, 25 min, wiped on sign-out), an edit bypasses that cache, the request
 // starts with the HTML, and the sidebar chip and Settings pages show the last values while they refresh. Offline.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -9,7 +9,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 20;
+const EXPECTED = 22;
 const eq = (a, b, msg) => { checks++; assert.equal(a, b, msg); };
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 
@@ -29,13 +29,19 @@ finish('speed-cache-checks', EXPECTED, () => checks, async () => {
   });
   const cc = async (url) => (await route.GET(new Request('https://mavya.app' + url))).headers.get('cache-control');
   const first = await route.GET(new Request('https://mavya.app/api/references?view=catalog&scope=curated&all=1'));
-  eq(first.headers.get('cache-control'), 'private, max-age=300, stale-while-revalidate=1200', 'the catalog is kept by the browser');
-  eq(first.headers.get('vary'), 'Cookie', 'only inside the same signed-in session (sign-out or another account misses it)');
+  eq(first.headers.get('cache-control'), 'private, max-age=1500', 'the catalog is kept by the browser (Vercel strips stale-while-revalidate)');
+  eq(first.headers.get('vary'), null, 'no Vary: Cookie (analytics cookies change on every view, so it never matched)');
   // Signed media links can arrive with half their hour left; the cached list must be older than that never.
   const r2 = fs.readFileSync('src/lib/server/r2.ts', 'utf8');
   const life = Number(r2.match(/export function signedGet\(key: string, seconds = (\d+)/)[1]);
-  const [, fresh, stale] = first.headers.get('cache-control').match(/max-age=(\d+), stale-while-revalidate=(\d+)/).map(Number);
-  ok(/Keep at least half the original lifetime/.test(r2) && fresh + stale < life / 2, `cached at most ${fresh + stale} s, under the ${life / 2} s a link may have left`);
+  const age = Number(first.headers.get('cache-control').match(/max-age=(\d+)/)[1]);
+  ok(/Keep at least half the original lifetime/.test(r2) && age < life / 2, `cached at most ${age} s, under the ${life / 2} s a link may have left`);
+
+  // Sign-out wipes the browser cache, so the saved catalog never outlives the session.
+  const out = load('src/app/api/signed-out/route.ts').POST();
+  ok(out.status === 204 && out.headers.get('clear-site-data') === '"cache"', 'the sign-out endpoint clears the browser cache');
+  const prof = fs.readFileSync('src/lib/profile.ts', 'utf8');
+  ok(/await fetch\("\/api\/signed-out", \{ method: "POST", signal: AbortSignal\.timeout\(5_000\) \}\)\.catch\(\(\) => undefined\);\s*if \(AUTH_ENABLED\)/.test(prof) && /const PUBLIC_API = \["\/api\/signed-out",/.test(fs.readFileSync('src/lib/supabase/session.ts', 'utf8')), 'signOut calls it before ending the session, and it works without a session');
   ok(!/public|s-maxage/.test(await cc('/api/references?view=catalog&scope=curated&all=1')), 'never a shared CDN cache');
   eq(await cc('/api/references?view=catalog&scope=curated&all=1&cursor=abc'), null, 'continuations stay fresh');
   eq(await cc('/api/references?view=cards'), null, 'owned lists are not cached');

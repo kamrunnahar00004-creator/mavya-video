@@ -37,13 +37,13 @@ async function readGET(request: Request) {
     // The curated catalog is the same for every account. Let the browser keep it (never a shared CDN cache):
     // fresh for 5 minutes, then shown at once while a background request refreshes it (founder 2026-11-10:
     // "anything to make it faster"). A curator's edit bypasses this cache (library-cache.ts). Continuations stay fresh.
-    // Vary: Cookie keeps a saved copy inside one signed-in session: signing out, or another account, misses it and
-    // goes through the sign-in check (Codex). At most 25 minutes old in total: signed media links can arrive with
-    // only 30 minutes left (r2.ts reuses them for half their hour).
-    if (!query.get("cursor")) {
-      response.headers.set("Cache-Control", "private, max-age=300, stale-while-revalidate=1200");
-      response.headers.set("Vary", "Cookie");
-    }
+    // At most 25 minutes old: signed media links can arrive with only 30 minutes left (r2.ts reuses them for half
+    // their hour). Signing out wipes the browser cache (/api/signed-out), so a saved copy never outlives the session.
+    // No Vary: Cookie: the analytics cookies change on every page view, so it never matched (measured 2026-11-10);
+    // and no stale-while-revalidate: Vercel strips it. Founder decision 2026-11-10 (Codex P2, accepted): after a
+    // session expires without Sign out, the same browser may still read this shared curated list (no owned or
+    // personal data) for up to 25 minutes.
+    if (!query.get("cursor")) response.headers.set("Cache-Control", "private, max-age=1500");
     return response;
   }
   if (view === "cards") return respond(refs);
