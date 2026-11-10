@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><style>body{margin:0;background:#fff}#box{position:absolute;left:40px;top:40px;width:258px;height:459px;overflow:hidden;background:#000}
+video{width:100%;height:100%;object-fit:cover;display:block}</style>
+<div id="box"><video id="v" src="still480.mp4" muted playsinline preload="auto"></video><canvas id="c" width="516" height="918" style="position:absolute;inset:0;width:100%;height:100%;display:none"></canvas></div>
+<script src="app.js"></script><script>
+const v=document.getElementById('v'), cv=document.getElementById('c'), cx=cv.getContext('2d');
+const zoomAt=(t)=>{const p=Math.min(1,Math.max(0,(t-0.3)/2));return 32*p*p*(3-2*p);};
+window.setT=(t,variant)=>{let z=zoomAt(t); if(variant==='rounded') z=Math.round(z*10)/10; const s=1+z/100;
+  v.style.transform=''; v.style.objectViewBox=''; cv.style.display='none'; v.style.visibility='';
+  if(variant==='rot') v.style.transform = z ? `scale(${s}) rotate(0.02deg)` : '';
+  else if(variant==='ovb'){ const m=(1-1/s)/2*100; v.style.objectViewBox = z ? `inset(${m}% ${m}% ${m}% ${m}%)` : ''; }
+  else if(variant==='canvas'){ cv.style.display='block'; v.style.visibility='hidden'; const vw=v.videoWidth, vh=v.videoHeight;
+    const box=258/459, cw=Math.min(vw, vh*box), ch=cw/box, x0=(vw-cw)/2, y0=(vh-ch)/2, w=cw/s, h=ch/s;
+    cx.imageSmoothingQuality='high'; cx.drawImage(v, x0+(cw-w)/2, y0+(ch-h)/2, w, h, 0, 0, cv.width, cv.height); }
+  else if(variant==='app') v.style.transform = window.APP[Math.round(t*30)];
+  else v.style.transform = z ? `scale(${s}) translate(0%, 0%)` : '';
+};
+window.ready=new Promise(r=>{v.addEventListener('loadeddata',()=>{v.currentTime=0.5;v.addEventListener('seeked',()=>r(1),{once:true})},{once:true});});
+</script>

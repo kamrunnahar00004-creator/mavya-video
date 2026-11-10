@@ -51,8 +51,9 @@ export const speedOf = (a?: Partial<Adjust> | null) => Math.max(0.5, Math.min(2,
 const sortKeys = (keys: MotionKey[]) => [...keys].sort((a, b) => a.t - b.t);
 const pick = (k: Motion): Motion => ({ zoom: k.zoom, panX: k.panX, panY: k.panY });
 
-/** Zoom and position at file time t: the static values, or eased between keyframes. */
-export function motionAt(a: Partial<Adjust> | null | undefined, t?: number): Motion {
+/** Zoom and position at file time t: the static values, or eased between keyframes. `exact` keeps the fractions (for
+ * drawing); without it values round to 0.1 for the controls. */
+export function motionAt(a: Partial<Adjust> | null | undefined, t?: number, exact = false): Motion {
   const v = fullAdjust(a);
   const ks = sortKeys(v.keys);
   if (!ks.length || t === undefined) return pick(v);
@@ -63,7 +64,8 @@ export function motionAt(a: Partial<Adjust> | null | undefined, t?: number): Mot
   const [from, to] = [ks[i], ks[i + 1]];
   const p = (t - from.t) / (to.t - from.t);
   const e = p * p * (3 - 2 * p); // ease in-out
-  const mix = (x: number, y: number) => Math.round((x + (y - x) * e) * 10) / 10;
+  // Drawing uses the exact value: rounding to 0.1 made a slow zoom move in uneven steps (founder 2026-11-11).
+  const mix = (x: number, y: number) => (exact ? x + (y - x) * e : Math.round((x + (y - x) * e) * 10) / 10);
   return { zoom: mix(from.zoom, to.zoom), panX: mix(from.panX, to.panX), panY: mix(from.panY, to.panY) };
 }
 
@@ -172,7 +174,7 @@ const panRoom = (scale: number) => ((scale - 1) / (2 * scale)) * 100;
 /** CSS for a <video> at file time t: filter + zoom / position / flip transform. */
 export function videoStyle(a?: Partial<Adjust> | null, t?: number): CSSProperties | undefined {
   if (!isAdjusted(a)) return undefined;
-  const v = { ...fullAdjust(a), ...motionAt(a, t) };
+  const v = { ...fullAdjust(a), ...motionAt(a, t, true) };
   const parts = [];
   if (v.brightness) parts.push(`url(#${exposureId(v.brightness)})`);
   if (v.contrast) parts.push(`url(#${contrastId(v.contrast)})`);
@@ -180,7 +182,10 @@ export function videoStyle(a?: Partial<Adjust> | null, t?: number): CSSPropertie
   if (v.warmth) parts.push(`url(#${warmthId(v.warmth)})`);
   const s = 1 + v.zoom / 100;
   const room = panRoom(s);
-  const move = v.zoom ? [`scale(${s})`, `translate(${(v.panX / 100) * room}%, ${(v.panY / 100) * room}%)`] : [];
+  // rotate(0.02deg) (0.09 px of tilt across the preview, invisible) keeps Chrome from snapping the zoomed video to
+  // whole screen pixels: without it a keyframed zoom wobbled 0.5 px every frame in the small preview, ~2 px of the
+  // video (founder 2026-11-11: "in the preview there is the wobble"; measured 0.54 px, with it 0.13, perfect 0.06).
+  const move = v.zoom ? [`scale(${s})`, `translate(${(v.panX / 100) * room}%, ${(v.panY / 100) * room}%)`, "rotate(0.02deg)"] : [];
   if (v.flip) move.push("scaleX(-1)");
   return {
     filter: parts.length ? parts.join(" ") : undefined,
