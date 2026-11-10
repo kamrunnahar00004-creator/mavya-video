@@ -27,9 +27,9 @@ const BASE = ["-nostdin", "-y", "-v", "error", "-filter_complex_threads", "1", "
  */
 const PIECE_OUT = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "12", "-pix_fmt", "yuv420p", "-color_range", "tv", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-threads", "1", "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", "-f", "matroska"];
 
-/** Smooth (ease in-out) value of keyframe field `k` at file time it + p0, as an ffmpeg expression. */
-function curve(keys, k, p0) {
-  const F = `(it+${r(p0)})`;
+/** Smooth (ease in-out) value of keyframe field `k` at file time `at` + p0, as an ffmpeg expression. */
+function curve(keys, k, p0, at = "it") {
+  const F = `(${at}+${r(p0)})`;
   let e = `${keys[keys.length - 1][k]}`;
   for (let i = keys.length - 2; i >= 0; i--) {
     const a = keys[i];
@@ -61,9 +61,17 @@ function look(a, p0, W, H, fps) {
   if (v.flip) out.push("hflip");
   const keys = [...(v.keys ?? [])].sort((x, y) => x.t - y.t);
   if (keys.length) {
-    // zoompan: d=1 keeps one output frame per input frame; x / y are the window's top left in the input.
-    const z = `(1+(${curve(keys, "zoom", p0)})/100)`;
-    out.push(`zoompan=z='${z}':x='(iw-iw/zoom)/2*(1-(${curve(keys, "panX", p0)})/100)':y='(ih-ih/zoom)/2*(1-(${curve(keys, "panY", p0)})/100)':d=1:s=${W}x${H}:fps=${fps}`);
+    // The zoom window's corners in the input, to the fraction of a pixel: perspective resamples (bilinear) from
+    // them. zoompan snapped the window to whole pixels, so a keyframed zoom wobbled 1-2 px every frame (founder
+    // 2026-11-11: "when it is zooming, it is shaking"); the browser export never did. One output frame per input
+    // frame; `in` counts frames from 1 and the input is already at `fps`, so slot j = in - 1 is at file time
+    // j / fps + p0 (in / fps ran one frame early, measured 2026-11-11).
+    const at = `(in-1)/${fps}`;
+    const z = `(1+(${curve(keys, "zoom", p0, at)})/100)`;
+    const left = `((W-W/${z})/2*(1-(${curve(keys, "panX", p0, at)})/100))`;
+    const top = `((H-H/${z})/2*(1-(${curve(keys, "panY", p0, at)})/100))`;
+    const right = `(${left}+W/${z})`, bottom = `(${top}+H/${z})`;
+    out.push(`perspective=x0='${left}':y0='${top}':x1='${right}':y1='${top}':x2='${left}':y2='${bottom}':x3='${right}':y3='${bottom}':interpolation=linear:sense=source:eval=frame`);
   } else if (v.zoom) {
     const s = 1 + v.zoom / 100;
     const sw = 2 * Math.round((W * s) / 2);
@@ -328,7 +336,7 @@ export function stepArgs(spec, step, src, out, slots, sound) {
     `crop='trunc(min(iw,ih*${W}/${H})/2)*2':'trunc(min(ih,iw*${H}/${W})/2)*2'`,
     `scale=${W}:${H}`,
     "setsar=1",
-    // One frame rate before the look: zoompan makes one frame per input frame at `fps`. A held frame is one frame
+    // One frame rate before the look: the keyframed look reads each frame's slot at `fps`. A held frame is one frame
     // already (fps could drop it: at 120 fps it lasts under half an output frame, Codex 2026-11-07).
     ...(held ? ["format=yuv420p"] : [`fps=${fps}`]),
     ...look(seg.look, step.start, W, H, fps),

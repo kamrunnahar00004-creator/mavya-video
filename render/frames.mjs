@@ -12,7 +12,7 @@ const near = (x) => (x < 0 ? -Math.floor(-x + 0.5 + 1e-4) : Math.floor(x + 0.5 +
  * @param {number} speed
  * @param {number} fps
  * @returns {{ source: number[], slot: number[] }} for each output frame, an index into `pts` (-1 when the piece has no
- *   frame at all) and its first-pass slot j (the look's keyframe time is start + j / fps, as zoompan's `it`)
+ *   frame at all) and its first-pass slot j (the look's keyframe time is start + j / fps, as the server's perspective look reads it)
  */
 export function frameSchedule(pts, step, speed, fps) {
   // trim: frames from start (inclusive) to end (exclusive), timestamps then start at the first kept frame.
