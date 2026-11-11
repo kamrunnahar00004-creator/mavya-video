@@ -20,7 +20,7 @@ finish('export-colour-checks', EXPECTED, () => checks, () => {
   const src = fs.readFileSync('src/lib/browser-export.ts', 'utf8');
   class Quality { constructor(o) { Object.assign(this, o); } }
   const m = load('src/lib/browser-export.ts', {
-    mediabunny: { Quality }, '../../render/render.mjs': {}, '../../render/frames.mjs': {}, '../../render/sound.mjs': {},
+    mediabunny: { Quality }, '../../render/render.mjs': {}, '../../render/frames.mjs': {}, '../../render/sound.mjs': {}, '../../render/loudness.mjs': {},
   }, {}, { navigator: {}, Uint8Array });
 
   // The colour box: BT.709 primaries, curve and matrix; standard range; the box's other bits kept.

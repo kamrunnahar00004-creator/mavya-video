@@ -371,6 +371,20 @@ export function stepArgs(spec, step, src, out, slots, sound) {
  * @param {string} list  concat demuxer list of the step files
  * @param {{ sounds: Probe[], overlays: string[] }} local
  */
+/**
+ * The server export's loudness (render/loudness.mjs, the browser export's rule): measure the finished file with
+ * ffmpeg's BS.1770 meter, then one gain on its sound (the picture is copied, key frames and all).
+ */
+export const loudnessArgs = (input) => ["-hide_banner", "-nostats", "-i", input, "-vn", "-af", "ebur128=peak=true:framelog=quiet", "-f", "null", "-"];
+/** {lufs, peak} from loudnessArgs' summary; -Infinity when silent or missing. */
+export function parseLoudness(text) {
+  const num = (re) => { const m = [...String(text).matchAll(re)].pop(); return m && m[1] !== "-inf" ? Number(m[1]) : -Infinity; };
+  return { lufs: num(/^\s*I:\s*(-?[\d.]+|-inf) LUFS/gm), peak: num(/^\s*Peak:\s*(-?[\d.]+|-inf) dBFS/gm) };
+}
+/** The export with its sound raised or lowered by `gainDb` (same AAC settings as finalArgs). */
+export const levelArgs = (input, out, gainDb) => ["-y", "-hide_banner", "-i", input, "-map", "0:v:0", "-map", "0:a:0", "-c:v", "copy",
+  "-af", `volume=${gainDb.toFixed(2)}dB`, "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", out];
+
 export function finalArgs(spec, list, local, out) {
   const { fps, total } = spec;
   // -reinit_filter 0: the joined pieces are all 720x1280 yuv420p; never rebuild the filters mid-video (see PIECE_OUT).

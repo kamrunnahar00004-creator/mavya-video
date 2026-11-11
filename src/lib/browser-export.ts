@@ -3,6 +3,7 @@ import { ALL_FORMATS, AudioBufferSource, BlobSource, BufferSource, BufferTarget,
 import { demoAt, exposurePower, contrastGamma, layout, plan, textFrames, type Look, type Spec } from "../../render/render.mjs";
 import { frameSchedule, frameTimes, mediaOrigin } from "../../render/frames.mjs";
 import { fillSound } from "../../render/sound.mjs";
+import { levelMix } from "../../render/loudness.mjs";
 
 /**
  * Export in the user's browser (founder 2026-11-04: CapCut exports in seconds, so ours must not take minutes). The
@@ -346,7 +347,7 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
   // Where the demo starts (render.mjs demoAt): a key frame there lets its part be copied out as its own clip.
   const at = demoAt(spec), demoFrame = at === null ? -1 : Math.round(at * fps);
 
-  // Sound: every piece and sound mixed like the server's final pass (summed, no normalizing).
+  // Sound: every piece and sound mixed like the server's final pass (summed), then set to one level (levelMix).
   const sounds = new Map<string, Promise<Float32Array[] | null>>();
   const soundOf = (url: string) => {
     const k = keyOf(url);
@@ -528,6 +529,8 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
   picture.close();
   // The sound, once every file is in (the picture is already encoded).
   await mixSound();
+  // The whole mix to the platforms' level (-14 LUFS), never clipping (render/loudness.mjs; founder 2026-11-11).
+  levelMix(mix, RATE);
   signal?.throwIfAborted();
   const sound = new AudioBuffer({ length: Math.max(1, total), numberOfChannels: 2, sampleRate: RATE });
   sound.copyToChannel(mix[0], 0);

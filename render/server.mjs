@@ -15,7 +15,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID, timingSafeEqual, createHash } from "node:crypto";
 import ffmpegPath from "ffmpeg-static";
-import { countArgs, countFrames, demoArgs, demoAt, finalArgs, isHdr, pieceHasSound, pieceSoundArgs, plan, previewRuns, stepArgs } from "./render.mjs";
+import { countArgs, countFrames, demoArgs, demoAt, finalArgs, isHdr, levelArgs, loudnessArgs, parseLoudness, pieceHasSound, pieceSoundArgs, plan, previewRuns, stepArgs } from "./render.mjs";
+import { levelFile } from "./loudness.mjs";
 import { fillSoundFile } from "./sound-file.mjs";
 import { nextJob } from "./queue.mjs";
 
@@ -152,11 +153,21 @@ async function work(id) {
     }
     const list = path.join(dir, "list.txt");
     await writeFile(list, files.map((f) => `file '${f}'`).join("\n"));
-    const out = path.join(dir, "out.mp4");
-    await run(finalArgs(spec, list, { sounds, overlays }, out), (text) => {
+    const joined = path.join(dir, "joined.mp4");
+    await run(finalArgs(spec, list, { sounds, overlays }, joined), (text) => {
       const m = /out_time_us=(\d+)/.exec(text.split("\n").filter((l) => l.startsWith("out_time_us=")).pop() ?? "");
       if (m && spec.total > 0) job.progress = Math.min(0.97, 0.65 + (Number(m[1]) / 1e6 / spec.total) * 0.32);
     },signal,300_000);
+    // The sound to the platforms' level, never clipping (render/loudness.mjs, the same rule as the browser export;
+    // founder 2026-11-11). The encoded result is measured again: when the AAC encoder pushed a peak over the limit,
+    // the sound is turned down by that much more (at most twice more; Codex 2026-11-11). A meter that fails leaves
+    // the sound as mixed.
+    const measure = async (file) => parseLoudness(await run(loudnessArgs(file ?? joined), null, signal, 120_000).catch((e) => e?.stderr ?? ""));
+    const out = (await levelFile(measure, async (gain, pass) => {
+      const file = path.join(dir, `out${pass}.mp4`);
+      await run(levelArgs(joined, file, gain), null, signal, 120_000);
+      return file;
+    })) ?? joined;
     const size = (await stat(out)).size;
     if(size>MAX_FILE_BYTES)throw new Error("Output too large");
     // The demo part as its own clip (My files, Demos), uploaded before the video: the app finishes the job as soon as
