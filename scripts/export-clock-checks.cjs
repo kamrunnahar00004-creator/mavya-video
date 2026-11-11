@@ -21,6 +21,6 @@ finish('export-clock-checks', EXPECTED, () => checks, () => {
   eq(c.exportClockLabel(-5, 0), '1:00 left', 'a clock read before the start is the start');
   eq(c.exportClockLabel(NaN, 0), '1:00 left', 'no time yet: the start');
   const b = fs.readFileSync('src/components/export-button.tsx', 'utf8');
-  ok(/\{busy \? <ExportClock startedAt=\{startedAt\} progress=\{progress\} \/> : "Export"\}/.test(b) && /useState\(startedAt\);[\s\S]{0,80}setInterval\(\(\) => setNow\(Date\.now\(\)\), 250\)/.test(b) && /exportClockLabel\(\(now - startedAt\) \/ 1000, progress\)/.test(b), 'the button shows the timer and ticks while busy');
+  ok(/\{busy \? <ExportClock startedAt=\{startedAt\} progress=\{progress\} \/> : [^\n]*"Export"\}/.test(b) && /useState\(startedAt\);[\s\S]{0,80}setInterval\(\(\) => setNow\(Date\.now\(\)\), 250\)/.test(b) && /exportClockLabel\(\(now - startedAt\) \/ 1000, progress\)/.test(b), 'the button shows the timer and ticks while busy');
   ok(/blocked\.current=true;setStartedAt\(clockNow\(\)\);setProgress\(0\);\n/.test(b) && /reply\?\.job\)\{blocked\.current=true;setStartedAt\(clockNow\(\)\);setProgress\(0\);setJobId/.test(b), 'the timer starts on Export and on a running export found again');
 });

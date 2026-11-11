@@ -11,6 +11,7 @@ import { exportClockLabel } from "@/lib/export-clock";
 import { renderLimitError } from "@/lib/render-limits";
 import { timeline, videoLength } from "@/lib/edit";
 import { soundPieces } from "@/lib/sound";
+import { COPY_ALMOST_SECONDS, copyEtaLabel, exportUploads } from "@/lib/copy-eta";
 import type { Run } from "@/lib/types";
 
 type Done = { src: string; seconds: number; at: string };
@@ -25,6 +26,16 @@ function ExportClock({ startedAt, progress }: { startedAt: number; progress: num
     return () => clearInterval(t);
   }, []);
   return <>{exportClockLabel((now - startedAt) / 1000, progress)}</>;
+}
+
+/** "Preparing" timer: counts down from the server's estimate (copy-eta.ts) between checks. */
+function PrepClock({ seconds, at }: { seconds: number; at: number }) {
+  const [now, setNow] = useState(at);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return <>{copyEtaLabel(Math.max(COPY_ALMOST_SECONDS, seconds - (now - at) / 1000))}</>;
 }
 
 /** The export route refused, with a message meant for the user. */
@@ -51,6 +62,34 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
       lifetime.current?.abort();
     };
   }, []);
+
+  // Clips still being prepared (their working copies, previews.ts): Export waits, spinning with an estimate, and can
+  // be clicked only once every clip of the video is ready (founder 2026-11-11). `clear` is the clip list last found
+  // ready. A failed check never lets Export through: it keeps checking, more slowly (Codex 2026-11-11).
+  const uploads=exportUploads(timeline(run,null).filter(s=>s.src)).join(",");
+  const [clear,setClear]=useState<string|null>(null);
+  const [prep,setPrep]=useState<{key:string;seconds:number;at:number}|null>(null);
+  const [recheck,setRecheck]=useState(0);
+  const preparing=Boolean(uploads)&&clear!==uploads;
+  useEffect(()=>{
+    if(!uploads)return;
+    let stop=false;
+    const abort=new AbortController();
+    void(async()=>{
+      let failures=0;
+      for(let i=0;!stop;i++){
+        if(i)await waitForPoll(pollDelay(3000,failures,document.hidden),abort.signal);
+        if(stop)return;
+        const response=await fetch(`/api/runs/${run.id}/export?copies=${encodeURIComponent(uploads)}`,{cache:"no-store",signal:AbortSignal.timeout(30_000)}).catch(()=>null);
+        const reply=await response?.json().catch(()=>null) as {pending?:number;seconds?:number}|null;
+        if(stop)return;
+        if(response?.ok&&reply?.pending===0){setPrep(null);setClear(uploads);return;}
+        if(response?.ok&&typeof reply?.seconds==="number"){failures=0;setPrep({key:uploads,seconds:reply.seconds,at:Date.now()});continue;}
+        failures++;
+      }
+    })();
+    return ()=>{stop=true;abort.abort();};
+  },[uploads,run.id,recheck]);
 
   const [jobId,setJobId]=useState<string|null>(null);
   // The browser export's own copy of the video, shown at once while the upload to My files finishes.
@@ -117,6 +156,8 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
         if(result==="started")return;
         blocked.current=false;
         // The server's own words when it refused (for example, clips still being prepared), else a general message.
+        // Refused because a clip is still being prepared: back to waiting for it, with the timer, not a message.
+        if(said&&/still being prepared/.test(said)){if(alive.current){setProgress(null);setClear(null);setRecheck(n=>n+1);}return;}
         if(alive.current&&!lifetime.current?.signal.aborted){setProgress(null);onToast(said??"Couldn't export in this browser. Check your connection and try again.");}
         return;
       }
@@ -204,13 +245,13 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
     <>
       <button
         type="button"
-        disabled={!ready || busy}
-        title={ready ? undefined : "Generate the hook and add a demo first"}
+        disabled={!ready || busy || preparing}
+        title={!ready ? "Generate the hook and add a demo first" : preparing && !busy ? "Your clips are being prepared for export" : undefined}
         onClick={() => void start()}
         className="btn-primary ml-1 min-w-[150px] px-4 py-2 text-[14px] tabular-nums"
       >
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-        {busy ? <ExportClock startedAt={startedAt} progress={progress} /> : "Export"}
+        {busy || (ready && preparing) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+        {busy ? <ExportClock startedAt={startedAt} progress={progress} /> : ready && preparing ? (prep?.key === uploads ? <>Preparing <PrepClock key={prep.at} seconds={prep.seconds} at={prep.at} /></> : "Preparing") : "Export"}
       </button>
       {done && (
         <div role="dialog" aria-modal="true" aria-labelledby="export-title" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && setDone(null)}>

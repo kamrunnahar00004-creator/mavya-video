@@ -8,7 +8,8 @@ import { fullAdjust } from "@/lib/adjust";
 import { segSpeed, timeline, videoLength } from "@/lib/edit";
 import { cloud, getRun, libraryLink, mediaAccess, mediaLink, mediaUploadLink, newUpload } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
-import { exportSource, masterKey } from "@/lib/server/previews";
+import { exportSource, masterKey, masterReady, requestPreview } from "@/lib/server/previews";
+import { copyEta } from "@/lib/copy-eta";
 import { signedGet, signedPut } from "@/lib/server/r2";
 import { pieceEnd, soundPieces } from "@/lib/sound";
 import { RENDER_LIMITS, renderLimitError } from "@/lib/render-limits";
@@ -161,7 +162,27 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
 export async function GET(request: Request, ctx: RouteContext<"/api/runs/[id]/export">) {
   const {id}=await ctx.params,who=await currentUser();
   if(!who)return signInFirst();
-  const key=new URL(request.url).searchParams.get("job");
+  const params=new URL(request.url).searchParams;
+  // ?copies=<id>,<id>: which of these uploaded clips still have no working copy, and about how long until they all
+  // do (copy-eta.ts). The Export button waits on this before it can be clicked (founder 2026-11-11). The ids come
+  // from the editor (its clips, saved or not); only the user's own files are looked at, and each missing copy is asked
+  // for again.
+  const copies=params.get("copies");
+  if(copies!==null){
+    const ids=[...new Set(copies.split(",").filter(Boolean))];
+    if(ids.length>50||ids.some(x=>!/^[0-9a-f-]{36}\.[a-z0-9]{2,5}$/i.test(x)))return Response.json({error:"Not found"},{status:404});
+    // Local development has no copies (the export reads the files themselves); only videos get one.
+    if(!cloud())return Response.json({pending:0,seconds:0},{headers:{"Cache-Control":"no-store"}});
+    const missing=(await Promise.all(ids.map(async x=>(await mediaAccess(x,who))?.mime.startsWith("video/")&&!(await masterReady(x))?x:null))).filter((x):x is string=>Boolean(x));
+    if(!missing.length)return Response.json({pending:0,seconds:0},{headers:{"Cache-Control":"no-store"}});
+    await Promise.all(missing.map(x=>requestPreview(x)));
+    const {data,error}=await createSupabaseAdminClient().from("media").select("id,size,created_at").eq("user_id",who).in("id",missing);
+    if(error)throw error;
+    const now=Date.now();
+    const pending=missing.map(x=>{const row=data?.find(r=>r.id===x);return {size:Number(row?.size??0),uploadedAt:row?.created_at?Date.parse(row.created_at):now};});
+    return Response.json({pending:missing.length,seconds:copyEta(pending,now)},{headers:{"Cache-Control":"no-store"}});
+  }
+  const key=params.get("job");
   if(key&&!/^[0-9a-f-]{36}$/i.test(key))return Response.json({error:"Not found"},{status:404});
   const job=await exportJob(who,id,key??undefined);
   if(!job)return key?Response.json({error:"Not found"},{status:404}):Response.json({state:"idle"});
