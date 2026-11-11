@@ -111,10 +111,14 @@ function look(a, p0, W, H, fps) {
  * HDR (HLG or PQ) to SDR BT.709, for the copies of an HDR upload (iPhones film HDR by default). Without it the 10-bit
  * BT.2020 picture lands in an 8-bit BT.709 file unconverted and looks flat and washed out. Runs after the copy is
  * scaled down, so the float frames stay small (25 MB at 1080x1920, not 100 MB at 4K) on the 512 MB render server.
- * Mobius keeps mid-tones as they are and only rolls off highlights: on an HLG test clip made from an SDR original it
- * kept average brightness at 97 (original 101), where hable gave 71 (2026-11-05).
+ * Hable with npl=140, measured against what Chrome shows for the same iPhone clips (founder 2026-11-11: "it had the perfect
+ * color and while editing the color just bursted": the editor had switched from the original to this copy). The old
+ * mobius at npl=100 doubled the brightness of HLG mid-grey (Y 141 where Chrome shows 78) and blew out three real iPhone
+ * clips by ~40 levels; hable at npl=140 is within 11 levels of Chrome on the BT.2408 reference levels and within 2 on
+ * the average of those clips (scripts/hdr-tonemap-checks.mjs). The 2026-11-05 test that picked mobius used an HLG clip
+ * made from an SDR one, which sits far darker than iPhone footage.
  */
-export const TONEMAP = "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=mobius:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p";
+export const TONEMAP = "zscale=t=linear:npl=140,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p";
 /** HDR from ffmpeg's stream line, e.g. "yuv420p10le(tv, bt2020nc/bt2020/arib-std-b67)". */
 export const isHdr = (probeText) => /Video:.*\b(arib-std-b67|smpte2084)\b/.test(probeText);
 
