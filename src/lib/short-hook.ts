@@ -28,15 +28,24 @@ export function restoreArgs(factor: number): string[] {
   return ["-vf", `setpts=PTS/${factor},fps=30`];
 }
 
-/** The provider task id with the slowdown carried along ("<model>|<request id>|slow<factor>"), so the poll can undo it. */
+/**
+ * The provider task id with the slowdown carried along ("<model>/slow<factor>|<request id>"), so the poll can undo it.
+ * The factor sits in the model part: the database stores only "<model>|<id>" (mavya_generation_transition), and the
+ * old "<model>|<id>|slow<factor>" was refused after Kling had already made (and charged for) the hook, leaving the job
+ * stuck (founder 2026-11-12: a 2.53 s library hook "stuck" while generating).
+ */
 export function withSlow(taskId: string, factor: number): string {
-  return factor > 1 ? `${taskId}|slow${factor}` : taskId;
+  if (!(factor > 1)) return taskId;
+  const [model, id] = taskId.split("|");
+  return `${model}/slow${factor}|${id}`;
 }
 
 /** A provider task id split into model, request id and slowdown (1 when there is none or it is malformed). */
 export function parseTask(taskId: string): { model: string; id: string; factor: number } {
-  const [model = "", id = "", extra] = taskId.split("|");
-  const m = extra ? /^slow(\d+(?:\.\d+)?)$/.exec(extra) : null;
-  const factor = m ? Number(m[1]) : 1;
+  const [stored = "", id = "", extra] = taskId.split("|");
+  const inModel = /^(.*)\/slow(\d+(?:\.\d+)?)$/.exec(stored);
+  const old = extra ? /^slow(\d+(?:\.\d+)?)$/.exec(extra) : null;
+  const model = inModel ? inModel[1] : stored;
+  const factor = inModel ? Number(inModel[2]) : old ? Number(old[1]) : 1;
   return { model, id, factor: Number.isFinite(factor) && factor > 1 && factor < 10 ? factor : 1 };
 }

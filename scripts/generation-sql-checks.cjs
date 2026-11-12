@@ -136,6 +136,20 @@ async function main() {
     assert.ok(blocked.every(x=>JSON.parse(x).error==='attempts'),'parallel admission cannot pass a committing tenth refund');
     const replayKey=sql(`select request_key from generations where id='${capJob}'`);
     assert.equal(JSON.parse(sql(reserve(capRun,replayKey,other))).job.id,capJob,'existing request replay survives the cap');
+    // A slowed short hook's task id, as src/lib/short-hook.ts withSlow writes it, is stored (founder 2026-11-12: the old
+    // "<model>|<id>|slow<factor>" was refused after Kling had made the hook, and the job hung in "starting").
+    {
+      const { load } = require('./check-module.cjs');
+      const { withSlow, slowFactor } = load('src/lib/short-hook.ts');
+      const run2 = '20000000-0000-4000-8000-000000000009', key2 = '30000000-0000-4000-8000-000000000009';
+      sql(`insert into runs(id,user_id,data) values('${run2}','${user}','{"updatedAt":"original","hook":{},"demo":{"keep":true}}');`);
+      const reply = JSON.parse(sql(reserve(run2, key2)));
+      assert.ok(reply.job, `a second generation can be reserved for the slowed-hook check (${JSON.stringify(reply)})`);
+      const lease2 = claim(reply.job.id);
+      const slowed = withSlow('fal-ai/kling-video/v3/standard/motion-control|01a1cf34-6b31-7a62-be12-061715922f09', slowFactor(2.53));
+      assert.equal(transition(reply.job.id, lease2.lease_token, 'started', slowed), 't', `the slowed task id ${slowed} is stored`);
+      assert.equal(sql(`select task_id from generations where id='${reply.job.id}'`), slowed);
+    }
     console.log('PASS: migration replay, ownership, request replay, parallel quota, shared monthly window, leases, bound legacy/fal task IDs, one fallback/refund, completion CAS/replay, uncertain recovery, RPC grants');
   } finally { docker('rm', '--force', name); }
 }
