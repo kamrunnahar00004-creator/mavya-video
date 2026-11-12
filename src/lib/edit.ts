@@ -177,14 +177,24 @@ export function textOwner(start: number, segs: Seg[]): { seg: number; gap: boole
   return next >= 0 && gapHolds(segs[next], start) ? { seg: next, gap: true } : null;
 }
 const gapHolds = (s: Seg, start: number) => s.gap > 0 && roundTime(start) >= roundTime(s.offset - s.gap);
+/**
+ * A start this little before a clip's start (under one frame) is rounding drift, not a choice: re-timing after a
+ * trim and then a speed change put "pick AI face" at 6.288 on a clip starting at 6.289, the text was judged the
+ * previous clip's, cut to 1 ms and lost with every other text after the hook (founder 2026-11-12: "after generation
+ * where did all my subtitles go?"). Such a start moves onto the clip's edge, so the text stays on its clip.
+ */
+export const EDGE_DRIFT = 0.02;
 export function containTexts(texts: TextLayer[], segs: Seg[]): TextLayer[] {
   let moved = false;
   const next = texts.map((t) => {
-    const seg = segs.find((s) => ownedBy(t.start, s.offset, s.len));
-    const end = seg ? seg.offset + seg.len : segs.find((s) => roundTime(s.offset) > roundTime(t.start))?.offset;
-    if (end === undefined || t.end <= end) return t;
+    const edge = segs.find((s) => { const d = roundTime(s.offset) - roundTime(t.start); return d > 0 && d <= EDGE_DRIFT + 1e-9 && t.end > s.offset + EDGE_DRIFT; });
+    const start = edge ? roundTime(edge.offset) : t.start;
+    const seg = segs.find((s) => ownedBy(start, s.offset, s.len));
+    const end = seg ? seg.offset + seg.len : segs.find((s) => roundTime(s.offset) > roundTime(start))?.offset;
+    const clamp = end !== undefined && t.end > end;
+    if (start === t.start && !clamp) return t;
     moved = true;
-    return { ...t, end };
+    return { ...t, start, end: clamp ? end : t.end };
   });
   return moved ? next : texts;
 }

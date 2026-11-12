@@ -1,0 +1,318 @@
+{
+ "hook": {
+  "start": 1.334,
+  "end": 3.953,
+  "adjust": {
+   "speed": 1.15,
+   "volume": 100
+  },
+  "mode": "upload",
+  "source": "library",
+  "generated": {
+   "src": "/api/media/00000000-0000-4000-8000-0000000000aa.mp4",
+   "seconds": 5.041,
+   "at": "2026-11-12T10:00:00Z"
+  }
+ },
+ "demo": {
+  "mode": "clips",
+  "clips": [
+   {
+    "id": "wi4zt6c7",
+    "end": 4.296,
+    "parts": [
+     {
+      "id": "fbe8ewia",
+      "end": 4.296,
+      "start": 1.763
+     }
+    ],
+    "start": 1.763,
+    "adjust": {
+     "keys": [
+      {
+       "t": 2.16,
+       "panX": -9,
+       "panY": 36,
+       "zoom": 8
+      },
+      {
+       "t": 3.97,
+       "panX": 59,
+       "panY": 39,
+       "zoom": 32
+      }
+     ],
+     "panX": -9,
+     "panY": 36,
+     "zoom": 8,
+     "speed": 1,
+     "volume": 0
+    },
+    "seconds": 7.265,
+    "src": "/api/media/00000000-0000-4000-8000-000000000000.mov"
+   },
+   {
+    "id": "rqetos2l",
+    "end": 4.072,
+    "parts": [
+     {
+      "id": "jriexpef",
+      "end": 4.072,
+      "start": 1.656
+     }
+    ],
+    "start": 1.656,
+    "adjust": {
+     "keys": [
+      {
+       "t": 1.66,
+       "panX": 0,
+       "panY": 0,
+       "zoom": 40
+      },
+      {
+       "t": 3.97,
+       "panX": 0,
+       "panY": 0,
+       "zoom": 0
+      }
+     ],
+     "panX": 0,
+     "panY": 0,
+     "zoom": 40,
+     "speed": 1,
+     "volume": 0
+    },
+    "seconds": 16.636,
+    "src": "/api/media/00000000-0000-4000-8000-000000000001.mov"
+   },
+   {
+    "id": "4txmrzv0",
+    "end": 3.87,
+    "parts": [
+     {
+      "id": "vnsnu2o0",
+      "end": 3.87,
+      "start": 1.801
+     }
+    ],
+    "start": 1.801,
+    "adjust": {
+     "keys": [
+      {
+       "t": 2.03,
+       "panX": -7,
+       "panY": 22,
+       "zoom": 0
+      },
+      {
+       "t": 3.69,
+       "panX": -7,
+       "panY": 22,
+       "zoom": 33
+      }
+     ],
+     "panX": -7,
+     "panY": 22,
+     "zoom": 0,
+     "speed": 1,
+     "volume": 0
+    },
+    "seconds": 9.766,
+    "src": "/api/media/00000000-0000-4000-8000-000000000002.mov"
+   },
+   {
+    "id": "765u41qg",
+    "end": 4.467,
+    "parts": [
+     {
+      "id": "atm8l869",
+      "end": 4.467,
+      "start": 2.162
+     }
+    ],
+    "start": 2.162,
+    "adjust": {
+     "keys": [
+      {
+       "t": 2.66,
+       "panX": -89,
+       "panY": 60,
+       "zoom": 12
+      },
+      {
+       "t": 4.27,
+       "panX": -46,
+       "panY": 54,
+       "zoom": 21
+      }
+     ],
+     "panX": -89,
+     "panY": 60,
+     "zoom": 12,
+     "speed": 1,
+     "volume": 0
+    },
+    "seconds": 10.998,
+    "src": "/api/media/00000000-0000-4000-8000-000000000003.mov"
+   },
+   {
+    "id": "w7lys3br",
+    "end": 5.005,
+    "parts": [
+     {
+      "id": "hg10t6ek",
+      "end": 5.005,
+      "start": 2.412
+     }
+    ],
+    "start": 2.412,
+    "adjust": {
+     "keys": [],
+     "panX": 0,
+     "panY": 0,
+     "zoom": 0,
+     "speed": 1,
+     "volume": 0
+    },
+    "seconds": 6.865,
+    "src": "/api/media/00000000-0000-4000-8000-000000000004.mov"
+   }
+  ]
+ },
+ "texts": [
+  {
+   "id": "hook",
+   "text": "text 0",
+   "start": 0,
+   "end": 2.277,
+   "x": 50,
+   "y": 50,
+   "size": 4,
+   "font": "TikTok Sans",
+   "color": "#ffffff",
+   "style": "outline"
+  },
+  {
+   "id": "xp9sbkod",
+   "text": "text 1",
+   "start": 0,
+   "end": 2.277,
+   "x": 50,
+   "y": 50,
+   "size": 4,
+   "font": "TikTok Sans",
+   "color": "#ffffff",
+   "style": "outline"
+  },
+  {
+   "id": "fx5ih0h9",
+   "text": "text 2",
+   "start": 0,
+   "end": 2.277,
+   "x": 50,
+   "y": 50,
+   "size": 4,
+   "font": "TikTok Sans",
+   "color": "#ffffff",
+   "style": "outline"
+  },
+  {
+   "id": "n2uznq3m",
+   "text": "text 3",
+   "start": 2.277,
+   "end": 4.81,
+   "x": 50,
+   "y": 50,
+   "size": 4,
+   "font": "TikTok Sans",
+   "color": "#ffffff",
+   "style": "outline"
+  },
+  {
+   "id": "sgrb9e8q",
+   "text": "text 4",
+   "start": 7.226,
+   "end": 9.295,
+   "x": 50,
+   "y": 50,
+   "size": 4,
+   "font": "TikTok Sans",
+   "color": "#ffffff",
+   "style": "outline"
+  },
+  {
+   "id": "phgufpo0",
+   "text": "text 5",
+   "start": 9.295,
+   "end": 11.6,
+   "x": 50,
+   "y": 50,
+   "size": 4,
+   "font": "TikTok Sans",
+   "color": "#ffffff",
+   "style": "outline"
+  },
+  {
+   "id": "h76ojemk",
+   "text": "text 6",
+   "start": 9.295,
+   "end": 11.6,
+   "x": 50,
+   "y": 50,
+   "size": 4,
+   "font": "TikTok Sans",
+   "color": "#ffffff",
+   "style": "outline"
+  },
+  {
+   "id": "ndbkkhme",
+   "text": "text 7",
+   "start": 4.81,
+   "end": 7.226,
+   "x": 50,
+   "y": 50,
+   "size": 4,
+   "font": "TikTok Sans",
+   "color": "#ffffff",
+   "style": "outline"
+  },
+  {
+   "id": "bg9j898q",
+   "text": "text 8",
+   "start": 4.81,
+   "end": 7.226,
+   "x": 50,
+   "y": 50,
+   "size": 4,
+   "font": "TikTok Sans",
+   "color": "#ffffff",
+   "style": "outline"
+  },
+  {
+   "id": "84ipxymi",
+   "text": "text 9",
+   "start": 11.6,
+   "end": 14.193,
+   "x": 50,
+   "y": 50,
+   "size": 4,
+   "font": "TikTok Sans",
+   "color": "#ffffff",
+   "style": "outline"
+  },
+  {
+   "id": "054ij5uu",
+   "text": "text 10",
+   "start": 11.6,
+   "end": 14.193,
+   "x": 50,
+   "y": 50,
+   "size": 4,
+   "font": "TikTok Sans",
+   "color": "#ffffff",
+   "style": "outline"
+  }
+ ]
+}
