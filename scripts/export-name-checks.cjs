@@ -44,5 +44,5 @@ finish('export-name-checks', EXPECTED, () => checks, () => {
   eq(n.downloadHref('/api/media/abc.mp4', 'my_app_nov8_214pm'), '/api/media/abc.mp4?download=my_app_nov8_214pm', 'server link gets the name');
   const button = fs.readFileSync('src/components/export-button.tsx', 'utf8');
   const panel = fs.readFileSync('src/components/history-panel.tsx', 'utf8');
-  ok(/exportFileName\(run\.hook\.text, done\.at\)/.test(button) && /downloadHref\(done\.src, name\)/.test(button) && /downloadHref\(x\.value\.src, exportFileName\(x\.hookText, x\.value\.at\)\)/.test(panel) && /downloadName=\{exportFileName\(x\.hookText, x\.value\.at\)\}/.test(panel) && /download=\{downloadName \? `\$\{downloadName\}\.mp4` : true\}/.test(panel), 'Export dialog and My files both use the name');
+  ok(/exportFileName\(run\.hook\.text, done\.at\)/.test(button) && /downloadHref\(done\.src, name\)/.test(button) && /downloadHref\(x\.value\.src, exportFileName\(x\.hookText, x\.value\.at\)\)/.test(panel) && /downloadName=\{`\$\{exportFileName\(x\.hookText, x\.value\.at\)\}\.mp4`\}/.test(panel) && /download=\{downloadName \?\? true\}/.test(panel), 'Export dialog and My files both use the name');
 });

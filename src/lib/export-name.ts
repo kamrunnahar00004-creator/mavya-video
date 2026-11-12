@@ -50,3 +50,15 @@ export function downloadHref(src: string, name: string): string {
   if (src.startsWith("blob:")) return src;
   return `${src}${src.includes("?") ? "&" : "?"}download=${encodeURIComponent(name)}`;
 }
+
+/**
+ * Download in My files (founder 2026-11-12: "use, download and delete" on every file that is the user's own): the
+ * link that saves a stored file ("/api/media/<id>") under the item's name, with its own extension. Null for anything
+ * else (library reels, library songs, built-in characters: other people's work, never offered for download).
+ */
+export function fileDownload(src: string | undefined, name: string): { href: string; file: string } | null {
+  const id = /^\/api\/media\/([^/?#]+)$/.exec(src ?? "")?.[1];
+  if (!id) return null;
+  const base = hookWords(name), ext = /\.([a-z0-9]{2,5})$/i.exec(id)?.[1]?.toLowerCase() ?? "mp4";
+  return { href: downloadHref(src!, base), file: `${base}.${ext}` };
+}

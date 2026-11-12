@@ -8,7 +8,7 @@ import { claimPlayback, usePlaybackClaims } from "@/components/run-preview";
 import { Check, CirclePlus, Download, Film, FolderOpen, Loader2, MoreVertical, Music, Pause, Play, Trash2, X } from "lucide-react";
 import { characterById } from "@/lib/characters";
 import { clipSrc, demoClips } from "@/lib/edit";
-import { downloadHref, exportFileName } from "@/lib/export-name";
+import { downloadHref, exportFileName, fileDownload } from "@/lib/export-name";
 import { AVATAR_TONES } from "@/lib/client";
 import { fmtDate, fmtTime, type Asset, type Reference, type Run, type SoundPiece } from "@/lib/types";
 import { AvatarPlaceholder } from "@/components/frames";
@@ -137,7 +137,11 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
       .then((r) => { if (!r.ok) throw Error(); })
       .catch(() => setListError("Couldn't save. Try again."));
   };
-  const actions = (key: string, fallback: string) => ({ name: nameOf(key, fallback), onRename: (name: string) => changePref(key, { name }), onDelete: () => changePref(key, { hidden: true }) });
+  // Use, Download and Delete on every item; Download only for the user's own files (fileDownload).
+  const actions = (key: string, fallback: string, src?: string) => {
+    const name = nameOf(key, fallback), saved = fileDownload(src, name);
+    return { name, onRename: (n: string) => changePref(key, { name: n }), onDelete: () => changePref(key, { hidden: true }), ...(saved ? { download: saved.href, downloadName: saved.file } : {}) };
+  };
 
   const chip = (on: boolean) => `rounded-none border px-3 py-1 text-[12.5px] font-semibold ${on ? "border-ink bg-ink text-white" : "border-line text-muted hover:border-line-strong hover:text-text"}`;
   const meta = (x: Entry<unknown>) => (
@@ -160,7 +164,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           const use = run.sourceRefId === r.id ? undefined : () => onUseHook(r);
           const open = r.mediaId ? () => setPlaying({ clips: [{ src: `/api/media/${r.mediaId}`, start: 0 }], sound: true, onUse: use, useLabel: "Use this hook" }) : embedUrl(r) ? () => setHookView({ r, onUse: use }) : undefined;
           return (
-            <Card key={x.key} onOpen={open} onUse={() => onUseHook(r)} inUse={!use} {...actions(x.key, r.author ? `@${r.author}` : r.title)} meta={meta(x)}>
+            <Card key={x.key} onOpen={open} onUse={() => onUseHook(r)} inUse={!use} {...actions(x.key, r.author ? `@${r.author}` : r.title, x.kind === "upload" && r.mediaId ? `/api/media/${r.mediaId}` : undefined)} meta={meta(x)}>
               {thumb ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={thumb} alt="" loading="lazy" className="h-full w-full object-cover" />
@@ -179,7 +183,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           const f = x.value;
           const name = f.kind === "character" ? (characterById(f.id)?.name ?? "Character") : f.kind === "photo" ? "Your photo" : f.kind === "ai" ? `AI face ${f.index + 1}` : f.text;
           return (
-            <Card key={x.key} square onUse={() => onUseFace(f)} inUse={Boolean(run.hook.face && `face:${faceKey(run.hook.face)}` === x.key)} {...actions(x.key, name)} meta={meta(x)}>
+            <Card key={x.key} square onUse={() => onUseFace(f)} inUse={Boolean(run.hook.face && `face:${faceKey(run.hook.face)}` === x.key)} {...actions(x.key, name, f.kind === "photo" ? `/api/media/${f.mediaId}` : undefined)} meta={meta(x)}>
               {f.kind === "character" ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={characterById(f.id)?.thumb ?? `/characters/${f.id}.jpg`} alt="" className="h-full w-full object-cover" />
@@ -204,7 +208,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           const inUse = run.hook.generated?.src === x.value.g.src;
           const use = () => onUseGenerated(x.value.g, x.value.run);
           return (
-            <Card key={x.key} onOpen={() => setPlaying({ clips: [{ src: x.value.g.src, start: 0 }], sound: true, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, `Hook · ${fmtTime(x.value.g.seconds)}`)} meta={meta(x)}>
+            <Card key={x.key} onOpen={() => setPlaying({ clips: [{ src: x.value.g.src, start: 0 }], sound: true, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, `Hook · ${fmtTime(x.value.g.seconds)}`, x.value.g.src)} meta={meta(x)}>
               <Still src={x.value.g.src} />
             </Card>
           );
@@ -220,7 +224,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           const inUse = demo.src === demoNow;
           const use = () => onUseDemo(demo, x.value.run);
           return (
-            <Card key={x.key} onOpen={() => setPlaying({ clips: [{ src: demo.src, start: 0 }], sound: false, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, `Demo · ${fmtTime(demo.seconds)}`)} meta={meta(x)}>
+            <Card key={x.key} onOpen={() => setPlaying({ clips: [{ src: demo.src, start: 0 }], sound: false, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, `Demo · ${fmtTime(demo.seconds)}`, demo.src)} meta={meta(x)}>
               <Still src={demo.src} at={Math.min(0.5, demo.seconds / 2)} />
             </Card>
           );
@@ -237,7 +241,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
           const use = () => onUseUpload([x.value]);
           const on = selected.includes(x.key);
           return (
-            <Card key={x.key} onOpen={x.value.kind === "image" ? undefined : () => setPlaying({ clips: [{ src: `${src}?preview=1`, start: 0 }], sound: true, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, x.value.name)} meta={meta(x)}
+            <Card key={x.key} onOpen={x.value.kind === "image" ? undefined : () => setPlaying({ clips: [{ src: `${src}?preview=1`, start: 0 }], sound: true, onUse: inUse ? undefined : use })} onUse={use} inUse={inUse} {...actions(x.key, x.value.name, src)} meta={meta(x)}
               selected={selecting ? on : undefined} onSelect={() => { setConfirmDelete(false); setSelected((k) => (on ? k.filter((y) => y !== x.key) : [...k, x.key])); }}>
               {x.value.kind === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -253,7 +257,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
     body = list.length ? (
       <div className="space-y-1">
         {list.map((x) => (
-          <SoundRow key={x.key} p={x.value} meta={meta(x)} onUse={() => onUseSound(x.value)} inUse={soundsNow.has(x.value.src)} {...actions(x.key, x.value.name)} />
+          <SoundRow key={x.key} p={x.value} meta={meta(x)} onUse={() => onUseSound(x.value)} inUse={soundsNow.has(x.value.src)} {...actions(x.key, x.value.name, x.value.kind === "upload" ? x.value.src : undefined)} />
         ))}
       </div>
     ) : empty("Songs and sounds you use show here");
@@ -266,7 +270,7 @@ export function HistoryPanel({ run, refs, refreshKey, initialTab, onClose, onUse
             key={x.key}
             onOpen={() => setPlaying({ clips: [{ src: x.value.src, start: 0 }], sound: true })}
             download={downloadHref(x.value.src, exportFileName(x.hookText, x.value.at))}
-            downloadName={exportFileName(x.hookText, x.value.at)}
+            downloadName={`${exportFileName(x.hookText, x.value.at)}.mp4`}
             {...actions(x.key, `${x.runTitle} · ${fmtTime(x.value.seconds)}`)}
             meta={meta(x)}
           >
@@ -364,9 +368,9 @@ function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-3 gap-3">{children}</div>;
 }
 
-type ItemActions = { name: string; onRename: (name: string) => void; onDelete: () => void; onUse?: () => void; inUse?: boolean; download?: string; /** The saved file's name, without ".mp4". */ downloadName?: string };
+type ItemActions = { name: string; onRename: (name: string) => void; onDelete: () => void; onUse?: () => void; inUse?: boolean; download?: string; /** The saved file's name, with its extension. */ downloadName?: string };
 
-/** The ⋮ menu on an item: Use (unless it is in use), Download (exports), Delete (removes it from My files). Renaming is a click on the name. */
+/** The ⋮ menu on an item: Use (unless it is in use), Download (the user's own files), Delete (removes it from My files). Renaming is a click on the name. */
 function ItemMenu({ onUse, inUse, download, downloadName, onDelete, dark = true }: Omit<ItemActions, "name" | "onRename"> & { dark?: boolean }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -386,7 +390,7 @@ function ItemMenu({ onUse, inUse, download, downloadName, onDelete, dark = true 
       {open && (
         <div role="menu" className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-lg border border-line bg-panel py-1 shadow-[0_8px_24px_rgba(0,0,0,0.14)]">
           {onUse && !inUse && <button type="button" role="menuitem" onClick={run(onUse)} className={item}><CirclePlus className="h-3.5 w-3.5" />Use</button>}
-          {download && <a role="menuitem" href={download} download={downloadName ? `${downloadName}.mp4` : true} onClick={() => setOpen(false)} className={item}><Download className="h-3.5 w-3.5" />Download</a>}
+          {download && <a role="menuitem" href={download} download={downloadName ?? true} onClick={() => setOpen(false)} className={item}><Download className="h-3.5 w-3.5" />Download</a>}
           <button type="button" role="menuitem" onClick={run(onDelete)} className={`${item} text-red-600`}><Trash2 className="h-3.5 w-3.5" />Delete</button>
         </div>
       )}
@@ -529,8 +533,8 @@ function PlayPopup({ p, onClose }: { p: Playing; onClose: () => void }) {
   );
 }
 
-/** A sound in the history: play / pause, name (green check when this video uses it), ⋮ for Use / Rename / Delete. */
-function SoundRow({ p, meta, name, onUse, inUse = false, onRename, onDelete }: ItemActions & { p: SoundPiece; meta: React.ReactNode }) {
+/** A sound in the history: play / pause, name (green check when this video uses it), ⋮ for Use / Download (uploads) / Delete. */
+function SoundRow({ p, meta, name, onUse, inUse = false, onRename, onDelete, download, downloadName }: ItemActions & { p: SoundPiece; meta: React.ReactNode }) {
   const audio = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -564,7 +568,7 @@ function SoundRow({ p, meta, name, onUse, inUse = false, onRename, onDelete }: I
         </div>
         {meta}
       </div>
-      <ItemMenu dark={false} onUse={onUse} inUse={inUse} onDelete={onDelete} />
+      <ItemMenu dark={false} onUse={onUse} inUse={inUse} download={download} downloadName={downloadName} onDelete={onDelete} />
     </div>
   );
 }

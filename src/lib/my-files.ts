@@ -98,6 +98,9 @@ export function pickedWith(had: Run["picked"], patch: Partial<Run>, at: string):
 }
 
 /** Everything My files lists, from the saved records and the videos (the open one as it is now: `current`). */
+/** A saved library song's name ("Title · Artist"), not an uploaded file's. */
+export const isSongName = (name: string) => / · /.test(name) || !/\.\w{2,4}$/.test(name);
+
 export function buildFiles(src: FileSources, current: Run | null): Files {
   const runs = current ? [current, ...src.runs.filter((r) => r.id !== current.id)] : src.runs;
   const runById = new Map(runs.map((r) => [r.id, r]));
@@ -227,7 +230,10 @@ export function buildFiles(src: FileSources, current: Run | null): Files {
   for (const r of oldestRuns) for (const p of r.sounds ?? (r.sound ? [{ id: "main", at: 0, row: 0, ...r.sound }] : [])) addSound(p, r.updatedAt, r.id);
   for (const r of oldestRuns) for (const p of r.picked?.sounds ?? []) addSound({ kind: p.kind, src: p.src, name: p.name, refId: p.refId }, p.at, r.id);
   // A saved song has no file extension in its name; an uploaded sound keeps its file's name.
-  const songName = (a: Asset) => !/\.\w{2,4}$/.test(a.name);
+  // A library song is saved as "Title · Artist" with no extension (src/app/api/songs/[id]); an upload keeps its file
+  // name. " · " marks a song even when the artist ends like an extension ("Song · will.i.am"), so a song is never
+  // offered for download as the user's own upload (Codex 2026-11-12).
+  const songName = (a: Asset) => isSongName(a.name);
   for (const x of all) for (const s of x.sounds) {
     const media = /^\/api\/media\/(.+)$/.exec(s)?.[1];
     const asset = media ? assetByMedia.get(media) : undefined;
