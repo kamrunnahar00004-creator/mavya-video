@@ -4,6 +4,8 @@
 //    (library/<kind>/<code>.*), covers -> R2 media/<id> (shared), records -> Supabase `library`.
 // 3. The founder's own runs and uploads -> R2 media/<id> + Supabase `runs`, `media`, `assets` (owner = OWNER_EMAIL).
 // Usage: node --env-file=.env.local scripts/upload-library.mjs [--library] [--mine] [--cors]   (default: all)
+//        --only <code>[,<code>]  with --library: just these hooks (a new pick), so records edited in the cloud
+//        since the local copy was made are not overwritten.
 // Needs supabase/migrations/0002_storage.sql applied first.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync, mkdtempSync, rmSync } from "node:fs";
@@ -16,7 +18,10 @@ const ROOT = "/home/farhan/mavya-video";
 const DATA = `${ROOT}/.data`;
 const FF = `${ROOT}/node_modules/ffmpeg-static/ffmpeg`;
 const e = process.env;
-const args = new Set(process.argv.slice(2));
+const argv = process.argv.slice(2);
+const args = new Set(argv);
+const only = argv.includes("--only") ? new Set((argv[argv.indexOf("--only") + 1] ?? "").split(",").filter(Boolean)) : null;
+if (only && !only.size) throw new Error("--only needs one or more shortcodes");
 const all = !args.has("--library") && !args.has("--mine") && !args.has("--cors");
 const s3 = new S3Client({ region: "auto", endpoint: `https://${e.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`, credentials: { accessKeyId: e.R2_ACCESS_KEY_ID, secretAccessKey: e.R2_SECRET_ACCESS_KEY } });
 const Bucket = e.R2_BUCKET;
@@ -50,7 +55,7 @@ if (args.has("--cors")) {
 }
 
 if (all || args.has("--library")) {
-  const refs = db.references.filter((r) => (r.owner ?? "curated") === "curated");
+  const refs = db.references.filter((r) => (r.owner ?? "curated") === "curated" && (!only || only.has(code(r))));
   console.log(`library: ${refs.length} hooks`);
   const tmp = mkdtempSync(path.join(tmpdir(), "mavya-audio-"));
   let done = 0;
