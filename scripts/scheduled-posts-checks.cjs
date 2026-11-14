@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 52;
+const EXPECTED = 82;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -22,8 +22,10 @@ const stubs = {
   '@/lib/server/my-files': { fileSources: async () => ({}) },
   '@/lib/server/store': { getFilePrefs: async () => ({ names: {}, hidden: [] }), mediaAccess: async (id) => (owned.has(id) ? { mime: 'video/mp4', size: 1 } : null) },
   '@/lib/scheduled-posts': shared,
+  '@/lib/posts-access': null,
 };
 const env = { SCHEDULED_POSTS_USERS: ` ${OWNER} ` };
+stubs['@/lib/posts-access'] = load('src/lib/posts-access.ts', {}, env);
 const sp = load('src/lib/server/scheduled-posts.ts', stubs, env, { URLSearchParams });
 
 /** A simulated Meta: answers by URL, counts every call that would post. */
@@ -76,7 +78,7 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   // Owner-only.
   ok(sp.schedulerAllowed(OWNER), 'the owner may use it');
   ok(!sp.schedulerAllowed('someone-else') && !sp.schedulerAllowed(null), 'nobody else may (or a signed-out visitor)');
-  const off = load('src/lib/server/scheduled-posts.ts', stubs, { SCHEDULED_POSTS_USERS: '' }, { URLSearchParams });
+  const off = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/posts-access': load('src/lib/posts-access.ts', {}, { SCHEDULED_POSTS_USERS: '' }) }, { SCHEDULED_POSTS_USERS: '' }, { URLSearchParams });
   ok(!off.schedulerAllowed(OWNER), 'empty list: off for everyone');
   const route = load('src/lib/server/posts-route.ts', { '@/lib/server/who': { currentUser: async () => 'someone-else', signInFirst: () => new Response(null, { status: 401 }) }, '@/lib/server/scheduled-posts': sp });
   eq((await route.postsUser()).response?.status, 404, 'API: another signed-in user gets 404, as if it did not exist');
@@ -85,33 +87,37 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   eq(sp.metaCreds({ META_PAGE_ID: '1', META_PAGE_TOKEN: 't' }), null, 'missing Instagram id: posting not set up');
 
   // Sidebar: every other account sees exactly the old menu.
-  const React = { useEffect() {}, useState: (v) => [typeof v === 'function' ? v() : v, () => {}] };
-  const nav = load('src/components/nav-links.tsx', { 'react': React, 'react/jsx-runtime': { jsx: () => null, jsxs: () => null }, 'next/navigation': { usePathname: () => null }, 'lucide-react': new Proxy({}, { get: (_, k) => k }), '@/components/pending-link': {} }, {}, { sessionStorage: { getItem: () => null, setItem() {} } });
+  const navStore = load('src/lib/posts-nav.ts', { react: { useSyncExternalStore: (_s, get) => get() } });
+  const nav = load('src/components/nav-links.tsx', { 'react/jsx-runtime': { jsx: () => null, jsxs: () => null }, 'next/navigation': { usePathname: () => null }, 'lucide-react': new Proxy({}, { get: (_, k) => k }), '@/components/pending-link': {}, '@/lib/posts-nav': navStore });
+  eq(navStore.usePostsNav(), false, 'menu flag starts off: nothing shows before the owner\'s own profile says so');
+  const navSrc = require('node:fs').readFileSync('src/components/nav-links.tsx', 'utf8') + require('node:fs').readFileSync('src/lib/posts-nav.ts', 'utf8');
+  ok(!/fetch\(|sessionStorage|localStorage/.test(navSrc), 'the sidebar makes no extra request and keeps nothing across accounts (Codex 2026-11-15)');
   eq(nav.navItems(false).map((i) => i.href), ['/studio', '/library', '/settings'], 'not allowed: the sidebar is unchanged');
   eq(nav.navItems(true).map((i) => i.href), ['/studio', '/library', '/posts', '/settings'], 'owner: Scheduled posts right under Viral library');
 
-  // The every-minute job: posting failing never stops exports, generations or cleanup, and posting off costs nothing.
-  const steps = [];
-  const cronStubs = (postsImpl) => ({
-    '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from: () => { const q = { select: () => q, neq: () => q, or: () => q, in: () => q, order: () => q, limit: async () => ({ data: [], error: null }) }; return q; } }) },
-    '@/lib/server/generation-jobs': { advanceGeneration: async () => {} }, '@/lib/server/account-deletion': { advanceDeletion: async () => {} },
-    '@/lib/server/uploads': { expireUploads: async () => { steps.push('uploads'); return 0; } }, '@/lib/server/export-jobs': { advanceExport: async () => {} },
-    '@/lib/server/temp-cleanup': { expireTemporaryObjects: async () => { steps.push('temp'); return 0; } },
-    '@/lib/server/scheduled-posts': { advancePosts: postsImpl }, 'node:crypto': require('node:crypto'),
-  });
-  const secret = 'x'.repeat(40), req = new Request('https://m/api/internal/generations', { headers: { authorization: `Bearer ${secret}` } });
-  const cron = load('src/app/api/internal/generations/route.ts', cronStubs(async () => { throw new Error('Meta down'); }), { CRON_SECRET: secret }, { Date });
-  const res = await cron.GET(req);
-  ok(steps.includes('uploads') && steps.includes('temp'), 'posting throws: the other work still runs this minute');
-  eq(res.status, 503, 'and the minute is reported as failed (visible in logs)');
-  steps.length = 0;
-  const calm = load('src/app/api/internal/generations/route.ts', cronStubs(async () => false), { CRON_SECRET: secret }, { Date });
-  eq((await calm.GET(req)).status, 200, 'nothing to post: the minute succeeds as before');
+  // Thumbnails (2026-11-15: the picker showed black tiles): lists show still pictures, never a video per tile.
+  const view = require('node:fs').readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
+  ok((view.match(/<ThumbImg /g) ?? []).length === 2, 'calendar cards and the picker show still pictures');
+  ok((view.match(/<video /g) ?? []).length === 1 && /<video [^>]*preload="none"/.test(view), 'the only video is the one opened post, loaded when played');
+
+  // Its own every-minute job (Codex 2026-11-15): the shared recovery cron is exactly as before, so a slow Meta call can
+  // never hold up anyone's exports, generations or cleanup.
+  const fs = require('node:fs');
+  const shared_ = fs.readFileSync('src/app/api/internal/generations/route.ts', 'utf8');
+  ok(!/advancePosts|scheduled/.test(shared_), 'the shared recovery cron does not touch scheduled posts');
+  const crons = JSON.parse(fs.readFileSync('vercel.json', 'utf8')).crons;
+  ok(crons[0].path === '/api/internal/generations' && crons.some((c) => c.path === '/api/internal/posts' && c.schedule === '* * * * *'), 'posting has its own per-minute cron');
+  const secret = 'x'.repeat(40);
+  let ran = 0;
+  const postsCron = load('src/app/api/internal/posts/route.ts', { 'node:crypto': require('node:crypto'), '@/lib/server/scheduled-posts': { advancePosts: async () => { ran++; return false; } } }, { CRON_SECRET: secret });
+  eq((await postsCron.GET(new Request('https://m/api/internal/posts'))).status, 401, 'posting cron: no secret, refused');
+  eq((await postsCron.GET(new Request('https://m/api/internal/posts', { headers: { authorization: `Bearer ${secret}` } }))).status, 200, 'posting cron: with the secret, runs');
+  ok(ran === 1, 'and runs the posting pass once');
   let queried = false;
   const offDb = { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => { queried = true; return fakeDb; } } };
   const offPosts = load('src/lib/server/scheduled-posts.ts', offDb, { SCHEDULED_POSTS_USERS: '' }, { URLSearchParams });
   ok((await offPosts.advancePosts()) === false && !queried, 'scheduler off: no database read at all');
-  const missing = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from: () => { const q = { select: () => q, or: () => q, order: () => q, limit: async () => ({ data: null, error: { code: 'PGRST205' } }) }; return q; } }) } }, env, { URLSearchParams });
+  const missing = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from: () => { const q = { select: () => q, or: () => q, order: () => q, limit: async () => ({ data: null, error: { code: 'PGRST205' } }), in: () => q }; return q; } }) } }, env, { URLSearchParams });
   ok((await missing.advancePosts()) === false, 'database update not applied yet: quietly nothing to post, not an error every minute');
 
   // Creating: only the user's own videos, never in the past.
@@ -185,4 +191,114 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   next = await sp.advancePost(post({ targets: ['instagram', 'facebook'], result: { facebook: { state: 'done', id: 'V1', url: 'u' } } }), 0, ctxFor(m));
   ok(next.state === 'failed' && next.result.facebook.state === 'done' && !m.calls.some((u) => u.includes('video_reels') || u.includes('rupload')), 'Facebook already done: untouched while Instagram fails');
   ok(!/Facebook/.test(next.error), 'the error names only the network that failed');
+
+  // Progress is never lost (Codex 2026-11-15 P1): an error after a step was saved keeps that step.
+  m = meta();
+  const flaky = m.fetch;
+  let n = 0;
+  m.fetch = async (u, i) => { if (++n > 2) throw new TypeError('fetch failed'); return flaky(u, i); };
+  next = await sp.advancePost(post(), 0, ctxFor(m));
+  ok(next.result.instagram.container === 'C1' && next.result.instagram.step === 'processing', 'network dies after the container was made: the container is kept, not started over');
+  m = meta({ igStatus: ['FINISHED'] });
+  const publishFlaky = m.fetch;
+  m.fetch = async (u, i) => { if (u.includes('media_publish')) { m.publishes++; throw new TypeError('timeout'); } return publishFlaky(u, i); };
+  next = await sp.advancePost(post({ result: { instagram: { state: 'working', step: 'processing', container: 'C1', since: new Date(T0).toISOString() } } }), 0, ctxFor(m));
+  ok(next.result.instagram.step === 'publishing' && next.result.instagram.container === 'C1', 'publish call lost in the network: the publish mark stays, so the next pass asks Meta first');
+  m = meta({ igStatus: ['PUBLISHED'] });
+  next = await sp.advancePost(post({ result: next.result }), 0, ctxFor(m));
+  ok(next.state === 'posted' && m.publishes === 0 && m.creates === 0, 'next pass: Meta says it went out, so done without a second post');
+
+  // A run that lost its claim stops before calling Meta again (Codex P1).
+  m = meta({ igStatus: ['FINISHED'] });
+  const lost = ctxFor(m);
+  lost.save = async () => { throw new sp.LostLease('taken over'); };
+  let threw = null;
+  await sp.advancePost(post(), 0, lost).catch((e) => { threw = e; });
+  ok(threw instanceof sp.LostLease && m.publishes === 0 && m.creates === 1, 'lost the claim after making the container: stops, publishes nothing');
+
+  // Time limits (Codex P1): each Meta call has a timeout; nothing starts after the post's deadline.
+  m = meta();
+  let signals = 0;
+  const timed = m.fetch;
+  m.fetch = async (u, i) => { if (i?.signal) signals++; return timed(u, i); };
+  await sp.advancePost(post(), 0, ctxFor(m));
+  ok(signals > 0 && signals === m.calls.length, 'every Meta call carries a timeout');
+  m = meta();
+  next = await sp.advancePost(post(), 0, { ...ctxFor(m), deadline: Date.now() - 1 });
+  ok(m.calls.length === 0 && next.state === 'posting', 'past the deadline: no call to Meta, it carries on next minute');
+
+  // Retry never reposts something that may have gone out (Codex P1).
+  const kept = sp.retryResult({
+    instagram: { state: 'failed', step: 'publishing', container: 'C1', error: 'x' },
+    facebook: { state: 'failed', step: 'uploaded', video: 'V9', error: 'y' },
+  });
+  ok(kept.instagram?.state === 'working' && kept.instagram.container === 'C1' && kept.instagram.step === 'publishing', 'retry keeps an Instagram attempt that may have published, to check it first');
+  ok(kept.facebook === undefined, 'retry starts fresh only where nothing could have gone out');
+  const fbKept = sp.retryResult({ facebook: { state: 'failed', step: 'finishing', video: 'V1' }, instagram: { state: 'done', id: 'M1' } });
+  ok(fbKept.facebook?.state === 'working' && fbKept.facebook.video === 'V1' && fbKept.instagram.state === 'done', 'retry keeps a Facebook publish that may have happened, and what is done');
+  m = meta({ igStatus: ['PUBLISHED'] });
+  next = await sp.advancePost(post({ result: kept, targets: ['instagram'] }), 0, ctxFor(m));
+  ok(next.state === 'posted' && m.publishes === 0 && m.creates === 0, 'after Retry: Meta says it went out, so no second post');
+
+  // Only listed accounts' posts are ever picked up (Codex P2).
+  const filters = [];
+  const spyDb = { from: () => { const q = { select: () => q, update: () => q, in: (col, v) => { filters.push([col, v]); return q; }, or: () => q, order: () => q, eq: () => q, limit: async () => ({ data: [], error: null }) }; return q; } };
+  const listed = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => spyDb } }, env, { URLSearchParams });
+  await listed.advancePosts();
+  ok(filters.some(([c, v]) => c === 'user_id' && JSON.stringify(v) === JSON.stringify([OWNER])), 'the due-posts read is limited to the listed accounts');
+
+  // The page: a real 404 for everyone else, before anything renders (Codex P2).
+  const res404 = { status: 404 };
+  const next_ = { cookies: { getAll: () => [], set() {} } };
+  const NextResponse = { next: () => next_, rewrite: (_u, init) => ({ ...res404, ...init, rewritten: true, cookies: { set() {} } }), redirect: (u) => ({ status: 307, to: String(u), cookies: { set() {} } }), json: (b, i) => ({ status: i?.status ?? 200, body: b, cookies: { set() {} } }) };
+  const session = (sub) => load('src/lib/supabase/session.ts', { 'next/server': { NextResponse }, '@supabase/ssr': { createServerClient: () => ({ auth: { getClaims: async () => ({ data: sub ? { claims: { sub } } : null }) } }) }, '@/lib/posts-access': stubs['@/lib/posts-access'], '@/lib/supabase/server': { createSupabaseAdminClient: () => ({}) } }, { ...env, NEXT_PUBLIC_SUPABASE_URL: 'https://s', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'k' });
+  const reqTo = (path) => ({ nextUrl: new URL(`https://mavya.app${path}`), url: `https://mavya.app${path}`, method: 'GET', cookies: { getAll: () => [], set() {} } });
+  eq((await session('someone-else').updateSession(reqTo('/posts'))).status, 404, '/posts for another signed-in user: 404');
+  eq((await session(null).updateSession(reqTo('/posts'))).status, 404, '/posts signed out: 404, not a sign-in prompt');
+  ok((await session(OWNER).updateSession(reqTo('/posts'))) === next_, '/posts for the owner: goes through');
+  const proxySrc = fs.readFileSync('src/proxy.ts', 'utf8'), sessionSrc = fs.readFileSync('src/lib/supabase/session.ts', 'utf8');
+  ok(proxySrc.includes('"/posts/:path*"') && /PUBLIC_API = \[[^\]]*"\/api\/internal\/posts"/.test(sessionSrc), 'the proxy guards /posts; the posting cron gets through without a session');
+
+  // The profile: everyone else's is exactly as before; only the owner's carries the menu flag (no extra request).
+  const profileFor = (id) => load('src/app/api/profile/route.ts', {
+    'node:fs/promises': {}, 'node:path': require('node:path'), 'next/server': { connection: async () => {} }, '@/lib/profile': { NO_PROFILE: {} },
+    '@/lib/supabase/server': { authEnabled: () => true, getSessionUser: async () => ({ id, email: 'a@b.c' }), createSupabaseServerClient: async () => ({ from: () => { const q = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: { first_name: 'A', last_name: 'B', avatar_url: '' }, error: null }) }; return q; } }) },
+    '@/lib/posts-access': stubs['@/lib/posts-access'],
+  }, env);
+  const other = await (await profileFor('someone-else').GET()).json();
+  eq(Object.keys(other).sort(), ['avatar', 'email', 'firstName', 'lastName'], 'another user\'s profile: the same four fields as before, nothing added');
+  eq((await (await profileFor(OWNER).GET()).json()).scheduler, true, 'the owner\'s profile: scheduler: true');
+
+  // Codex round 2: an unreadable or incomplete answer from Meta is "unknown", never success.
+  m = meta({ igStatus: ['FINISHED'] });
+  const cut = m.fetch;
+  m.fetch = async (u, i) => { const r = await cut(u, i); if (u.includes('media_publish')) return { ok: true, status: 200, json: async () => { throw new Error('body timed out'); } }; return r; };
+  next = await sp.advancePost(post({ result: { instagram: { state: 'working', step: 'processing', container: 'C1', since: new Date(T0).toISOString() } } }), 0, ctxFor(m));
+  ok(next.state === 'posting' && next.result.instagram.step === 'publishing', 'publish answer cut off mid-body: not marked posted, the publish mark stays to check');
+  m = meta();
+  const noId = m.fetch;
+  m.fetch = async (u, i) => (u.endsWith('/IG/media') ? { ok: true, status: 200, json: async () => ({}) } : noId(u, i));
+  next = await sp.advancePost(post(), 0, ctxFor(m));
+  ok(next.state === 'posting' && !next.result.instagram?.container, 'container answer without an id: nothing saved as made, tried again next minute');
+  m = meta({ fbStatus: [{ uploading_phase: { status: 'complete' } }] });
+  const noSuccess = m.fetch;
+  m.fetch = async (u, i) => (u.includes('rupload') ? { ok: true, status: 200, json: async () => ({ success: false }) } : noSuccess(u, i));
+  next = await sp.advancePost(fbPost({ facebook: { state: 'working', step: 'upload', video: 'V1', since: new Date(T0).toISOString() } }), 0, ctxFor(m));
+  ok(next.result.facebook.step === 'upload' && next.state === 'posting', 'upload not confirmed: stays at upload, not marked uploaded');
+
+  // Codex round 2: a Facebook publishing error is a failure, never a green check.
+  m = meta({ fbStatus: [{ video_status: 'ready', uploading_phase: { status: 'complete' }, publishing_phase: { status: 'error' } }] });
+  next = await sp.advancePost(fbPost({ facebook: { state: 'working', step: 'finishing', video: 'V1', since: new Date(T0).toISOString() } }), 0, ctxFor(m));
+  ok(next.state === 'failed' && /publish/.test(next.error) && m.finishes === 0, 'publishing phase in error with video "ready": failed, not posted');
+  m = meta({ fbStatus: [{ video_status: 'ready', uploading_phase: { status: 'complete' }, publishing_phase: { status: 'in_progress' } }] });
+  next = await sp.advancePost(fbPost({ facebook: { state: 'working', step: 'published', video: 'V1', since: new Date(T0).toISOString() } }), 0, ctxFor(m));
+  ok(next.state === 'posting', 'video "ready" while publishing is still in progress: not yet posted');
+
+  // Codex round 2: the claim re-checks "due", so a post moved later between the read and the claim is not taken.
+  const ors = [];
+  const claimDb = { from: () => { const q = { select: () => q, update: () => q, in: () => q, eq: () => q, order: () => q, or: (f) => { ors.push(f); return q; }, limit: async () => ({ data: [{ id: 'P1', user_id: OWNER, targets: ['instagram'], result: {}, attempts: 0, at: new Date(T0).toISOString(), state: 'scheduled' }], error: null }), then: (res) => res({ data: [], error: null }) }; return q; } };
+  const claimer = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => claimDb } }, env, { URLSearchParams });
+  const worked = await claimer.advancePosts(T0);
+  ok(ors.length === 2 && ors.every((f) => /state\.eq\.scheduled,at\.lte\./.test(f)), 'the claim repeats the due test (time come), not just the state');
+  ok(worked === false, 'the row no longer due at claim time: nothing is posted');
 });

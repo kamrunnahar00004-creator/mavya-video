@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, CircleCheck, CircleX, ExternalLink, LoaderCircle, Plus, RotateCcw, Timer, Trash2, X } from "lucide-react";
+import { ThumbImg } from "@/components/thumb-img";
 import { countdown, DEFAULT_TEMPLATES, fillCaption, MAX_BATCH, spreadTimes, TARGETS, type Post, type Target, type Templates } from "@/lib/scheduled-posts";
 
 type ExportChoice = { mediaId: string; title: string; hook: string; at: string; seconds: number; src: string };
@@ -33,7 +34,10 @@ async function call<T>(url: string, init?: RequestInit): Promise<T> {
   return json as T;
 }
 
-/** Scheduled posts (owner-only): a week calendar of exported videos that post to Instagram and Facebook by themselves. */
+/**
+ * Scheduled posts (owner-only): a week calendar of exported videos that post to Instagram and Facebook by themselves.
+ * Lists show still pictures (ThumbImg), never videos (founder 2026-11-09; 2026-11-15: the picker showed black tiles).
+ */
 export function ScheduledPostsView() {
   const [week, setWeek] = useState(() => weekStart(Date.now()));
   const [posts, setPosts] = useState<Post[] | null>(null);
@@ -53,8 +57,10 @@ export function ScheduledPostsView() {
   useEffect(() => { shown.current = week; void load(); }, [week, load]);
   const goWeek = (w: number) => { if (w !== week) { setPosts(null); setWeek(w); } };
   useEffect(() => { void call<{ templates: Templates }>("/api/posts/templates").then((o) => setTemplates(o.templates)).catch(() => undefined); }, []);
-  // The countdowns tick every second; the list refreshes every 15 s while something is about to post or posting.
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  // The page's clock moves every 15 s (which days have passed, what is about to post); each countdown ticks by itself
+  // (Countdown), so the calendar is not redrawn every second (Codex 2026-11-15). The list refreshes every 15 s while
+  // something is about to post or posting.
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 15_000); return () => clearInterval(t); }, []);
   const busy = (posts ?? []).some((p) => p.state === "posting" || (p.state === "scheduled" && Date.parse(p.at) - now < 5 * 60_000));
   useEffect(() => {
     if (!busy) return;
@@ -67,10 +73,12 @@ export function ScheduledPostsView() {
   const counts = { scheduled: 0, posting: 0, posted: 0, failed: 0 };
   for (const p of posts ?? []) counts[p.state]++;
 
-  async function retry(p: Post) {
-    try { const out = await call<{ post: Post }>(`/api/posts/${p.id}`, { method: "PATCH", body: JSON.stringify({ retry: true }) }); setPosts((all) => (all ?? []).map((x) => x.id === p.id ? out.post : x)); }
-    catch (e) { setError((e as Error).message); }
-  }
+  // Stable, so the memoised cards don't redraw when the page does.
+  const retryRef = useCallback((p: Post) => {
+    call<{ post: Post }>(`/api/posts/${p.id}`, { method: "PATCH", body: JSON.stringify({ retry: true }) })
+      .then((out) => setPosts((all) => (all ?? []).map((x) => x.id === p.id ? out.post : x)))
+      .catch((e: Error) => setError(e.message));
+  }, []);
 
   return (
     <div className="card flex h-full flex-col overflow-hidden">
@@ -100,7 +108,7 @@ export function ScheduledPostsView() {
                 {!past && <button type="button" aria-label="Schedule on this day" onClick={() => setAdding(Math.max(d, Date.now()))} className="flex h-6 w-6 cursor-pointer items-center justify-center text-soft hover:bg-raised hover:text-text"><Plus className="h-3.5 w-3.5" /></button>}
               </div>
               <div className="space-y-1.5 p-1.5">
-                {posts === null ? <div className="h-24 animate-pulse bg-raised" /> : list.map((p) => <PostCard key={p.id} post={p} now={now} onOpen={() => setEditing(p)} onRetry={() => void retry(p)} />)}
+                {posts === null ? <div className="h-24 animate-pulse bg-raised" /> : list.map((p) => <PostCard key={p.id} post={p} onOpen={setEditing} onRetry={retryRef} />)}
                 {posts !== null && !list.length && !past && <button type="button" onClick={() => setAdding(Math.max(d, Date.now()))} className="w-full cursor-pointer border border-dashed border-line-strong py-3 text-[12px] text-soft hover:bg-raised hover:text-text">+ Add</button>}
               </div>
             </section>
@@ -114,24 +122,31 @@ export function ScheduledPostsView() {
   );
 }
 
-function Status({ post, now }: { post: Post; now: number }) {
+/** The time left before a post goes out, ticking every second on its own. */
+function Countdown({ at }: { at: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  return <>{countdown(Date.parse(at) - now)}</>;
+}
+
+function Status({ post }: { post: Post }) {
   if (post.state === "posted") return <span className="flex items-center gap-1 text-[11.5px] font-bold text-green-700"><CircleCheck className="h-4 w-4 fill-green-600 text-white" />Posted</span>;
   if (post.state === "failed") return <span className="flex items-center gap-1 text-[11.5px] font-bold text-red-700"><CircleX className="h-4 w-4" />Failed</span>;
   if (post.state === "posting") return <span className="flex items-center gap-1 text-[11.5px] font-bold text-accent"><LoaderCircle className="h-3.5 w-3.5 animate-spin" />Posting</span>;
-  return <span className="flex items-center gap-1 text-[11.5px] font-semibold text-muted"><Timer className="h-3.5 w-3.5" />{countdown(Date.parse(post.at) - now)}</span>;
+  return <span className="flex items-center gap-1 text-[11.5px] font-semibold text-muted"><Timer className="h-3.5 w-3.5" /><Countdown at={post.at} /></span>;
 }
 
-function PostCard({ post, now, onOpen, onRetry }: { post: Post; now: number; onOpen: () => void; onRetry: () => void }) {
+const PostCard = memo(function PostCard({ post, onOpen, onRetry }: { post: Post; onOpen: (p: Post) => void; onRetry: (p: Post) => void }) {
   const waiting = TARGETS.map((t) => post.result[t]?.note).find(Boolean);
   return (
     <div className={`border bg-panel ${post.state === "failed" ? "border-red-300" : post.state === "posted" ? "border-green-300" : "border-line"}`}>
-      <button type="button" onClick={onOpen} className="flex w-full cursor-pointer gap-2 p-1.5 text-left hover:bg-raised">
-        <video src={`/api/media/${post.mediaId}#t=0.5`} preload="metadata" muted playsInline className="aspect-[9/16] w-10 shrink-0 bg-ink object-cover" />
+      <button type="button" onClick={() => onOpen(post)} className="flex w-full cursor-pointer gap-2 p-1.5 text-left hover:bg-raised">
+        <ThumbImg src={`/api/media/${post.mediaId}`} className="aspect-[9/16] w-10 shrink-0 bg-raised object-cover" />
         <span className="min-w-0 flex-1">
           <span className="block text-[12.5px] font-bold">{timeText(Date.parse(post.at))}</span>
           <span className="block truncate text-[11.5px] text-muted">{post.title || "Untitled video"}</span>
           <span className="block text-[10.5px] text-soft">{post.targets.map((t) => NAMES[t]).join(" + ")}</span>
-          <span className="mt-0.5 block"><Status post={post} now={now} /></span>
+          <span className="mt-0.5 block"><Status post={post} /></span>
         </span>
       </button>
       {waiting && post.state === "posting" && <p className="px-1.5 pb-1.5 text-[11px] text-muted">{waiting}</p>}
@@ -143,12 +158,12 @@ function PostCard({ post, now, onOpen, onRetry }: { post: Post; now: number; onO
       {post.state === "failed" && (
         <div className="px-1.5 pb-1.5">
           <p className="line-clamp-3 text-[11px] text-red-700" title={post.error ?? ""}>{post.error}</p>
-          <button type="button" onClick={onRetry} className="mt-1 flex cursor-pointer items-center gap-1 text-[11.5px] font-bold text-accent hover:underline"><RotateCcw className="h-3 w-3" />Retry</button>
+          <button type="button" onClick={() => onRetry(post)} className="mt-1 flex cursor-pointer items-center gap-1 text-[11.5px] font-bold text-accent hover:underline"><RotateCcw className="h-3 w-3" />Retry</button>
         </div>
       )}
     </div>
   );
-}
+});
 
 function Dialog({ title, onClose, wide, children }: { title: string; onClose: () => void; wide?: boolean; children: React.ReactNode }) {
   useEffect(() => {
@@ -250,7 +265,7 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
                 const state = used.get(e.mediaId);
                 return (
                   <button key={e.mediaId} type="button" onClick={() => toggle(e.mediaId)} className={`relative cursor-pointer border-2 text-left ${n >= 0 ? "border-accent" : "border-transparent hover:border-line-strong"}`}>
-                    <video src={`${e.src}#t=0.5`} preload="metadata" muted playsInline className="aspect-[9/16] w-full bg-ink object-cover" />
+                    <ThumbImg src={e.src} className="block aspect-[9/16] w-full bg-raised object-cover" />
                     {n >= 0 && <span className="absolute left-1 top-1 flex h-6 min-w-6 items-center justify-center bg-accent px-1 text-[12px] font-bold text-white">{n + 1}</span>}
                     {state && <span className={`absolute right-1 top-1 px-1 text-[10px] font-bold text-white ${state === "posted" ? "bg-green-700" : state === "failed" ? "bg-red-700" : "bg-ink/80"}`}>{state === "posted" ? "Posted" : state === "failed" ? "Failed" : "Scheduled"}</span>}
                     <span className="block truncate px-1 pt-1 text-[11.5px] font-semibold">{e.title}</span>
@@ -314,7 +329,7 @@ function EditDialog({ post, onClose, onSaved }: { post: Post; onClose: () => voi
   return (
     <Dialog title={post.title || "Untitled video"} onClose={onClose}>
       <div className="flex gap-4 p-5">
-        <video src={`/api/media/${post.mediaId}`} controls playsInline className="aspect-[9/16] w-[140px] shrink-0 bg-ink object-cover" />
+        <video src={`/api/media/${post.mediaId}`} poster={`/api/media/${post.mediaId}/thumb`} preload="none" controls playsInline className="aspect-[9/16] w-[140px] shrink-0 bg-ink object-cover" />
         <div className="min-w-0 flex-1 space-y-3">
           {post.state === "posted" && <p className="flex items-center gap-1.5 text-[14px] font-bold text-green-700"><CircleCheck className="h-5 w-5 fill-green-600 text-white" />Posted {new Date(t).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}</p>}
           {post.state === "posting" && <p className="flex items-center gap-1.5 text-[14px] font-bold text-accent"><LoaderCircle className="h-4 w-4 animate-spin" />Posting now</p>}

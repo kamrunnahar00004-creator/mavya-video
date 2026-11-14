@@ -4,18 +4,15 @@ import { signedGet } from "@/lib/server/r2";
 import { fileSources } from "@/lib/server/my-files";
 import { getFilePrefs, mediaAccess } from "@/lib/server/store";
 import { buildFiles, mediaOf } from "@/lib/my-files";
+import { schedulerAllowed, schedulerUsers } from "@/lib/posts-access";
 import { badPost, DEFAULT_TEMPLATES, MAX_BATCH, rollUp, TARGETS, type Post, type Target, type TargetResult, type Templates } from "@/lib/scheduled-posts";
 
 /**
- * Scheduled posts (founder 2026-11-15). Owner-only: SCHEDULED_POSTS_USERS lists the account ids that may use it, and
- * every post goes to the accounts in META_PAGE_TOKEN / META_PAGE_ID / IG_USER_ID (the founder's Summer Viola Page and
- * its Instagram). Opening it to everyone needs each user's own Meta connection and Meta's App Review first, never just
- * adding them here: their posts would go to the founder's accounts.
+ * Scheduled posts (founder 2026-11-15). Owner-only: SCHEDULED_POSTS_USERS (src/lib/posts-access.ts) lists the account
+ * ids that may use it, and every post goes to the accounts in META_PAGE_TOKEN / META_PAGE_ID / IG_USER_ID (the
+ * founder's Summer Viola Page and its Instagram).
  */
-export function schedulerAllowed(who: string | null): boolean {
-  if (!who) return false;
-  return (process.env.SCHEDULED_POSTS_USERS ?? "").split(",").map((s) => s.trim()).filter(Boolean).includes(who);
-}
+export { schedulerAllowed };
 
 const GRAPH = "https://graph.facebook.com/v24.0";
 const RUPLOAD = "https://rupload.facebook.com/video-upload/v24.0";
@@ -27,6 +24,11 @@ const MAX_ATTEMPTS = 8;
 export class MetaError extends Error {
   constructor(message: string, readonly transient: boolean) { super(message); }
 }
+/** Another cron run took this post over (its lease ran out): stop at once, make no further call to Meta. */
+export class LostLease extends Error {}
+
+/** One Meta call may take this long (the upload from a link longer); a post's whole pass stops at its deadline. */
+const CALL_MS = 20_000, UPLOAD_MS = 60_000;
 
 export type Creds = { pageId: string; pageToken: string; igUserId: string };
 export function metaCreds(env: Record<string, string | undefined> = process.env): Creds | null {
@@ -41,29 +43,49 @@ export type Ctx = {
   now: number;
   /** A link Meta can download the video from. */
   link: (mediaId: string) => Promise<string>;
-  /** Saves one network's progress before the next call, so a tick that dies never repeats a publish. */
+  /** Saves one network's progress before the next call, so a tick that dies never repeats a publish. Throws
+   *  LostLease when this run no longer owns the post. */
   save: (target: Target, r: TargetResult) => Promise<void>;
+  /** No Meta call starts after this (ms); unset: no limit. */
+  deadline?: number;
 };
 
 /** One Graph API call; Meta's error message on failure (transient when Meta says so, or on a network error / 5xx). */
 async function graph(ctx: Ctx, path: string, params: Record<string, string>, method: "GET" | "POST" = "GET", base = GRAPH, headers: Record<string, string> = {}) {
   const body = new URLSearchParams({ ...params, ...(base === GRAPH ? { access_token: ctx.creds.pageToken } : {}) });
+  if (ctx.deadline !== undefined && Date.now() > ctx.deadline) throw new MetaError("Out of time this minute; it carries on next minute.", true);
+  const signal = AbortSignal.timeout(base === RUPLOAD ? UPLOAD_MS : CALL_MS);
   let res: Response;
   try {
     res = method === "GET"
-      ? await ctx.fetch(`${base}/${path}?${body}`, { headers, cache: "no-store" })
-      : await ctx.fetch(`${base}/${path}`, { method, headers: { ...(base === GRAPH ? { "content-type": "application/x-www-form-urlencoded" } : {}), ...headers }, body: base === GRAPH ? body : undefined, cache: "no-store" });
+      ? await ctx.fetch(`${base}/${path}?${body}`, { headers, cache: "no-store", signal })
+      : await ctx.fetch(`${base}/${path}`, { method, headers: { ...(base === GRAPH ? { "content-type": "application/x-www-form-urlencoded" } : {}), ...headers }, body: base === GRAPH ? body : undefined, cache: "no-store", signal });
   } catch {
+    // A timeout is "unknown", never "didn't happen": every publish is marked before its call and checked with Meta
+    // before it is repeated.
     throw new MetaError("Couldn't reach Meta.", true);
   }
-  const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  // An answer that can't be read (cut off, timed out mid-body) is "unknown", never success (Codex 2026-11-15).
+  const json = (await res.json().catch(() => undefined)) as Record<string, unknown> | null | undefined;
+  if (json === undefined || json === null || typeof json !== "object") {
+    if (!res.ok) throw new MetaError(`Meta answered ${res.status}.`, res.status >= 500);
+    throw new MetaError("Meta's answer couldn't be read.", true);
+  }
   const err = json?.error as { message?: string; is_transient?: boolean; code?: number; error_user_msg?: string } | undefined;
   if (!res.ok || err) {
     const message = err?.error_user_msg || err?.message || `Meta answered ${res.status}.`;
     throw new MetaError(message, Boolean(err?.is_transient) || res.status >= 500 || err?.code === 2 || err?.code === 4);
   }
-  return json ?? {};
+  return json;
 }
+
+/** A field Meta must send back; missing means the outcome is unknown, so the step is not marked as done. */
+function need(json: Record<string, unknown>, key: string): string {
+  const v = json[key];
+  if ((typeof v === "string" && v) || typeof v === "number") return String(v);
+  throw new MetaError("Meta's answer was incomplete.", true);
+}
+const succeeded = (json: Record<string, unknown>) => { if (json.success !== true) throw new MetaError("Meta's answer was incomplete.", true); };
 
 const iso = (ms: number) => new Date(ms).toISOString();
 const tooSlow = (r: TargetResult, now: number) => r.since !== undefined && now - Date.parse(r.since) > PROCESS_LIMIT_MS;
@@ -80,7 +102,7 @@ async function stepInstagram(post: Post, r: TargetResult, ctx: Ctx): Promise<Tar
         return { ...r, state: "waiting", note: "Instagram's daily limit is reached. It posts as soon as there's room." };
       }
       const c = await graph(ctx, `${ig}/media`, { media_type: "REELS", video_url: await ctx.link(post.mediaId), caption: post.captions.instagram ?? "", share_to_feed: "true" }, "POST");
-      r = { state: "working", step: "processing", container: String(c.id), since: iso(ctx.now) };
+      r = { state: "working", step: "processing", container: need(c, "id"), since: iso(ctx.now) };
       await ctx.save("instagram", r);
       continue;
     }
@@ -94,7 +116,7 @@ async function stepInstagram(post: Post, r: TargetResult, ctx: Ctx): Promise<Tar
       r = { ...r, step: "publishing" };
       await ctx.save("instagram", r);
       const done = await graph(ctx, `${ig}/media_publish`, { creation_id: r.container! }, "POST");
-      r = { state: "done", container: r.container, id: String(done.id) };
+      r = { state: "done", container: r.container, id: need(done, "id") };
       await ctx.save("instagram", r);
       const link = await graph(ctx, r.id!, { fields: "permalink" }).catch(() => null);
       return typeof link?.permalink === "string" ? { ...r, url: link.permalink } : r;
@@ -111,33 +133,36 @@ async function stepFacebook(post: Post, r: TargetResult, ctx: Ctx): Promise<Targ
     if (r.state === "done" || r.state === "failed") return r;
     if (!r.video) {
       const s = await graph(ctx, `${page}/video_reels`, { upload_phase: "start" }, "POST");
-      r = { state: "working", step: "upload", video: String(s.video_id), since: iso(ctx.now) };
+      r = { state: "working", step: "upload", video: need(s, "video_id"), since: iso(ctx.now) };
       await ctx.save("facebook", r);
       continue;
     }
     if (r.step === "upload") {
-      await graph(ctx, r.video, {}, "POST", RUPLOAD, { Authorization: `OAuth ${ctx.creds.pageToken}`, file_url: await ctx.link(post.mediaId) });
+      succeeded(await graph(ctx, r.video, {}, "POST", RUPLOAD, { Authorization: `OAuth ${ctx.creds.pageToken}`, file_url: await ctx.link(post.mediaId) }));
       r = { ...r, step: "uploaded" };
       await ctx.save("facebook", r);
       continue;
     }
     const status = (await graph(ctx, r.video, { fields: "status,permalink_url" })) as { status?: { video_status?: string; uploading_phase?: { status?: string }; processing_phase?: { status?: string; error?: { message?: string } }; publishing_phase?: { status?: string } }; permalink_url?: string };
     const st = status.status ?? {};
-    const failed = st.video_status === "error" || st.uploading_phase?.status === "error" || st.processing_phase?.status === "error";
-    if (failed) return { ...r, state: "failed", error: `Facebook couldn't take the video${st.processing_phase?.error?.message ? `: ${st.processing_phase.error.message}` : "."}` };
+    // Any phase in error fails it, publishing included (Codex 2026-11-15: a publishing error with video "ready" showed
+    // as posted).
+    const failed = st.video_status === "error" || st.uploading_phase?.status === "error" || st.processing_phase?.status === "error" || st.publishing_phase?.status === "error";
+    if (failed) return { ...r, state: "failed", error: `Facebook couldn't ${st.publishing_phase?.status === "error" ? "publish" : "take"} the video${st.processing_phase?.error?.message ? `: ${st.processing_phase.error.message}` : "."}` };
     if (r.step === "uploaded" || r.step === "finishing") {
       // Already published by a tick that died after the call: don't publish twice.
-      if (r.step === "finishing" && st.publishing_phase?.status && st.publishing_phase.status !== "not_started") { r = { ...r, step: "published" }; continue; }
+      if (r.step === "finishing" && (st.publishing_phase?.status === "in_progress" || st.publishing_phase?.status === "complete")) { r = { ...r, step: "published" }; continue; }
       if (st.uploading_phase?.status !== "complete") return tooSlow(r, ctx.now) ? { ...r, state: "failed", error: "Facebook took over 30 minutes to receive the video." } : r;
       r = { ...r, step: "finishing" };
       await ctx.save("facebook", r);
-      await graph(ctx, `${page}/video_reels`, { upload_phase: "finish", video_id: r.video!, video_state: "PUBLISHED", description: post.captions.facebook ?? "" }, "POST");
+      succeeded(await graph(ctx, `${page}/video_reels`, { upload_phase: "finish", video_id: r.video!, video_state: "PUBLISHED", description: post.captions.facebook ?? "" }, "POST"));
       r = { ...r, step: "published" };
       await ctx.save("facebook", r);
       continue;
     }
     if (r.step === "published") {
-      const live = st.video_status === "ready" || st.publishing_phase?.status === "complete";
+      // Live only on Meta's word that publishing completed ("ready" alone only when Meta reports no publishing phase).
+      const live = st.publishing_phase?.status === "complete" || (st.publishing_phase === undefined && st.video_status === "ready");
       const url = status.permalink_url ? (status.permalink_url.startsWith("http") ? status.permalink_url : `https://www.facebook.com${status.permalink_url}`) : undefined;
       if (live) return { state: "done", video: r.video, id: r.video, ...(url ? { url } : {}) };
       return tooSlow(r, ctx.now) ? { ...r, state: "failed", error: "Facebook took over 30 minutes to publish the video." } : r;
@@ -149,12 +174,16 @@ async function stepFacebook(post: Post, r: TargetResult, ctx: Ctx): Promise<Targ
 
 /** Moves one network as far as it can go now. Meta's refusals fail it; network blips leave it for the next minute. */
 export async function stepTarget(target: Target, post: Post, ctx: Ctx): Promise<{ r: TargetResult; transient?: string }> {
-  const start: TargetResult = post.result[target] ?? { state: "waiting" };
+  // The newest saved progress, never the starting point: an error after a step was saved keeps that step (its
+  // container, video, publish marker), so the next pass checks it instead of starting over (Codex 2026-11-15).
+  let latest: TargetResult = post.result[target] ?? { state: "waiting" };
+  const tracked: Ctx = { ...ctx, save: async (t, r) => { latest = r; await ctx.save(t, r); } };
   try {
-    return { r: await (target === "instagram" ? stepInstagram : stepFacebook)(post, { ...start }, ctx) };
+    return { r: await (target === "instagram" ? stepInstagram : stepFacebook)(post, { ...latest }, tracked) };
   } catch (e) {
-    if (e instanceof MetaError && !e.transient) return { r: { ...start, state: "failed", error: e.message } };
-    return { r: start, transient: e instanceof Error ? e.message : "Couldn't reach Meta." };
+    if (e instanceof LostLease) throw e;
+    if (e instanceof MetaError && !e.transient) return { r: { ...latest, state: "failed", error: e.message } };
+    return { r: latest, transient: e instanceof Error ? e.message : "Couldn't reach Meta." };
   }
 }
 
@@ -187,26 +216,34 @@ type Row = { id: string; user_id: string; media_id: string; title: string; hook:
 const toPost = (r: Row): Post => ({ id: r.id, mediaId: r.media_id, title: r.title, hook: r.hook, captions: r.captions ?? {}, targets: r.targets, at: r.at, state: r.state, result: r.result ?? {}, error: r.error, createdAt: r.created_at });
 const db = () => createSupabaseAdminClient();
 
+/** A claim lasts longer than a post's whole pass can (its deadline), so two runs never work on one post. */
+const LEASE_MS = 5 * 60_000, POST_MS = 200_000, START_MS = 30_000;
+/** Due now: scheduled with its time come, or mid-posting with no live claim. The read and the claim both use it, so a
+ *  post moved later between them is not taken (Codex 2026-11-15). */
+export const due = (at: string) => `and(state.eq.scheduled,at.lte.${at}),and(state.eq.posting,or(lease_until.is.null,lease_until.lt.${at}))`;
+
 /**
- * Cron: posts whatever is due (up to 5 a minute, ~25 s at most). Each post is leased, so two ticks never post the same
- * one; a post waiting on Meta's processing is released and checked again next minute. True when it did work.
+ * Cron (/api/internal/posts, its own job): posts whatever is due for the allowed accounts, up to 5 a minute. Each post
+ * is leased; every save checks the lease, so a run that lost it stops before calling Meta again. A post waiting on
+ * Meta's processing is released and checked again next minute. True when it did work.
  */
-export async function advancePosts(now = Date.now(), ctxFor: (save: Ctx["save"]) => Ctx | null = defaultCtx): Promise<boolean> {
-  // Off (nobody on the list): no query at all, so the cron costs nothing extra.
-  if (!(process.env.SCHEDULED_POSTS_USERS ?? "").trim()) return false;
+export async function advancePosts(now = Date.now(), ctxFor: (save: Ctx["save"], deadline: number) => Ctx | null = defaultCtx, env: Record<string, string | undefined> = process.env): Promise<boolean> {
+  // Off (nobody on the list): no query at all. Only listed accounts' posts are ever posted (Codex 2026-11-15).
+  const users = schedulerUsers(env);
+  if (!users.length) return false;
   const at = iso(now);
-  const { data, error } = await db().from("scheduled_posts").select("*")
-    .or(`and(state.eq.scheduled,at.lte.${at}),and(state.eq.posting,or(lease_until.is.null,lease_until.lt.${at}))`)
+  const { data, error } = await db().from("scheduled_posts").select("*").in("user_id", users)
+    .or(due(at))
     .order("at").limit(5);
   // Migration 0020 not applied yet: nothing to post (the page says so), not a failing cron every minute.
   if (error && (error.code === "PGRST205" || error.code === "42P01")) return false;
   if (error) throw error;
   let worked = false;
   for (const row of (data ?? []) as Row[]) {
-    if (Date.now() - now > 25_000) break;
+    if (Date.now() - now > START_MS) break;
     const token = crypto.randomUUID();
-    const claim = await db().from("scheduled_posts").update({ state: "posting", lease_token: token, lease_until: iso(Date.now() + 3 * 60_000), updated_at: iso(Date.now()) })
-      .eq("id", row.id).in("state", ["scheduled", "posting"]).or(`lease_until.is.null,lease_until.lt.${iso(Date.now())}`).select("*");
+    const claim = await db().from("scheduled_posts").update({ state: "posting", lease_token: token, lease_until: iso(Date.now() + LEASE_MS), updated_at: iso(Date.now()) })
+      .eq("id", row.id).in("user_id", users).or(due(iso(Date.now()))).select("*");
     if (claim.error) throw claim.error;
     const claimed = claim.data?.[0] as Row | undefined;
     if (!claimed) continue;
@@ -214,25 +251,32 @@ export async function advancePosts(now = Date.now(), ctxFor: (save: Ctx["save"])
     const post = toPost(claimed);
     const saved: Post["result"] = { ...post.result };
     const save: Ctx["save"] = async (t, r) => {
-      saved[t] = r;
-      const { error: e } = await db().from("scheduled_posts").update({ result: saved, updated_at: iso(Date.now()) }).eq("id", post.id).eq("lease_token", token);
+      const next = { ...saved, [t]: r };
+      const { data: hit, error: e } = await db().from("scheduled_posts").update({ result: next, updated_at: iso(Date.now()) }).eq("id", post.id).eq("lease_token", token).select("id");
       if (e) throw new MetaError("Couldn't save progress.", true);
+      if (!hit?.length) throw new LostLease("lost the post's lease");
+      saved[t] = r;
     };
-    const ctx = ctxFor(save);
-    const next = ctx
-      ? await advancePost(post, claimed.attempts, ctx)
-      : { state: "failed" as const, result: post.result, error: "Posting isn't set up on the server (Meta keys missing).", attempts: claimed.attempts };
-    await db().from("scheduled_posts").update({ state: next.state, result: next.result, error: next.error, attempts: next.attempts, lease_token: null, lease_until: null, updated_at: iso(Date.now()) })
-      .eq("id", post.id).eq("lease_token", token);
+    const ctx = ctxFor(save, Date.now() + POST_MS);
+    try {
+      const next = ctx
+        ? await advancePost(post, claimed.attempts, ctx)
+        : { state: "failed" as const, result: post.result, error: "Posting isn't set up on the server (Meta keys missing).", attempts: claimed.attempts };
+      await db().from("scheduled_posts").update({ state: next.state, result: next.result, error: next.error, attempts: next.attempts, lease_token: null, lease_until: null, updated_at: iso(Date.now()) })
+        .eq("id", post.id).eq("lease_token", token);
+    } catch (e) {
+      if (!(e instanceof LostLease)) throw e;
+      // Another run owns it now; it carries on from the saved progress.
+    }
   }
   return worked;
 }
 
-function defaultCtx(save: Ctx["save"]): Ctx | null {
+function defaultCtx(save: Ctx["save"], deadline: number): Ctx | null {
   const creds = metaCreds();
   if (!creds) return null;
   // Meta downloads the file within minutes; the link lasts 6 hours for slow processing.
-  return { fetch, creds, now: Date.now(), save, link: (mediaId) => signedGet(`media/${mediaId}`, 6 * 3600) };
+  return { fetch, creds, now: Date.now(), save, deadline, link: (mediaId) => signedGet(`media/${mediaId}`, 6 * 3600) };
 }
 
 // The page's reads and writes. All are the signed-in owner's own rows only.
@@ -289,13 +333,31 @@ export async function updatePost(who: string, id: string, patch: { at: string; t
   return row ? { post: toPost(row) } : { error: "This post has already started posting." };
 }
 
+/**
+ * What a retry keeps (Codex 2026-11-15): networks already done, and any attempt that may have gone out (Instagram
+ * publish marked, Facebook finish marked or published), set going again so the next pass asks Meta what happened
+ * before doing anything. Only attempts that surely never went out start fresh.
+ */
+export function retryResult(result: Post["result"]): Post["result"] {
+  const out: Post["result"] = {};
+  for (const t of TARGETS) {
+    const r = result[t];
+    if (!r) continue;
+    if (r.state === "done") out[t] = r;
+    else if ((t === "instagram" && r.container && r.step === "publishing") || (t === "facebook" && r.video && (r.step === "finishing" || r.step === "published"))) {
+      out[t] = { ...r, state: "working", error: undefined, since: iso(Date.now()) };
+    }
+  }
+  return out;
+}
+
 /** A failed post goes again now (or at its time, if that's later). Networks it already reached are not posted twice. */
 export async function retryPost(who: string, id: string, now = Date.now()): Promise<{ error: string } | { post: Post }> {
   const { data: rows, error: readError } = await db().from("scheduled_posts").select("*").eq("id", id).eq("user_id", who).eq("state", "failed").limit(1);
   if (readError) throw readError;
   const row = rows?.[0] as Row | undefined;
   if (!row) return { error: "Only a failed post can be retried." };
-  const result = Object.fromEntries(Object.entries(row.result ?? {}).filter(([, r]) => r?.state === "done"));
+  const result = retryResult(row.result ?? {});
   const { data, error } = await db().from("scheduled_posts")
     .update({ state: "scheduled", result, error: null, attempts: 0, at: iso(Math.max(now, Date.parse(row.at))), updated_at: iso(now) })
     .eq("id", id).eq("user_id", who).eq("state", "failed").select("*");

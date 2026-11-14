@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { isPostsPage, schedulerAllowed } from "@/lib/posts-access";
 
 /**
  * Runs in the proxy: refreshes the Supabase session cookie on every app and API request and guards them.
@@ -8,7 +9,7 @@ import { createServerClient } from "@supabase/ssr";
  * locally with no accounts.
  */
 // The fast export lane's own calls carry no user session; those routes check the render secret themselves.
-const PUBLIC_API = ["/api/signed-out", "/api/contact", "/api/stripe/webhook", "/api/internal/generations", "/api/internal/export-run", "/api/internal/export-step"];
+const PUBLIC_API = ["/api/signed-out", "/api/contact", "/api/stripe/webhook", "/api/internal/generations", "/api/internal/export-run", "/api/internal/export-step", "/api/internal/posts"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -45,6 +46,13 @@ export async function updateSession(request: NextRequest) {
     response.cookies.getAll().forEach((c) => r.cookies.set(c));
     return r;
   };
+  // Scheduled posts (owner-only, SCHEDULED_POSTS_USERS): anyone else, signed in or not, gets a real 404, as if the
+  // page did not exist (Codex 2026-11-15: a not-found rendered by the page itself still answered 200).
+  if (isPostsPage(pathname) && !schedulerAllowed(signedIn ? (data!.claims.sub as string) : null)) {
+    const r = NextResponse.rewrite(new URL("/_posts-not-found", request.url), { status: 404 });
+    response.cookies.getAll().forEach((c) => r.cookies.set(c));
+    return r;
+  }
   if (pathname.startsWith("/api/")) {
     if (PUBLIC_API.includes(pathname)) return response;
     if (!signedIn) return denied({ error: "Sign in first." }, 401);
