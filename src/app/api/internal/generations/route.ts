@@ -5,6 +5,7 @@ import { advanceDeletion } from "@/lib/server/account-deletion";
 import { expireUploads } from "@/lib/server/uploads";
 import { advanceExport } from "@/lib/server/export-jobs";
 import { expireTemporaryObjects } from "@/lib/server/temp-cleanup";
+import { advancePosts } from "@/lib/server/scheduled-posts";
 
 // Keep each invocation within the configured Pro function budget.
 export const maxDuration = 300;
@@ -49,8 +50,11 @@ export async function GET(request: Request) {
       return true;
     },
   ];
-  const first = Math.floor(Date.now() / 60_000) % steps.length;
+  // Scheduled posts go first, every minute, outside the rotation: a post is due at its time, not up to five minutes
+  // later behind exports and generations. Bounded (~25 s, 5 posts); a failure here never stops the other work.
   let failed = false;
+  try { await advancePosts(); } catch (error) { console.error("scheduled posts", error); failed = true; }
+  const first = Math.floor(Date.now() / 60_000) % steps.length;
   // A step can take up to ~240 s (a generation's setup plus settlement). Start one only while the tick is young, so
   // slow failures earlier in the loop can never push the whole invocation past the 300 s limit (Codex P2V3).
   const started = Date.now();
@@ -58,7 +62,7 @@ export async function GET(request: Request) {
   for (let i = 0; i < steps.length; i++) {
     if (i > 0 && Date.now() - started > START_WINDOW_MS) break;
     try {
-      if (await steps[(first + i) % steps.length]()) return Response.json({ ok: true });
+      if (await steps[(first + i) % steps.length]()) return failed ? new Response(null, { status: 503 }) : Response.json({ ok: true });
     } catch (error) {
       // One kind failing does not stop the others this tick.
       console.error("recovery step", (first + i) % steps.length, error);
