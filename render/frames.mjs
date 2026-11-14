@@ -11,8 +11,11 @@ const near = (x) => (x < 0 ? -Math.floor(-x + 0.5 + 1e-4) : Math.floor(x + 0.5 +
  * @param {{ start: number, end: number, frames: number }} step  the piece (file times) and its planned frame count
  * @param {number} speed
  * @param {number} fps
- * @returns {{ source: number[], slot: number[] }} for each output frame, an index into `pts` (-1 when the piece has no
- *   frame at all) and its first-pass slot j (the look's keyframe time is start + j / fps, as the server's perspective look reads it)
+ * @returns {{ source: number[], slot: number[], time: number[] }} for each output frame, an index into `pts` (-1 when
+ *   the piece has no frame at all), its first-pass slot j, and its keyframe time (seconds after the piece's start, as
+ *   the server's perspective look reads it): n * slots / frames / fps, the output frame's own place in the piece, not
+ *   its source frame's slot. At 1.35x a 30 fps clip shows source frames 1, 1, 2 apart; a zoom read from the slot
+ *   stepped with them (founder 2026-11-14: "the zoom is shaking", clip at 1.35x).
  */
 export function frameSchedule(pts, step, speed, fps) {
   // trim: frames from start (inclusive) to end (exclusive), timestamps then start at the first kept frame.
@@ -26,7 +29,7 @@ export function frameSchedule(pts, step, speed, fps) {
     // frame is in `pts`.
     let held = -1;
     for (let i = 0; i < pts.length; i++) if (pts[i] < start - 1e-9 && (held < 0 || pts[i] > pts[held])) held = i;
-    return { source: new Array(step.frames).fill(held), slot: new Array(step.frames).fill(0) };
+    return { source: new Array(step.frames).fill(held), slot: new Array(step.frames).fill(0), time: new Array(step.frames).fill(0) };
   }
   const p0 = pts[kept[0]];
   // fps (first pass): slot j shows the last kept frame whose time rounds to a slot <= j. The stream ends at the
@@ -39,7 +42,7 @@ export function frameSchedule(pts, step, speed, fps) {
   // The frame-rate pass keeps none of the piece's frames (they all fit in under half an output frame): stepArgs
   // then holds the first frame inside the piece (countFrames), so the browser does too (Codex 2026-11-07: at 240 fps
   // it held the last one, a different picture).
-  if (slots < 1) return { source: new Array(step.frames).fill(kept[0]), slot: new Array(step.frames).fill(0) };
+  if (slots < 1) return { source: new Array(step.frames).fill(kept[0]), slot: new Array(step.frames).fill(0), time: new Array(step.frames).fill(0) };
   const inter = [];
   for (let j = 0, k = 0; j < slots; j++) {
     while (k + 1 < kept.length && slotOf[k + 1] <= j) k++;
@@ -49,13 +52,14 @@ export function frameSchedule(pts, step, speed, fps) {
   // floor(n * slots / frames). Never a slot past the piece's end, and no held last frame at the cut while the piece
   // has frames enough (founder 2026-11-06). `speed` is already in the planned frame count.
   void speed;
-  const source = [], slot = [];
+  const source = [], slot = [], time = [];
   for (let n = 0; n < step.frames; n++) {
     const j = Math.min(slots - 1, Math.floor((n * slots) / step.frames));
     source.push(inter[j]);
     slot.push(j);
+    time.push((n * slots) / step.frames / fps);
   }
-  return { source, slot };
+  return { source, slot, time };
 }
 
 /**

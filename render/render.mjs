@@ -54,8 +54,9 @@ export const exposurePower = (v) => measured([[-50, 0.28], [-25, 0.44], [0, 1], 
 /** Curve strength for a positive contrast value (src/lib/adjust.ts contrastGamma). */
 export const contrastGamma = (c) => measured([[0, 1], [10, 1.22], [20, 1.46], [35, 1.94], [50, 3.1]], c);
 
-/** Filters for one clip's look, on a W x H frame (file time of the piece's first frame = p0). */
-function look(a, p0, W, H, fps) {
+/** Filters for one clip's look, on a W x H frame (file time of the piece's first frame = p0). `at`: the keyframe
+ * time of each frame after p0, as an ffmpeg expression (default: one frame per slot at `fps`). */
+function look(a, p0, W, H, fps, at = `(in-1)/${fps}`) {
   const v = { brightness: 0, contrast: 0, saturation: 0, warmth: 0, zoom: 0, panX: 0, panY: 0, flip: false, keys: [], ...(a ?? {}) };
   const out = [];
   if (v.flip) out.push("hflip");
@@ -66,7 +67,6 @@ function look(a, p0, W, H, fps) {
     // 2026-11-11: "when it is zooming, it is shaking"); the browser export never did. One output frame per input
     // frame; `in` counts frames from 1 and the input is already at `fps`, so slot j = in - 1 is at file time
     // j / fps + p0 (in / fps ran one frame early, measured 2026-11-11).
-    const at = `(in-1)/${fps}`;
     const z = `(1+(${curve(keys, "zoom", p0, at)})/100)`;
     const left = `((W-W/${z})/2*(1-(${curve(keys, "panX", p0, at)})/100))`;
     const top = `((H-H/${z})/2*(1-(${curve(keys, "panY", p0, at)})/100))`;
@@ -340,10 +340,9 @@ export function stepArgs(spec, step, src, out, slots, sound) {
     `crop='trunc(min(iw,ih*${W}/${H})/2)*2':'trunc(min(ih,iw*${H}/${W})/2)*2'`,
     `scale=${W}:${H}`,
     "setsar=1",
-    // One frame rate before the look: the keyframed look reads each frame's slot at `fps`. A held frame is one frame
-    // already (fps could drop it: at 120 fps it lasts under half an output frame, Codex 2026-11-07).
-    ...(held ? ["format=yuv420p"] : [`fps=${fps}`]),
-    ...look(seg.look, step.start, W, H, fps),
+    // One frame rate first (the slots). A held frame is one frame already (fps could drop it: at 120 fps it lasts
+    // under half an output frame, Codex 2026-11-07); its look goes here, before it is repeated.
+    ...(held ? ["format=yuv420p", ...look(seg.look, step.start, W, H, fps)] : [`fps=${fps}`]),
     // Spread the piece's own frames evenly over its planned frames: output n shows frame floor(n * slots / frames).
     // setpts gives frame j the time ceil(j * frames / slots) in whole frames and fps keeps the last frame per time.
     // The speed is the clip's, adjusted by under a frame for the timeline's rounding; the old setpts=PTS/speed
@@ -352,6 +351,10 @@ export function stepArgs(spec, step, src, out, slots, sound) {
     `settb=1/${fps}`,
     // A held frame is repeated to the piece's planned frames, one per output frame.
     ...(held ? [`loop=loop=${step.frames - 1}:size=1:start=0`, "setpts=N"] : [`setpts='ceil(N*${step.frames}/${slots})'`, `fps=${fps}`]),
+    // The look after the retime: output frame n (perspective's in - 1) is at n * slots / frames / fps into the piece,
+    // its own place, not its source frame's slot. Read from the slot, a zoom on a clip at 1.35x stepped 1, 1, 2 frames
+    // with the picked frames (founder 2026-11-14: "the zoom is shaking"). render/frames.mjs time mirrors this.
+    ...(held ? [] : look(seg.look, step.start, W, H, fps, `(in-1)*${slots}/${step.frames}/${fps}`)),
     "format=yuv420p",
     // Exactly the planned length (texts are timed to it), even if the file ends early.
     `tpad=stop_mode=clone:stop_duration=${len}`,

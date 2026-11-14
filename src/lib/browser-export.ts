@@ -500,7 +500,8 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
     const schedule = frameSchedule(pts, { start: st.start!, end: st.end!, frames: st.frames }, seg.speed, fps);
     const sink = new VideoSampleSink(track);
     const times = schedule.source.map((i) => (i < 0 ? -1 : first + pts[i]));
-    const files = schedule.slot.map((j) => st.start! + j / fps);
+    // Keyframe time of each output frame: its own place in the piece, so a zoom on a sped-up clip moves evenly.
+    const files = schedule.time.map((x) => st.start! + x);
     let k = 0, last: VideoFrame | null = null;
     for await (const sample of sink.samplesAtTimestamps(times)) {
       if (sample && times[k] >= 0) {

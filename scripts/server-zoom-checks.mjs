@@ -40,5 +40,25 @@ try {
     let best = [Infinity, 0]; for (let d = -0.012; d <= 0.012 + 1e-9; d += 0.0005) { const v = cost(want + d); if (v < best[0]) best = [v, want + d]; }
     ok(Math.abs(best[1] - want) <= 0.001, `frame ${n} on time: zoom ${((best[1] - 1) * 100).toFixed(2)} %, plan ${((want - 1) * 100).toFixed(2)} %`);
   }
-  if (!process.exitCode) console.log(`server-zoom-checks: ${checks} checks pass (shift ${shift.toFixed(2)} px, step error ${stepErr.toFixed(2)})`);
+  // A sped-up clip (founder 2026-11-14: "the zoom is shaking", a 30 fps phone clip at 1.35x): the shown source frames
+  // step 1, 1, 2 apart, and a zoom read from them stepped too (step error 2.5 on this still). The zoom must follow each
+  // output frame's own time, in the server's frames and in the browser's schedule (render/frames.mjs time) alike.
+  const { frameSchedule } = await import(path.join(root, "render/frames.mjs"));
+  const speed = 1.35, fast = { ...spec, total: 3 / speed, segments: [{ ...spec.segments[0], speed }] };
+  const fstep = plan(fast)[0];
+  execFileSync(ff, countArgs(fast, fstep, src, `${dir}/count2.txt`));
+  const slots = countFrames(fs.readFileSync(`${dir}/count2.txt`, "utf8"));
+  execFileSync(ff, stepArgs(fast, fstep, src, `${dir}/fast.mkv`, slots, undefined));
+  const fm = JSON.parse(execFileSync("node", [path.join(root, "scripts/browser/zoom-preview/motion.mjs"), ff, `${dir}/fast.mkv`, "360", "640"], { maxBuffer: 1 << 26 }));
+  const ft = (n) => (n * slots) / fstep.frames / 30;
+  let fe = 0, fc = 0;
+  fm.forEach((r, i) => { const n = i + 1, t = ft(n); if (t < 0.2 || t > 2.5 || !r) return; fe += (r.k - (z(t) / z(ft(n - 1)) - 1) * 1000) ** 2; fc++; });
+  const fastErr = Math.sqrt(fe / fc);
+  ok(fc >= 45, `sped-up clip: every frame measured (${fc})`);
+  ok(fastErr <= 0.8, `zoom on a clip at ${speed}x grows evenly: step error ${fastErr.toFixed(2)} (read from the source frame: 2.5)`);
+  const pts = Array.from({ length: 90 }, (_, i) => i / 30);
+  const sched = frameSchedule(pts, fstep, speed, 30);
+  ok(sched.time.every((x, n) => Math.abs(x - ft(n)) < 1e-9), "browser export: keyframe time is the output frame's own place, the server's (in-1)*slots/frames/fps");
+  ok(new Set(sched.time.slice(1).map((x, n) => (x - sched.time[n]).toFixed(9))).size === 1, "browser export: keyframe times are evenly spaced at 1.35x");
+  if (!process.exitCode) console.log(`server-zoom-checks: ${checks} checks pass (shift ${shift.toFixed(2)} px, step error ${stepErr.toFixed(2)}, at ${speed}x ${fastErr.toFixed(2)})`);
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
