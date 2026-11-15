@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, CircleCheck, CircleX, ExternalLink, LoaderCircle, Plus, RotateCcw, Timer, Trash2, X } from "lucide-react";
 import { ThumbImg } from "@/components/thumb-img";
 import { countdown, DEFAULT_TEMPLATES, fillCaption, finalTimes, randomSlots, seeded, slotMoments, timeProblem, MAX_BATCH, TARGETS, type Post, type Target, type Templates } from "@/lib/scheduled-posts";
@@ -153,14 +153,14 @@ const PostCard = memo(function PostCard({ post, onOpen, onRetry }: { post: Post;
         <span className="min-w-0 flex-1">
           <span className="block text-[12.5px] font-bold">{timeText(Date.parse(post.at))}</span>
           <span className="block truncate text-[11.5px] text-muted">{post.title || "Untitled video"}</span>
-          <span className="block text-[10.5px] text-soft">{post.targets.map((t) => NAMES[t]).join(" + ")}</span>
+          <span className="mt-0.5 flex gap-1" aria-label={post.targets.map((t) => NAMES[t]).join(" and ")}>{post.targets.map((t) => <NetworkLogo key={t} t={t} className="h-3.5 w-3.5" />)}</span>
           <span className="mt-0.5 block"><Status post={post} /></span>
         </span>
       </button>
       {waiting && post.state === "posting" && <p className="px-1.5 pb-1.5 text-[11px] text-muted">{waiting}</p>}
       {post.state === "posted" && (
         <div className="flex gap-2 px-1.5 pb-1.5">
-          {TARGETS.map((t) => post.result[t]?.url && <a key={t} href={post.result[t]!.url} target="_blank" rel="noreferrer" className="flex items-center gap-0.5 text-[11px] font-semibold text-accent hover:underline">{NAMES[t]}<ExternalLink className="h-3 w-3" /></a>)}
+          {TARGETS.map((t) => post.result[t]?.url && <a key={t} href={post.result[t]!.url} target="_blank" rel="noreferrer" title={`Open on ${NAMES[t]}`} aria-label={`Open on ${NAMES[t]}`} className="opacity-90 hover:opacity-100"><NetworkLogo t={t} className="h-5 w-5" /></a>)}
         </div>
       )}
       {post.state === "failed" && (
@@ -200,13 +200,30 @@ function HookLine({ hook }: { hook?: string }) {
   return <p className="truncate text-[11px] text-muted" title={hook ?? ""}>Hook: {hook ? `“${hook}”` : <i>none, the caption skips the hook line</i>}</p>;
 }
 
+/** The Instagram and Facebook marks, in their own colours (they link to the posts on those apps). */
+function NetworkLogo({ t, className = "h-4 w-4" }: { t: Target; className?: string }) {
+  // Each logo its own gradient id: many on one page must not share one (Codex 2026-11-15).
+  const grad = `ig-${useId().replace(/:/g, "")}`;
+  if (t === "facebook") return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className}><circle cx="12" cy="12" r="12" fill="#1877F2" /><path fill="#fff" d="M13.4 19.5v-6.3h2.1l.3-2.5h-2.4V9.2c0-.7.2-1.2 1.2-1.2h1.3V5.8c-.2 0-1-.1-1.9-.1-1.9 0-3.2 1.2-3.2 3.3v1.8H8.7v2.5h2.1v6.3h2.6z" /></svg>
+  );
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className}>
+      <defs><radialGradient id={grad} cx="0.3" cy="1.07" r="1.2"><stop offset="0" stopColor="#FFD600" /><stop offset="0.25" stopColor="#FF7A00" /><stop offset="0.5" stopColor="#FF0069" /><stop offset="0.8" stopColor="#D300C5" /><stop offset="1" stopColor="#7638FA" /></radialGradient></defs>
+      <rect width="24" height="24" rx="6" fill={`url(#${grad})`} />
+      <rect x="5" y="5" width="14" height="14" rx="4" fill="none" stroke="#fff" strokeWidth="1.8" />
+      <circle cx="12" cy="12" r="3.3" fill="none" stroke="#fff" strokeWidth="1.8" /><circle cx="16.3" cy="7.7" r="1.05" fill="#fff" />
+    </svg>
+  );
+}
+
 function Targets({ value, onChange }: { value: Target[]; onChange: (t: Target[]) => void }) {
   return (
     <div className="flex gap-4">
       {TARGETS.map((t) => (
         <label key={t} className="flex cursor-pointer items-center gap-1.5 text-[14px] font-semibold">
           <input type="checkbox" checked={value.includes(t)} onChange={(e) => onChange(e.target.checked ? TARGETS.filter((x) => x === t || value.includes(x)) : value.filter((x) => x !== t))} />
-          {NAMES[t]}
+          <NetworkLogo t={t} />{NAMES[t]}
         </label>
       ))}
     </div>
@@ -406,31 +423,61 @@ function EditDialog({ post, onClose, onSaved }: { post: Post; onClose: () => voi
     catch (e) { setError((e as Error).message); setSaving(false); }
   }
 
+  const when = new Date(t).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   return (
     <Dialog title={post.title || "Untitled video"} onClose={onClose}>
-      <div className="flex gap-4 p-5">
-        <video src={`/api/media/${post.mediaId}`} poster={`/api/media/${post.mediaId}/thumb`} preload="none" controls playsInline className="aspect-[9/16] w-[140px] shrink-0 bg-ink object-cover" />
-        <div className="min-w-0 flex-1 space-y-3">
-          {post.state === "posted" && <p className="flex items-center gap-1.5 text-[14px] font-bold text-green-700"><CircleCheck className="h-5 w-5 fill-green-600 text-white" />Posted {new Date(t).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}</p>}
-          {post.state === "posting" && <p className="flex items-center gap-1.5 text-[14px] font-bold text-accent"><LoaderCircle className="h-4 w-4 animate-spin" />Posting now</p>}
-          {post.state === "failed" && <p className="text-[13px] font-semibold text-red-700">{post.error}</p>}
-          {TARGETS.map((x) => post.result[x]?.url && <a key={x} href={post.result[x]!.url} target="_blank" rel="noreferrer" className="mr-3 inline-flex items-center gap-1 text-[13px] font-semibold text-accent hover:underline">Open on {NAMES[x]}<ExternalLink className="h-3.5 w-3.5" /></a>)}
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block text-[12.5px] font-semibold">Day<input type="date" disabled={!editable} value={date} onChange={(e) => setDate(e.target.value)} className={`${field} mt-1 disabled:opacity-60`} /></label>
-            <label className="block text-[12.5px] font-semibold">Time<input type="time" disabled={!editable} value={time} onChange={(e) => setTime(e.target.value)} className={`${field} mt-1 disabled:opacity-60`} /></label>
+      <div className="flex gap-5 p-5">
+        <video src={`/api/media/${post.mediaId}`} poster={`/api/media/${post.mediaId}/thumb`} preload="none" controls playsInline className="aspect-[9/16] w-[150px] shrink-0 self-start bg-ink object-cover" />
+        {editable ? (
+          <div className="min-w-0 flex-1 space-y-3">
+            <p className="flex items-center gap-1.5 text-[13px] font-semibold text-muted"><Timer className="h-4 w-4" />Scheduled</p>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block text-[12.5px] font-semibold">Day<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${field} mt-1`} /></label>
+              <label className="block text-[12.5px] font-semibold">Time<input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={`${field} mt-1`} /></label>
+            </div>
+            <Targets value={targets} onChange={setTargets} />
+            {TARGETS.filter((x) => targets.includes(x)).map((x) => (
+              <label key={x} className="block text-[12.5px] font-semibold"><span className="flex items-center gap-1.5"><NetworkLogo t={x} />{NAMES[x]} caption</span>
+                <textarea rows={x === "instagram" ? 6 : 3} value={captions[x] ?? ""} onChange={(e) => setCaptions({ ...captions, [x]: e.target.value })} className={`${field} mt-1 resize-y`} />
+              </label>
+            ))}
+            {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
+            <div className="flex items-center gap-2 pt-1">
+              <button type="button" disabled={saving || !targets.length} onClick={() => void save()} className="btn-primary px-4 py-2 text-[14px]">Save</button>
+              <button type="button" disabled={saving} onClick={() => void remove()} className="ml-auto flex cursor-pointer items-center gap-1 px-2 py-2 text-[13px] font-semibold text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4" />Remove</button>
+            </div>
           </div>
-          {editable && <Targets value={targets} onChange={setTargets} />}
-          {TARGETS.filter((x) => targets.includes(x)).map((x) => (
-            <label key={x} className="block text-[12.5px] font-semibold">{NAMES[x]} caption
-              <textarea disabled={!editable} rows={x === "instagram" ? 6 : 3} value={captions[x] ?? ""} onChange={(e) => setCaptions({ ...captions, [x]: e.target.value })} className={`${field} mt-1 resize-y disabled:opacity-60`} />
-            </label>
-          ))}
-          {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
-          <div className="flex items-center gap-2 pt-1">
-            {editable && <button type="button" disabled={saving || !targets.length} onClick={() => void save()} className="btn-primary px-4 py-2 text-[14px]">Save</button>}
-            {post.state !== "posting" && <button type="button" disabled={saving} onClick={() => void remove()} className="ml-auto flex cursor-pointer items-center gap-1 px-2 py-2 text-[13px] font-semibold text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4" />{post.state === "posted" ? "Remove from calendar" : "Remove"}</button>}
+        ) : (
+          // Gone out (or going): a summary, not greyed-out boxes.
+          <div className="min-w-0 flex-1 space-y-4">
+            <div>
+              {post.state === "posted" && <p className="flex items-center gap-1.5 text-[15px] font-bold text-green-700"><CircleCheck className="h-5 w-5 fill-green-600 text-white" />Posted</p>}
+              {post.state === "posting" && <p className="flex items-center gap-1.5 text-[15px] font-bold text-accent"><LoaderCircle className="h-4 w-4 animate-spin" />Posting now</p>}
+              {post.state === "failed" && <p className="flex items-center gap-1.5 text-[15px] font-bold text-red-700"><CircleX className="h-5 w-5" />Failed</p>}
+              <p className="mt-0.5 text-[13px] text-muted">{when}</p>
+              {post.state === "failed" && <p className="mt-1 text-[12.5px] text-red-700">{post.error}</p>}
+            </div>
+            {post.targets.some((x) => post.result[x]?.url) && (
+              <div className="flex flex-wrap gap-2">
+                {post.targets.map((x) => post.result[x]?.url && (
+                  <a key={x} href={post.result[x]!.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 border border-line-strong px-3 py-2 text-[13px] font-semibold hover:bg-raised">
+                    <NetworkLogo t={x} className="h-5 w-5" />{NAMES[x]}<ExternalLink className="h-3.5 w-3.5 text-soft" />
+                  </a>
+                ))}
+              </div>
+            )}
+            {post.targets.map((x) => (
+              <div key={x}>
+                <p className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold text-muted"><NetworkLogo t={x} className="h-3.5 w-3.5" />{NAMES[x]} caption</p>
+                <p className="whitespace-pre-wrap break-words border-l-2 border-line-strong pl-3 text-[13px] leading-relaxed">{post.captions[x] || <i className="text-soft">No caption</i>}</p>
+              </div>
+            ))}
+            {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
+            {post.state !== "posting" && (
+              <button type="button" disabled={saving} onClick={() => void remove()} className="flex cursor-pointer items-center gap-1 px-0 py-1 text-[12.5px] font-semibold text-red-700 hover:underline"><Trash2 className="h-3.5 w-3.5" />Remove from calendar</button>
+            )}
           </div>
-        </div>
+        )}
       </div>
     </Dialog>
   );

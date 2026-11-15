@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 111;
+const EXPECTED = 114;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -357,4 +357,8 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   const serverSrc = fs.readFileSync('src/lib/server/scheduled-posts.ts', 'utf8');
   ok(/hook: \(e\.runId && onScreen\.get\(e\.runId\)\) \|\| e\.hookText/.test(serverSrc), 'the export list uses the on-screen hook first, the library words only as a fallback');
   ok((view.match(/<HookLine hook=/g) ?? []).length === 2, 'the dialog shows each picked video\'s hook words, for one video and for several');
+  const viewNow = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
+  ok(!/disabled=\{!editable\}/.test(viewNow) && /\{editable \? \(/.test(viewNow), 'a post that went out shows a summary, never greyed-out form boxes (founder 2026-11-15: "looks broken")');
+  ok(/function NetworkLogo/.test(viewNow) && !/Open on \{NAMES\[x\]\}<ExternalLink/.test(viewNow) && (viewNow.match(/<NetworkLogo /g) ?? []).length >= 6, 'Instagram and Facebook logos instead of "Open on Instagram / Open on Facebook" text');
+  ok(!/id="ig-grad"/.test(viewNow) && /useId\(\)/.test(viewNow), 'each Instagram logo has its own gradient id');
 });
