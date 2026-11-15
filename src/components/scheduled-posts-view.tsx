@@ -235,9 +235,9 @@ function Targets({ value, onChange }: { value: Target[]; onChange: (t: Target[])
   return (
     <div className="flex gap-4">
       {TARGETS.map((t) => (
-        <label key={t} className="flex cursor-pointer items-center gap-1.5 text-[14px] font-semibold">
-          <input type="checkbox" checked={value.includes(t)} onChange={(e) => onChange(e.target.checked ? TARGETS.filter((x) => x === t || value.includes(x)) : value.filter((x) => x !== t))} />
-          <NetworkLogo t={t} />{NAMES[t]}
+        <label key={t} title={NAMES[t]} className="flex cursor-pointer items-center gap-1.5">
+          <input type="checkbox" aria-label={NAMES[t]} checked={value.includes(t)} onChange={(e) => onChange(e.target.checked ? TARGETS.filter((x) => x === t || value.includes(x)) : value.filter((x) => x !== t))} />
+          <NetworkLogo t={t} className="h-6 w-6" />
         </label>
       ))}
     </div>
@@ -355,7 +355,7 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
                       const text = drafts[id]?.[t] ?? "";
                       return (
                         <label key={t} className="block text-[12px] font-semibold">
-                          <span className="flex items-center justify-between"><span className="flex items-center gap-1.5"><NetworkLogo t={t} className="h-3.5 w-3.5" />{NAMES[t]}</span><span className={text.length > CAPTION_MAX ? "text-red-600" : "font-normal text-soft"}>{text.length}/{CAPTION_MAX}</span></span>
+                          <span className="flex items-center justify-between"><span title={NAMES[t]}><NetworkLogo t={t} className="h-5 w-5" /><span className="sr-only">{NAMES[t]} caption</span></span><span className={text.length > CAPTION_MAX ? "text-red-600" : "font-normal text-soft"}>{text.length}/{CAPTION_MAX}</span></span>
                           <textarea rows={t === "instagram" ? 6 : 4} value={text} onChange={(e) => setDrafts((d) => ({ ...d, [id]: { ...d[id], [t]: e.target.value } }))} className={`${field} mt-1 resize-y text-[13px]`} />
                         </label>
                       );
@@ -369,7 +369,7 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
             <button type="button" disabled={saving} onClick={() => setReviewing(false)} className="cursor-pointer px-3 py-2 text-[13.5px] font-semibold text-muted hover:bg-raised">Back</button>
             {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
             <button type="button" disabled={saving || tooLong} onClick={() => void save()} className="btn-primary ml-auto px-5 py-2.5 text-[14px]">
-              {saving ? "Publishing..." : now ? "Publish now" : picked.length === 1 ? "Publish on schedule" : `Publish ${picked.length} on schedule`}
+              {saving ? "Publishing..." : "Publish"}
             </button>
           </div>
         </div>

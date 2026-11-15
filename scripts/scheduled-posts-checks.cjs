@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 122;
+const EXPECTED = 123;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -324,7 +324,7 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   ok(Math.floor(many[many.length - 1] / 1440) >= 4, 'more than fit in a day roll over to the next days');
   eq(shared.randomSlots(5, 540, 1320, shared.seeded(3)), shared.randomSlots(5, 540, 1320, shared.seeded(3)), 'same seed, same times (the screen doesn\'t jump)');
   ok(shared.randomSlots(3, 540, 1320, shared.seeded(5), 20 * 60)[0] >= 20 * 60, 'starting today: the first time is after now');
-  ok(/aria-pressed=\{mode === m\}/.test(view) && /"Now" : "Schedule"/.test(view) && /now \? "Publish now"/.test(view) && /Times in \{zone\}/.test(view) && !/[\u2013\u2014]/.test(view), 'one video: Now and Schedule buttons; time zone shown; no dashes in the screen');
+  ok(/aria-pressed=\{mode === m\}/.test(view) && /"Now" : "Schedule"/.test(view) && />\s*\{saving \? "Publishing\.\.\." : "Publish"\}/.test(view) && /Times in \{zone\}/.test(view) && !/[\u2013\u2014]/.test(view), 'one video: Now and Schedule buttons; time zone shown; no dashes in the screen');
 
   // Clock changes (Codex round 6): spacing and "not in the past" hold on the real clock.
   const H = 3600e3, base = Date.parse('2027-03-14T05:00:00Z');
@@ -371,11 +371,13 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   ok(kept2.v1.instagram === 'my edit' && kept2.v1.facebook.startsWith('x'), 'an edit made on the review screen is kept (Back and forth)');
   const viewR = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
   ok(/onClick=\{review\}/.test(viewR) && /reviewing \? \(/.test(viewR) && /drafts\[id\]\?\.\[t\] \?\? fillCaption/.test(viewR), 'Schedule goes to the review screen first, and what is published is the reviewed caption');
-  ok(/"Publish now"/.test(viewR) && /disabled=\{saving \|\| tooLong\}/.test(viewR), 'the review screen ends with Publish; an over-long caption blocks it');
+  ok(/: "Publish"\}/.test(viewR) && !/Publish on schedule|Publish now/.test(viewR) && /disabled=\{saving \|\| tooLong\}/.test(viewR), 'the review screen ends with Publish; an over-long caption blocks it');
   let dd = shared.draftCaptions(['v1', 'v2'], () => 'h', ['instagram', 'facebook'], shared.DEFAULT_TEMPLATES, { v1: { facebook: 'fb edit' }, v2: { instagram: 'v2 edit' } });
   dd = shared.draftCaptions(['v1'], () => 'h', ['instagram'], shared.DEFAULT_TEMPLATES, dd);
   dd = shared.draftCaptions(['v1', 'v2'], () => 'h', ['instagram', 'facebook'], shared.DEFAULT_TEMPLATES, dd);
   ok(dd.v1.facebook === 'fb edit', 'Facebook unticked and ticked again: its edited caption comes back');
   ok(dd.v2.instagram === 'v2 edit', 'a video unpicked and picked again: its edited caption comes back');
   ok(/onClick=\{review\}[^>]*>\s*Next\s*</.test(fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8')), 'the button to the caption check just says "Next" (founder 2026-11-15)');
+  const viewL = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
+  ok(/aria-label=\{NAMES\[t\]\} checked=/.test(viewL) && /<NetworkLogo t=\{t\} className="h-6 w-6" \/>\s*<\/label>/.test(viewL), 'Post to shows the logos only (founder 2026-11-15), still named for screen readers');
 });
