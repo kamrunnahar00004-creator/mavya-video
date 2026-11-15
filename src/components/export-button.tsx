@@ -4,6 +4,7 @@ import { MediaVideo } from "@/components/media-video";
 import { useEffect, useRef, useState } from "react";
 import { Download, Loader2, X } from "lucide-react";
 import { uploadFile, waitRunSaves } from "@/lib/client";
+import { uploadExportFiles } from "@/lib/upload-put";
 import { pollDelay, waitForPoll } from "@/lib/polling";
 import { exportLayers } from "@/lib/export-layers";
 import { downloadHref, exportFileName } from "@/lib/export-name";
@@ -217,16 +218,17 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
     if(blob.size>300*1024*1024||(made.demo?.size??0)>300*1024*1024)return unsaved("This video is too large to save in My files. Download it now.");
     const reserved=await post("local",{size:blob.size,encoder:made.encoder,...(made.demo?{demoSize:made.demo.size}:{})}).catch(()=>null);
     if(!reserved?.job||!reserved.upload)return unsaved("Couldn't save the video to My files. Download it now.");
-    // Each try has a deadline (at least 2 minutes, or 200 KB/s), so a stalled upload can't hang the button.
     // Every try fits inside the upload link's 15 minutes (13, with room to spare); then the job is ended instead.
+    // Each try watches its own progress (upload-put.ts): silence past 45 s connecting, 20 s mid-upload or 60 s waiting
+    // for the answer drops it and the next starts at once, instead of one hung connection holding the button for
+    // 13 minutes (founder 2026-11-15: "export is stuck"). Three dead tries give up in about 2 minutes.
     const until=Date.now()+13*60_000;
-    // The demo part first (My files, Demos): the job finishes as soon as the video lands. Its failure is only a
-    // missing demo.
-    if(made.demo&&reserved.demoUpload)await fetch(reserved.demoUpload,{method:"PUT",headers:{"content-type":"video/mp4"},body:made.demo,signal:AbortSignal.any([life.signal,AbortSignal.timeout(Math.max(1000,until-Date.now()))])}).catch(()=>null);
-    let put:Response|null=null;
-    for(let i=0;i<3&&!put?.ok&&!life.signal.aborted&&until-Date.now()>5_000;i++)put=await fetch(reserved.upload,{method:"PUT",headers:{"content-type":"video/mp4"},body:blob,signal:AbortSignal.any([life.signal,AbortSignal.timeout(until-Date.now())])}).catch(()=>null);
+    // The demo part first (My files, Demos): the job finishes as soon as the video lands. One try, also dropped when it
+    // stalls, so it can never hold up the video; its failure is only a missing demo.
+    // The video: up to 3 tries; the button shows how much is sent (uploadExportFiles, upload-put.ts).
+    const put=await uploadExportFiles({video:blob,demo:made.demo},{upload:reserved.upload,demoUpload:reserved.demoUpload},{until,signal:life.signal,onProgress:f=>{if(alive.current)setProgress(previous=>Math.max(previous??0,0.92+0.07*f));}});
     if(life.signal.aborted)return "started";
-    if(!put?.ok){
+    if(!put){
       // The video is here to download; end the job so Export is free again at once. If the server keeps the job
       // (its file arrived after all, or the cancel didn't get through), follow it like any export.
       const reply=await post("cancel",{job:reserved.job}).catch(()=>null);
@@ -235,7 +237,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
       else if(alive.current)setJobId(reserved.job);
       return "started";
     }
-    if(alive.current){setProgress(0.95);setJobId(reserved.job);}
+    if(alive.current){setProgress(previous=>Math.max(previous??0,0.95));setJobId(reserved.job);}
     return "started";
   }
 
