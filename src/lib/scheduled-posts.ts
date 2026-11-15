@@ -84,15 +84,15 @@ export function badPost(p: { at?: unknown; targets?: unknown; captions?: unknown
   return null;
 }
 
-/** "in 2 h 5 min", "in 45 s": the time left before a scheduled post goes out. */
+/** "in 41m", "in 1h 50m", "in 2d 3h", "in 45s": the time left before a scheduled post goes out, short enough for one line. */
 export function countdown(ms: number): string {
   if (ms <= 0) return "posting soon";
   const s = Math.ceil(ms / 1000);
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
-  if (d) return `in ${d} d ${h} h`;
-  if (h) return `in ${h} h ${m} min`;
-  if (m) return `in ${m} min ${s % 60} s`;
-  return `in ${s} s`;
+  if (d) return `in ${d}d ${h}h`;
+  if (h) return `in ${h}h ${m}m`;
+  if (m) return `in ${m}m`;
+  return `in ${s}s`;
 }
 
 /**

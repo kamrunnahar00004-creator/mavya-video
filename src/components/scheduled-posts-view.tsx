@@ -138,10 +138,10 @@ function Countdown({ at }: { at: string }) {
 }
 
 function Status({ post }: { post: Post }) {
-  if (post.state === "posted") return <span className="flex items-center gap-1 text-[11px] font-bold text-green-700"><CircleCheck className="h-3.5 w-3.5 fill-green-600 text-white" />Posted</span>;
-  if (post.state === "failed") return <span className="flex items-center gap-1 text-[11.5px] font-bold text-red-700"><CircleX className="h-4 w-4" />Failed</span>;
-  if (post.state === "posting") return <span className="flex items-center gap-1 text-[11.5px] font-bold text-accent"><LoaderCircle className="h-3.5 w-3.5 animate-spin" />Posting</span>;
-  return <span className="flex items-center gap-1 text-[11.5px] font-semibold text-muted"><Timer className="h-3.5 w-3.5" /><Countdown at={post.at} /></span>;
+  if (post.state === "posted") return <span className="flex items-center gap-1 whitespace-nowrap text-[11px] font-bold text-green-700"><CircleCheck className="h-3.5 w-3.5 fill-green-600 text-white" />Posted</span>;
+  if (post.state === "failed") return <span className="flex items-center gap-1 whitespace-nowrap text-[11px] font-bold text-red-700"><CircleX className="h-3.5 w-3.5" />Failed</span>;
+  if (post.state === "posting") return <span className="flex items-center gap-1 whitespace-nowrap text-[11px] font-bold text-accent"><LoaderCircle className="h-3 w-3 animate-spin" />Posting</span>;
+  return <span className="flex items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-muted"><Timer className="h-3 w-3" /><Countdown at={post.at} /></span>;
 }
 
 const EDGE: Record<Post["state"], string> = { scheduled: "border-l-line-strong", posting: "border-l-accent", posted: "border-l-green-600", failed: "border-l-red-600" };
@@ -167,12 +167,12 @@ const PostCard = memo(function PostCard({ post, onOpen, onRetry }: { post: Post;
             {post.targets.map((t) => {
               const url = post.result[t]?.url;
               return url ? (
-                <a key={t} href={url} target="_blank" rel="noreferrer" title={`Open on ${NAMES[t]}`} aria-label={`Open on ${NAMES[t]}`} className="transition-transform hover:scale-110"><NetworkLogo t={t} className="h-[18px] w-[18px]" /></a>
+                <a key={t} href={url} target="_blank" rel="noreferrer" title={`Open on ${NAMES[t]}`} aria-label={`Open on ${NAMES[t]}`} className="transition-transform hover:scale-110"><NetworkLogo t={t} className="h-4 w-4" /></a>
               ) : (
-                <span key={t} title={`${NAMES[t]}: not posted yet`} className="opacity-40 grayscale"><NetworkLogo t={t} className="h-[18px] w-[18px]" /><span className="sr-only">{NAMES[t]}: not posted yet</span></span>
+                <span key={t} title={`${NAMES[t]}: not posted yet`} className="opacity-45"><NetworkLogo t={t} className="h-4 w-4" /><span className="sr-only">{NAMES[t]}: not posted yet</span></span>
               );
             })}
-            <span className="ml-auto"><Status post={post} /></span>
+            <span className="ml-auto pl-1"><Status post={post} /></span>
           </div>
         </div>
       </div>

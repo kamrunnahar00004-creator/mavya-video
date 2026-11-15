@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 123;
+const EXPECTED = 127;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -380,4 +380,13 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   ok(/onClick=\{review\}[^>]*>\s*Next\s*</.test(fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8')), 'the button to the caption check just says "Next" (founder 2026-11-15)');
   const viewL = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
   ok(/aria-label=\{NAMES\[t\]\} checked=/.test(viewL) && /<NetworkLogo t=\{t\} className="h-6 w-6" \/>\s*<\/label>/.test(viewL), 'Post to shows the logos only (founder 2026-11-15), still named for screen readers');
+
+  // One line on the card (founder 2026-11-15): a short countdown, never wrapped.
+  eq([shared.countdown(41 * 60e3 + 48e3), shared.countdown(110 * 60e3), shared.countdown(51 * 3600e3), shared.countdown(45e3)], ['in 41m', 'in 1h 50m', 'in 2d 3h', 'in 45s'], 'countdowns are short: 41m, 1h 50m, 2d 3h, 45s');
+  ok(/whitespace-nowrap[^"]*"><Timer/.test(fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8')), 'the countdown never wraps to a second line');
+  // A post can't be moved into the past (it would go out within the minute).
+  const editDb = { from: () => { const q = { update: () => q, eq: () => q, select: async () => ({ data: [{ id: 'P1', state: 'scheduled', result: {}, captions: {}, targets: ['instagram'], at: new Date(T0).toISOString(), created_at: '' }], error: null }) }; return q; } };
+  const editor = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => editDb } }, env, { URLSearchParams });
+  ok((await editor.updatePost(OWNER, 'P1', { at: new Date(T0 - 3600e3).toISOString(), targets: ['instagram'], captions: { instagram: 'a' } }, T0)).error, 'editing a post to a time that has passed is refused');
+  ok((await editor.updatePost(OWNER, 'P1', { at: new Date(T0 + 3600e3).toISOString(), targets: ['instagram'], captions: { instagram: 'a' } }, T0)).post, 'editing it to a later time works');
 });

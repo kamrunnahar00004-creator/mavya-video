@@ -336,6 +336,8 @@ export async function createPosts(who: string, items: NewPost[], now = Date.now(
 export async function updatePost(who: string, id: string, patch: { at: string; targets: Target[]; captions: Post["captions"] }, now = Date.now()): Promise<{ error: string } | { post: Post }> {
   const bad = badPost(patch, now);
   if (bad) return { error: bad };
+  // Moving a post into the past would post it within the minute: refused, as when scheduling (founder 2026-11-15).
+  if (Date.parse(patch.at) < now - 60_000) return { error: "Pick a time that hasn't passed." };
   const { data, error } = await db().from("scheduled_posts")
     .update({ at: iso(Date.parse(patch.at)), targets: patch.targets, captions: Object.fromEntries(patch.targets.map((t) => [t, patch.captions[t]])), updated_at: iso(now) })
     .eq("id", id).eq("user_id", who).eq("state", "scheduled").select("*");
