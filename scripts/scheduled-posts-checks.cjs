@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 114;
+const EXPECTED = 115;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -361,4 +361,6 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   ok(!/disabled=\{!editable\}/.test(viewNow) && /\{editable \? \(/.test(viewNow), 'a post that went out shows a summary, never greyed-out form boxes (founder 2026-11-15: "looks broken")');
   ok(/function NetworkLogo/.test(viewNow) && !/Open on \{NAMES\[x\]\}<ExternalLink/.test(viewNow) && (viewNow.match(/<NetworkLogo /g) ?? []).length >= 6, 'Instagram and Facebook logos instead of "Open on Instagram / Open on Facebook" text');
   ok(!/id="ig-grad"/.test(viewNow) && /useId\(\)/.test(viewNow), 'each Instagram logo has its own gradient id');
+  const card = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8').match(/const PostCard = memo[\s\S]*?\n\}\);/)[0];
+  ok((card.match(/<NetworkLogo /g) ?? []).length === 2 && /url \? \(/.test(card), 'a card shows each network logo once: grey until posted, then a link');
 });

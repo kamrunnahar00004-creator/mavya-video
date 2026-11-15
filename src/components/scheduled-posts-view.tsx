@@ -138,34 +138,48 @@ function Countdown({ at }: { at: string }) {
 }
 
 function Status({ post }: { post: Post }) {
-  if (post.state === "posted") return <span className="flex items-center gap-1 text-[11.5px] font-bold text-green-700"><CircleCheck className="h-4 w-4 fill-green-600 text-white" />Posted</span>;
+  if (post.state === "posted") return <span className="flex items-center gap-1 text-[11px] font-bold text-green-700"><CircleCheck className="h-3.5 w-3.5 fill-green-600 text-white" />Posted</span>;
   if (post.state === "failed") return <span className="flex items-center gap-1 text-[11.5px] font-bold text-red-700"><CircleX className="h-4 w-4" />Failed</span>;
   if (post.state === "posting") return <span className="flex items-center gap-1 text-[11.5px] font-bold text-accent"><LoaderCircle className="h-3.5 w-3.5 animate-spin" />Posting</span>;
   return <span className="flex items-center gap-1 text-[11.5px] font-semibold text-muted"><Timer className="h-3.5 w-3.5" /><Countdown at={post.at} /></span>;
 }
 
+const EDGE: Record<Post["state"], string> = { scheduled: "border-l-line-strong", posting: "border-l-accent", posted: "border-l-green-600", failed: "border-l-red-600" };
+
+/**
+ * One post on the calendar (founder 2026-11-15: "make it better"): picture, time, name, then one row of network logos
+ * and the status. A logo is grey until that network has the post, then in colour and a link to it.
+ */
 const PostCard = memo(function PostCard({ post, onOpen, onRetry }: { post: Post; onOpen: (p: Post) => void; onRetry: (p: Post) => void }) {
   const waiting = TARGETS.map((t) => post.result[t]?.note).find(Boolean);
   return (
-    <div className={`border bg-panel ${post.state === "failed" ? "border-red-300" : post.state === "posted" ? "border-green-300" : "border-line"}`}>
-      <button type="button" onClick={() => onOpen(post)} className="flex w-full cursor-pointer gap-2 p-1.5 text-left hover:bg-raised">
-        <ThumbImg src={`/api/media/${post.mediaId}`} className="aspect-[9/16] w-10 shrink-0 bg-raised object-cover" />
-        <span className="min-w-0 flex-1">
-          <span className="block text-[12.5px] font-bold">{timeText(Date.parse(post.at))}</span>
-          <span className="block truncate text-[11.5px] text-muted">{post.title || "Untitled video"}</span>
-          <span className="mt-0.5 flex gap-1" aria-label={post.targets.map((t) => NAMES[t]).join(" and ")}>{post.targets.map((t) => <NetworkLogo key={t} t={t} className="h-3.5 w-3.5" />)}</span>
-          <span className="mt-0.5 block"><Status post={post} /></span>
-        </span>
-      </button>
-      {waiting && post.state === "posting" && <p className="px-1.5 pb-1.5 text-[11px] text-muted">{waiting}</p>}
-      {post.state === "posted" && (
-        <div className="flex gap-2 px-1.5 pb-1.5">
-          {TARGETS.map((t) => post.result[t]?.url && <a key={t} href={post.result[t]!.url} target="_blank" rel="noreferrer" title={`Open on ${NAMES[t]}`} aria-label={`Open on ${NAMES[t]}`} className="opacity-90 hover:opacity-100"><NetworkLogo t={t} className="h-5 w-5" /></a>)}
+    <div className={`border border-l-[3px] border-line bg-panel transition-colors hover:border-t-line-strong hover:border-r-line-strong hover:border-b-line-strong ${EDGE[post.state]}`}>
+      <div className="flex gap-2 p-1.5">
+        <button type="button" onClick={() => onOpen(post)} aria-label={`Open ${post.title || "post"}`} className="shrink-0 cursor-pointer">
+          <ThumbImg src={`/api/media/${post.mediaId}`} className="aspect-[9/16] w-11 bg-raised object-cover" />
+        </button>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <button type="button" onClick={() => onOpen(post)} className="cursor-pointer text-left">
+            <span className="block text-[13px] font-bold leading-tight">{timeText(Date.parse(post.at))}</span>
+            <span className="block truncate text-[11.5px] text-muted">{post.title || "Untitled video"}</span>
+          </button>
+          <div className="mt-auto flex items-center gap-1 pt-1.5">
+            {post.targets.map((t) => {
+              const url = post.result[t]?.url;
+              return url ? (
+                <a key={t} href={url} target="_blank" rel="noreferrer" title={`Open on ${NAMES[t]}`} aria-label={`Open on ${NAMES[t]}`} className="transition-transform hover:scale-110"><NetworkLogo t={t} className="h-[18px] w-[18px]" /></a>
+              ) : (
+                <span key={t} title={`${NAMES[t]}: not posted yet`} className="opacity-40 grayscale"><NetworkLogo t={t} className="h-[18px] w-[18px]" /><span className="sr-only">{NAMES[t]}: not posted yet</span></span>
+              );
+            })}
+            <span className="ml-auto"><Status post={post} /></span>
+          </div>
         </div>
-      )}
+      </div>
+      {waiting && post.state === "posting" && <p className="px-2 pb-1.5 text-[11px] text-muted">{waiting}</p>}
       {post.state === "failed" && (
-        <div className="px-1.5 pb-1.5">
-          <p className="line-clamp-3 text-[11px] text-red-700" title={post.error ?? ""}>{post.error}</p>
+        <div className="border-t border-line px-2 py-1.5">
+          <p className="line-clamp-2 text-[11px] text-red-700" title={post.error ?? ""}>{post.error}</p>
           <button type="button" onClick={() => onRetry(post)} className="mt-1 flex cursor-pointer items-center gap-1 text-[11.5px] font-bold text-accent hover:underline"><RotateCcw className="h-3 w-3" />Retry</button>
         </div>
       )}
