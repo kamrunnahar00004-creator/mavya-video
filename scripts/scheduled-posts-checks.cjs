@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 127;
+const EXPECTED = 133;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -389,4 +389,39 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   const editor = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => editDb } }, env, { URLSearchParams });
   ok((await editor.updatePost(OWNER, 'P1', { at: new Date(T0 - 3600e3).toISOString(), targets: ['instagram'], captions: { instagram: 'a' } }, T0)).error, 'editing a post to a time that has passed is refused');
   ok((await editor.updatePost(OWNER, 'P1', { at: new Date(T0 + 3600e3).toISOString(), targets: ['instagram'], captions: { instagram: 'a' } }, T0)).post, 'editing it to a later time works');
+
+  // Founder 2026-11-15: Facebook showed "failed" though the reel was live. A status question that errors is asked
+  // again next minute, never a failure; a posting step that Meta refuses still fails.
+  m = meta({ fbStatus: [] });
+  const flakyStatus = m.fetch;
+  let statusCalls = 0;
+  m.fetch = async (u, i) => (u.includes('/V1?') && ++statusCalls === 1 ? { ok: false, status: 400, json: async () => ({ error: { message: 'Unsupported get request', code: 100 } }) } : flakyStatus(u, i));
+  next = await sp.advancePost(fbPost({ facebook: { state: 'working', step: 'published', video: 'V1', since: new Date(T0).toISOString() } }), 0, ctxFor(m));
+  ok(next.state === 'posting' && next.result.facebook.step === 'published' && next.attempts === 1, 'Facebook status check errors once: still posting, asked again next minute (not failed)');
+  m = meta({ igStatus: ['IN_PROGRESS'] });
+  const igFlaky = m.fetch;
+  m.fetch = async (u, i) => (u.includes('/C1?') ? { ok: false, status: 400, json: async () => ({ error: { message: 'Media not ready', code: 100 } }) } : igFlaky(u, i));
+  next = await sp.advancePost(post({ result: { instagram: { state: 'working', step: 'processing', container: 'C1', since: new Date(T0).toISOString() } } }), 0, ctxFor(m));
+  ok(next.state === 'posting' && next.result.instagram.container === 'C1', 'Instagram status check errors: still posting, the container is kept');
+  m = meta({ refuse: true });
+  next = await sp.advancePost(post(), 0, ctxFor(m));
+  ok(next.state === 'failed', 'a posting step Meta refuses still fails (with its reason)');
+  m = meta({ igStatus: ['IN_PROGRESS'] });
+  const htmlErr = m.fetch;
+  m.fetch = async (u, i) => (u.includes('/C1?') ? { ok: false, status: 403, json: async () => { throw new Error('not json'); } } : htmlErr(u, i));
+  next = await sp.advancePost(post({ result: { instagram: { state: 'working', step: 'processing', container: 'C1', since: new Date(T0).toISOString() } } }), 0, ctxFor(m));
+  ok(next.state === 'posting', 'a status check answered with an unreadable 403 page: asked again, not failed');
+  m = meta({ igStatus: ['IN_PROGRESS'] });
+  const keepErr = m.fetch;
+  m.fetch = async (u, i) => (u.includes('/C1?') ? { ok: false, status: 400, json: async () => ({ error: { message: 'x', code: 100 } }) } : keepErr(u, i));
+  next = await sp.advancePost(post({ result: { instagram: { state: 'working', step: 'publishing', container: 'C1', since: new Date(T0).toISOString() } } }), 7, ctxFor(m));
+  ok(next.state === 'failed' && next.result.instagram.container === 'C1' && next.result.instagram.step === 'publishing', 'status errors that never stop: fails after the retry budget, keeping the publish mark for a safe Retry');
+  m = meta({ igStatus: ['PUBLISHED'] });
+  let first = true;
+  const onceErr = m.fetch;
+  m.fetch = async (u, i) => (u.includes('/C1?') && first ? ((first = false), { ok: false, status: 400, json: async () => ({ error: { message: 'x', code: 100 } }) }) : onceErr(u, i));
+  const mark = { instagram: { state: 'working', step: 'publishing', container: 'C1', since: new Date(T0).toISOString() } };
+  next = await sp.advancePost(post({ result: mark }), 0, ctxFor(m));
+  next = await sp.advancePost(post({ result: next.result }), next.attempts, ctxFor(m));
+  ok(next.state === 'posted' && m.publishes === 0, 'one status error, then Meta says published: done, with no second publish');
 });

@@ -68,13 +68,15 @@ async function graph(ctx: Ctx, path: string, params: Record<string, string>, met
   // An answer that can't be read (cut off, timed out mid-body) is "unknown", never success (Codex 2026-11-15).
   const json = (await res.json().catch(() => undefined)) as Record<string, unknown> | null | undefined;
   if (json === undefined || json === null || typeof json !== "object") {
-    if (!res.ok) throw new MetaError(`Meta answered ${res.status}.`, res.status >= 500);
+    if (!res.ok) throw new MetaError(`Meta answered ${res.status}.`, method === "GET" || res.status >= 500);
     throw new MetaError("Meta's answer couldn't be read.", true);
   }
   const err = json?.error as { message?: string; is_transient?: boolean; code?: number; error_user_msg?: string } | undefined;
   if (!res.ok || err) {
     const message = err?.error_user_msg || err?.message || `Meta answered ${res.status}.`;
-    throw new MetaError(message, Boolean(err?.is_transient) || res.status >= 500 || err?.code === 2 || err?.code === 4);
+    // A status question (GET) never fails a post: asking again can't post twice, and Meta sometimes answers it with an
+    // error for a moment right after publishing (founder 2026-11-15: Facebook said failed, though the reel was live).
+    throw new MetaError(message, method === "GET" || Boolean(err?.is_transient) || res.status >= 500 || err?.code === 2 || err?.code === 4);
   }
   return json;
 }
@@ -182,6 +184,8 @@ export async function stepTarget(target: Target, post: Post, ctx: Ctx): Promise<
     return { r: await (target === "instagram" ? stepInstagram : stepFacebook)(post, { ...latest }, tracked) };
   } catch (e) {
     if (e instanceof LostLease) throw e;
+    // Every Meta error is logged, the passing ones too, so a failure's first cause is never lost.
+    console.error("scheduled post meta error", post.id, target, latest.step ?? "start", e instanceof Error ? e.message : String(e));
     if (e instanceof MetaError && !e.transient) return { r: { ...latest, state: "failed", error: e.message } };
     return { r: latest, transient: e instanceof Error ? e.message : "Couldn't reach Meta." };
   }
@@ -262,6 +266,8 @@ export async function advancePosts(now = Date.now(), ctxFor: (save: Ctx["save"],
       const next = ctx
         ? await advancePost(post, claimed.attempts, ctx)
         : { state: "failed" as const, result: post.result, error: "Posting isn't set up on the server (Meta keys missing).", attempts: claimed.attempts };
+      // Every failure is logged with Meta's exact words, so a retry (which clears the card's message) loses nothing.
+      if (next.state === "failed") console.error("scheduled post failed", post.id, next.error, JSON.stringify(next.result));
       await db().from("scheduled_posts").update({ state: next.state, result: next.result, error: next.error, attempts: next.attempts, lease_token: null, lease_until: null, updated_at: iso(Date.now()) })
         .eq("id", post.id).eq("lease_token", token);
     } catch (e) {
