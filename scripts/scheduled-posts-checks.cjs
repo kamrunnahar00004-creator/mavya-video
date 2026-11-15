@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 121;
+const EXPECTED = 122;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -377,4 +377,5 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   dd = shared.draftCaptions(['v1', 'v2'], () => 'h', ['instagram', 'facebook'], shared.DEFAULT_TEMPLATES, dd);
   ok(dd.v1.facebook === 'fb edit', 'Facebook unticked and ticked again: its edited caption comes back');
   ok(dd.v2.instagram === 'v2 edit', 'a video unpicked and picked again: its edited caption comes back');
+  ok(/onClick=\{review\}[^>]*>\s*Next\s*</.test(fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8')), 'the button to the caption check just says "Next" (founder 2026-11-15)');
 });

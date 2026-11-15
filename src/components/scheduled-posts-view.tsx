@@ -452,7 +452,7 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
           <p className="text-[11.5px] text-soft">Captions come from your Captions templates with each video&apos;s hook filled in. Click a post on the calendar to change its caption or time.</p>
           {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
           <button type="button" disabled={!picked.length || !targets.length || saving || problems.some(Boolean)} onClick={review} className="btn-primary w-full px-4 py-2.5 text-[14px]">
-            Next: check captions
+            Next
           </button>
         </div>
       </div>
