@@ -195,3 +195,17 @@ export function hookWords(texts: unknown, hook: { start?: unknown; end?: unknown
     .join(" ");
   return words || null;
 }
+
+export type Drafts = Record<string, Partial<Record<Target, string>>>;
+
+/**
+ * The captions on the final review screen (founder 2026-11-15: "a final screen where they can edit their caption"):
+ * each picked video's caption per network, filled from the templates with its hook, keeping any edit already made there.
+ */
+export function draftCaptions(ids: string[], hookOf: (id: string) => string, targets: Target[], templates: Templates, kept: Drafts): Drafts {
+  // Merged into what is kept: a video or network unticked for a while keeps its edit for when it comes back (Codex
+  // 2026-11-15). The screen, the length check and Publish use only the current picks and networks.
+  const out: Drafts = { ...kept };
+  for (const id of ids) out[id] = { ...kept[id], ...Object.fromEntries(targets.filter((t) => kept[id]?.[t] === undefined).map((t) => [t, fillCaption(templates[t], hookOf(id))])) };
+  return out;
+}

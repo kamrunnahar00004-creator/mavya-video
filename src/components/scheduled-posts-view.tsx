@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, CircleCheck, CircleX, ExternalLink, LoaderCircle, Plus, RotateCcw, Timer, Trash2, X } from "lucide-react";
 import { ThumbImg } from "@/components/thumb-img";
-import { countdown, DEFAULT_TEMPLATES, fillCaption, finalTimes, randomSlots, seeded, slotMoments, timeProblem, MAX_BATCH, TARGETS, type Post, type Target, type Templates } from "@/lib/scheduled-posts";
+import { CAPTION_MAX, countdown, DEFAULT_TEMPLATES, draftCaptions, type Drafts, fillCaption, finalTimes, randomSlots, seeded, slotMoments, timeProblem, MAX_BATCH, TARGETS, type Post, type Target, type Templates } from "@/lib/scheduled-posts";
 
 type ExportChoice = { mediaId: string; title: string; hook: string; at: string; seconds: number; src: string };
 
@@ -302,18 +302,31 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
     setPicked((p) => p.includes(id) ? p.filter((x) => x !== id) : p.length >= MAX_BATCH ? p : [...p, id]);
   };
 
-  async function save() {
+  // The final review screen: every caption, editable, before anything is scheduled (founder 2026-11-15).
+  const [drafts, setDrafts] = useState<Drafts>({});
+  const [reviewing, setReviewing] = useState(false);
+  function review() {
     if (!picked.length || !targets.length) return;
-    // Checked again at the click, not at the last clock tick (Codex 2026-11-15).
     const passed = now ? null : passedAt(times);
     if (passed !== null) { setClock(passed); setError("A time has passed. Pick a later one."); return; }
+    setError(null);
+    setDrafts((kept) => draftCaptions(picked, (id) => byId.get(id)?.hook ?? "", targets, templates, kept));
+    setReviewing(true);
+  }
+  const tooLong = picked.some((id) => targets.some((t) => (drafts[id]?.[t] ?? "").length > CAPTION_MAX));
+
+  async function save() {
+    if (!picked.length || !targets.length || tooLong) return;
+    // Checked again at the click, not at the last clock tick (Codex 2026-11-15).
+    const passed = now ? null : passedAt(times);
+    if (passed !== null) { setClock(passed); setReviewing(false); setError("A time has passed. Pick a later one."); return; }
     const postNow = now ? nowIso() : null;
     setSaving(true);
     setError(null);
     try {
       const items = picked.map((id, i) => {
         const e = byId.get(id)!;
-        return { mediaId: id, at: postNow ?? new Date(times[i]!).toISOString(), targets, title: e.title, hook: e.hook, captions: Object.fromEntries(targets.map((t) => [t, fillCaption(templates[t], e.hook)])) };
+        return { mediaId: id, at: postNow ?? new Date(times[i]!).toISOString(), targets, title: e.title, hook: e.hook, captions: Object.fromEntries(targets.map((t) => [t, drafts[id]?.[t] ?? fillCaption(templates[t], e.hook)])) };
       });
       const out = await call<{ posts: Post[] }>("/api/posts", { method: "POST", body: JSON.stringify({ items }) });
       onDone(out.posts);
@@ -324,7 +337,43 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
   }
 
   return (
-    <Dialog title="Schedule videos" onClose={onClose} wide>
+    <Dialog title={reviewing ? "Check captions" : "Schedule videos"} onClose={onClose} wide>
+      {reviewing ? (
+        <div>
+          <p className="border-b border-line px-5 py-3 text-[13px] text-muted">Last look before it goes out. Change any caption, then {now ? "post" : "schedule"}.</p>
+          <div className="max-h-[62vh] divide-y divide-line overflow-y-auto">
+            {picked.map((id, i) => (
+              <div key={id} className="flex gap-4 px-5 py-4">
+                <ThumbImg src={`/api/media/${id}`} className="aspect-[9/16] w-16 shrink-0 self-start bg-raised object-cover" />
+                <div className="min-w-0 flex-1 space-y-2.5">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="truncate text-[14px] font-bold">{byId.get(id)?.title}</p>
+                    <p className="shrink-0 text-[12.5px] font-semibold text-muted">{now ? "Now" : times[i] ? new Date(times[i]!).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""}</p>
+                  </div>
+                  <div className={`grid gap-3 ${targets.length > 1 ? "md:grid-cols-2" : ""}`}>
+                    {targets.map((t) => {
+                      const text = drafts[id]?.[t] ?? "";
+                      return (
+                        <label key={t} className="block text-[12px] font-semibold">
+                          <span className="flex items-center justify-between"><span className="flex items-center gap-1.5"><NetworkLogo t={t} className="h-3.5 w-3.5" />{NAMES[t]}</span><span className={text.length > CAPTION_MAX ? "text-red-600" : "font-normal text-soft"}>{text.length}/{CAPTION_MAX}</span></span>
+                          <textarea rows={t === "instagram" ? 6 : 4} value={text} onChange={(e) => setDrafts((d) => ({ ...d, [id]: { ...d[id], [t]: e.target.value } }))} className={`${field} mt-1 resize-y text-[13px]`} />
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-3 border-t border-line px-5 py-3">
+            <button type="button" disabled={saving} onClick={() => setReviewing(false)} className="cursor-pointer px-3 py-2 text-[13.5px] font-semibold text-muted hover:bg-raised">Back</button>
+            {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
+            <button type="button" disabled={saving || tooLong} onClick={() => void save()} className="btn-primary ml-auto px-5 py-2.5 text-[14px]">
+              {saving ? "Publishing..." : now ? "Publish now" : picked.length === 1 ? "Publish on schedule" : `Publish ${picked.length} on schedule`}
+            </button>
+          </div>
+        </div>
+      ) : (
       <div className="grid gap-0 md:grid-cols-[1fr_300px]">
         <div className="border-b border-line p-4 md:border-b-0 md:border-r">
           <p className="mb-2 text-[13px] text-muted">Pick exported videos in the order they should go out. {picked.length ? <b className="text-text">{picked.length} picked</b> : null}</p>
@@ -402,11 +451,12 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
           {picked.length > 0 && !now && <p className="text-[11.5px] text-soft">Times in {zone}.</p>}
           <p className="text-[11.5px] text-soft">Captions come from your Captions templates with each video&apos;s hook filled in. Click a post on the calendar to change its caption or time.</p>
           {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
-          <button type="button" disabled={!picked.length || !targets.length || saving || problems.some(Boolean)} onClick={() => void save()} className="btn-primary w-full px-4 py-2.5 text-[14px]">
-            {saving ? (now ? "Posting..." : "Scheduling...") : now ? "Post now" : `Schedule ${picked.length || ""} video${picked.length === 1 ? "" : "s"}`}
+          <button type="button" disabled={!picked.length || !targets.length || saving || problems.some(Boolean)} onClick={review} className="btn-primary w-full px-4 py-2.5 text-[14px]">
+            Next: check captions
           </button>
         </div>
       </div>
+      )}
     </Dialog>
   );
 }

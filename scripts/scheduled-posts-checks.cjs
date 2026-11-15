@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 115;
+const EXPECTED = 121;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -97,7 +97,7 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
 
   // Thumbnails (2026-11-15: the picker showed black tiles): lists show still pictures, never a video per tile.
   const view = require('node:fs').readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
-  ok((view.match(/<ThumbImg /g) ?? []).length === 2, 'calendar cards and the picker show still pictures');
+  ok((view.match(/<ThumbImg /g) ?? []).length === 3, 'calendar cards, the picker and the review screen show still pictures');
   ok((view.match(/<video /g) ?? []).length === 1 && /<video [^>]*preload="none"/.test(view), 'the only video is the one opened post, loaded when played');
 
   // Its own every-minute job (Codex 2026-11-15): the shared recovery cron is exactly as before, so a slow Meta call can
@@ -324,7 +324,7 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   ok(Math.floor(many[many.length - 1] / 1440) >= 4, 'more than fit in a day roll over to the next days');
   eq(shared.randomSlots(5, 540, 1320, shared.seeded(3)), shared.randomSlots(5, 540, 1320, shared.seeded(3)), 'same seed, same times (the screen doesn\'t jump)');
   ok(shared.randomSlots(3, 540, 1320, shared.seeded(5), 20 * 60)[0] >= 20 * 60, 'starting today: the first time is after now');
-  ok(/aria-pressed=\{mode === m\}/.test(view) && /"Now" : "Schedule"/.test(view) && /now \? "Post now"/.test(view) && /Times in \{zone\}/.test(view) && !/[\u2013\u2014]/.test(view), 'one video: Now and Schedule buttons; time zone shown; no dashes in the screen');
+  ok(/aria-pressed=\{mode === m\}/.test(view) && /"Now" : "Schedule"/.test(view) && /now \? "Publish now"/.test(view) && /Times in \{zone\}/.test(view) && !/[\u2013\u2014]/.test(view), 'one video: Now and Schedule buttons; time zone shown; no dashes in the screen');
 
   // Clock changes (Codex round 6): spacing and "not in the past" hold on the real clock.
   const H = 3600e3, base = Date.parse('2027-03-14T05:00:00Z');
@@ -363,4 +363,18 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   ok(!/id="ig-grad"/.test(viewNow) && /useId\(\)/.test(viewNow), 'each Instagram logo has its own gradient id');
   const card = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8').match(/const PostCard = memo[\s\S]*?\n\}\);/)[0];
   ok((card.match(/<NetworkLogo /g) ?? []).length === 2 && /url \? \(/.test(card), 'a card shows each network logo once: grey until posted, then a link');
+
+  // Final review screen (founder 2026-11-15: "a final screen where they can edit their caption ... and then the publish button").
+  const dr = shared.draftCaptions(['v1', 'v2'], (id) => (id === 'v1' ? 'SaaS + Insta reels =' : ''), ['instagram', 'facebook'], shared.DEFAULT_TEMPLATES, {});
+  ok(dr.v1.instagram.startsWith('SaaS + Insta reels =') && dr.v1.facebook.startsWith('SaaS + Insta reels =') && !dr.v2.facebook.startsWith('{hook}'), 'review captions start filled from the templates with each video\'s hook');
+  const kept2 = shared.draftCaptions(['v1'], () => 'x', ['instagram', 'facebook'], shared.DEFAULT_TEMPLATES, { v1: { instagram: 'my edit' } });
+  ok(kept2.v1.instagram === 'my edit' && kept2.v1.facebook.startsWith('x'), 'an edit made on the review screen is kept (Back and forth)');
+  const viewR = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
+  ok(/onClick=\{review\}/.test(viewR) && /reviewing \? \(/.test(viewR) && /drafts\[id\]\?\.\[t\] \?\? fillCaption/.test(viewR), 'Schedule goes to the review screen first, and what is published is the reviewed caption');
+  ok(/"Publish now"/.test(viewR) && /disabled=\{saving \|\| tooLong\}/.test(viewR), 'the review screen ends with Publish; an over-long caption blocks it');
+  let dd = shared.draftCaptions(['v1', 'v2'], () => 'h', ['instagram', 'facebook'], shared.DEFAULT_TEMPLATES, { v1: { facebook: 'fb edit' }, v2: { instagram: 'v2 edit' } });
+  dd = shared.draftCaptions(['v1'], () => 'h', ['instagram'], shared.DEFAULT_TEMPLATES, dd);
+  dd = shared.draftCaptions(['v1', 'v2'], () => 'h', ['instagram', 'facebook'], shared.DEFAULT_TEMPLATES, dd);
+  ok(dd.v1.facebook === 'fb edit', 'Facebook unticked and ticked again: its edited caption comes back');
+  ok(dd.v2.instagram === 'v2 edit', 'a video unpicked and picked again: its edited caption comes back');
 });
