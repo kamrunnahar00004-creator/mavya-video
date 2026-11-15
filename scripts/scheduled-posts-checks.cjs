@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 90;
+const EXPECTED = 104;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -311,5 +311,33 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   ok(shared.timeProblem(T0 + 30e3, T0) && shared.timeProblem(T0 + 120e3, T0) === null, 'a time under a minute ahead is refused, later is fine');
   ok(/type="datetime-local"/.test(view) && /disabled=\{[^}]*problems\.some\(Boolean\)/.test(view), 'each picked video has its own time box; any bad time blocks the Schedule button');
   eq(shared.finalTimes(['a', 'b'], spreadT, { a: null }), [null, T0 + 2e6], 'a time box cleared by hand stays empty (blocks), never falls back to the spread');
-  ok(/const passed = passedAt\(times\);\s*if \(passed !== null\)/.test(view) && /const passedAt = [^\n]*Date\.now\(\)[^\n]*timeProblem\(t, now\)/.test(view), 'times are checked again at the click, not at the last clock tick');
+  ok(/const passed = now \? null : passedAt\(times\);\s*if \(passed !== null\)/.test(view) && /const passedAt = [^\n]*Date\.now\(\)[^\n]*timeProblem\(t, now\)/.test(view), 'times are checked again at the click, not at the last clock tick');
+
+  // Random spread (founder 2026-11-15, against spam filters): 1.5 to 2 hours apart, never on a round time, rolls over.
+  const many = shared.randomSlots(40, 9 * 60, 22 * 60, shared.seeded(11));
+  const gaps = many.slice(1).map((x, i) => x - many[i]);
+  ok(many.length === 40 && gaps.every((g) => g >= shared.MIN_GAP), '40 videos: every gap at least 1.5 hours, overnight too');
+  ok(gaps.filter((g) => g < 600).every((g) => g <= shared.MAX_GAP), 'within a day, gaps at most 2 hours');
+  ok(new Set(gaps.filter((g) => g < 600)).size > 5, 'gaps vary (random), not a fixed pattern');
+  ok(many.every((m) => m % 1440 >= 9 * 60 && m % 1440 <= 22 * 60), 'every time inside the day\'s window');
+  ok(many.every((m) => m % 15 !== 0), 'never on the hour or a quarter hour');
+  ok(Math.floor(many[many.length - 1] / 1440) >= 4, 'more than fit in a day roll over to the next days');
+  eq(shared.randomSlots(5, 540, 1320, shared.seeded(3)), shared.randomSlots(5, 540, 1320, shared.seeded(3)), 'same seed, same times (the screen doesn\'t jump)');
+  ok(shared.randomSlots(3, 540, 1320, shared.seeded(5), 20 * 60)[0] >= 20 * 60, 'starting today: the first time is after now');
+  ok(/aria-pressed=\{mode === m\}/.test(view) && /"Now" : "Schedule"/.test(view) && /now \? "Post now"/.test(view) && /Times in \{zone\}/.test(view) && !/[\u2013\u2014]/.test(view), 'one video: Now and Schedule buttons; time zone shown; no dashes in the screen');
+
+  // Clock changes (Codex round 6): spacing and "not in the past" hold on the real clock.
+  const H = 3600e3, base = Date.parse('2027-03-14T05:00:00Z');
+  const springForward = (m) => base + m * 60e3 + (m >= 120 ? -H : 0) + (m >= 120 && m < 180 ? 2 * H : 0); // 02:00-03:00 doesn't exist
+  const sf = shared.slotMoments([68, 158, 254], springForward, 0);
+  ok(sf.slice(1).every((t, i) => t - sf[i] >= shared.MIN_GAP * 60e3), 'spring-forward day: posts stay at least 1.5 hours apart on the real clock');
+  const fallBack = (m) => base + m * 60e3 + (m >= 120 ? H : 0);
+  ok(shared.slotMoments([60, 200], fallBack, base + 5 * H)[0] >= base + 5 * H, 'a time before "now" is moved after now');
+  ok(shared.slotMoments([60, 200, 400], fallBack, 0).every((t) => Math.floor(t / 60e3) % 15 !== 0), 'moved times still avoid round times');
+  // Codex round 7: final moments stay inside Earliest/Latest; one pushed out rolls to the next window.
+  const winFits = (t) => { const m = ((t - base) / 60e3) % 1440; return m >= 60 && m <= 180; };
+  const winNext = (t) => base + (Math.floor((t - base) / 86400e3) + 1) * 86400e3 + 60 * 60e3 + 7 * 60e3;
+  const inWin = shared.slotMoments([68, 158], springForward, 0, winFits, winNext);
+  ok(inWin.every(winFits), 'a spring-forward time pushed past Latest moves into the next day\'s window');
+  ok(inWin[1] - inWin[0] >= shared.MIN_GAP * 60e3, 'and keeps the 1.5 hour gap');
 });

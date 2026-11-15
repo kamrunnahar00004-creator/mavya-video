@@ -110,3 +110,65 @@ export function timeProblem(t: number | null, now: number): string | null {
   if (t <= now + 60_000) return "That time has passed";
   return null;
 }
+
+/** A small seeded random generator (mulberry32): the same seed gives the same times, so the screen doesn't jump. */
+export function seeded(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export const MIN_GAP = 90, MAX_GAP = 120;
+
+/**
+ * Random posting times for `count` videos (founder 2026-11-15, against spam filters): each day from `from` to `to`
+ * (minutes after midnight), the first at a random time in its first half hour, then 1.5 to 2 hours apart at random,
+ * never on a quarter hour; what doesn't fit rolls over to the next days. `earliest`: the first day starts no sooner
+ * (minutes after its midnight, e.g. now + a few minutes when that day is today). Returns minutes after the first day's
+ * midnight; consecutive posts are always at least MIN_GAP apart, overnight too.
+ */
+export function randomSlots(count: number, from: number, to: number, rng: () => number, earliest = 0): number[] {
+  const out: number[] = [];
+  if (count <= 0 || to <= from) return out;
+  const jitter = (n: number) => Math.floor(rng() * (n + 1));
+  const offQuarter = (m: number) => (m % 15 === 0 ? m + 1 + jitter(2) : m);
+  let day = 0;
+  let next = offQuarter(Math.max(from, earliest) + jitter(30));
+  for (let guard = 0; out.length < count && guard < count * 4 + 400; guard++) {
+    const end = day * 1440 + to;
+    if (next > end || next < day * 1440 + from) {
+      // Next day: its window's start plus a random bit, and never sooner than the gap after the last post.
+      day++;
+      const last = out.length ? out[out.length - 1] : -Infinity;
+      next = offQuarter(Math.max(day * 1440 + from + jitter(30), last + MIN_GAP));
+      continue;
+    }
+    out.push(next);
+    next = offQuarter(next + MIN_GAP + jitter(MAX_GAP - MIN_GAP - 3));
+  }
+  return out;
+}
+
+/**
+ * The real posting moments for randomSlots' minutes (Codex 2026-11-15, clock changes): `wall` turns a minute after the
+ * first day's midnight into a moment (local clock; a time that doesn't exist on a spring-forward day comes out an hour
+ * later). Then every moment is made at least `earliest` and at least MIN_GAP after the one before, on the real clock,
+ * and must sit inside the day's window (`fits`); one that doesn't moves to the next window's start (`nextStart`). So a
+ * clock change can never squeeze two posts together, put one in the past, or outside Earliest/Latest.
+ */
+export function slotMoments(minutes: number[], wall: (minute: number) => number, earliest: number, fits: (t: number) => boolean = () => true, nextStart: (t: number) => number = (t) => t): number[] {
+  const out: number[] = [];
+  const offRound = (t: number, m: number) => (Math.floor(t / 60_000) % 15 === 0 ? t + 60_000 * (1 + (m % 2)) : t);
+  for (const m of minutes) {
+    const floor = Math.max(earliest, out.length ? out[out.length - 1] + MIN_GAP * 60_000 : -Infinity);
+    let t = offRound(Math.max(wall(m), floor), m);
+    for (let guard = 0; !fits(t) && guard < 400; guard++) t = offRound(Math.max(nextStart(t), floor), m);
+    out.push(t);
+  }
+  return out;
+}

@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, CircleCheck, CircleX, ExternalLink, LoaderCircle, Plus, RotateCcw, Timer, Trash2, X } from "lucide-react";
 import { ThumbImg } from "@/components/thumb-img";
-import { countdown, DEFAULT_TEMPLATES, fillCaption, finalTimes, timeProblem, MAX_BATCH, spreadTimes, TARGETS, type Post, type Target, type Templates } from "@/lib/scheduled-posts";
+import { countdown, DEFAULT_TEMPLATES, fillCaption, finalTimes, randomSlots, seeded, slotMoments, timeProblem, MAX_BATCH, TARGETS, type Post, type Target, type Templates } from "@/lib/scheduled-posts";
 
 type ExportChoice = { mediaId: string; title: string; hook: string; at: string; seconds: number; src: string };
 
@@ -23,6 +23,8 @@ const sameDay = (a: number, b: number) => new Date(a).toDateString() === new Dat
 const timeText = (t: number) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 const dateInput = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const toMinutes = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + (m || 0); };
+/** "Now", read at the click. */
+const nowIso = () => new Date().toISOString();
 /** Checked at the click against the real clock, not the last tick (Codex 2026-11-15). */
 const passedAt = (times: (number | null)[]) => { const now = Date.now(); return times.some((t) => timeProblem(t, now)) ? now : null; };
 const without = (o: Record<string, number | null>, id: string) => Object.fromEntries(Object.entries(o).filter(([k]) => k !== id));
@@ -94,7 +96,7 @@ export function ScheduledPostsView() {
           <button type="button" aria-label="Previous week" onClick={() => goWeek(addDays(week, -7))} className="flex h-8 w-8 cursor-pointer items-center justify-center text-muted hover:bg-raised hover:text-text"><ChevronLeft className="h-4 w-4" /></button>
           <button type="button" onClick={() => goWeek(weekStart(Date.now()))} className="h-8 cursor-pointer px-2 text-[13px] font-semibold text-muted hover:bg-raised hover:text-text">This week</button>
           <button type="button" aria-label="Next week" onClick={() => goWeek(addDays(week, 7))} className="flex h-8 w-8 cursor-pointer items-center justify-center text-muted hover:bg-raised hover:text-text"><ChevronRight className="h-4 w-4" /></button>
-          <span className="ml-2 text-[14px] font-semibold">{new Date(week).toLocaleDateString([], { month: "short", day: "numeric" })} – {new Date(addDays(week, 6)).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</span>
+          <span className="ml-2 text-[14px] font-semibold">{new Date(week).toLocaleDateString([], { month: "short", day: "numeric" })} to {new Date(addDays(week, 6)).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</span>
         </div>
         <p className="text-[13px] text-soft">{counts.scheduled} scheduled · {counts.posted} posted{counts.failed ? ` · ${counts.failed} failed` : ""}</p>
         <div className="ml-auto flex items-center gap-2">
@@ -203,15 +205,20 @@ function Targets({ value, onChange }: { value: Target[]; onChange: (t: Target[])
   );
 }
 
-/** Pick exported videos, then spread them over days: so many a day, between two times. */
+/**
+ * Pick exported videos (founder 2026-11-15). One video: Now, or Schedule at one time. Several: random times through
+ * the day, 1.5 to 2 hours apart and never on a round time (against spam filters), rolling over to the next days; any
+ * one can be changed by hand. Times are the device's local time, shown with its time zone.
+ */
 function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; templates: Templates; onClose: () => void; onDone: (posts: Post[]) => void }) {
   const [exports, setExports] = useState<ExportChoice[] | null>(null);
   const [used, setUsed] = useState<Map<string, Post["state"]>>(new Map());
   const [picked, setPicked] = useState<string[]>([]);
   const [date, setDate] = useState(dateInput(day));
   const [from, setFrom] = useState("09:00");
-  const [to, setTo] = useState("21:00");
-  const [perDay, setPerDay] = useState(7);
+  const [to, setTo] = useState("22:00");
+  const [mode, setMode] = useState<"now" | "schedule">("schedule");
+  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 2 ** 31));
   const [targets, setTargets] = useState<Target[]>(["instagram", "facebook"]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -224,23 +231,31 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
     void call<{ posts: Post[] }>(`/api/posts?from=${new Date(t - 30 * DAY).toISOString()}&to=${new Date(t + 30 * DAY).toISOString()}`).then((o) => setUsed(new Map(o.posts.map((p) => [p.mediaId, p.state])))).catch(() => undefined);
   }, []);
 
-  /** The spread times, in order: perDay a day from `date`, skipping any that has passed. */
+  /** Random times in pick order (randomSlots), from `date`; a first day that is today starts a few minutes from now. */
   const spread = useMemo(() => {
-    const out: number[] = [];
-    const slots = spreadTimes(Math.max(1, perDay), toMinutes(from), toMinutes(to));
-    for (let d = 0; out.length < picked.length && d < 120; d++) {
-      const day = dateInput(addDays(at(date, 0), d));
-      for (const m of slots) { const t = at(day, m); if (t > opened + 120_000 && out.length < picked.length) out.push(t); }
-    }
-    return out;
-  }, [picked.length, perDay, from, to, date, opened]);
+    if (picked.length < 2) return [opened + 60 * 60_000 - ((opened + 60 * 60_000) % (5 * 60_000))];
+    const start = at(date, 0);
+    // Today: from the clock's own hour and minute (not time since midnight, which a clock change shifts).
+    const o = new Date(opened);
+    const today = dateInput(opened) === date ? o.getHours() * 60 + o.getMinutes() + 5 : 0;
+    const minutes = randomSlots(picked.length, toMinutes(from), toMinutes(to), seeded(seed), today);
+    const lo = toMinutes(from), hi = toMinutes(to);
+    const clockMin = (t: number) => { const d = new Date(t); return d.getHours() * 60 + d.getMinutes(); };
+    // Inside Earliest-Latest on the local clock; else the next window's start (today's if still before it).
+    const fits = (t: number) => clockMin(t) >= lo && clockMin(t) <= hi;
+    const nextStart = (t: number) => at(dateInput(clockMin(t) < lo ? t : addDays(t, 1)), lo + (Math.floor(t / 60_000) % 23));
+    return slotMoments(minutes, (m) => at(dateInput(addDays(start, Math.floor(m / 1440))), m % 1440), opened + 5 * 60_000, fits, nextStart);
+  }, [picked.length, from, to, date, opened, seed]);
+  const single = picked.length === 1;
+  const now = single && mode === "now";
   // Times set by hand for single videos; the rest follow the spread.
   const [own, setOwn] = useState<Record<string, number | null>>({});
   const times = finalTimes(picked, spread, own);
   // A clock for "has it passed": moves every 15 s while the dialog is open.
   const [clock, setClock] = useState(opened);
   useEffect(() => { const t = setInterval(() => setClock(Date.now()), 15_000); return () => clearInterval(t); }, []);
-  const problems = times.map((t) => timeProblem(t, clock));
+  const problems = now ? [] : times.map((t) => timeProblem(t, clock));
+  const zone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
 
   const byId = new Map((exports ?? []).map((e) => [e.mediaId, e]));
   const toggle = (id: string) => {
@@ -251,14 +266,15 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
   async function save() {
     if (!picked.length || !targets.length) return;
     // Checked again at the click, not at the last clock tick (Codex 2026-11-15).
-    const passed = passedAt(times);
+    const passed = now ? null : passedAt(times);
     if (passed !== null) { setClock(passed); setError("A time has passed. Pick a later one."); return; }
+    const postNow = now ? nowIso() : null;
     setSaving(true);
     setError(null);
     try {
       const items = picked.map((id, i) => {
         const e = byId.get(id)!;
-        return { mediaId: id, at: new Date(times[i]!).toISOString(), targets, title: e.title, hook: e.hook, captions: Object.fromEntries(targets.map((t) => [t, fillCaption(templates[t], e.hook)])) };
+        return { mediaId: id, at: postNow ?? new Date(times[i]!).toISOString(), targets, title: e.title, hook: e.hook, captions: Object.fromEntries(targets.map((t) => [t, fillCaption(templates[t], e.hook)])) };
       });
       const out = await call<{ posts: Post[] }>("/api/posts", { method: "POST", body: JSON.stringify({ items }) });
       onDone(out.posts);
@@ -296,34 +312,57 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
           )}
         </div>
         <div className="space-y-3.5 p-4">
-          <label className="block text-[12.5px] font-semibold">Starting day<input type="date" value={date} min={dateInput(opened)} onChange={(e) => setDate(e.target.value)} className={`${field} mt-1`} /></label>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block text-[12.5px] font-semibold">First post<input type="time" value={from} onChange={(e) => setFrom(e.target.value)} className={`${field} mt-1`} /></label>
-            <label className="block text-[12.5px] font-semibold">Last post<input type="time" value={to} onChange={(e) => setTo(e.target.value)} className={`${field} mt-1`} /></label>
-          </div>
-          <label className="block text-[12.5px] font-semibold">Posts a day<input type="number" min={1} max={50} value={perDay} onChange={(e) => setPerDay(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} className={`${field} mt-1`} /></label>
-          <div><p className="mb-1 text-[12.5px] font-semibold">Post to</p><Targets value={targets} onChange={setTargets} /></div>
-          {picked.length > 0 && (
-            <div className="max-h-[260px] space-y-1.5 overflow-y-auto border border-line bg-raised p-2 text-[12px]">
-              <p className="text-[11px] text-soft">Change any time to schedule that video when you want.</p>
-              {picked.map((id, i) => (
-                <div key={id}>
-                  <p className="truncate font-semibold">{i + 1}. {byId.get(id)?.title}</p>
-                  <div className="mt-0.5 flex items-center gap-1">
-                    <input type="datetime-local" aria-label={`Time for ${byId.get(id)?.title ?? "video"}`} value={times[i] !== null ? localInput(times[i]!) : ""} min={localInput(opened)}
-                      onChange={(e) => { const t = fromLocalInput(e.target.value); setOwn((o) => ({ ...o, [id]: t })); }}
-                      className={`min-w-0 flex-1 border bg-panel px-1.5 py-1 text-[12px] ${problems[i] ? "border-red-400" : "border-line-strong"}`} />
-                    {Object.hasOwn(own, id) && <button type="button" onClick={() => setOwn((o) => without(o, id))} className="cursor-pointer px-1 text-[11px] font-semibold text-accent hover:underline">Auto</button>}
-                  </div>
-                  {problems[i] && <p className="text-[11px] font-semibold text-red-600">{problems[i]}</p>}
-                </div>
-              ))}
-            </div>
+          {!picked.length && <p className="text-[13px] text-muted">Pick one video to post now or at a time, or several to spread through the day.</p>}
+          {single && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                {(["now", "schedule"] as const).map((m) => (
+                  <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)} className={`cursor-pointer border-2 py-2 text-[14px] font-bold ${mode === m ? "border-ink bg-accent text-white" : "border-line-strong hover:bg-raised"}`}>{m === "now" ? "Now" : "Schedule"}</button>
+                ))}
+              </div>
+              {mode === "schedule" && (
+                <label className="block text-[12.5px] font-semibold">Post at
+                  <input type="datetime-local" value={times[0] !== null ? localInput(times[0]!) : ""} min={localInput(opened)} onChange={(e) => { const t = fromLocalInput(e.target.value); setOwn((o) => ({ ...o, [picked[0]]: t })); }}
+                    className={`${field} mt-1 ${problems[0] ? "border-red-400" : ""}`} />
+                  {problems[0] && <span className="block text-[11px] font-semibold text-red-600">{problems[0]}</span>}
+                </label>
+              )}
+            </>
           )}
+          {picked.length > 1 && (
+            <>
+              <label className="block text-[12.5px] font-semibold">Starting day<input type="date" value={date} min={dateInput(opened)} onChange={(e) => setDate(e.target.value)} className={`${field} mt-1`} /></label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block text-[12.5px] font-semibold">Earliest<input type="time" value={from} onChange={(e) => setFrom(e.target.value)} className={`${field} mt-1`} /></label>
+                <label className="block text-[12.5px] font-semibold">Latest<input type="time" value={to} onChange={(e) => setTo(e.target.value)} className={`${field} mt-1`} /></label>
+              </div>
+              <p className="text-[11.5px] text-soft">Random times, 1.5 to 2 hours apart, so it doesn&apos;t look automated. What doesn&apos;t fit goes to the next day.</p>
+              <div className="max-h-[260px] space-y-1.5 overflow-y-auto border border-line bg-raised p-2 text-[12px]">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] text-soft">Change any time if you want.</p>
+                  <button type="button" onClick={() => { setOwn({}); setSeed(Math.floor(Math.random() * 2 ** 31)); }} className="cursor-pointer text-[11px] font-semibold text-accent hover:underline">Shuffle times</button>
+                </div>
+                {picked.map((id, i) => (
+                  <div key={id}>
+                    <p className="truncate font-semibold">{i + 1}. {byId.get(id)?.title}</p>
+                    <div className="mt-0.5 flex items-center gap-1">
+                      <input type="datetime-local" aria-label={`Time for ${byId.get(id)?.title ?? "video"}`} value={times[i] !== null ? localInput(times[i]!) : ""} min={localInput(opened)}
+                        onChange={(e) => { const t = fromLocalInput(e.target.value); setOwn((o) => ({ ...o, [id]: t })); }}
+                        className={`min-w-0 flex-1 border bg-panel px-1.5 py-1 text-[12px] ${problems[i] ? "border-red-400" : "border-line-strong"}`} />
+                      {Object.hasOwn(own, id) && <button type="button" onClick={() => setOwn((o) => without(o, id))} className="cursor-pointer px-1 text-[11px] font-semibold text-accent hover:underline">Auto</button>}
+                    </div>
+                    {problems[i] && <p className="text-[11px] font-semibold text-red-600">{problems[i]}</p>}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {picked.length > 0 && <div><p className="mb-1 text-[12.5px] font-semibold">Post to</p><Targets value={targets} onChange={setTargets} /></div>}
+          {picked.length > 0 && !now && <p className="text-[11.5px] text-soft">Times in {zone}.</p>}
           <p className="text-[11.5px] text-soft">Captions come from your Captions templates with each video&apos;s hook filled in. Click a post on the calendar to change its caption or time.</p>
           {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
           <button type="button" disabled={!picked.length || !targets.length || saving || problems.some(Boolean)} onClick={() => void save()} className="btn-primary w-full px-4 py-2.5 text-[14px]">
-            {saving ? "Scheduling..." : `Schedule ${picked.length || ""} video${picked.length === 1 ? "" : "s"}`}
+            {saving ? (now ? "Posting..." : "Scheduling...") : now ? "Post now" : `Schedule ${picked.length || ""} video${picked.length === 1 ? "" : "s"}`}
           </button>
         </div>
       </div>
