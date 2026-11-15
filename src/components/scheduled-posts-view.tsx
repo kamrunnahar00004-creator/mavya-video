@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, CircleCheck, CircleX, ExternalLink, LoaderCircle, Plus, RotateCcw, Timer, Trash2, X } from "lucide-react";
 import { ThumbImg } from "@/components/thumb-img";
-import { countdown, DEFAULT_TEMPLATES, fillCaption, MAX_BATCH, spreadTimes, TARGETS, type Post, type Target, type Templates } from "@/lib/scheduled-posts";
+import { countdown, DEFAULT_TEMPLATES, fillCaption, finalTimes, timeProblem, MAX_BATCH, spreadTimes, TARGETS, type Post, type Target, type Templates } from "@/lib/scheduled-posts";
 
 type ExportChoice = { mediaId: string; title: string; hook: string; at: string; seconds: number; src: string };
 
@@ -23,6 +23,12 @@ const sameDay = (a: number, b: number) => new Date(a).toDateString() === new Dat
 const timeText = (t: number) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 const dateInput = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const toMinutes = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + (m || 0); };
+/** Checked at the click against the real clock, not the last tick (Codex 2026-11-15). */
+const passedAt = (times: (number | null)[]) => { const now = Date.now(); return times.some((t) => timeProblem(t, now)) ? now : null; };
+const without = (o: Record<string, number | null>, id: string) => Object.fromEntries(Object.entries(o).filter(([k]) => k !== id));
+/** A time as a datetime-local value (local), and back. */
+const localInput = (t: number) => `${dateInput(t)}T${hhmm(new Date(t).getHours() * 60 + new Date(t).getMinutes())}`;
+const fromLocalInput = (v: string) => { const t = v ? new Date(v).getTime() : NaN; return Number.isFinite(t) ? t : null; };
 const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 /** Local date (yyyy-mm-dd) + minutes after midnight, as a time. */
 const at = (date: string, minutes: number) => { const [y, m, d] = date.split("-").map(Number); return new Date(y, m - 1, d, Math.floor(minutes / 60), minutes % 60).getTime(); };
@@ -218,8 +224,8 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
     void call<{ posts: Post[] }>(`/api/posts?from=${new Date(t - 30 * DAY).toISOString()}&to=${new Date(t + 30 * DAY).toISOString()}`).then((o) => setUsed(new Map(o.posts.map((p) => [p.mediaId, p.state])))).catch(() => undefined);
   }, []);
 
-  /** The times, in order: perDay a day from `date`, skipping any that has passed. */
-  const times = useMemo(() => {
+  /** The spread times, in order: perDay a day from `date`, skipping any that has passed. */
+  const spread = useMemo(() => {
     const out: number[] = [];
     const slots = spreadTimes(Math.max(1, perDay), toMinutes(from), toMinutes(to));
     for (let d = 0; out.length < picked.length && d < 120; d++) {
@@ -228,18 +234,31 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
     }
     return out;
   }, [picked.length, perDay, from, to, date, opened]);
+  // Times set by hand for single videos; the rest follow the spread.
+  const [own, setOwn] = useState<Record<string, number | null>>({});
+  const times = finalTimes(picked, spread, own);
+  // A clock for "has it passed": moves every 15 s while the dialog is open.
+  const [clock, setClock] = useState(opened);
+  useEffect(() => { const t = setInterval(() => setClock(Date.now()), 15_000); return () => clearInterval(t); }, []);
+  const problems = times.map((t) => timeProblem(t, clock));
 
   const byId = new Map((exports ?? []).map((e) => [e.mediaId, e]));
-  const toggle = (id: string) => setPicked((p) => p.includes(id) ? p.filter((x) => x !== id) : p.length >= MAX_BATCH ? p : [...p, id]);
+  const toggle = (id: string) => {
+    if (picked.includes(id)) setOwn((o) => without(o, id));
+    setPicked((p) => p.includes(id) ? p.filter((x) => x !== id) : p.length >= MAX_BATCH ? p : [...p, id]);
+  };
 
   async function save() {
     if (!picked.length || !targets.length) return;
+    // Checked again at the click, not at the last clock tick (Codex 2026-11-15).
+    const passed = passedAt(times);
+    if (passed !== null) { setClock(passed); setError("A time has passed. Pick a later one."); return; }
     setSaving(true);
     setError(null);
     try {
       const items = picked.map((id, i) => {
         const e = byId.get(id)!;
-        return { mediaId: id, at: new Date(times[i]).toISOString(), targets, title: e.title, hook: e.hook, captions: Object.fromEntries(targets.map((t) => [t, fillCaption(templates[t], e.hook)])) };
+        return { mediaId: id, at: new Date(times[i]!).toISOString(), targets, title: e.title, hook: e.hook, captions: Object.fromEntries(targets.map((t) => [t, fillCaption(templates[t], e.hook)])) };
       });
       const out = await call<{ posts: Post[] }>("/api/posts", { method: "POST", body: JSON.stringify({ items }) });
       onDone(out.posts);
@@ -285,13 +304,25 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
           <label className="block text-[12.5px] font-semibold">Posts a day<input type="number" min={1} max={50} value={perDay} onChange={(e) => setPerDay(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} className={`${field} mt-1`} /></label>
           <div><p className="mb-1 text-[12.5px] font-semibold">Post to</p><Targets value={targets} onChange={setTargets} /></div>
           {picked.length > 0 && (
-            <div className="max-h-[180px] overflow-y-auto border border-line bg-raised p-2 text-[12px]">
-              {picked.map((id, i) => <p key={id} className="flex justify-between gap-2"><span className="truncate">{i + 1}. {byId.get(id)?.title}</span><span className="shrink-0 font-semibold">{times[i] ? new Date(times[i]).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }) : "—"}</span></p>)}
+            <div className="max-h-[260px] space-y-1.5 overflow-y-auto border border-line bg-raised p-2 text-[12px]">
+              <p className="text-[11px] text-soft">Change any time to schedule that video when you want.</p>
+              {picked.map((id, i) => (
+                <div key={id}>
+                  <p className="truncate font-semibold">{i + 1}. {byId.get(id)?.title}</p>
+                  <div className="mt-0.5 flex items-center gap-1">
+                    <input type="datetime-local" aria-label={`Time for ${byId.get(id)?.title ?? "video"}`} value={times[i] !== null ? localInput(times[i]!) : ""} min={localInput(opened)}
+                      onChange={(e) => { const t = fromLocalInput(e.target.value); setOwn((o) => ({ ...o, [id]: t })); }}
+                      className={`min-w-0 flex-1 border bg-panel px-1.5 py-1 text-[12px] ${problems[i] ? "border-red-400" : "border-line-strong"}`} />
+                    {Object.hasOwn(own, id) && <button type="button" onClick={() => setOwn((o) => without(o, id))} className="cursor-pointer px-1 text-[11px] font-semibold text-accent hover:underline">Auto</button>}
+                  </div>
+                  {problems[i] && <p className="text-[11px] font-semibold text-red-600">{problems[i]}</p>}
+                </div>
+              ))}
             </div>
           )}
           <p className="text-[11.5px] text-soft">Captions come from your Captions templates with each video&apos;s hook filled in. Click a post on the calendar to change its caption or time.</p>
           {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
-          <button type="button" disabled={!picked.length || !targets.length || saving || times.length < picked.length} onClick={() => void save()} className="btn-primary w-full px-4 py-2.5 text-[14px]">
+          <button type="button" disabled={!picked.length || !targets.length || saving || problems.some(Boolean)} onClick={() => void save()} className="btn-primary w-full px-4 py-2.5 text-[14px]">
             {saving ? "Scheduling..." : `Schedule ${picked.length || ""} video${picked.length === 1 ? "" : "s"}`}
           </button>
         </div>

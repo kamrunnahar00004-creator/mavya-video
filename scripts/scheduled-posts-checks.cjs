@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 82;
+const EXPECTED = 90;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -301,4 +301,15 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   const worked = await claimer.advancePosts(T0);
   ok(ors.length === 2 && ors.every((f) => /state\.eq\.scheduled,at\.lte\./.test(f)), 'the claim repeats the due test (time come), not just the state');
   ok(worked === false, 'the row no longer due at claim time: nothing is posted');
+
+  // Per-video times (founder 2026-11-15: "per video, i can schedule anytime i want").
+  const spreadT = [T0 + 1e6, T0 + 2e6, T0 + 3e6];
+  eq(shared.finalTimes(['a', 'b', 'c'], spreadT, {}), spreadT, 'no hand-set times: each video follows the spread');
+  eq(shared.finalTimes(['a', 'b', 'c'], spreadT, { b: T0 + 9e6 }), [T0 + 1e6, T0 + 9e6, T0 + 3e6], 'a hand-set time replaces only that video\'s time');
+  eq(shared.finalTimes(['a', 'b'], [T0 + 1e6], {}), [T0 + 1e6, null], 'no spread slot left and no hand-set time: no time (blocked)');
+  eq(shared.timeProblem(null, T0), 'Pick a time', 'missing time blocks scheduling');
+  ok(shared.timeProblem(T0 + 30e3, T0) && shared.timeProblem(T0 + 120e3, T0) === null, 'a time under a minute ahead is refused, later is fine');
+  ok(/type="datetime-local"/.test(view) && /disabled=\{[^}]*problems\.some\(Boolean\)/.test(view), 'each picked video has its own time box; any bad time blocks the Schedule button');
+  eq(shared.finalTimes(['a', 'b'], spreadT, { a: null }), [null, T0 + 2e6], 'a time box cleared by hand stays empty (blocks), never falls back to the spread');
+  ok(/const passed = passedAt\(times\);\s*if \(passed !== null\)/.test(view) && /const passedAt = [^\n]*Date\.now\(\)[^\n]*timeProblem\(t, now\)/.test(view), 'times are checked again at the click, not at the last clock tick');
 });

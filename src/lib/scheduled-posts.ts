@@ -94,3 +94,19 @@ export function countdown(ms: number): string {
   if (m) return `in ${m} min ${s % 60} s`;
   return `in ${s} s`;
 }
+
+/**
+ * Each picked video's time, in pick order: the one set for it by hand, else the spread time in its place (founder
+ * 2026-11-15: "a feature that is per video, i can schedule anytime i want"). Null where it has neither.
+ */
+export function finalTimes(picked: string[], spread: number[], own: Record<string, number | null>): (number | null)[] {
+  // A box cleared by hand stays empty (null) until a time or Auto is picked; it never falls back to the spread.
+  return picked.map((id, i) => (Object.hasOwn(own, id) ? own[id] : spread[i] ?? null));
+}
+
+/** Why a picked video's time can't be used (null: fine): none, or not at least a minute ahead. */
+export function timeProblem(t: number | null, now: number): string | null {
+  if (t === null) return "Pick a time";
+  if (t <= now + 60_000) return "That time has passed";
+  return null;
+}
