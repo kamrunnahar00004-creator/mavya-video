@@ -192,6 +192,14 @@ function Dialog({ title, onClose, wide, children }: { title: string; onClose: ()
   );
 }
 
+/**
+ * The hook words the caption will use (the video's on-screen hook text now; founder 2026-11-15 chose to see them
+ * here rather than change the export). Any caption can still be changed by clicking the post on the calendar.
+ */
+function HookLine({ hook }: { hook?: string }) {
+  return <p className="truncate text-[11px] text-muted" title={hook ?? ""}>Hook: {hook ? `“${hook}”` : <i>none, the caption skips the hook line</i>}</p>;
+}
+
 function Targets({ value, onChange }: { value: Target[]; onChange: (t: Target[]) => void }) {
   return (
     <div className="flex gap-4">
@@ -315,6 +323,7 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
           {!picked.length && <p className="text-[13px] text-muted">Pick one video to post now or at a time, or several to spread through the day.</p>}
           {single && (
             <>
+              <div className="border border-line bg-raised p-2 text-[12px]"><p className="truncate font-semibold">{byId.get(picked[0])?.title}</p><HookLine hook={byId.get(picked[0])?.hook} /></div>
               <div className="grid grid-cols-2 gap-2">
                 {(["now", "schedule"] as const).map((m) => (
                   <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)} className={`cursor-pointer border-2 py-2 text-[14px] font-bold ${mode === m ? "border-ink bg-accent text-white" : "border-line-strong hover:bg-raised"}`}>{m === "now" ? "Now" : "Schedule"}</button>
@@ -345,6 +354,7 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
                 {picked.map((id, i) => (
                   <div key={id}>
                     <p className="truncate font-semibold">{i + 1}. {byId.get(id)?.title}</p>
+                    <HookLine hook={byId.get(id)?.hook} />
                     <div className="mt-0.5 flex items-center gap-1">
                       <input type="datetime-local" aria-label={`Time for ${byId.get(id)?.title ?? "video"}`} value={times[i] !== null ? localInput(times[i]!) : ""} min={localInput(opened)}
                         onChange={(e) => { const t = fromLocalInput(e.target.value); setOwn((o) => ({ ...o, [id]: t })); }}

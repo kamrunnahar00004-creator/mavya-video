@@ -5,7 +5,7 @@ import { fileSources } from "@/lib/server/my-files";
 import { getFilePrefs, mediaAccess } from "@/lib/server/store";
 import { buildFiles, mediaOf } from "@/lib/my-files";
 import { schedulerAllowed, schedulerUsers } from "@/lib/posts-access";
-import { badPost, DEFAULT_TEMPLATES, MAX_BATCH, rollUp, TARGETS, type Post, type Target, type TargetResult, type Templates } from "@/lib/scheduled-posts";
+import { badPost, hookWords, DEFAULT_TEMPLATES, MAX_BATCH, rollUp, TARGETS, type Post, type Target, type TargetResult, type Templates } from "@/lib/scheduled-posts";
 
 /**
  * Scheduled posts (founder 2026-11-15). Owner-only: SCHEDULED_POSTS_USERS (src/lib/posts-access.ts) lists the account
@@ -287,9 +287,20 @@ export type ExportChoice = { mediaId: string; title: string; hook: string; at: s
 export async function listExports(who: string): Promise<ExportChoice[]> {
   const [sources, prefs] = await Promise.all([fileSources(who), getFilePrefs(who)]);
   const hidden = new Set(prefs.hidden);
-  return buildFiles(sources, null).exports
-    .filter((e) => !hidden.has(e.key))
-    .map((e) => ({ mediaId: mediaOf(e.value.src) ?? "", title: prefs.names[e.key] || e.runTitle || "Untitled video", hook: e.hookText ?? "", at: e.at, seconds: e.value.seconds, src: e.value.src }))
+  const exports = buildFiles(sources, null).exports.filter((e) => !hidden.has(e.key));
+  // Each video's own on-screen hook words (hookWords), read from its texts; the library hook's words only as a fallback.
+  const ids = [...new Set(exports.map((e) => e.runId).filter((x): x is string => Boolean(x)))];
+  const onScreen = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await db().from("runs").select("id,texts:data->texts,hookStart:data->hook->start,hookEnd:data->hook->end").eq("user_id", who).in("id", ids.slice(i, i + 200));
+    if (error) throw error;
+    for (const r of (data ?? []) as { id: string; texts: unknown; hookStart: unknown; hookEnd: unknown }[]) {
+      const words = hookWords(r.texts, { start: r.hookStart, end: r.hookEnd });
+      if (words) onScreen.set(r.id, words);
+    }
+  }
+  return exports
+    .map((e) => ({ mediaId: mediaOf(e.value.src) ?? "", title: prefs.names[e.key] || e.runTitle || "Untitled video", hook: (e.runId && onScreen.get(e.runId)) || e.hookText || "", at: e.at, seconds: e.value.seconds, src: e.value.src }))
     .filter((e) => e.mediaId)
     .sort((a, b) => b.at.localeCompare(a.at));
 }

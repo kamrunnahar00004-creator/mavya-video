@@ -172,3 +172,26 @@ export function slotMoments(minutes: number[], wall: (minute: number) => number,
   }
   return out;
 }
+
+type HookText = { text?: unknown; start?: unknown; end?: unknown; x?: unknown; y?: unknown; id?: unknown };
+
+/**
+ * The hook words for a caption: what the video itself shows during its hook (founder 2026-11-15: "the hook should be
+ * the hook of my video", e.g. "SaaS + Insta reels"), not the library hook's own words. Every non-empty text box that
+ * starts while the hook plays, read top to bottom (then left to right), on one line. Null when there are none.
+ */
+export function hookWords(texts: unknown, hook: { start?: unknown; end?: unknown } | null | undefined): string | null {
+  if (!Array.isArray(texts)) return null;
+  const list = texts as HookText[];
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const hs = num(hook?.start) ?? 0, he = num(hook?.end);
+  const ownHook = list.find((t) => t?.id === "hook");
+  // How long the hook plays on the timeline: its trimmed length, else the hook text's own end, else 3 s.
+  const length = he !== null && he > hs ? he - hs : num(ownHook?.end) ?? 3;
+  const words = list
+    .filter((t) => typeof t?.text === "string" && t.text.trim() && (num(t.start) ?? 0) < length - 0.01)
+    .sort((a, b) => (num(a.y) ?? 0) - (num(b.y) ?? 0) || (num(a.x) ?? 0) - (num(b.x) ?? 0))
+    .map((t) => (t.text as string).replace(/\s+/g, " ").trim())
+    .join(" ");
+  return words || null;
+}

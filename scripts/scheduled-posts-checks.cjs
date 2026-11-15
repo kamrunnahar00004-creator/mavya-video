@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 104;
+const EXPECTED = 111;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -340,4 +340,21 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   const inWin = shared.slotMoments([68, 158], springForward, 0, winFits, winNext);
   ok(inWin.every(winFits), 'a spring-forward time pushed past Latest moves into the next day\'s window');
   ok(inWin[1] - inWin[0] >= shared.MIN_GAP * 60e3, 'and keeps the 1.5 hour gap');
+
+  // Caption hook = the video's own on-screen hook (founder 2026-11-15: "the hook should be the hook of my video").
+  const texts = [
+    { id: 'b', text: 'how tf did i get ', start: 0, end: 2.4, y: 73.8, x: 50 },
+    { id: 'hook', text: 'WAIT...', start: 0, end: 2.4, y: 67.2, x: 50 },
+    { id: 'c', text: '198 users in 1 day?', start: 0, end: 2.4, y: 79.8, x: 50 },
+    { id: 'd', text: 'pick AI face', start: 5.5, end: 7.2, y: 20, x: 50 },
+    { id: 'e', text: '', start: 0, end: 2.4, y: 76, x: 50 },
+  ];
+  eq(shared.hookWords(texts, { start: 0, end: 2.672 }), 'WAIT... how tf did i get 198 users in 1 day?', 'all hook text boxes, top to bottom, on one line');
+  ok(!/pick AI face/.test(shared.hookWords(texts, { start: 0, end: 2.672 })), 'demo texts after the hook are left out');
+  eq(shared.hookWords([{ id: 'x', text: 'SaaS + Insta reels =', start: 0, end: 3, y: 20 }, { id: 'y', text: '🔥', start: 0.2, end: 3, y: 30 }], { start: 1, end: 3.5 }), 'SaaS + Insta reels = 🔥', 'hook length is its trimmed length (end - start)');
+  eq(shared.hookWords([{ id: 'hook', text: 'How is this legal?', start: 0, end: 3, y: 22 }, { id: 'z', text: 'browse', start: 3, end: 5, y: 9 }], {}), 'How is this legal?', 'no hook timing saved: the hook text box\'s own end');
+  eq(shared.hookWords([], { end: 2 }), null, 'no text boxes: none (the library words are the fallback)');
+  const serverSrc = fs.readFileSync('src/lib/server/scheduled-posts.ts', 'utf8');
+  ok(/hook: \(e\.runId && onScreen\.get\(e\.runId\)\) \|\| e\.hookText/.test(serverSrc), 'the export list uses the on-screen hook first, the library words only as a fallback');
+  ok((view.match(/<HookLine hook=/g) ?? []).length === 2, 'the dialog shows each picked video\'s hook words, for one video and for several');
 });
