@@ -178,7 +178,7 @@ type HookText = { text?: unknown; start?: unknown; end?: unknown; x?: unknown; y
 /**
  * The hook words for a caption: what the video itself shows during its hook (founder 2026-11-15: "the hook should be
  * the hook of my video", e.g. "SaaS + Insta reels"), not the library hook's own words. Every non-empty text box that
- * starts while the hook plays, read top to bottom (then left to right), on one line. Null when there are none.
+ * comes on while the hook text is shown, read top to bottom (then left to right), on one line. Null when there are none.
  */
 export function hookWords(texts: unknown, hook: { start?: unknown; end?: unknown } | null | undefined): string | null {
   if (!Array.isArray(texts)) return null;
@@ -186,8 +186,11 @@ export function hookWords(texts: unknown, hook: { start?: unknown; end?: unknown
   const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
   const hs = num(hook?.start) ?? 0, he = num(hook?.end);
   const ownHook = list.find((t) => t?.id === "hook");
-  // How long the hook plays on the timeline: its trimmed length, else the hook text's own end, else 3 s.
-  const length = he !== null && he > hs ? he - hs : num(ownHook?.end) ?? 3;
+  // Up to when a box counts as hook words: while the hook text itself is on screen (founder 2026-11-15: "this reel got
+  // 1.6M views" came on at 2.6 s, after the hook text, still inside the 3.3 s hook clip, and must not be in the
+  // caption). With no hook text box: the hook's trimmed length, else 3 s.
+  const ownEnd = num(ownHook?.end);
+  const length = ownEnd !== null && ownEnd > (num(ownHook?.start) ?? 0) ? ownEnd : he !== null && he > hs ? he - hs : 3;
   const words = list
     .filter((t) => typeof t?.text === "string" && t.text.trim() && (num(t.start) ?? 0) < length - 0.01)
     .sort((a, b) => (num(a.y) ?? 0) - (num(b.y) ?? 0) || (num(a.x) ?? 0) - (num(b.x) ?? 0))

@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 133;
+const EXPECTED = 135;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -353,6 +353,10 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   ok(!/pick AI face/.test(shared.hookWords(texts, { start: 0, end: 2.672 })), 'demo texts after the hook are left out');
   eq(shared.hookWords([{ id: 'x', text: 'SaaS + Insta reels =', start: 0, end: 3, y: 20 }, { id: 'y', text: '🔥', start: 0.2, end: 3, y: 30 }], { start: 1, end: 3.5 }), 'SaaS + Insta reels = 🔥', 'hook length is its trimmed length (end - start)');
   eq(shared.hookWords([{ id: 'hook', text: 'How is this legal?', start: 0, end: 3, y: 22 }, { id: 'z', text: 'browse', start: 3, end: 5, y: 9 }], {}), 'How is this legal?', 'no hook timing saved: the hook text box\'s own end');
+  // Founder 2026-11-15: "this reel got 1.6M views" came on after the hook text but inside the 3.3 s hook clip.
+  const reel = [{ id: 'hook', text: 'why is my app suddenly', start: 0, end: 2.604, x: 49.6, y: 63.5 }, { id: '931ev8cc', text: 'blowing up on insta??🤯', start: 0, end: 2.604, x: 50.5, y: 69.6 }, { id: 'ndbkkhme', text: 'this reel got 1.6M views', start: 2.604, end: 5.366, x: 49.8, y: 81.7 }, { id: 'sgrb9e8q', text: 'pick AI face', start: 5.366, end: 7.119, x: 49.7, y: 75.4 }];
+  eq(shared.hookWords(reel, { start: 1.493, end: 4.748 }), 'why is my app suddenly blowing up on insta??🤯', 'only the words shown with the hook text: a line that comes on after it is left out');
+  eq(shared.hookWords([{ id: 'hook', text: 'A', start: 0, end: 2, y: 10 }, { id: 'b', text: 'B', start: 1.5, end: 3, y: 20 }], { start: 0, end: 4 }), 'A B', 'a box that comes on while the hook text is still shown counts');
   eq(shared.hookWords([], { end: 2 }), null, 'no text boxes: none (the library words are the fallback)');
   const serverSrc = fs.readFileSync('src/lib/server/scheduled-posts.ts', 'utf8');
   ok(/hook: \(e\.runId && onScreen\.get\(e\.runId\)\) \|\| e\.hookText/.test(serverSrc), 'the export list uses the on-screen hook first, the library words only as a fallback');
