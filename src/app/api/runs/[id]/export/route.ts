@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { exportLayers, exportWindow } from "@/lib/export-layers";
 import { billingRpc } from "@/lib/server/billing-state";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
-import { advanceExport, cancelBrowserExport, exportJob } from "@/lib/server/export-jobs";
+import { advanceExport, cancelBrowserExport, exportJob, noteBrowserAlive } from "@/lib/server/export-jobs";
 import { randomUUID } from "node:crypto";
 import { fullAdjust } from "@/lib/adjust";
 import { segSpeed, timeline, videoLength } from "@/lib/edit";
@@ -49,12 +49,18 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   if (!cloud() || !render) return Response.json({ error: "Export is not connected yet." }, { status: 503 });
   const run = await getRun(id, who);
   if (!run) return Response.json({ error: "Not found" }, { status: 404 });
-  const body = await request.json().catch(()=>null) as {snapshot?:unknown;mode?:unknown;job?:unknown;size?:unknown;demoSize?:unknown;encoder?:unknown;texts?:{id?:unknown;mediaId?:unknown;x?:unknown;y?:unknown}[]} | null;
+  const body = await request.json().catch(()=>null) as {snapshot?:unknown;mode?:unknown;job?:unknown;sent?:unknown;size?:unknown;demoSize?:unknown;encoder?:unknown;texts?:{id?:unknown;mediaId?:unknown;x?:unknown;y?:unknown}[]} | null;
   if (body?.mode === "cancel") {
     // A browser export whose upload failed: end its job now, so Export works again at once (instead of after the
     // 15 minute wait in advanceExport). The browser still has the video.
     if (typeof body.job !== "string" || !/^[0-9a-f-]{36}$/i.test(body.job)) return Response.json({ error: "Not found" }, { status: 404 });
     return Response.json({ state: await cancelBrowserExport(who, id, body.job) });
+  }
+  if (body?.mode === "alive") {
+    // A browser export still uploading (founder 2026-11-15, export-alive.ts): noted, so a closed tab ends its job soon.
+    if (typeof body.job !== "string" || !/^[0-9a-f-]{36}$/i.test(body.job)) return Response.json({ error: "Not found" }, { status: 404 });
+    const sent = typeof body.sent === "number" && Number.isFinite(body.sent) ? Math.min(1, Math.max(0, body.sent)) : null;
+    return Response.json({ ok: await noteBrowserAlive(who, id, body.job, sent) });
   }
   if (!run.hook.generated) return Response.json({ error: "Generate the hook first." }, { status: 400 });
   const sourceSegments = timeline(run, null).filter(s => s.src);

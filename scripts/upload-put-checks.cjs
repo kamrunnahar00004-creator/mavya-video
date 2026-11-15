@@ -8,9 +8,9 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 26;
+const EXPECTED = 36;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
-const up = load('src/lib/upload-put.ts', {}, {}, { setInterval, clearInterval, Blob });
+const up = load('src/lib/upload-put.ts', { '@/lib/export-alive': load('src/lib/export-alive.ts') }, {}, { setInterval, clearInterval, Blob });
 
 /** A pretend network: each connection follows a script ('ok', 'hang', 'error', 500, or a function). */
 function net(scripts) {
@@ -112,7 +112,44 @@ finish('upload-put-checks', EXPECTED, () => checks, async () => {
 
   // The export button uses it, and progress never steps back.
   const b = fs.readFileSync('src/components/export-button.tsx', 'utf8');
-  ok(/const put=await uploadExportFiles\(\{video:blob,demo:made\.demo\}/.test(b) && /if\(!put\)\{/.test(b), 'the export button uploads through it; a failure frees the export');
+  ok(/const put=await uploadWhileAlive\(\{video:blob,demo:made\.demo\}/.test(b) && /if\(!put\)\{/.test(b), 'the export button uploads through it; a failure frees the export');
   ok(!/AbortSignal\.timeout\(until-Date\.now\(\)\)/.test(b) && !/method:"PUT"/.test(b), 'no upload waits out the whole 13 minutes any more');
   ok(/setProgress\(previous=>Math\.max\(previous\?\?0,0\.95\)\)/.test(b), 'after a successful upload the progress never steps back from 99% to 95%');
+
+  // Founder 2026-11-15: the page was changed to Scheduled posts while the export spun, which killed its upload, and
+  // the job then waited 15 minutes. Now leaving the page doesn't stop the upload, and it tells the server it's alive.
+  const tail = b.slice(b.indexOf('const put=await uploadWhileAlive'), b.indexOf('return "started";\n  }', b.indexOf('const put=await uploadWhileAlive')));
+  ok(tail.length > 100 && !/signal/.test(tail), 'leaving the run page never stops the upload or skips freeing a failed export');
+  ok(/ping:sent=>post\("alive",\{job:reserved\.job,sent\}\)/.test(b) && /if\(alive\.current\)onToast/.test(tail) && /else if\(alive\.current\)setJobId/.test(tail), 'it pings the server with how much is sent; only page updates wait for the page');
+  const live = (opts = {}) => { const ww = net([]); ww.pings = []; const at = (fn, ms) => { let due = ww.clock + ms; return ww.every(() => { if (ww.clock >= due) { due += ms; fn(); } }); }; return Object.assign(ww, { o: { until: 13 * 60e3, now: ww.now, every: at, stop: ww.stop, ping: async (sent) => { ww.pings.push([ww.clock, sent]); }, ...opts } }); };
+  // A fake upload that sends 10% every 10 s and finishes after 100 s.
+  const slow = (ww, seen) => async (_f, _l, o) => { seen.push(o); for (let i = 1; i <= 10; i++) { await new Promise((res) => { const t = ww.every(() => { if (ww.clock % 10e3 === 0) { ww.stop(t); res(); } }); }); o.onProgress(i / 10); } return true; };
+  let seen = [];
+  w = live(); w.o.upload = slow(w, seen);
+  let res = null; let pr = up.uploadWhileAlive({ video: body }, { upload: 'https://r2/video' }, w.o).then((v) => { res = v; });
+  for (let i = 0; i < 130 && res === null; i++) await w.advance(1000);
+  await pr;
+  ok(res === true && w.pings[0][0] <= 1000 && w.pings[0][1] === 0 && w.pings.length <= 12, 'it tells the server at once that the upload has started (and not more than every 15 s or so)');
+  const gaps = w.pings.slice(1).map((p, i) => p[0] - w.pings[i][0]);
+  ok(w.pings.length >= 7 && gaps.every((g) => g <= 15e3), 'then at least every 15 s while it lasts');
+  ok(w.pings.some((p) => p[1] >= 0.5 && p[1] < 1) && w.pings.every((p, i) => !i || p[1] >= w.pings[i - 1][1]), 'each ping carries how much is sent');
+  ok(w.ticks.size === 0 && !('signal' in seen[0]), 'no ping after the upload ends; the upload gets no page signal');
+  // Hidden tab: timers may not run, upload progress still pings.
+  seen = []; w = live(); const tick = w.every; w.o.every = () => ({}); w.o.stop = () => undefined;
+  w.o.upload = async (_f, _l, o) => { for (let i = 1; i <= 6; i++) { await new Promise((res2) => { const t = tick(() => { if (w.clock % 10e3 === 0) { w.ticks.delete(t); res2(); } }); }); o.onProgress(i / 6); } return true; };
+  res = null; pr = up.uploadWhileAlive({ video: body }, { upload: 'https://r2/video' }, w.o).then((v) => { res = v; });
+  for (let i = 0; i < 90 && res === null; i++) await w.advance(1000);
+  await pr;
+  ok(res === true && w.pings.length >= 3 && w.pings.slice(1).every((p, i) => p[0] - w.pings[i][0] <= 20e3), 'in a hidden tab whose timers stall, upload progress keeps pinging');
+  // A failing ping (network down, server error, even a throw) never touches the upload.
+  w = live({ ping: () => { throw new Error('offline'); } }); w.o.upload = async () => true;
+  ok((await up.uploadWhileAlive({ video: body }, { upload: 'https://r2/video' }, w.o)) === true, 'a ping that fails is ignored');
+  w = live({ ping: async () => { throw new Error('500'); } }); w.o.upload = async () => false;
+  ok((await up.uploadWhileAlive({ video: body }, { upload: 'https://r2/video' }, w.o)) === false && w.ticks.size === 0, 'a failed upload still reports false (the export is then freed) and stops pinging');
+  // The real upload underneath: a hung try is still dropped and retried.
+  w = net(['hang', 'ok']); const pings = [];
+  res = null; pr = up.uploadWhileAlive({ video: body }, { upload: 'https://r2/video' }, { until: 13 * 60e3, now: w.now, every: w.every, stop: w.stop, makeXhr: w.makeXhr, ping: async (sent) => { pings.push(sent); } }).then((v) => { res = v; });
+  for (let i = 0; i < 120 && res === null; i++) await w.advance(1000);
+  await pr;
+  ok(res === true && w.made.length === 2 && pings.length >= 3 && w.ticks.size === 0, 'with the real upload: a hung try is retried while pings keep the job alive');
 });

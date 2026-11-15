@@ -7,6 +7,7 @@ import { copyObject, deleteObjectStrict, objectInfo, objectStart } from "@/lib/s
 import { type ExportPayload, FAST_MAX_STEPS, callInternal } from "@/lib/server/fast-export";
 import { plan } from "../../../render/render.mjs";
 import constraints from "../../../render/constraints.json";
+import { browserGone, uploadProgress } from "@/lib/export-alive";
 type Result = { src: string; seconds: number; at: string; demo?: { src: string; seconds: number } };
 export type ExportJob = { id: string; user_id: string; run_id: string; media_id: string; overlay_ids: string[]; state: string; created_at: string; result: Result | null; cleaned: boolean; cleanup_cursor: number; progress: number; lease_token: string; payload: { meta: { seconds: number; demoMediaId?: string; demoSeconds?: number }; [key: string]: unknown } };
 export async function exportJob(who: string, run: string, id?: string) {
@@ -33,12 +34,43 @@ async function promoteUpload(j: ExportJob, upload: { key: string; size: number }
  return mp4;
 }
 
+/** The job's lease, waiting briefly (up to `tries` tries, 0.4 s apart) while someone else holds it. */
+async function claimSoon(who: string, id: string, tries: number): Promise<ExportJob | null> {
+ for (let i = 0; i < tries; i++) {
+  if (i) await new Promise((r) => setTimeout(r, 400));
+  const j = await billingRpc<ExportJob | null>("mavya_claim_export", { p_user: who, p_id: id });
+  if (j) return j;
+ }
+ return null;
+}
+
+/**
+ * A browser export's upload is still going (founder 2026-11-15, export-alive.ts): its time is noted, so a tab that
+ * closes mid-upload ends the job about 3 minutes later rather than 15, and `sent` (0..1 of the video sent) becomes
+ * the job's progress, shown when the run page is opened again. One guarded write, no lease (Codex 2026-11-15: a ping
+ * that died holding the 6 minute lease would block the job): it lands only while nobody holds the lease and nothing
+ * changed the job since it was read (every write sets updated_at); otherwise this ping is skipped, the next follows.
+ */
+export async function noteBrowserAlive(who: string, run: string, id: string, sent: number | null): Promise<boolean> {
+ const db = createSupabaseAdminClient();
+ const { data: j, error } = await db.from("export_jobs").select("run_id,state,payload,progress,updated_at,lease_until").eq("id", id).eq("user_id", who).maybeSingle<{ run_id: string; state: string; payload: ExportPayload; progress: number | null; updated_at: string; lease_until: string | null }>();
+ if (error || !j || j.run_id !== run || j.payload?.lane !== "browser" || !["pending", "running"].includes(j.state)) return false;
+ const now = new Date().toISOString();
+ if (j.lease_until && Date.parse(j.lease_until) > Date.now()) return false;
+ const { data, error: failed } = await db.from("export_jobs")
+  .update({ payload: { ...j.payload, aliveAt: Date.now() }, ...(sent === null ? {} : { progress: Math.max(j.progress ?? 0, uploadProgress(sent)) }), updated_at: now })
+  .eq("id", id).eq("updated_at", j.updated_at).or(`lease_until.is.null,lease_until.lt.${now}`).select("id");
+ return !failed && !!data?.length;
+}
+
 /**
  * The browser's upload failed: end its job now so Export works again at once. Under the job's lease, so it can never
  * race the completion; a file that did arrive is kept and finishes the job instead ("pending").
  */
 export async function cancelBrowserExport(who: string, run: string, id: string): Promise<"cancelled" | "pending"> {
- const j = await billingRpc<ExportJob | null>("mavya_claim_export", { p_user: who, p_id: id });
+ // The cron checks this job every few seconds and holds its lease meanwhile; a cancel that arrives then waits for it
+ // (founder 2026-11-15, stuck export) instead of answering "pending" and leaving the button spinning for 15 minutes.
+ const j = await claimSoon(who, id, 6);
  if (!j) return "pending";
  const db = createSupabaseAdminClient();
  const save = async (patch: Record<string, unknown>) => {
@@ -92,7 +124,8 @@ export async function advanceExport(who: string, id: string) {
    else if (lane === "browser") {
     // Rendered in the user's browser, which uploads the file to the output link (the check above then finishes the
     // job). No texts were uploaded for a server copy, so a browser that never delivers ends the job as failed.
-    if (Date.now() - laneAt > 15 * 60_000) { await save({ state: "failed" }); j.state = "failed"; }
+    // 15 minutes at most; 3 once the browser has said it is uploading and then went quiet (export-alive.ts).
+    if (browserGone(j.payload as ExportPayload, Date.now())) { await save({ state: "failed" }); j.state = "failed"; }
    }
    else if (!lane && process.env.EXPORT_FAST !== "0" && plan((j.payload as ExportPayload).spec).length <= FAST_MAX_STEPS) {
     // Fast lane first (src/lib/server/fast-export.ts): every piece at once on Vercel.

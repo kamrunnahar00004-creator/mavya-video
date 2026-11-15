@@ -20,7 +20,7 @@ import { MAX_FILE_BYTES, MAX_JOB_BYTES, countOverlayPixels, validProbe } from ".
  * Vercel function at the same time, then one function joins them, adds texts and sound, and uploads the video to the
  * job's output link. If it fails or stalls, advanceExport hands the job to the Render worker instead.
  */
-export type ExportPayload = { id: string; spec: Spec; output: { url: string; contentType: string }; meta: { seconds: number }; lane?: string; laneAt?: number; upload?: { key: string; size: number }; demo?: { url: string; contentType: string }; demoUpload?: { key: string; size: number } };
+export type ExportPayload = { id: string; spec: Spec; output: { url: string; contentType: string }; meta: { seconds: number }; lane?: string; laneAt?: number; aliveAt?: number; upload?: { key: string; size: number }; demo?: { url: string; contentType: string }; demoUpload?: { key: string; size: number } };
 
 /** Jobs with more pieces than this skip the fast lane (each piece is its own function and download). */
 export const FAST_MAX_STEPS = 24;

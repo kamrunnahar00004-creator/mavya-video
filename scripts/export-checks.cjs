@@ -1,13 +1,16 @@
 const assert=require('node:assert/strict'),{load}=require('./check-module.cjs');
 async function main(){
  let record={id:'job',user_id:'owner',run_id:'run',media_id:'out.mp4',state:'running',created_at:new Date().toISOString(),cleaned:false,cleanup_cursor:0,overlay_ids:['1.png','2.png','3.png','4.png','5.png','6.png'],payload:{meta:{seconds:3},lane:'render'}};
- let last=null,events=[],append=0,head={size:100,mime:'video/mp4'},health={protocol:1},network=[],objects=null,copies=[];
- const db={from(table){return {update(p){this.patch=p;return this;},delete(){events.push(['metadata',table]);return this;},eq(){return this;},async select(){Object.assign(record,this.patch);return {data:[{id:'job'}]};},then(resolve){resolve({error:null});}};}};
+ let busy=0,last=null,events=[],append=0,head={size:100,mime:'video/mp4'},health={protocol:1},network=[],objects=null,copies=[];
+ let beforeWrite=null;
+ // A read (select, then maybeSingle) gets the record; an update lands unless the updated_at it was guarded by is stale.
+ const db={from(table){return {filters:{},update(p){this.patch=p;return this;},delete(){events.push(['metadata',table]);return this;},eq(k,v){this.filters[k]=v;return this;},or(){return this;},select(){if(!this.patch)return this;beforeWrite?.();if(Object.hasOwn(this.filters,'updated_at')&&this.filters.updated_at!==record.updated_at)return Promise.resolve({data:[],error:null});Object.assign(record,this.patch);return Promise.resolve({data:[{id:'job'}]});},maybeSingle(){return Promise.resolve({data:JSON.parse(JSON.stringify(record)),error:null});},then(resolve){resolve({error:null});}};}};
  const info=async key=>objects?objects[key]??null:head;
  const api=load('src/lib/server/export-jobs.ts',{
   '@/lib/supabase/server':{createSupabaseAdminClient:()=>db},
-  '@/lib/server/billing-state':{billingRpc:async(name,args)=>{assert.equal(args.p_user,'owner');assert.equal(args.p_id,'job');if(record.cleaned)return null;record.lease_token='lease';return JSON.parse(JSON.stringify(record));}},
+  '@/lib/server/billing-state':{billingRpc:async(name,args)=>{assert.equal(args.p_user,'owner');assert.equal(args.p_id,'job');if(busy>0){busy--;return null;}if(record.cleaned)return null;record.lease_token='lease';return JSON.parse(JSON.stringify(record));}},
   '@/lib/server/account-state':{accountClosing:async()=>false},
+  '@/lib/export-alive':load('src/lib/export-alive.ts'),
   // These checks cover the Render worker path: the fast lane counts as already tried.
   '@/lib/server/fast-export':{callInternal:async()=>({ok:false}),FAST_MAX_STEPS:24},
   '../../../render/render.mjs':{plan:()=>[]},
@@ -60,6 +63,54 @@ async function main(){
  browserJob();objects={};
  assert.equal(await api.cancelBrowserExport('owner','other-run','job'),'pending');assert.equal(record.state,'running');
  assert.equal(await api.cancelBrowserExport('owner','run','job'),'cancelled');assert.equal(record.state,'failed');
- console.log('PASS: durable export recovers from output without worker/browser, owned registration, single append, bounded resumable PNG cleanup, terminal replay, worker size check, checked browser uploads (copied file wins on retry), the demo part, and leased cancel');
+ // Founder 2026-11-15: the page was changed to Scheduled posts mid-export and the export hung 15 minutes.
+ // The cron holds the lease for a moment every few seconds: a cancel arriving then waits for it, never "pending".
+ browserJob();objects={};busy=2;
+ assert.equal(await api.cancelBrowserExport('owner','run','job'),'cancelled');assert.equal(record.state,'failed');assert.equal(busy,0);
+ browserJob();objects={};busy=50;
+ assert.equal(await api.cancelBrowserExport('owner','run','job'),'pending');assert.equal(record.state,'running');busy=0;
+ // A live upload is noted (time and how much is sent); only the job's own run and a browser job.
+ browserJob();record.progress=0;objects={};
+ const before=Date.now();
+ assert.equal(await api.noteBrowserAlive('owner','run','job',0.5),true);
+ assert.ok(record.payload.aliveAt>=before&&record.payload.lane==='browser'&&record.payload.upload.key==='exports/job/upload.mp4');
+ assert.ok(Math.abs(record.progress-0.955)<1e-9);
+ assert.equal(await api.noteBrowserAlive('owner','run','job',0.1),true);assert.ok(Math.abs(record.progress-0.955)<1e-9,'progress never steps back');
+ assert.equal(await api.noteBrowserAlive('owner','run','job',null),true);assert.ok(Math.abs(record.progress-0.955)<1e-9);
+ browserJob();assert.equal(await api.noteBrowserAlive('owner','other-run','job',0.5),false);assert.equal(record.payload.aliveAt,undefined);
+ browserJob();record.payload.lane='render';assert.equal(await api.noteBrowserAlive('owner','run','job',0.5),false);assert.equal(record.payload.aliveAt,undefined);
+ browserJob();record.state='done';assert.equal(await api.noteBrowserAlive('owner','run','job',0.5),false);
+ // Lock-free (Codex 2026-11-15): never takes the lease, so a ping that dies can't block the job. It skips while
+ // someone holds the lease, or when the job changed after it was read.
+ browserJob();busy=50;assert.equal(await api.noteBrowserAlive('owner','run','job',0.5),true);assert.equal(busy,50);busy=0;
+ browserJob();record.lease_until=new Date(Date.now()+60_000).toISOString();assert.equal(await api.noteBrowserAlive('owner','run','job',0.5),false);assert.equal(record.payload.aliveAt,undefined);
+ browserJob();record.lease_until=new Date(Date.now()-60_000).toISOString();assert.equal(await api.noteBrowserAlive('owner','run','job',0.5),true);
+ browserJob();record.lease_until=null;record.updated_at='2026-11-15T07:00:00.000Z';beforeWrite=()=>{record.updated_at='2026-11-15T07:00:01.000Z';};
+ assert.equal(await api.noteBrowserAlive('owner','run','job',0.5),false);assert.equal(record.payload.aliveAt,undefined);beforeWrite=null;
+ assert.equal(await api.noteBrowserAlive('owner','run','job',0.5),true);assert.ok(record.payload.aliveAt>0&&record.updated_at!=='2026-11-15T07:00:01.000Z');
+ // A tab that stopped telling (closed or reloaded): its job ends 3 minutes later, not 15.
+ browserJob();objects={};record.payload.aliveAt=Date.now()-4*60_000;
+ await api.advanceExport('owner','job');assert.equal(record.state,'failed');
+ browserJob();objects={};record.payload.aliveAt=Date.now()-60_000;
+ await api.advanceExport('owner','job');assert.equal(record.state,'running');
+ // An older page that never tells keeps the 15 minutes; past them every browser job ends.
+ browserJob();objects={};record.payload.laneAt=Date.now()-5*60_000;
+ await api.advanceExport('owner','job');assert.equal(record.state,'running');
+ browserJob();objects={};record.payload.laneAt=Date.now()-16*60_000;record.payload.aliveAt=Date.now();
+ await api.advanceExport('owner','job');assert.equal(record.state,'failed');
+ // A quiet browser whose file did arrive: the file wins, the job finishes.
+ browserJob();objects={'exports/job/upload.mp4':{size:100,mime:'video/mp4',etag:'e5',bytes:mp4}};record.payload.aliveAt=Date.now()-4*60_000;
+ await api.advanceExport('owner','job');assert.equal(record.state,'done');
+ // The rule itself.
+ const al=load('src/lib/export-alive.ts'),t=1e12;
+ assert.equal(al.browserGone({laneAt:t},t+14*60_000),false);assert.equal(al.browserGone({laneAt:t},t+15*60_000+1),true);
+ assert.equal(al.browserGone({laneAt:t,aliveAt:t+60_000},t+60_000+3*60_000),false);assert.equal(al.browserGone({laneAt:t,aliveAt:t+60_000},t+60_000+3*60_000+1),true);
+ assert.equal(al.browserGone({},t),true);assert.equal(al.browserGone({laneAt:'x',aliveAt:'y'},t),true);
+ assert.equal(al.uploadProgress(0),0.92);assert.equal(al.uploadProgress(1),0.99);assert.equal(al.uploadProgress(-1),0.92);assert.equal(al.uploadProgress(5),0.99);
+ // The route: a live-upload note needs a job id and comes before the hook check, like cancel.
+ const route=require('node:fs').readFileSync('src/app/api/runs/[id]/export/route.ts','utf8');
+ const ai=route.indexOf('body?.mode === "alive"'),hi=route.indexOf('if (!run.hook.generated)');
+ assert.ok(ai>0&&ai<hi&&/mode === "alive"[\s\S]{0,200}\/\^\[0-9a-f-\]\{36\}\$\/i\.test\(body\.job\)/.test(route)&&/noteBrowserAlive\(who, id, body\.job, sent\)/.test(route));
+ console.log('PASS: durable export recovers from output without worker/browser, owned registration, single append, bounded resumable PNG cleanup, terminal replay, worker size check, checked browser uploads (copied file wins on retry), the demo part, leased cancel (waits out a busy lease), live-upload notes, and a quiet tab ending its job in 3 minutes');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
