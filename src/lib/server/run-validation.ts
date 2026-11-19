@@ -43,7 +43,7 @@ function hook(v: unknown): boolean {
   return optional(v.generated, gen) && within(v, object(v.generated) ? v.generated.seconds : undefined)
     && optional(v.source, (s) => ["library", "upload", "describe"].includes(String(s)))
     && optional(v.faceMode, (s) => ["upload", "describe"].includes(String(s)))
-    && optional(v.versions, (a) => Array.isArray(a) && a.length <= 50 && a.every(gen)) && optional(v.describeReady, (b) => typeof b === "boolean");
+    && optional(v.versions, (a) => Array.isArray(a) && a.length <= 50 && a.every(gen)) && optional(v.describeReady, (b) => typeof b === "boolean") && optional(v.removed, (b) => typeof b === "boolean");
 }
 
 function demo(v: unknown): boolean {

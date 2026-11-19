@@ -63,7 +63,7 @@ export function insertClipsChange(cur: Run, added: DemoClip[], at?: number): Pic
 
 /**
  * Several selected things deleted at once (Ctrl/Cmd-click in the editor, then Delete, like CapCut): texts, and clip
- * pieces (every piece of a demo clip removes the clip; the hook always keeps its pieces). Applied one after another to
+ * pieces (every piece of a clip removes the clip, the hook too unless it is all that is left). Applied one after another to
  * one working copy, so the result is saved once (one Undo).
  */
 export function deleteSelection(run: Run, source: Reference | null, textIds: string[], pieces: { seg: string; part: string }[], hold = false): Pick<Run, "hook" | "demo" | "texts"> {
@@ -76,7 +76,7 @@ export function deleteSelection(run: Run, source: Reference | null, textIds: str
     if (rest.length) {
       const change = partsChange(r, source, segId, rest, hold);
       if (change) r = { ...r, ...change };
-    } else if (segId !== "hook") r = { ...r, ...removeDemoClip(r, segId, runTexts(r), hold) };
+    } else r = { ...r, ...removeDemoClip(r, segId, runTexts(r), hold) };
   }
   return { hook: r.hook, demo: r.demo, texts: runTexts(r) };
 }

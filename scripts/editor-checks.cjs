@@ -50,13 +50,58 @@ const three = () => [clip('g', 1), clip('b', 2), clip('o', 3)];
   eq(out.demo.clips.map((c) => c.id), ['g'], 'whole clips go');
   ok(!out.texts.some((t) => t.id === 'tb' || t.id === 'tc'), 'texts only on deleted clips go with them');
   out = ops.deleteSelection(run, null, [], [{ seg: 'hook', part: 'p0' }, { seg: 'b', part: 'p0' }]);
-  ok(out.hook.clip && timeline({ ...run, ...out }, null)[0].id === 'hook', 'the hook is never deleted');
+  ok(out.hook.clip && out.hook.removed === true, 'the hook can be deleted (founder 2026-11-19); it stays in the run, marked removed');
+  eq(timeline({ ...run, ...out }, null).map((s) => [s.id, s.offset]), [['g', 0], ['o', 3]], 'magnet on: the video starts on the first demo clip');
   // Magnet off: deleting blue keeps orange in place (a gap takes blue's space).
   out = ops.deleteSelection(run, null, [], [{ seg: 'b', part: 'p0' }], true);
   const segs = timeline({ ...run, ...out }, null);
   ok(Math.abs(segs.find((s) => s.id === 'o').offset - 9) < 1e-9, 'magnet off: the clip after stays at 9 s');
   out = ops.deleteSelection(run, null, [], [{ seg: 'b', part: 'p0' }], false);
   ok(Math.abs(timeline({ ...run, ...out }, null).find((s) => s.id === 'o').offset - 6) < 1e-9, 'magnet on: the clip after moves up to 6 s');
+}
+
+// 2b. Deleting the hook (founder 2026-11-19: "editor is a free thing. anyone can / should be able to edit anything").
+{
+  const run = runOf(three(), [T('hook', 0, 3), T('ta', 3, 5), T('tb', 7, 9)]);
+  let out = edit.removeDemoClip(run, 'hook', run.texts);
+  ok(out.hook.removed === true, 'the hook is marked removed, not lost');
+  ok(!out.texts.some((t) => t.id === 'hook'), 'the hook text goes with the hook');
+  eq(out.texts.map((t) => [t.id, t.start, t.end]), [['ta', 0, 2], ['tb', 4, 6]], 'magnet on: texts after it move up by the hook length');
+  eq(timeline({ ...run, ...out }, null).map((s) => s.id), ['g', 'b', 'o'], 'the timeline starts on the first demo clip');
+  out = edit.removeDemoClip(run, 'hook', run.texts, true);
+  eq(timeline({ ...run, ...out }, null).map((s) => [s.id, s.offset]), [['g', 3], ['b', 6], ['o', 9]], 'magnet off: the clips stay put, a gap takes the hook');
+  const alone = runOf([], [T('hook', 0, 3)]);
+  out = edit.removeDemoClip(alone, 'hook', alone.texts);
+  ok(!out.hook.removed && timeline({ ...alone, ...out }, null).length === 1, 'the only clip on the timeline is never deleted');
+  out = ops.deleteSelection(alone, null, [], [{ seg: 'hook', part: 'p0' }]);
+  ok(!out.hook.removed, 'delete-many keeps the only clip too');
+  const lone = { ...runOf([clip('g', 1)], [T('ta', 0, 2)]), hook: { ...hook, removed: true } };
+  out = edit.removeDemoClip(lone, 'g', lone.texts);
+  eq(timeline({ ...lone, ...out }, null).map((s) => s.id), ['g'], 'hook deleted: the last demo clip is never deleted either');
+  const back = { ...run, hook: { ...run.hook, removed: undefined } };
+  eq(timeline(back, null)[0].id, 'hook', 'clearing removed (Undo, a new hook) puts the hook back in front');
+
+  // Codex 2026-11-19: a hook generated after the hook was deleted comes back in front; demo captions move after it
+  // and are never retimed as if the first demo clip were the old hook.
+  const gen = load('src/lib/generation-edit.ts', { '@/lib/edit': edit, '@/lib/studio-data': studio, '@/lib/client': client, '@/lib/adjust': adjust });
+  const deleted = { ...run, ...edit.removeDemoClip(run, 'hook', run.texts) };
+  const patched = gen.generationPatch(deleted, deleted, { src: '/api/media/new.mp4', seconds: 2, at: 'now' }, 'new hook');
+  ok(!patched.hook.removed, 'a new generated hook is shown again');
+  eq(patched.texts.map((t) => [t.id, t.start, t.end]), [['hook', 0, 2], ['ta', 2, 4], ['tb', 6, 8]], 'demo captions move later by the new hook, the hook caption sits on it');
+  eq(timeline({ ...deleted, ...patched }, null)[0].id, 'hook', 'the new hook is first on the timeline');
+
+  // Codex 2026-11-19: putting the hook back after a magnet-off delete fills the gap it left (no black space, captions stay).
+  const held = { ...run, ...edit.removeDemoClip(run, 'hook', run.texts, true) };
+  const room = edit.roomForHook(held, 3, held.texts);
+  const restored = { ...held, ...room, hook: { ...held.hook, removed: undefined } };
+  eq(timeline(restored, null).map((s) => [s.id, s.offset]), [['hook', 0], ['g', 3], ['b', 6], ['o', 9]], 'restored hook fills the gap, clips stay put');
+  eq(restored.texts.map((t) => [t.id, t.start]), [['ta', 3], ['tb', 7]], 'captions stay on their clips');
+  const room2 = edit.roomForHook(deleted, 3, deleted.texts);
+  eq(room2.texts.map((t) => [t.id, t.start]), [['ta', 3], ['tb', 7]], 'magnet-on delete: putting it back pushes everything by the hook length');
+
+  // Captions: with the hook deleted, the opening words are the first seconds' texts (not the old hook window).
+  const sp = load('src/lib/scheduled-posts.ts');
+  ok(sp.hookWords([T('AI UGC copied a viral hook', 0, 2.4), T('later', 4, 6)], null) === 'AI UGC copied a viral hook', 'no hook: the first 3 s of texts are the caption hook words');
 }
 
 // 3. Group paste placement (Codex: non-adjacent clips; a layer before the first clip; between clips; no clips).

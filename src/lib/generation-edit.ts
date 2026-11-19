@@ -18,15 +18,20 @@ export function generationPatch(run: Run, input: Run, generated: Generated, sugg
   const same = JSON.stringify(context(run)) === JSON.stringify(context(input));
   if (!same) return { hook: { ...hook, versions: [...versions.filter((g) => g.src !== generated.src), generated].slice(-50) }, texts: runTexts(run) };
   if (hook.generated?.src === generated.src) return { hook, texts: runTexts(run) };
-  const old = timeline(run, null)[0];
   const speed = speedOf(hook.adjust);
-  const texts = retimeTexts(runTexts(run), 0, { start: 0, end: old.len * speed, speed }, { start: 0, end: generated.seconds, speed });
-  const base = texts.find((t) => t.id === "hook");
+  const newLen = Math.round(generated.seconds / speed * 1000) / 1000;
+  // A hook deleted in the editor (hook.removed) comes back in front: every text moves later by the new hook's length.
+  // The completion (mavya_complete_generation) writes only hook and texts, so texts move by the whole hook length here; a
+  // gap a magnet-off delete left stays in front of the demo.
+  const texts = hook.removed
+    ? runTexts(run).map((t) => ({ ...t, start: Math.round((t.start + newLen) * 1000) / 1000, end: Math.round((t.end + newLen) * 1000) / 1000 }))
+    : retimeTexts(runTexts(run), 0, { start: 0, end: timeline(run, null)[0].len * speed, speed }, { start: 0, end: generated.seconds, speed });
+  const base = hook.removed ? undefined : texts.find((t) => t.id === "hook");
   const item: TextLayer = base
     ? { ...base, text: suggested && (!base.text || base.text === "How is this tool even legal?" || placeholders.includes(base.text)) ? suggested : base.text || suggested }
-    : { id: "hook", text: suggested, start: 0, end: Math.round(generated.seconds / speed * 1000) / 1000, x: 50, y: TEXT_Y.top, size: 4.6, font: DEFAULT_FONT, color: "#ffffff", style: "outline" };
+    : { id: "hook", text: suggested, start: 0, end: newLen, x: 50, y: TEXT_Y.top, size: 4.6, font: DEFAULT_FONT, color: "#ffffff", style: "outline" };
   if (hook.generated) versions.push(hook.generated);
-  const nextHook = { ...hook, generated, versions: versions.slice(-50), start: 0, end: generated.seconds, parts: undefined, text: item.text };
+  const nextHook = { ...hook, generated, versions: versions.slice(-50), start: 0, end: generated.seconds, parts: undefined, text: item.text, removed: undefined };
   // Each text inside its own clip on the new timeline (containTexts).
   const all = [item, ...texts.filter((t) => t.id !== "hook")];
   return { hook: nextHook, texts: containTexts(all, timeline({ ...run, hook: nextHook, texts: all }, null)) };

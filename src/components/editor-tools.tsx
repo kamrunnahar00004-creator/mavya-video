@@ -1600,7 +1600,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
   const r3 = (x: number) => Math.round(x * 1000) / 1000;
   const selSeg = sel?.kind === "clip" ? segs.find((x) => x.id === sel.seg) : undefined;
   const selText = sel?.kind === "text" ? texts.find((x) => x.id === sel.id) : undefined;
-  const canDelete = Boolean(multi.length > 1 || selText || (selSeg && (selSeg.parts.length > 1 || selSeg.id !== "hook")) || (!sel && sounds.selId));
+  const canDelete = Boolean(multi.length > 1 || selText || (selSeg && (selSeg.parts.length > 1 || segs.length > 1)) || (!sel && sounds.selId));
 
   /** ✂ at the playhead: the selected sound or text, else the clip under the playhead (two pieces, side by side). */
   const cut = (time: number) => {
@@ -1771,7 +1771,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
     onParts(seg.id, seg.parts.map((x, j) => (j === i ? (side === "left" ? { ...x, start: r3(file) } : { ...x, end: r3(file) }) : x)), !magnet);
   };
 
-  /** Delete the selection: a text, a clip piece (the last piece of a demo clip removes the clip), or a sound. */
+  /** Delete the selection: a text, a clip piece (the last piece of a clip removes the clip, the hook too), or a sound. */
   const remove = () => {
     if (multi.length > 1) {
       const picked = multi.filter((k) => !k.startsWith("s:")).map(fromKey);
@@ -1790,7 +1790,8 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
       if (selSeg.parts.length > 1) {
         remember();
         onParts(selSeg.id, selSeg.parts.filter((x) => x.id !== sel.part), !magnet);
-      } else if (selSeg.id !== "hook") {
+      } else if (segs.length > 1) {
+        // The last piece of a clip removes the clip; the hook too (founder 2026-11-19), never the only clip.
         remember();
         onDeleteClip(selSeg.id, !magnet);
       }
@@ -2464,9 +2465,10 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
                 <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => void takeMany(e.target.files, selected.id).then(() => (e.target.value = ""))} />
               </label>
             )}
-            <button type="button" onClick={() => { onDelete(selected.id); setOpenId(members.find((m) => m.id !== selected.id)?.id ?? null); }} aria-label={members.length > 1 ? `Delete part ${members.indexOf(selected) + 1}` : `Delete clip ${selIndex + 1}`} title={members.length > 1 ? "Delete this part" : "Delete clip"} className="rounded-lg p-2 text-soft hover:bg-red-50 hover:text-red-600">
+            {/* The last clip that plays is never deleted (hook deleted: a demo clip can be the whole video). */}
+            {!(run.hook.removed && clipSrc(selected) && segs.length < 2) && <button type="button" onClick={() => { onDelete(selected.id); setOpenId(members.find((m) => m.id !== selected.id)?.id ?? null); }} aria-label={members.length > 1 ? `Delete part ${members.indexOf(selected) + 1}` : `Delete clip ${selIndex + 1}`} title={members.length > 1 ? "Delete this part" : "Delete clip"} className="rounded-lg p-2 text-soft hover:bg-red-50 hover:text-red-600">
               <Trash2 className="h-4 w-4" />
-            </button>
+            </button>}
             <button type="button" onClick={() => setOpenId(null)} aria-label="Close" className="rounded-lg p-2 text-soft hover:bg-raised hover:text-text">
               <X className="h-4 w-4" />
             </button>

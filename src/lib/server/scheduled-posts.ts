@@ -297,16 +297,19 @@ export async function listExports(who: string): Promise<ExportChoice[]> {
   // Each video's own on-screen hook words (hookWords), read from its texts; the library hook's words only as a fallback.
   const ids = [...new Set(exports.map((e) => e.runId).filter((x): x is string => Boolean(x)))];
   const onScreen = new Map<string, string>();
+  const hookless = new Set<string>();
   for (let i = 0; i < ids.length; i += 200) {
-    const { data, error } = await db().from("runs").select("id,texts:data->texts,hookStart:data->hook->start,hookEnd:data->hook->end").eq("user_id", who).in("id", ids.slice(i, i + 200));
+    const { data, error } = await db().from("runs").select("id,texts:data->texts,hookStart:data->hook->start,hookEnd:data->hook->end,hookRemoved:data->hook->removed").eq("user_id", who).in("id", ids.slice(i, i + 200));
     if (error) throw error;
-    for (const r of (data ?? []) as { id: string; texts: unknown; hookStart: unknown; hookEnd: unknown }[]) {
-      const words = hookWords(r.texts, { start: r.hookStart, end: r.hookEnd });
+    for (const r of (data ?? []) as { id: string; texts: unknown; hookStart: unknown; hookEnd: unknown; hookRemoved: unknown }[]) {
+      // Hook deleted in the editor: the video's opening words are its first seconds' texts, not the old hook window.
+      if (r.hookRemoved === true) hookless.add(r.id);
+      const words = hookWords(r.texts, r.hookRemoved === true ? null : { start: r.hookStart, end: r.hookEnd });
       if (words) onScreen.set(r.id, words);
     }
   }
   return exports
-    .map((e) => ({ mediaId: mediaOf(e.value.src) ?? "", title: prefs.names[e.key] || e.runTitle || "Untitled video", hook: (e.runId && onScreen.get(e.runId)) || e.hookText || "", at: e.at, seconds: e.value.seconds, src: e.value.src }))
+    .map((e) => ({ mediaId: mediaOf(e.value.src) ?? "", title: prefs.names[e.key] || e.runTitle || "Untitled video", hook: (e.runId && onScreen.get(e.runId)) || (e.runId && hookless.has(e.runId) ? "" : e.hookText) || "", at: e.at, seconds: e.value.seconds, src: e.value.src }))
     .filter((e) => e.mediaId)
     .sort((a, b) => b.at.localeCompare(a.at));
 }

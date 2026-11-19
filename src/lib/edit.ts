@@ -108,11 +108,14 @@ export function demoClips(run: Run): DemoClip[] {
 
 export const segLen = (s: { start: number; end: number; adjust?: Partial<Adjust> }) => Math.max(0.1, s.end - s.start) / speedOf(s.adjust);
 
-/** The run's timeline: the hook, then the demo clips that have a video. No demo yet = just the hook. */
+/**
+ * The run's timeline: the hook, then the demo clips that have a video. No demo yet = just the hook. A hook deleted in
+ * the editor (hook.removed) is left out, so the video starts on the first demo clip.
+ */
 export function timeline(run: Run, source: Reference | null): Seg[] {
   const h = run.hook;
   const hookSrc = h.generated?.src ?? (h.clip?.mediaId ? `/api/media/${h.clip.mediaId}` : source?.mediaId ? `/api/media/${source.mediaId}` : null);
-  const segs: (Omit<Seg, "offset" | "len" | "parts"> & { parts?: Part[] })[] = [
+  const segs: (Omit<Seg, "offset" | "len" | "parts"> & { parts?: Part[] })[] = h.removed ? [] : [
     h.generated
       ? { id: "hook", label: "Hook", src: hookSrc, seconds: h.generated.seconds, start: h.start ?? 0, end: h.end ?? h.generated.seconds, parts: partsOf({ start: h.start ?? 0, end: h.end ?? h.generated.seconds, parts: h.parts }), adjust: h.adjust, editable: true, gap: 0 }
       : { id: "hook", label: "Hook", src: hookSrc, seconds: h.end ?? 3, start: h.clip ? 0 : (h.start ?? 0), end: h.clip ? Math.max(0.5, (h.end ?? 3) - (h.start ?? 0)) : (h.end ?? 3), editable: false, gap: 0 },
@@ -289,18 +292,41 @@ export function cutOutTexts(texts: TextLayer[], offset: number, len: number): Te
 }
 
 /** Delete a demo and its preceding gap together, or leave that space before its successor. */
-export function removeDemoClip(run: Run, clipId: string, texts: TextLayer[], hold = false): Pick<Run, "demo" | "texts"> {
+export function removeDemoClip(run: Run, clipId: string, texts: TextLayer[], hold = false): Pick<Run, "hook" | "demo" | "texts"> {
   const segs = timeline(run, null);
   const index = segs.findIndex((s) => s.id === clipId);
   const seg = segs[index];
   const after = segs[index + 1];
+  // The last clip on the timeline never goes: a video always has something to play (with the hook deleted, that can
+  // be a demo clip).
+  if (seg && segs.length < 2) return { hook: run.hook, demo: run.demo, texts };
+  // The hook goes like a clip (its texts with it), but stays in the run marked removed: Undo and a new hook bring it
+  // back (founder 2026-11-19: the editor edits anything).
+  const hook = clipId === "hook" && seg ? { ...run.hook, removed: true } : run.hook;
   let clips = demoClips(run).filter((c) => c.id !== clipId);
-  if (!seg) return { demo: { ...run.demo, clips }, texts };
+  if (!seg) return { hook, demo: { ...run.demo, clips }, texts };
   if (hold && after) clips = clips.map((c) => c.id === after.id ? { ...c, gap: roundTime((c.gap ?? 0) + seg.gap + seg.len) } : c);
   const nextTexts = hold
     ? texts.filter((t) => !(t.start >= seg.offset - 0.001 && t.end <= seg.offset + seg.len + 0.001))
     : cutOutTexts(texts, seg.offset - seg.gap, seg.gap + seg.len);
-  return { demo: { ...run.demo, clips }, texts: nextTexts };
+  return { hook, demo: { ...run.demo, clips }, texts: nextTexts };
+}
+
+/**
+ * Room for a deleted hook coming back in front (founder 2026-11-19): it first fills the empty space a magnet-off delete
+ * left before the first clip, and only what is left pushes the clips and every text later. `len` is the hook's length
+ * on the timeline.
+ */
+export function roomForHook(run: Run, len: number, texts: TextLayer[]): Pick<Run, "demo" | "texts"> {
+  const clips = demoClips(run);
+  const first = clips.find((c) => clipSrc(c));
+  const fill = Math.min(Math.max(0, first?.gap ?? 0), len);
+  const push = roundTime(len - fill);
+  const nextClips = fill > 0 ? clips.map((c) => (c === first ? { ...c, gap: roundTime((c.gap ?? 0) - fill) || undefined } : c)) : clips;
+  return {
+    demo: fill > 0 ? { ...run.demo, clips: nextClips } : run.demo,
+    texts: push > 0 ? texts.map((t) => ({ ...t, start: roundTime(t.start + push), end: roundTime(t.end + push) })) : texts,
+  };
 }
 
 /**

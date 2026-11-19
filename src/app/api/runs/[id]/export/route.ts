@@ -62,7 +62,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
     const sent = typeof body.sent === "number" && Number.isFinite(body.sent) ? Math.min(1, Math.max(0, body.sent)) : null;
     return Response.json({ ok: await noteBrowserAlive(who, id, body.job, sent) });
   }
-  if (!run.hook.generated) return Response.json({ error: "Generate the hook first." }, { status: 400 });
+  // A video with its hook deleted in the editor exports its demo clips alone.
+  if (!run.hook.generated && !run.hook.removed) return Response.json({ error: "Generate the hook first." }, { status: 400 });
   const sourceSegments = timeline(run, null).filter(s => s.src);
   const bounds = renderLimitError(sourceSegments, exportLayers(run).length, soundPieces(run, videoLength(sourceSegments)).length, videoLength(sourceSegments));
   if (bounds) return Response.json({ error: bounds }, { status: 400 });
@@ -146,7 +147,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/e
   const {mediaId}=newUpload("video/mp4"), job=randomUUID();
   // The demo part (after the hook) is saved as its own clip too (My files, Demos): its own file id.
   const spec={width:W,height:H,fps:FPS,total,segments,sounds,overlays};
-  const at=demoAt(spec), demoMedia=at!==null?newUpload("video/mp4").mediaId:null;
+  // No hook (deleted in the editor): the whole video is the demo, so no separate demo part.
+  const at=run.hook.removed?null:demoAt(spec), demoMedia=at!==null?newUpload("video/mp4").mediaId:null;
   // Browser export: which picture setting the user's browser used and the rate it reached (browser-export.ts), to check
   // production files (Codex 2026-11-05).
   const encoder=mode==="local"&&typeof body?.encoder==="string"&&/^[\w .-]{1,80}$/.test(body.encoder)?body.encoder:null;

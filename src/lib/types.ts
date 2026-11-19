@@ -276,6 +276,9 @@ export type Run = {
     adjust?: Partial<Adjust>;
     /** Pieces after a Cut (file times, played back to back). Absent = one piece from start to end. */
     parts?: Part[];
+    /** Deleted in the editor: the video starts on the first demo clip (founder 2026-11-19: the editor edits anything).
+     *  The hook itself stays (My files, Undo); a new or replaced hook brings it back. */
+    removed?: boolean;
   };
   demo: {
     /** Older runs: a single demo clip. Newer runs use clips. */

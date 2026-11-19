@@ -18,7 +18,7 @@ import { reconcileGeneration } from "@/lib/generation-edit";
 import { soundPieces } from "@/lib/sound";
 import { deleteSelection, insertClipsChange, partsChange } from "@/lib/edit-ops";
 
-import { type Seg, clipGroup, clipSrc, containTexts, demoClips, moveClipPiece, removeDemoClip, videoLength, remapTexts, retimeTexts, runSteps, shotList, snapTexts, timeline } from "@/lib/edit";
+import { type Seg, clipGroup, clipSrc, containTexts, demoClips, moveClipPiece, removeDemoClip, roomForHook, videoLength, remapTexts, retimeTexts, runSteps, shotList, snapTexts, timeline } from "@/lib/edit";
 
 import { loadFiles } from "@/lib/files-client";
 import { AVATAR_TONES, STALE_RUN_EVENT, abandonCopy, adoptGeneratedVersion, generationFollows, refusedByGeneration, setEditVersion, takeRefusedSections, unsavedSections, TEXT_Y, clipFromAsset, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
@@ -500,7 +500,8 @@ export function RunView() {
 
   const source = refs.find((r) => r.id === run.sourceRefId) ?? null;
   const hook = run.hook;
-  const ready = Boolean(hook.generated) && demoClips(run).some((c) => clipSrc(c));
+  // A video with its hook deleted (hook.removed) exports its demo clips alone.
+  const ready = (Boolean(hook.generated) || Boolean(hook.removed)) && demoClips(run).some((c) => clipSrc(c));
   const texts = runTexts(run);
   const pickHook = async (ref: Reference, from: HookSource = "library") => {
     if (ref.partial) {
@@ -550,6 +551,8 @@ export function RunView() {
     await pickHook(r, "upload");
   };
   const segs = timeline(run, source);
+  // The hook as a clip, also while it is deleted from the video (hook.removed): step 4 still shows and edits it.
+  const hookSeg = segs.find((s) => s.id === "hook") ?? timeline({ ...run, hook: { ...run.hook, removed: undefined } }, source)[0];
   const videoLen = videoLength(segs);
   const hasDemo = demoClips(run).some((c) => clipSrc(c));
   const job = productJob?.runId === run.id ? productJob : null;
@@ -642,17 +645,21 @@ export function RunView() {
   const applyGenerated = (generated: NonNullable<Run["hook"]["generated"]>, text: string, extra: Partial<Run["hook"]> = {}, sourceRefId?: string | null, blankText = false) => {
     const sp = speedOf(hook.adjust);
     const nextSpeed = "adjust" in extra ? speedOf(extra.adjust) : sp;
-    const old = segs[0];
-    const moved = retimeTexts(texts, 0, { start: 0, end: old.len * sp, speed: sp }, { start: 0, end: generated.seconds, speed: nextSpeed });
-    const base = moved.find((x) => x.id === "hook");
     const end = ms(generated.seconds / nextSpeed);
+    // A deleted hook comes back in front: everything moves later by the new hook's length.
+    const room = hook.removed ? roomForHook(run, end, texts) : null;
+    const moved = room
+      ? (room.texts ?? texts)
+      : retimeTexts(texts, 0, { start: 0, end: hookSeg.len * sp, speed: sp }, { start: 0, end: generated.seconds, speed: nextSpeed });
+    const base = hook.removed ? undefined : moved.find((x) => x.id === "hook");
     const item: TextLayer = base
       ? { ...base, text: blankText ? "" : base.text && base.text !== DEFAULT_HOOK_TEXT ? base.text : text }
       : { id: "hook", text: blankText ? "" : text, start: 0, end, x: 50, y: TEXT_Y.top, size: 4.6, font: DEFAULT_FONT, color: "#ffffff", style: "outline" };
     const versions = hook.generated && (hook.generated.src !== generated.src || hook.generated.at !== generated.at) ? [...(hook.versions ?? []), hook.generated].slice(-50) : hook.versions;
     save({
       ...(sourceRefId !== undefined ? { sourceRefId } : {}),
-      hook: { ...hook, ...extra, generated, versions, start: 0, end: generated.seconds, parts: undefined, text: item.text },
+      hook: { ...hook, ...extra, generated, versions, start: 0, end: generated.seconds, parts: undefined, text: item.text, removed: undefined },
+      ...(room ? { demo: room.demo } : {}),
       texts: [item, ...moved.filter((x) => x.id !== "hook")],
     });
   };
@@ -817,8 +824,9 @@ export function RunView() {
   const shiftClip = (clipId: string, to: number) => {
     const i = segs.findIndex((x) => x.id === clipId);
     const seg = segs[i];
-    if (!seg || i <= 0) return;
-    const prevEnd = segs[i - 1].offset + segs[i - 1].len;
+    if (!seg || seg.id === "hook") return;
+    // The first clip (hook deleted) moves from the video's start.
+    const prevEnd = i > 0 ? segs[i - 1].offset + segs[i - 1].len : 0;
     const next = segs[i + 1];
     const at = Math.max(prevEnd, next ? Math.min(to, next.offset - seg.len) : to);
     const d = at - seg.offset;
@@ -844,8 +852,12 @@ export function RunView() {
   };
   const resetDemo = () => {
     if (hasDemo && !confirm("Remove your demo clips?")) return;
-    save({ demo: { ...run.demo, clip: null, mode: undefined, clips: [] }, texts });
+    // A deleted hook comes back: with no demo it is the only thing left to play (texts move after it).
+    if (hook.removed) save({ hook: { ...hook, removed: undefined }, demo: { ...run.demo, clip: null, mode: undefined, clips: [] }, texts: texts.map((x) => ({ ...x, start: ms(x.start + hookSeg.len), end: ms(x.end + hookSeg.len) })) });
+    else save({ demo: { ...run.demo, clip: null, mode: undefined, clips: [] }, texts });
   };
+  /** Puts a hook deleted in the editor back in front; everything after it moves later by its length. */
+  const restoreHook = () => save({ hook: { ...hook, removed: undefined }, ...roomForHook(run, hookSeg.len, texts) });
   const resetHook = () => save({ sourceRefId: null, hook: { ...hook, source: undefined } });
   /** Applies a change to the hook text item (if the user kept it). */
   const withHookText = (p: Partial<TextLayer>) => texts.map((x) => (x.id === "hook" ? { ...x, ...p } : x));
@@ -1058,10 +1070,16 @@ export function RunView() {
             </Block>
 
             <Block n={4} title="Generate your hook" done={stepDone[3]} pending={stepPending[3]} open={openSteps.includes(4)} summary={stepSummary[3]} onToggle={() => toggleStep(4)}>
+              {hook.removed ? (
+                <div className="space-y-3 text-[13px]">
+                  <p className="text-muted">You deleted the hook in the editor, so the video starts on your demo.</p>
+                  <button type="button" onClick={restoreHook} className="btn-primary px-4 py-2 text-[13px]">Put the hook back</button>
+                </div>
+              ) : (
               <GenerateStep
                 run={run}
                 source={source}
-                seg={segs[0]}
+                seg={hookSeg}
                 texts={texts}
                 gen={gen}
                 onGenerate={startGenerate}
@@ -1077,8 +1095,8 @@ export function RunView() {
                 onReplace={() => {
                   // Back to the start of this step (Generate hook, Upload, Check library). The hook stays in My files.
                   if (!hook.generated) return;
-                  const next = { ...hook, generated: undefined, versions: [...(hook.versions ?? []), hook.generated].slice(-50), start: undefined, end: undefined, parts: undefined };
-                  const oldLen = segs[0].len, newLen = timeline({ ...run, hook: next }, source)[0]?.len ?? 0, d = newLen - oldLen;
+                  const next = { ...hook, generated: undefined, versions: [...(hook.versions ?? []), hook.generated].slice(-50), start: undefined, end: undefined, parts: undefined, removed: undefined };
+                  const oldLen = hook.removed ? 0 : hookSeg.len, newLen = timeline({ ...run, hook: next }, source)[0]?.len ?? 0, d = newLen - oldLen;
                   save({ hook: next, texts: texts.map((x) => (x.id !== "hook" && x.start >= oldLen - 0.001 ? { ...x, start: ms(x.start + d), end: ms(x.end + d) } : x.id === "hook" ? { ...x, end: Math.max(0.1, Math.min(x.end, newLen)) } : x)) });
                 }}
                 onRegenerateText={run.product?.brief ? regenerateHookText : undefined}
@@ -1090,6 +1108,7 @@ export function RunView() {
                 onApplyAll={applyTextToAll}
                 onRemove={removeText}
               />
+              )}
             </Block>
 
             <Block n={5} title="Add your demo" done={stepDone[4]} open={openSteps.includes(5)} summary={stepSummary[4]} onToggle={() => toggleStep(5)}>
@@ -1236,7 +1255,7 @@ export function RunView() {
                 const mediaId = demo.src.split("/").pop();
                 const seconds = clipSeconds(demo.seconds);
                 const clip = { id: uid(), label: "Demo", mediaId, name: "Demo", seconds, start: 0, end: seconds };
-                const demoStart = segs[0].len;
+                const demoStart = hook.removed ? 0 : hookSeg.len;
                 save({ demo: { ...run.demo, clip: null, mode: "single", clips: [clip] }, texts: texts.filter((x) => x.id === "hook" || x.start < demoStart - 0.05) });
                 setLibraryOpen(false);
                 setToast("Demo replaced");
