@@ -57,6 +57,9 @@ export const PLANS: Plan[] = [
   },
 ];
 
+/** Business is hidden from pricing and Plans until the service launches (founder 2026-11-21). Set true to show it again. */
+export const SHOW_BUSINESS = false;
+
 /** Business: we run your short-form for you, paid on performance. */
 export const BUSINESS = {
   name: "Business",

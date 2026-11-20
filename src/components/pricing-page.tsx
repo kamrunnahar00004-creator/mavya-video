@@ -5,7 +5,7 @@ import Link from "@/components/pending-link";
 import { ArrowRight, Check, Minus, Plus } from "lucide-react";
 import { ContactDialog } from "@/components/contact-dialog";
 import { MarketingFooter, MarketingHeader, MavyaMark } from "@/components/marketing-chrome";
-import { BUSINESS, PLANS, money, planById, priceOf, type BillingCycle, type Plan } from "@/lib/plans";
+import { BUSINESS, PLANS, SHOW_BUSINESS, money, planById, priceOf, type BillingCycle, type Plan } from "@/lib/plans";
 
 /*
  * The pricing page, laid out like the Etsy Mavya /subscribe page (2026-10-19): centered title, Monthly / Yearly
@@ -27,8 +27,8 @@ const STACK_TOTAL = STACK.reduce((t, x) => t + x.price, 0);
 const MAVYA = planById("pro");
 const usd = (n: number) => `$${n % 1 ? n.toFixed(2) : n}`;
 
-const COLUMNS = [...PLANS.map((p) => p.name), BUSINESS.name];
-const COMPARE: { group: string; rows: { label: string; cells: (string | boolean)[] }[] }[] = [
+const COLUMNS = [...PLANS.map((p) => p.name), ...(SHOW_BUSINESS ? [BUSINESS.name] : [])];
+const ALL_COMPARE: { group: string; rows: { label: string; cells: (string | boolean)[] }[] }[] = [
   {
     group: "Make videos",
     rows: [
@@ -62,7 +62,10 @@ const COMPARE: { group: string; rows: { label: string; cells: (string | boolean)
   },
 ];
 
-const FAQ = [
+/** Without Business: no Done for you group, and each row loses its Business cell. */
+const COMPARE = SHOW_BUSINESS ? ALL_COMPARE : ALL_COMPARE.filter((g) => g.group !== "Done for you").map((g) => ({ ...g, rows: g.rows.map((r) => ({ ...r, cells: r.cells.slice(0, PLANS.length) })) }));
+
+const ALL_FAQ = [
   { q: "What counts as an AI hook?", a: "Each hook Mavya generates with your character. Editing, exporting and reusing a hook you already made are free." },
   { q: "Is there a free plan?", a: "No. Every plan includes AI hooks from day one, so you can post your first video the day you sign up." },
   { q: "How does yearly billing work?", a: "You pay for the year up front: $290, $590 or $990, two months free. Switch between monthly and yearly any time." },
@@ -71,6 +74,8 @@ const FAQ = [
   { q: "What do the Pro and Studio reviews include?", a: "On Pro, our team reviews your week of videos and sends written feedback and hook picks for your app. On Studio, you get your own social media consultant: strategy, hook picks and 1:1 guidance when you need it." },
   { q: "How does Business work?", a: "Send us your website. A dedicated team makes and posts your short-form videos against a monthly views quota agreed up front. If we miss the quota, you don't pay for that month. A minimum applies; contact us for details." },
 ];
+
+const FAQ = SHOW_BUSINESS ? ALL_FAQ : ALL_FAQ.filter((f) => f.q !== "How does Business work?");
 
 const cardBtn = "inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg text-[14.5px] font-semibold transition-colors";
 
@@ -233,9 +238,9 @@ export function PricingPage() {
         </div>
 
         {/* The four cards */}
-        <div className="mt-9 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:items-stretch">
+        <div className={`mt-9 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:items-stretch ${SHOW_BUSINESS ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
           {PLANS.map((plan) => <PlanCard key={plan.id} plan={plan} cycle={cycle} viewer={viewer} />)}
-          <BusinessCard />
+          {SHOW_BUSINESS && <BusinessCard />}
         </div>
         <p className="mt-5 text-center text-[12.5px] text-soft">Plans renew automatically; cancel anytime in Billing.</p>
 

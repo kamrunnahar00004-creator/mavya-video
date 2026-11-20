@@ -7,7 +7,7 @@ import { Check } from "lucide-react";
 import { ContactDialog } from "@/components/contact-dialog";
 import { PlanCards } from "@/components/plan-cards";
 import { BTN_OUTLINE, SettingsPage, billingAction, useAccount, useToast } from "@/components/settings-shell";
-import { BUSINESS, type BillingCycle, type Plan } from "@/lib/plans";
+import { BUSINESS, SHOW_BUSINESS, type BillingCycle, type Plan } from "@/lib/plans";
 
 /**
  * Settings > Plans: monthly / yearly switch, the plan cards with Business last, and a link to the full comparison.
@@ -90,7 +90,7 @@ export function PlansView() {
               </button>
             )
           }
-          extra={
+          extra={SHOW_BUSINESS && (
             <div className="flex flex-col rounded-2xl bg-[#1c2633] p-6 text-white">
               <h3 className="text-[18px] font-bold text-white!">{BUSINESS.name}</h3>
               <p className="mt-4 text-[30px] font-semibold leading-none tracking-[-0.03em]">{BUSINESS.price}</p>
@@ -110,7 +110,7 @@ export function PlansView() {
                 </ul>
               </div>
             </div>
-          }
+          )}
         />
       </div>
       <p className="mt-6 text-[13.5px] text-muted">
