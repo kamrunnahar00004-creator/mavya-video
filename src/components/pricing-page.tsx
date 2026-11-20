@@ -5,7 +5,7 @@ import Link from "@/components/pending-link";
 import { ArrowRight, Check, Minus, Plus } from "lucide-react";
 import { ContactDialog } from "@/components/contact-dialog";
 import { MarketingFooter, MarketingHeader, MavyaMark } from "@/components/marketing-chrome";
-import { BUSINESS, PLANS, SHOW_BUSINESS, money, planById, priceOf, type BillingCycle, type Plan } from "@/lib/plans";
+import { BUSINESS, PLANS, SHOW_BUSINESS, TRIAL, money, planById, priceOf, trialTerms, type BillingCycle, type Plan } from "@/lib/plans";
 
 /*
  * The pricing page, laid out like the Etsy Mavya /subscribe page (2026-10-19): centered title, Monthly / Yearly
@@ -67,7 +67,7 @@ const COMPARE = SHOW_BUSINESS ? ALL_COMPARE : ALL_COMPARE.filter((g) => g.group 
 
 const ALL_FAQ = [
   { q: "What counts as an AI hook?", a: "Each hook Mavya generates with your character. Editing, exporting and reusing a hook you already made are free." },
-  { q: "Is there a free plan?", a: "No. Every plan includes AI hooks from day one, so you can post your first video the day you sign up." },
+  { q: "Is there a free trial?", a: `Yes. New accounts get ${TRIAL.days} days free with ${TRIAL.hooks} AI hooks on any plan. Add a card to start; cancel in Billing before the trial ends and you pay nothing.` },
   { q: "How does yearly billing work?", a: "You pay for the year up front: $290, $590 or $990, two months free. Switch between monthly and yearly any time." },
   { q: "Can I change plans?", a: "Yes, any time from Billing. Upgrades start right away." },
   { q: "Can I cancel?", a: "Yes, any time from Billing. Your plan keeps working until the end of the period you paid for." },
@@ -100,7 +100,7 @@ function FeatureList({ lead, items, strong }: { lead?: string; items: string[]; 
  * Signed out: the buttons lead to sign-up. Signed in without a plan: straight to Stripe Checkout. With a plan:
  * Settings > Plans, where plan changes live.
  */
-type Viewer = { kind: "loading" | "error" | "out" | "none" | "billing" } | { kind: "plan"; plan: string };
+type Viewer = { kind: "loading" | "error" | "out" | "billing" } | { kind: "none"; trial: boolean } | { kind: "plan"; plan: string };
 function useViewer(): Viewer {
   const [viewer, setViewer] = useState<Viewer>({ kind: "loading" });
   useEffect(() => {
@@ -110,8 +110,8 @@ function useViewer(): Viewer {
         if (!alive) return;
         if (r.status === 401) return setViewer({ kind: "out" });
         if (!r.ok) throw new Error("Usage unavailable");
-        const u = (await r.json()) as { plan?: string | null; limit?: number | null; billingStatus?: string | null };
-        setViewer(u.plan ? { kind: "plan", plan: u.plan } : u.limit === null ? { kind: "plan", plan: "admin" } : u.billingStatus === "past_due" ? { kind: "billing" } : { kind: "none" });
+        const u = (await r.json()) as { plan?: string | null; limit?: number | null; billingStatus?: string | null; trialEligible?: boolean };
+        setViewer(u.plan ? { kind: "plan", plan: u.plan } : u.limit === null ? { kind: "plan", plan: "admin" } : u.billingStatus === "past_due" ? { kind: "billing" } : { kind: "none", trial: Boolean(u.trialEligible) });
       })
       .catch(() => alive && setViewer({ kind: "error" }));
     return () => {
@@ -121,7 +121,7 @@ function useViewer(): Viewer {
   return viewer;
 }
 
-function PlanButton({ plan, cycle, viewer }: { plan: Plan; cycle: BillingCycle; viewer: Viewer }) {
+export function PlanButton({ plan, cycle, viewer }: { plan: Plan; cycle: BillingCycle; viewer: Viewer }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cls = `${cardBtn} mt-5 ${plan.popular ? "bg-accent text-white hover:bg-accent-hover" : "bg-text text-white hover:opacity-90"}`;
@@ -135,11 +135,16 @@ function PlanButton({ plan, cycle, viewer }: { plan: Plan; cycle: BillingCycle; 
       </Link>
     );
   }
+  // A new account starts with the free trial; Stripe Checkout shows the same terms before the card is taken.
+  const terms = <p className="mt-2 text-center text-[12.5px] text-soft">{trialTerms(plan, cycle)}</p>;
   if (viewer.kind !== "none") {
     return (
-      <Link href="/?auth=signup&next=%2Fpricing" scroll={false} className={cls}>
-        Choose {plan.name}
-      </Link>
+      <>
+        <Link href="/?auth=signup&next=%2Fpricing" scroll={false} className={cls}>
+          Start free trial
+        </Link>
+        {terms}
+      </>
     );
   }
   async function checkout() {
@@ -158,8 +163,9 @@ function PlanButton({ plan, cycle, viewer }: { plan: Plan; cycle: BillingCycle; 
   return (
     <>
       <button type="button" disabled={busy} onClick={() => void checkout()} className={`${cls} cursor-pointer disabled:opacity-60`}>
-        {busy ? "Opening checkout..." : `Choose ${plan.name}`}
+        {busy ? "Opening checkout..." : viewer.trial ? "Start free trial" : `Choose ${plan.name}`}
       </button>
+      {viewer.trial && terms}
       {error && <p role="alert" className="mt-2 text-[12.5px] font-semibold text-red-700">{error}</p>}
     </>
   );

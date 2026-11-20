@@ -11,9 +11,22 @@ export async function clearPendingChange(sub: Stripe.Subscription) {
 export async function changeSubscription(sub: Stripe.Subscription, plan: PlanId, cycle: BillingCycle, user: string) {
  const item = sub.items.data[0];
  const old = planOfPrice(item?.price.id);
- if (!old || sub.items.data.length !== 1 || item.quantity !== 1 || sub.status !== "active" || sub.pending_update || sub.pause_collection || sub.collection_method !== "charge_automatically") throw new Error("This subscription needs support to change.");
+ if (!old || sub.items.data.length !== 1 || item.quantity !== 1 || !["active", "trialing"].includes(sub.status) || sub.pending_update || sub.pause_collection || sub.collection_method !== "charge_automatically") throw new Error("This subscription needs support to change.");
  const price = priceFor(plan, cycle);
  if (price === item.price.id) { await clearPendingChange(sub); return { sub: await stripe().subscriptions.retrieve(sub.id), scheduled: false }; }
+ if (sub.status === "trialing") {
+  // Free trial: nothing has been paid, so any plan or cycle switches now and the trial keeps its end date. The first
+  // charge is the new price when the trial ends; no proration, no invoice now.
+  if (!sub.trial_end || sub.trial_end <= Date.now() / 1000) throw new Error("Trial period needs recovery");
+  // A cancelled trial stays cancelled (only Resume undoes it). No idempotency key: setting a price is safe to repeat,
+  // and a key per price pair would replay a stale answer after switching A to B, back to A, then to B again.
+  await clearPendingChange(sub);
+  const updated = await stripe().subscriptions.update(sub.id, {
+   items: [{ id: item.id, price }], proration_behavior: "none", trial_end: sub.trial_end, metadata: { user_id: user },
+  });
+  if (updated.items.data[0]?.price.id !== price) throw new Error("Trial change needs recovery");
+  return { sub: await stripe().subscriptions.retrieve(sub.id), scheduled: false };
+ }
  const deferred = cycle !== old.cycle || planById(plan).hooks < planById(old.plan).hooks;
  if (deferred) {
   const period = subscriptionPeriod(sub);

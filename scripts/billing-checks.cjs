@@ -40,7 +40,7 @@ async function main() {
   };
   const stripeStub = {stripe:()=>stripeClient,stripeEnabled:()=>true,priceFor:()=> 'price_fixture',subscriptionRow:(user,sub,time)=>({...sub,user_id:user,stripe_subscription_id:sub.id,last_event_created:time})};
   const supabase = {createSupabaseAdminClient:()=>db,getSessionUser:async()=>({id:'owner',email:'owner@fixture.invalid'})};
-  const state = load('src/lib/server/billing-state.ts',{'@/lib/supabase/server':supabase,'@/lib/server/stripe':stripeStub});
+  const state = load('src/lib/server/billing-state.ts',{'@/lib/supabase/server':supabase,'@/lib/server/stripe':stripeStub,'@/lib/plans':{TRIAL:{days:3,hooks:3}}});
   const checkout = (email='owner@fixture.invalid',origin='https://app.fixture.invalid')=>state.withBillingLock('owner',token=>state.pendingCheckout({id:'owner',email},token,null,'starter','monthly',origin));
   createError=true; await assert.rejects(checkout());
   const first = calls.find(c=>c[0]==='create'); assert.ok(pending); assert.equal(locked,false);

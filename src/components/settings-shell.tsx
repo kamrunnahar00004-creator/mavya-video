@@ -87,7 +87,7 @@ export function SettingsPage({ title, subtitle, wide, aside, children }: { title
 /** One date format on server and browser (a locale default would differ and break hydration). */
 export const formatDate = (d: Date | string, month: "long" | "short" = "long") => new Date(d).toLocaleDateString("en-US", { month, day: "numeric", year: "numeric" });
 
-export type Usage = { plan: PlanId | null; admin: boolean; used: number; limit: number | null; resetsAt: string | null; billingStatus?: string | null };
+export type Usage = { plan: PlanId | null; admin: boolean; used: number; limit: number | null; resetsAt: string | null; billingStatus?: string | null; trial?: boolean; trialEligible?: boolean };
 export type Subscription = { plan: PlanId; cycle: BillingCycle | null; status: string; periodEnd: string | null; cancelAtPeriodEnd: boolean; pendingChange?: { plan: PlanId; cycle: BillingCycle; at: string } | null };
 export type Billing = {
   enabled: boolean;

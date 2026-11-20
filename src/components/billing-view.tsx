@@ -59,7 +59,7 @@ export function BillingView() {
     if (error) setToast(error);
     else if (action === "cancel" || action === "resume") {
       await reload();
-      setToast(action === "cancel" ? "Your plan will end at the end of this period." : "Your plan will renew.");
+      setToast(action === "cancel" ? (sub?.status === "trialing" ? "Your trial will end. You won't be charged." : "Your plan will end at the end of this period.") : "Your plan will renew.");
     }
     setBusy(null);
   };
@@ -67,6 +67,8 @@ export function BillingView() {
   const card = "mt-6 rounded-2xl border border-line bg-panel";
   const ends = sub?.periodEnd ? formatDate(sub.periodEnd) : null;
   const pastDue = sub?.status === "past_due";
+  // Free trial: no charge yet. The first charge is on the trial end date unless it is cancelled (then nothing is charged).
+  const trialing = sub?.status === "trialing";
 
   return (
     <SettingsPage title="Billing" subtitle="Manage your subscription and payment details">
@@ -97,6 +99,8 @@ export function BillingView() {
                   {plan.name} plan
                   {pastDue ? (
                     <span className="rounded-md bg-red-50 px-2 py-0.5 text-[12px] font-bold text-red-700">Payment due</span>
+                  ) : trialing ? (
+                    <span className="rounded-md bg-accent-tint px-2 py-0.5 text-[12px] font-bold text-accent">Free trial</span>
                   ) : sub.cancelAtPeriodEnd ? (
                     <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[12px] font-bold text-amber-800">Ending</span>
                   ) : (
@@ -104,8 +108,14 @@ export function BillingView() {
                   )}
                 </p>
                 <p className="mt-0.5 text-[13.5px] text-muted">
-                  {sub.cycle === "annual" ? `$${plan.yearly} a year` : `$${plan.price} a month`}
-                  {ends && (sub.cancelAtPeriodEnd ? ` · Ends on ${ends}` : ` · Renews on ${ends}`)}
+                  {trialing && ends
+                    ? sub.cancelAtPeriodEnd
+                      ? `Trial ends on ${ends}. You won't be charged.`
+                      : `Trial ends on ${ends}, then ${sub.cycle === "annual" ? `$${plan.yearly} a year` : `$${plan.price} a month`}`
+                    : <>
+                        {sub.cycle === "annual" ? `$${plan.yearly} a year` : `$${plan.price} a month`}
+                        {ends && (sub.cancelAtPeriodEnd ? ` · Ends on ${ends}` : ` · Renews on ${ends}`)}
+                      </>}
                 </p>
                 {sub.pendingChange && <p className="mt-0.5 text-[13.5px] text-muted">{planById(sub.pendingChange.plan).name} ({sub.pendingChange.cycle === "annual" ? "yearly" : "monthly"}) starts on {formatDate(sub.pendingChange.at)}.</p>}
               </div>

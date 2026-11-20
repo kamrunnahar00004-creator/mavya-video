@@ -24,6 +24,14 @@ export type Plan = {
   popular?: boolean;
 };
 
+/**
+ * Free trial (founder 2026-11-21): new accounts only, card required at Stripe Checkout, charged when it ends unless
+ * cancelled. While trialing the AI hook limit is TRIAL.hooks on every plan (also in migration 0021 mavya_allowance).
+ */
+export const TRIAL = { days: 3, hooks: 3 } as const;
+/** The line under a trial button, e.g. "3 days free, then $29/mo". */
+export const trialTerms = (p: Plan, cycle: BillingCycle) => `${TRIAL.days} days free, then ${cycle === "annual" ? `$${p.yearly}/yr` : `$${p.price}/mo`}`;
+
 export const PLANS: Plan[] = [
   {
     id: "starter",

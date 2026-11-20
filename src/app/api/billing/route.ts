@@ -4,7 +4,7 @@ import { PLANS, type BillingCycle } from "@/lib/plans";
 import { planOfPrice, stripe, stripeEnabled } from "@/lib/server/stripe";
 import { changeSubscription, clearPendingChange } from "@/lib/server/billing-change";
 import { getSessionUser } from "@/lib/supabase/server";
-import { applyBillingAction, BillingBusy, billingRow, pendingCheckout, withBillingLock, type BillingRow } from "@/lib/server/billing-state";
+import { applyBillingAction, BillingBusy, billingRow, pendingCheckout, trialEligible, withBillingLock, type BillingRow } from "@/lib/server/billing-state";
 
 export const maxDuration = 120;
 
@@ -12,7 +12,7 @@ export const maxDuration = 120;
  * Settings > Billing and Plans.
  * GET: the plan (from our `subscriptions`, written by the webhook), the card on file and the invoices (from Stripe).
  * POST {action}:
- *   "checkout" {plan, cycle}  -> {url}  Stripe Checkout for a first plan
+ *   "checkout" {plan, cycle}  -> {url}  Stripe Checkout for a first plan (a free trial for an account that never had one)
  *   "change"   {plan, cycle}  -> {ok}   collect same-cycle upgrades; schedule other changes at renewal
  *   "cancel"                  -> {ok}   ends at the period end; access stays until then
  *   "resume"                  -> {ok}   undo a cancel before it ends
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
   if (!stripeEnabled()) return Response.json({ error: "Checkout is not connected yet." }, { status: 503 });
   const user = await getSessionUser();
   if (!user) return Response.json({ error: "Sign in first." }, { status: 401 });
-  const body = (await request.json().catch(() => null)) as { action?: unknown; plan?: unknown; cycle?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { action?: unknown; plan?: unknown; cycle?: unknown; expect?: unknown } | null;
   const origin = new URL(request.url).origin;
   const plan = PLANS.find((p) => p.id === body?.plan)?.id;
   const cycle: BillingCycle = body?.cycle === "annual" ? "annual" : "monthly";
@@ -92,11 +92,13 @@ export async function POST(request: Request) {
         case "checkout": {
           if (!plan) return Response.json({ error: "Pick a plan." }, { status: 400 });
           if (live(row)) return Response.json({ error: "You already have a plan. Change it instead." }, { status: 409 });
-          return Response.json({ url: await pendingCheckout(user, token, row, plan, cycle, origin) });
+          return Response.json({ url: await pendingCheckout(user, token, row, plan, cycle, origin, await trialEligible(user.id)) });
         }
         case "change": {
           if (!plan || !live(row)) return Response.json({ error: "Pick a plan." }, { status: 400 });
           const sub = await stripe().subscriptions.retrieve(row!.stripe_subscription_id!);
+          // Confirmed as a free trial switch, but the trial ended meanwhile: never charge on that confirmation.
+          if (body.expect === "trialing" && sub.status !== "trialing") return Response.json({ error: "Your trial has ended. Review the change again." }, { status: 409 });
           const changed = await changeSubscription(sub, plan, cycle, user.id);
           if (!changed.scheduled) await applyBillingAction(user.id, token, row!, changed.sub);
           return Response.json({ ok: true, scheduled: changed.scheduled });

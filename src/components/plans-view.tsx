@@ -7,7 +7,7 @@ import { Check } from "lucide-react";
 import { ContactDialog } from "@/components/contact-dialog";
 import { PlanCards } from "@/components/plan-cards";
 import { BTN_OUTLINE, SettingsPage, billingAction, useAccount, useToast } from "@/components/settings-shell";
-import { BUSINESS, SHOW_BUSINESS, type BillingCycle, type Plan } from "@/lib/plans";
+import { BUSINESS, SHOW_BUSINESS, trialTerms, type BillingCycle, type Plan } from "@/lib/plans";
 
 /**
  * Settings > Plans: monthly / yearly switch, the plan cards with Business last, and a link to the full comparison.
@@ -15,7 +15,9 @@ import { BUSINESS, SHOW_BUSINESS, type BillingCycle, type Plan } from "@/lib/pla
  */
 export function PlansView() {
   const router = useRouter();
-  const { billing, plan: current, loaded, error, reload } = useAccount({ billing: true });
+  const { usage, billing, plan: current, loaded, error, reload } = useAccount({ billing: true });
+  const trial = !current && Boolean(usage?.trialEligible);
+  const trialing = billing?.subscription?.status === "trialing";
   const currentCycle = billing?.subscription?.cycle ?? "monthly";
   const [cycle, setCycle] = useState<BillingCycle | null>(null);
   const shown = cycle ?? currentCycle;
@@ -28,9 +30,11 @@ export function PlansView() {
 
   const choose = async (p: Plan) => {
     setBusy(p.id);
-    const error = await billingAction(current ? "change" : "checkout", { plan: p.id, cycle: shown });
+    const error = await billingAction(current ? "change" : "checkout", { plan: p.id, cycle: shown, ...(current && trialing ? { expect: "trialing" } : {}) });
     if (error) {
       setToast(error);
+      // A refused change may mean the plan moved on (a trial that just converted): show the current terms again.
+      if (current) await reload();
       setBusy(null);
       return;
     }
@@ -65,7 +69,7 @@ export function PlansView() {
   );
 
   const label = (p: Plan) => {
-    if (!current) return `Choose ${p.name}`;
+    if (!current) return trial ? "Start free trial" : `Choose ${p.name}`;
     if (p.id === current.id) return shown === "annual" ? "Switch to yearly" : "Switch to monthly";
     return p.price > current.price ? "Upgrade" : "Downgrade";
   };
@@ -90,6 +94,7 @@ export function PlansView() {
               </button>
             )
           }
+          below={(p) => trial && <p className="mt-2 text-center text-[12.5px] text-soft">{trialTerms(p, shown)}</p>}
           extra={SHOW_BUSINESS && (
             <div className="flex flex-col rounded-2xl bg-[#1c2633] p-6 text-white">
               <h3 className="text-[18px] font-bold text-white!">{BUSINESS.name}</h3>
@@ -122,7 +127,7 @@ export function PlansView() {
           <div role="alertdialog" aria-modal="true" aria-labelledby="change-title" className="w-full max-w-[420px] rounded-2xl bg-panel p-6 shadow-[0_24px_64px_-16px_rgba(21,18,31,0.45)]">
             <h2 id="change-title" className="text-[19px] font-bold">Switch to {confirm.name}?</h2>
             <p className="mt-2 text-[14px] text-muted">
-              {shown === "annual" ? `$${confirm.yearly} a year` : `$${confirm.price} a month`}. {shown !== currentCycle || confirm.hooks < current.hooks ? "Starts at your next renewal." : confirm.id === current.id ? "Your scheduled change will be cleared." : "The prorated difference is charged now."}
+              {shown === "annual" ? `$${confirm.yearly} a year` : `$${confirm.price} a month`}. {trialing ? "Switches now. Nothing is charged until your trial ends." : shown !== currentCycle || confirm.hooks < current.hooks ? "Starts at your next renewal." : confirm.id === current.id ? "Your scheduled change will be cleared." : "The prorated difference is charged now."}
             </p>
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={() => setConfirm(null)} className={BTN_OUTLINE}>

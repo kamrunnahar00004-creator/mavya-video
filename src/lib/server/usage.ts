@@ -4,7 +4,7 @@ import { cloud } from "@/lib/server/store";
 import { createSupabaseAdminClient, getSessionUser } from "@/lib/supabase/server";
 import type { BillingCycle, PlanId } from "@/lib/plans";
 
-export type Allowance = { plan: PlanId | null; admin: boolean; used: number; limit: number | null; resetsAt: string | null };
+export type Allowance = { plan: PlanId | null; admin: boolean; used: number; limit: number | null; resetsAt: string | null; trial?: boolean };
 
 /**
  * Unlimited use for the accounts in ADMIN_USER_IDS (the founder). By user id, never by email: email sign-up is not
