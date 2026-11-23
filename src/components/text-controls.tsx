@@ -8,7 +8,7 @@ import { FONT_CHOICES, fontCss, fontLabel, loadFonts } from "@/lib/studio-data";
 
 
 
-import { STYLE_GROUPS, STYLE_PRESETS, autoSecond, stylePreset } from "@/lib/text-styles";
+import { STYLE_GROUPS, STYLE_PRESETS, autoSecond, previewSecond, stylePreset } from "@/lib/text-styles";
 
 import { type TextLayer } from "@/lib/types";
 
@@ -85,8 +85,8 @@ export function TextRow({ t, placeholder, onPatch, onAdd, onRemove, onApplyAll, 
                     <div className="px-1 pb-1.5 text-[11.5px] font-semibold text-soft">{g}</div>
                     <div className="grid grid-cols-4 gap-2">
                       {STYLE_PRESETS.filter((p) => p.group === g).map((p) => {
-                        // Previews use fixed, high-contrast demo colors so every outline / box / glow is visible.
-                        const look = p.look("#ffffff", t.second ?? "#7b4cfa");
+                        // White demo letters with the text's own second color, made dark when it is too light to see.
+                        const look = p.look("#ffffff", previewSecond(t.second));
                         const on = t.style === p.id;
                         return (
                           <button

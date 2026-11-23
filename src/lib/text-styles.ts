@@ -90,3 +90,18 @@ export function autoSecond(fg: string): string {
 export function textLook(styleId: string, fg: string, second?: string): Look {
   return stylePreset(styleId).look(fg, second ?? autoSecond(fg));
 }
+
+/**
+ * The second color for the style picker's previews (founder 2026-11-23: with a white outline color every preview was
+ * white on white). The text's own second color, unless it is too light to show against the white demo letters,
+ * then near-black; purple when none is set.
+ */
+export function previewSecond(second: string | undefined): string {
+  if (!second) return "#7b4cfa";
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(second.trim());
+  if (!m) return second;
+  const hex = m[1].length === 3 ? m[1].replace(/./g, (c) => c + c) : m[1];
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance > 0.6 ? "#111111" : second;
+}
