@@ -12,6 +12,7 @@ import { waveform } from "@/lib/waveform";
 
 
 
+import { clipTexts } from "@/lib/clip-lane";
 import { ADJUST_ROWS, type Adjust, type AdjustRow, type Motion, NO_ADJUST, fullAdjust, isAdjusted, keyAt, motionAt, moveKey, panBy, setMotion, speedOf, toggleKey, videoStyle } from "@/lib/adjust";
 import { activeGroup, pasteGroupLayers, toggleInGroup } from "@/lib/selection";
 import { audioLength, pieceEnd, refSoundSrc, rowBounds, rowOf, soundName, soundPieces, soundRows } from "@/lib/sound";
@@ -245,9 +246,9 @@ export function ClipEditor({ seg, version, texts, cover, overlay, side, firstTex
     window.addEventListener("pointerup", up);
   }
 
-  // This clip's texts (anything overlapping its part of the timeline), in clip time.
-  const mine = texts.filter((x) => x.end > offset + 0.05 && x.start < offset + len - 0.05);
-  const local = mine.map((x) => ({ ...x, start: Math.max(0, x.start - offset), end: Math.min(len, x.end - offset) }));
+  // This clip's texts, in clip time: not one that only grazes its edge (src/lib/clip-lane.ts).
+  const local = clipTexts(texts, offset, len);
+  const mine = texts.filter((x) => local.some((l) => l.id === x.id));
   // To the millisecond, like the clip itself: an added text covers exactly this clip.
   const span: [number, number] = [Math.round(offset * 1000) / 1000, Math.round((offset + len) * 1000) / 1000];
 
@@ -3026,7 +3027,8 @@ function ClipControls({ label, src, speed = 1, playing, onPlay, t, len, pieces, 
         {texts.length > 0 && (
           <div className="mt-1 space-y-1">
             {texts.map((x) => (
-              <div key={x.id} className="relative h-6 rounded-md bg-raised/70" onPointerDown={(e) => track(e, onSeek)}>
+              // overflow-hidden: a bar never hangs past the end of its lane (founder 2026-11-23).
+              <div key={x.id} className="relative h-6 overflow-hidden rounded-md bg-raised/70" onPointerDown={(e) => track(e, onSeek)}>
                 <div
                   onPointerDown={(e) => dragText(e, x, "move")}
                   title="Drag to move. Drag the ends to make it longer or shorter."
