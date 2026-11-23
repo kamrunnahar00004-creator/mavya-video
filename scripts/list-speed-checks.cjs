@@ -62,7 +62,8 @@ finish('list-speed-checks', EXPECTED, () => checks, async () => {
   const route = src('src/app/api/media/[id]/thumb/route.ts');
   ok(/mediaAccess\(id, who\)/.test(route) && /signInFirst\(\)/.test(route), 'only the owner gets the picture');
   ok(/max-age=82800, immutable/.test(route), 'the browser keeps it');
-  ok(/oldMasterKey\(id\)\]\), \.\.\.d\.media_ids\.map\(thumbKey\)\];/.test(src('src/lib/server/account-deletion.ts')), 'deleting the account deletes the pictures, added after the existing keys (a deletion under way keeps its place)');
+  // Keys only ever appended (the browser-copy markers came after the pictures, 2026-11-23).
+  ok(/oldMasterKey\(id\)\]\), \.\.\.d\.media_ids\.map\(thumbKey\), \.\.\.d\.media_ids\.map\(copyingKey\)\];/.test(src('src/lib/server/account-deletion.ts')), 'deleting the account deletes the pictures, added after the existing keys (a deletion under way keeps its place)');
   const cfg = src('next.config.ts');
   ok(/"\/api\/media\/\*\/thumb": \["\.\/node_modules\/ffmpeg-static\/ffmpeg"\]/.test(cfg) && /"\/api\/uploads": \["\.\/node_modules\/ffmpeg-static\/ffmpeg"\]/.test(cfg), 'ffmpeg ships with the routes that make pictures');
   ok(/thumbLink\(done\.mediaId\)/.test(src('src/app/api/uploads/route.ts')), 'an upload gets its picture right away');

@@ -27,13 +27,25 @@ export async function uploadFile(file: File, asAsset: boolean, purpose?: "export
   if (start.status !== 501) {
     const s = (await start.json().catch(() => ({}))) as { mediaId?: string; url?: string; error?: string };
     if (!start.ok || !s.mediaId || !s.url) throw new Error(s.error ?? "Upload failed");
-    const put = await fetch(s.url, { method: "PUT", headers: { "content-type": file.type }, body: file, signal }).catch(() => null);
-    signal?.throwIfAborted();
-    if (!put?.ok) throw new Error("Upload failed. Check your connection and try again.");
-    const done = await fetch("/api/uploads", json({ step: "finish", mediaId: s.mediaId, mime: file.type, name: file.name, asset: asAsset }));
-    const d = (await done.json().catch(() => ({}))) as { mediaId?: string; error?: string };
-    if (!done.ok || !d.mediaId) throw new Error(d.error ?? "Upload failed");
-    return { mediaId: d.mediaId, mime: file.type };
+    // A video's copies are made in this browser while it uploads (src/lib/browser-copies.ts); the server makes them
+    // when the browser cannot. Loaded only for videos.
+    // Its own switch: a failed or cancelled upload stops the copies too (Codex 2026-11-23).
+    const stop = new AbortController();
+    signal?.addEventListener("abort", () => stop.abort(), { once: true });
+    const copying = file.type.startsWith("video/") && !purpose ? import("@/lib/browser-copies").then((m) => (m.copiesPossible() ? m.queueCopies(file, stop.signal) : null)).catch(() => null) : null;
+    try {
+      const put = await fetch(s.url, { method: "PUT", headers: { "content-type": file.type }, body: file, signal }).catch(() => null);
+      signal?.throwIfAborted();
+      if (!put?.ok) throw new Error("Upload failed. Check your connection and try again.");
+      const done = await fetch("/api/uploads", json({ step: "finish", mediaId: s.mediaId, mime: file.type, name: file.name, asset: asAsset, ...(copying ? { copies: "browser" } : {}) }));
+      const d = (await done.json().catch(() => ({}))) as { mediaId?: string; error?: string };
+      if (!done.ok || !d.mediaId) throw new Error(d.error ?? "Upload failed");
+      if (copying) void deliverCopies(d.mediaId, file.type, copying, stop.signal);
+      return { mediaId: d.mediaId, mime: file.type };
+    } catch (error) {
+      stop.abort();
+      throw error;
+    }
   }
   const form = new FormData();
   form.append("file", file);
@@ -42,6 +54,32 @@ export async function uploadFile(file: File, asAsset: boolean, purpose?: "export
   const data = (await res.json()) as { mediaId?: string; mime?: string; error?: string };
   if (!res.ok || !data.mediaId) throw new Error(data.error ?? "Upload failed");
   return { mediaId: data.mediaId, mime: data.mime ?? file.type };
+}
+
+/**
+ * Uploads the browser's copies of a video (after the original is in), or hands the job to the server when there are
+ * none or anything fails on the way. Runs in the background; never throws.
+ */
+export async function deliverCopies(mediaId: string, mime: string, copying: Promise<{ preview: Blob; master: Blob } | null>, signal?: AbortSignal): Promise<"browser" | "server"> {
+  const post = (body: unknown) => fetch("/api/uploads", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mediaId, mime, ...(body as object) }) });
+  const toServer = async () => { await post({ step: "server-copy" }).catch(() => undefined); return "server" as const; };
+  try {
+    const copies = await copying;
+    if (!copies || signal?.aborted) return toServer();
+    const links = await post({ step: "copies", previewSize: copies.preview.size, masterSize: copies.master.size });
+    const l = (await links.json().catch(() => null)) as { preview?: string; master?: string; attempt?: string; ready?: boolean } | null;
+    if (l?.ready) return "browser";
+    if (!links.ok || !l?.preview || !l.master || !l.attempt) return toServer();
+    const sent = await Promise.all([
+      fetch(l.master, { method: "PUT", headers: { "content-type": "video/mp4" }, body: copies.master, signal }),
+      fetch(l.preview, { method: "PUT", headers: { "content-type": "video/mp4" }, body: copies.preview, signal }),
+    ]).catch(() => null);
+    if (!sent || !sent.every((r) => r.ok)) return toServer();
+    const done = await post({ step: "copies-done", attempt: l.attempt });
+    return done.ok ? "browser" : "server";
+  } catch {
+    return toServer();
+  }
 }
 
 export function videoLength(mediaId: string): Promise<number | null> {

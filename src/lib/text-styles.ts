@@ -94,10 +94,10 @@ export function textLook(styleId: string, fg: string, second?: string): Look {
 /**
  * The second color for the style picker's previews (founder 2026-11-23: with a white outline color every preview was
  * white on white). The text's own second color, unless it is too light to show against the white demo letters,
- * then near-black; purple when none is set.
+ * then near-black; undefined when none is set (the picker's own demo color, text-controls.tsx).
  */
-export function previewSecond(second: string | undefined): string {
-  if (!second) return "#7b4cfa";
+export function previewSecond(second: string | undefined): string | undefined {
+  if (!second) return undefined;
   const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(second.trim());
   if (!m) return second;
   const hex = m[1].length === 3 ? m[1].replace(/./g, (c) => c + c) : m[1];

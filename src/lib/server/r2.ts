@@ -100,10 +100,10 @@ export function signedGet(key: string, seconds = 3600, download?: string): Promi
 export function signedPut(key: string, contentType: string, seconds = 900, size?: number): Promise<string> {
   return getSignedUrl(r2(), new PutObjectCommand({ Bucket: Bucket(), Key: key, ContentType: contentType, ...(size === undefined ? {} : { ContentLength: size }) }), { expiresIn: seconds });
 }
-export async function objectInfo(key: string): Promise<{size: number; mime: string; etag: string} | null> {
+export async function objectInfo(key: string): Promise<{size: number; mime: string; etag: string; modified?: number} | null> {
  try {
   const h = await r2().send(new HeadObjectCommand({ Bucket: Bucket(), Key: key }));
-  return { size: h.ContentLength ?? 0, mime: h.ContentType ?? "", etag: h.ETag ?? "" };
+  return { size: h.ContentLength ?? 0, mime: h.ContentType ?? "", etag: h.ETag ?? "", modified: h.LastModified ? h.LastModified.getTime() : undefined };
  } catch (error) {
   if ((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404) return null;
   throw error;

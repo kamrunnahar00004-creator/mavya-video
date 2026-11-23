@@ -396,6 +396,13 @@ export async function mediaAccess(mediaId: string, who: string): Promise<{ mime:
   return { mime: data.mime, size: data.size };
 }
 
+/** A stored file this user owns themselves (never shared library media): its type, or null. */
+export async function ownMedia(mediaId: string, who: string): Promise<{ mime: string; size: number } | null> {
+  if (!isMediaId(mediaId) || !cloud()) return null;
+  const { data } = await db().from("media").select("user_id, mime, size").eq("id", mediaId).maybeSingle<{ user_id: string | null; mime: string; size: number }>();
+  return data && data.user_id === who ? { mime: data.mime, size: data.size } : null;
+}
+
 /** Local: the file on disk (streamed by /api/media). Cloud: null; use mediaLink. */
 export function localMediaPath(mediaId: string): string | null {
   return cloud() || !isMediaId(mediaId) ? null : path.join(MEDIA_DIR, mediaId);

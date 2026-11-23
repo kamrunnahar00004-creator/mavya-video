@@ -86,7 +86,7 @@ export function TextRow({ t, placeholder, onPatch, onAdd, onRemove, onApplyAll, 
                     <div className="grid grid-cols-4 gap-2">
                       {STYLE_PRESETS.filter((p) => p.group === g).map((p) => {
                         // White demo letters with the text's own second color, made dark when it is too light to see.
-                        const look = p.look("#ffffff", previewSecond(t.second));
+                        const look = p.look("#ffffff", previewSecond(t.second) ?? "#7b4cfa");
                         const on = t.style === p.id;
                         return (
                           <button

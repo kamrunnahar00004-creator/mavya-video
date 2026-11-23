@@ -9,9 +9,9 @@ const ok = (c, m) => { n++; assert.ok(c, m); };
 ok(previewSecond('#ffffff') === '#111111' && previewSecond('#FFF') === '#111111' && previewSecond('#eeeeee') === '#111111', 'white or near-white turns dark');
 ok(previewSecond('#ffe600') === '#111111', 'a very light yellow too');
 ok(previewSecond('#000000') === '#000000' && previewSecond('#7b4cfa') === '#7b4cfa' && previewSecond('#e11d48') === '#e11d48', 'a visible color stays the text\'s own');
-ok(previewSecond(undefined) === '#7b4cfa', 'none set: purple as before');
+ok(previewSecond(undefined) === undefined, 'none set: the picker keeps its own demo color');
 ok(previewSecond('rgba(0,0,0,0.5)') === 'rgba(0,0,0,0.5)', 'a non-hex color passes through');
 const src = fs.readFileSync('src/components/text-controls.tsx', 'utf8');
-ok(src.includes('p.look("#ffffff", previewSecond(t.second))'), 'the picker uses it');
+ok(src.includes('p.look("#ffffff", previewSecond(t.second) ?? "#7b4cfa")'), 'the picker uses it, purple when none is set, as before');
 if (n !== 6) { console.error(`style-preview-checks: ${n} checks ran, expected 6`); process.exit(1); }
 console.log(`style-preview-checks: ${n} checks pass`);
