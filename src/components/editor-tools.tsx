@@ -3054,8 +3054,6 @@ function ClipControls({ label, src, speed = 1, playing, onPlay, t, len, pieces, 
   );
 }
 
-/** About how long one hook takes (outfit, swapped first frame, then Kling Motion Control), for the progress cover. */
-
 const GEN_STAGES = ["Reading the hook", "Matching {who}", "Animating the moves", "Finishing up"];
 
 /** While a hook generates: the character with a scan line, the current stage, a timer and an easing progress bar. */

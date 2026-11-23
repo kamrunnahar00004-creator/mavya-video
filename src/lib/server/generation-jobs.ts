@@ -5,7 +5,6 @@ import { adminUser } from "@/lib/server/usage";
 import { cloud, getRun, getRunStored, mediaAccess, registerMedia } from "@/lib/server/store";
 import { copyObject, objectInfo, putObject } from "@/lib/server/r2";
 import { HookStartUncertain, checkHook, startHook } from "@/lib/server/hookgen";
-import { WrongPerson } from "@/lib/server/first-frame";
 import { generationPatch } from "@/lib/generation-edit";
 import { PHOTO_SINCE } from "@/lib/characters";
 import { APPROVED_HOOK_CLIPS } from "@/lib/hook-cache";
@@ -142,9 +141,6 @@ export async function advanceGeneration(who: string, id: string): Promise<void> 
     } catch (error) {
       console.error("generation start", job.id, error);
       if (error instanceof HookStartUncertain) await transition(job, "uncertain");
-      // The character could not be put in the frame (founder 2026-11-08): fail and refund now. The fallback would make
-      // the same first frame again, adding minutes, and the clip must never go to Kling with someone else's face.
-      else if (error instanceof WrongPerson) await transition(job, "failed", error.message);
       else await transition(job, job.fallback_used ? "failed" : "fallback");
       return;
     }
@@ -165,7 +161,8 @@ export async function advanceGeneration(who: string, id: string): Promise<void> 
       if (await accountClosing(who)) return;
     } else {
       const task = await checkHook(taskId);
-      if (task.state === "failed") return transition(job, job.fallback_used ? "failed" : "fallback");
+      // A refusal (safety) is final: the fallback is the same request and would be refused again (and charged).
+      if (task.state === "failed") return transition(job, job.fallback_used || task.final ? "failed" : "fallback", task.final ? task.error : undefined);
       if (task.state === "running") return transition(job, "release");
       seconds = task.seconds;
       if (await accountClosing(who)) return;

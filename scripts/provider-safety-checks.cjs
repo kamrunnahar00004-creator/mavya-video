@@ -4,7 +4,7 @@ async function main(){
  const stubs={
   '@/lib/server/work-budget':{checkBudget(){},withWorkBudget:f=>f(),workSignal:()=>AbortSignal.timeout(1000)},
   'node:child_process':{execFile(){}},'node:crypto':require('node:crypto'),'node:fs/promises':{mkdtemp:async()=>'/fixture',rm:async()=>{}},'node:module':require('node:module'),'node:os':require('node:os'),'node:path':require('node:path'),'node:util':require('node:util'),
-  '@/lib/server/gemini':{},'@/lib/server/r2':{},'@/lib/server/store':{}
+  '@/lib/server/face-ref':{},'@/lib/server/r2':{},'@/lib/server/store':{}
   ,'@/lib/supabase/server':{},'@/lib/server/ffmpeg':{ffmpegPath:async()=>'/fixture/ffmpeg'}
  };
  const api=load('src/lib/server/hookgen.ts',stubs,{FAL_KEY:'fixture-only'},{fetch:async()=>replies.shift()});

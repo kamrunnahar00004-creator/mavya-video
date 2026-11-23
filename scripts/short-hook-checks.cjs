@@ -31,7 +31,7 @@ ok(2.99 * h.slowFactor(2.99) >= 3.2, 'just under 3 s is slowed too (Kling counts
 const id = 'fal-ai/kling-video/v3/standard/motion-control|01a1ba0a-8fe9-7d42-9a10-fe17bfcef787';
 eq(h.withSlow(id, 1), id, 'a normal hook keeps the plain task id');
 const slowed = h.withSlow(id, 1.3169);
-eq(JSON.stringify(h.parseTask(slowed)), JSON.stringify({ model: 'fal-ai/kling-video/v3/standard/motion-control', id: '01a1ba0a-8fe9-7d42-9a10-fe17bfcef787', factor: 1.3169 }), 'the slowdown comes back from the task id');
+eq(JSON.stringify(h.parseTask(slowed)), JSON.stringify({ model: 'fal-ai/kling-video/v3/standard/motion-control', id: '01a1ba0a-8fe9-7d42-9a10-fe17bfcef787', factor: 1.3169, length: 0 }), 'the slowdown comes back from the task id');
 eq(h.parseTask(id).factor, 1, 'a task id from before has no slowdown');
 eq(h.parseTask(`${id}|slowabc`).factor, 1, 'a malformed slowdown is ignored');
 eq(h.parseTask(`${id}|slow50`).factor, 1, 'an absurd slowdown is ignored');
@@ -49,14 +49,15 @@ ok(accepted(id) && accepted('cache/3.03|cc4afb16-d2cc-446f-b9fa-ba09688dc4df'), 
 for (const len of [2.53, 1.4, 2.99]) ok(accepted(h.withSlow(id, h.slowFactor(len))), `a slowed ${len} s hook's task id passes the database rule (${h.withSlow(id, h.slowFactor(len))})`);
 ok(accepted(h.withSlow('fal-ai/kling-video/v2.6/standard/motion-control|01a1cf34-6b31-7a62-be12-061715922f09', h.slowFactor(2.53))), 'the fallback model too');
 ok(!accepted(`${id}|slow1.2649`), 'the old format is what the database refused');
-eq(JSON.stringify(h.parseTask(`${id}|slow1.2649`)), JSON.stringify({ model: 'fal-ai/kling-video/v3/standard/motion-control', id: '01a1ba0a-8fe9-7d42-9a10-fe17bfcef787', factor: 1.2649 }), 'an old-format id still reads');
+eq(JSON.stringify(h.parseTask(`${id}|slow1.2649`)), JSON.stringify({ model: 'fal-ai/kling-video/v3/standard/motion-control', id: '01a1ba0a-8fe9-7d42-9a10-fe17bfcef787', factor: 1.2649, length: 0 }), 'an old-format id still reads');
 
 // hookgen uses it.
 const g = fs.readFileSync('src/lib/server/hookgen.ts', 'utf8');
-ok(/const factor = slowFactor\(len\);/.test(g) && /factor > 1 \? referenceArgs\(factor\)/.test(g), 'the reference is slowed when the clip is short');
-ok(/return withSlow\(await falSubmit\(simple \? MOTION_FALLBACK : MOTION, \{[\s\S]{0,400}\}\), reference\.factor\);/.test(g), 'the task id carries the slowdown (main and fallback model)');
-ok(/const \{ model, id, factor \} = parseTask\(taskId\);/.test(g) && /const video = factor > 1 \? await restoreSpeed\(generated, factor\) : generated;/.test(g), 'the result is sped back before it is saved');
-ok(/share\(reference\.bytes, "mp4", who\)/.test(g), 'the slowed reference is what Kling gets');
+// Kling 4.0 (founder 2026-11-21): the same slowdown, plus the length sent so the result is cut back to it.
+ok(/const factor = slowFactor\(len\);/.test(g) && /factor > 1 \? `setpts=\$\{factor\}\*PTS`/.test(g), 'the reference is slowed when the clip is short');
+ok(/return withLength\(withSlow\(await falSubmit\(SWAP, [^\n]*\), sent\.factor\), sent\.seconds\);/.test(g), 'the task id carries the slowdown and the length sent');
+ok(/const \{ model, id, factor, length \} = parseTask\(taskId\);/.test(g) && /const video = factor > 1 \|\| length > 0 \? await finish\(generated, factor, length\) : generated;/.test(g), 'the result is sped back and cut before it is saved');
+ok(/share\(sent\.bytes, "mp4", who\)/.test(g), 'the slowed reference is what Kling gets');
 
 // A real round trip with ffmpeg: a 2.43 s moving clip.
 const ff = require(path.join(process.cwd(), 'node_modules/ffmpeg-static'));

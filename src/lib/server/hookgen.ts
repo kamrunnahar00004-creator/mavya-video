@@ -8,56 +8,54 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { ffmpegPath } from "@/lib/server/ffmpeg";
-import { geminiJSON } from "@/lib/server/gemini";
+import { faceRef } from "@/lib/server/face-ref";
 import { putObject, signedGet } from "@/lib/server/r2";
 import { libraryFile, mediaToFile } from "@/lib/server/store";
 import type { Reference, Run } from "@/lib/types";
-import { makeFirstFrame, VERDICT_SCHEMA, type Verdict } from "@/lib/server/first-frame";
-import { parseTask, referenceArgs, restoreArgs, slowFactor, withSlow } from "@/lib/short-hook";
+import { finishArgs, minSideFilter, parseTask, slowFactor, withLength, withSlow } from "@/lib/short-hook";
 
 /**
- * Hook generation (founder decision 2026-10-23, after testing Veo, Wan Animate, H3 Recast and Kling side by side:
- * "100% kling stays", no Veo, no Runway).
+ * Hook generation. Character swap on Kling 4.0 (founder decision 2026-11-21, after testing Kling 3.0 motion control,
+ * Kling 4.0, Kling 4.0 Flash, Higgsfield Genjutsu and Wan side by side on 7 library hooks: "it cannot be better than
+ * kling 4.0 with face ref"). Replaces 2026-10-23's Gemini first frame + Kling 3.0 motion control (about 150-220 s).
  *
- * A hook with a video (a library hook or an uploaded one): RECREATE it with the character, with the original's
- * real motion.
- *   1. Gemini looks at the hook and the character and picks the outfit for THIS person (same colors and style;
- *      anything that does not suit them, like a halter on a man, becomes the closest equivalent).
- *   2. Gemini 3.1 Flash Image puts the character, in that outfit, into the hook's first frame (first-frame.ts: only the
- *      person, with their own body, comes from the character photo; each frame is checked against the original and
- *      made again when the room, light, framing, hands, expression or person are off): same scene, objects,
- *      pose, expression and light, natural nails, nothing added, no captions.
- *   3. Kling v3 Standard Motion Control (fal.ai) animates that frame with the ORIGINAL clip as the motion
- *      reference: same gestures, timing, gaze and mouth, one take, no captions (it draws from the clean frame).
- *      ~$0.126 per second of the clip, ~3.5 min. Runs as a background job (generation-jobs.ts).
- *   Fallback (the job's one automatic retry): the same with Kling v2.6 Standard Motion Control.
+ * A hook with a video (a library hook or an uploaded one): fal.ai Kling 4.0 video edit swaps the person in the clip
+ * for the character, keeping the clip's own motion, timing, expressions, framing, clothes and room.
+ *   References: the character's FACE (head and hair, face-ref.ts) first, then the whole photo. The face is what makes
+ *   it work: with only the whole photo, Kling copied the photo's room and outfit into the hook.
+ *   Same for a library character and an uploaded photo. A character described in words goes in the prompt instead.
+ *   ~$0.157 per second of the clip, about 65-120 s. Runs as a background job (generation-jobs.ts).
+ *   Kling 4.0 Flash was rejected: the result stays too close to the original creator.
+ * Fallback (the job's one automatic retry): the same request again.
  * A described hook (no video): Kling v3 Standard image-to-video from the character photo, or text-to-video when the
  * character is described in words.
- * Never the original's captions: Mavya adds the product's own text on top. No post-processing of the result.
+ * The result: no sound (Kling 4.0 adds its own audio), cut back to the clip's length (it rounds up to whole seconds),
+ * a slowed short clip sped back up (short-hook.ts). Never the original's captions: Mavya adds the product's own text.
  */
 const FAL = "https://queue.fal.run";
-const MOTION = "fal-ai/kling-video/v3/standard/motion-control";
-const MOTION_FALLBACK = "fal-ai/kling-video/v2.6/standard/motion-control";
+/** Kling 4.0 video edit: the clip plus reference images, the person swapped (founder 2026-11-21). */
+export const SWAP = "kling/v4/video-to-video/edit";
 const IMAGE_TO_VIDEO = "fal-ai/kling-video/v3/standard/image-to-video";
 const TEXT_TO_VIDEO = "fal-ai/kling-video/v3/standard/text-to-video";
 /** Length of a described hook (no original clip to follow). */
 export const DESCRIBED_SECONDS = 5;
+/** Shortest clip that is swapped (a shorter one is slowed past the task id's limit, short-hook.ts). */
+const MIN_CLIP = 1;
 /** Kling needs a few seconds of reference motion; shorter library cuts hold their last frame to reach it. */
 const MIN_REFERENCE = 3;
 /** Provider links (frames, clips) are read by fal within minutes; give them a day for queues. */
 const LINK_SECONDS = 24 * 3600;
 
 const LOOK = "Real handheld phone selfie video, casual UGC, one continuous take. Natural five-finger hands. No text, captions, subtitles, stickers or watermarks anywhere on screen.";
-/** Motion control: the reference clip is the performance to copy (founder 2026-10-23: as close to the original as possible). */
-const MATCH =
-  "Copy the reference video's performance exactly and as closely as possible: the same gestures, hand positions and hand shapes, head moves, gaze direction, facial expressions at the same strength, mouth movements and timing, frame by frame. Add nothing, exaggerate nothing, no extra gestures, no overacting. Keep the same person, face, hair, outfit, held objects, room and light as in the image for the whole video; no new objects.";
 /**
- * The camera moves as in the reference (founder 2026-11-08: a phone pulled closer came out as a flat digital zoom,
- * because MATCH said to keep the same framing for the whole video; tested on Olivia + @blair.buildsthingss DaFCnEnNxTM,
- * "PERFECT"). The image sets the starting framing only.
+ * The swap prompt, as tested and won (founder 2026-11-21), with "woman" made "person" so men swap too. @Image1 is the
+ * face, @Image2 the whole photo of the same person.
  */
-const CAMERA =
-  "Copy the camera too: start with the image's framing, then make every camera move the reference video makes. If the phone is brought closer or pulled away, the camera physically moves, so the perspective and the background shift with it; if it zooms, it zooms; if it stays still, it stays still.";
+export const SWAP_PROMPT =
+  "Replace the person in @Video1 with the person in @Image1. Their face and hair must match @Image1 (@Image2 shows the same person). Keep everything else from @Video1 exactly: the motion, timing, facial expressions, head turns, framing, clothes and room. Do not add any text.";
+/** A character described in words: no photo, the description takes @Image1's place. */
+export const swapPromptFor = (words: string) =>
+  `Replace the person in @Video1 with ${words}. Keep everything else from @Video1 exactly: the motion, timing, facial expressions, head turns, framing, clothes and room. Do not add any text.`;
 const NEGATIVE = "text, captions, subtitles, watermark, logo, cut, scene change, extra fingers, deformed hands, distorted face, morphing, exaggerated expressions, overacting";
 
 const exec = promisify(execFile);
@@ -101,7 +99,7 @@ async function share(bytes: Buffer, ext: "jpg" | "mp4", user: string): Promise<s
   return signedGet(key, LINK_SECONDS);
 }
 
-type Character = { image: { data: string; mime: string } | null; words: string };
+type Character = { image: { data: string; mime: string } | null; words: string; id?: string };
 
 /** The character as image bytes, or their description when they were described in words. */
 async function characterOf(run: Run, who: string, dir: string): Promise<Character> {
@@ -109,11 +107,11 @@ async function characterOf(run: Run, who: string, dir: string): Promise<Characte
   if (face?.kind === "character") {
     if (!/^[a-z0-9-]+$/.test(face.id)) throw new Error("Unknown character");
     const data = (await readFile(path.join(process.cwd(), "public", "characters", `${face.id}.jpg`))).toString("base64");
-    return { image: { data, mime: "image/jpeg" }, words: "" };
+    return { image: { data, mime: "image/jpeg" }, words: "", id: face.id };
   }
   if (face?.kind === "photo") {
     const photo = await mediaToFile(face.mediaId, who, dir);
-    if (!photo) throw new Error("Your photo is missing. Upload it again.");
+    if (!photo || !/^image\/(jpeg|png|webp)$/.test(photo.mime)) throw new Error("Your photo is missing. Upload it again.");
     return { image: { data: (await readFile(photo.file)).toString("base64"), mime: photo.mime }, words: "" };
   }
   if (face?.kind === "described" && face.text.trim()) return { image: null, words: face.text.trim().slice(0, 300) };
@@ -133,63 +131,50 @@ async function hookVideo(run: Run, source: Reference | null, who: string, dir: s
   const start = Math.max(0, run.hook.start ?? 0);
   const end = Math.max(start + 1, Math.min(start + 8, run.hook.end ?? start + 3));
   const out = path.join(dir, "hook-cut.mp4");
-  await ff("-ss", start.toFixed(2), "-i", info.file, "-t", (end - start).toFixed(2), "-an", "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", out);
+  // Even sizes: x264 refuses an odd width (Codex 2026-11-21: a 721 px wide upload failed here).
+  await ff("-ss", start.toFixed(2), "-i", info.file, "-t", (end - start).toFixed(2), "-an", "-vf", "scale='max(2,trunc(iw/2)*2)':'max(2,trunc(ih/2)*2)'", "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p", out);
   return out;
 }
 
 /**
- * The motion reference: the clip without sound. A clip under 3 s is slowed to 3.2 s of real motion (short-hook.ts:
- * Kling refuses less, and a frozen frame does not count); `factor` undoes it on the result. One whose length cannot be
- * read is held on its last frame up to MIN_REFERENCE seconds, as before.
+ * The character photo as JPEG bytes, always re-encoded from its first frame (a few ms): a PNG, a WebP or a broken file
+ * that only claims to be a JPEG either becomes a real JPEG or fails here, before anything is paid for.
  */
-async function motionReference(clip: string, dir: string): Promise<{ bytes: Buffer; factor: number }> {
+async function asJpeg(image: { data: string; mime: string }, dir: string): Promise<Buffer> {
+  const bytes = Buffer.from(image.data, "base64");
+  const input = path.join(dir, "photo-in"), out = path.join(dir, "photo.jpg");
+  await writeFile(input, bytes);
+  await ff("-i", input, "-frames:v", "1", "-q:v", "2", out);
+  return readFile(out);
+}
+
+/**
+ * The clip Kling 4.0 edits: no sound, at most 30 s, at least 720 px on its short side (Kling refuses under 700 px).
+ * A clip under 3 s is slowed to 3.2 s of real motion (short-hook.ts: Kling 4.0 refuses under 3 s); `factor` undoes it
+ * on the result. One whose length cannot be read is held on its last frame up to MIN_REFERENCE seconds. `seconds` is
+ * the length sent, so the result can be cut back to it.
+ */
+async function reference(clip: string, dir: string): Promise<{ bytes: Buffer; factor: number; seconds: number }> {
   const out = path.join(dir, "reference.mp4");
   const len = mp4Seconds(await readFile(clip)) ?? 0;
   const factor = slowFactor(len);
-  const video = factor > 1 ? referenceArgs(factor) : len < MIN_REFERENCE ? ["-vf", `tpad=stop_mode=clone:stop_duration=${MIN_REFERENCE}`, "-t", String(MIN_REFERENCE)] : referenceArgs(1);
-  await ff("-i", clip, "-an", ...video, "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-pix_fmt", "yuv420p", out);
-  return { bytes: await readFile(out), factor };
-}
-
-const OUTFIT_SCHEMA = { type: "OBJECT", properties: { outfit: { type: "STRING" } }, required: ["outfit"] };
-/** What the new person wears: same colors and style as the original, unless it does not suit them. */
-async function outfitFor(clip: string, who: Character): Promise<string> {
-  const plan = await geminiJSON<{ outfit: string }>(
-    [
-      { text: "VIDEO 1:" },
-      { inline_data: { mime_type: "video/mp4", data: (await readFile(clip)).toString("base64") } },
-      ...(who.image ? [{ text: "IMAGE 2 (the new person):" }, { inline_data: { mime_type: who.image.mime, data: who.image.data } }] : []),
-      {
-        text: `${who.image ? "The person in IMAGE 2" : `A new person (${who.words})`} will take the place of the person in VIDEO 1. Write in JSON what the new person wears ("outfit"): the same garment colors and style as in VIDEO 1, unless that garment does not suit this person (for example a tank top, halter, crop top or dress on a man, or anything revealing), then the closest equivalent that suits them, same colors. No jewelry or nail polish unless the new person already has it. Under 120 characters.`,
-      },
-    ],
-    { schema: OUTFIT_SCHEMA, temperature: 0.2, signal: workSignal(120_000) },
-  );
-  return String(plan.outfit ?? "").slice(0, 160) || "the same clothes as in the scene";
-}
-
-/** Gemini 3.1 Flash Image: the parts in, the image out. */
-async function geminiImage(parts: unknown[], ms = 180_000): Promise<Buffer> {
-  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent", {
-    method: "POST",
-    headers: { "x-goog-api-key": process.env.GEMINI_API_KEY ?? "", "content-type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "9:16" } } }),
-    signal: workSignal(Math.max(1000, ms)),
-  });
-  const out = (await res.json().catch(() => null)) as { candidates?: { content?: { parts?: { inlineData?: { data?: string }; inline_data?: { data?: string } }[] } }[] } | null;
-  const data = out?.candidates?.[0]?.content?.parts?.map((p) => p.inlineData?.data ?? p.inline_data?.data).find(Boolean);
-  if (!res.ok || !data) throw new Error(`frame swap failed (${res.status})`);
-  return Buffer.from(data, "base64");
+  // Under 1 s there is no motion to copy, and the slowdown would not fit the task id (short-hook.ts caps it at 10).
+  if (len > 0 && len < MIN_CLIP) throw new Error("This hook is too short. Choose at least 1 second of it.");
+  const filters = [factor > 1 ? `setpts=${factor}*PTS` : len < MIN_REFERENCE ? `tpad=stop_mode=clone:stop_duration=${MIN_REFERENCE}` : "", minSideFilter, "fps=30"].filter(Boolean);
+  const cap = factor > 1 ? [] : ["-t", String(len > 0 && len < MIN_REFERENCE ? MIN_REFERENCE : 30)];
+  await ff("-i", clip, "-an", "-vf", filters.join(","), ...cap, "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-pix_fmt", "yuv420p", out);
+  const bytes = await readFile(out);
+  return { bytes, factor, seconds: mp4Seconds(bytes) ?? 0 };
 }
 
 /**
  * Start one hook generation; returns the provider task id. `note` is what went wrong last time (Regenerate).
- * `simple` is the job's single fallback attempt (Kling v2.6 motion control, or the same text/image path).
+ * `simple` is the job's single fallback attempt: the same request again (it no longer picks another model).
  * The durable generation job owns fallback and retry decisions.
  */
-export const startHook = (run: Run, source: Reference | null, who: string, note?: string, simple = false) => withWorkBudget(() => startHookInner(run, source, who, note, simple));
-async function startHookInner(run: Run, source: Reference | null, who: string, note?: string, simple = false): Promise<string> {
-  const began = Date.now();
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for the job API: the fallback is the same request.
+export const startHook = (run: Run, source: Reference | null, who: string, note?: string, simple = false) => withWorkBudget(() => startHookInner(run, source, who, note));
+async function startHookInner(run: Run, source: Reference | null, who: string, note?: string): Promise<string> {
   const fix = note?.trim() ? ` Fix this from the last try: ${note.trim().slice(0, 200)}.` : "";
   const dir = await mkdtemp(path.join(tmpdir(), "mavya-hook-"));
   try {
@@ -200,39 +185,36 @@ async function startHookInner(run: Run, source: Reference | null, who: string, n
     }
 
     if (clip) {
-      const [outfit, reference] = await Promise.all([outfitFor(clip, character), motionReference(clip, dir)]);
-      const first = path.join(dir, "first.jpg");
-      await ff("-ss", "0.05", "-i", clip, "-frames:v", "1", "-q:v", "2", first);
-      const { frame } = await makeFirstFrame({
-        image: geminiImage,
-        judge: (parts, ms) => geminiJSON<Verdict>(parts as Parameters<typeof geminiJSON>[0], { schema: VERDICT_SCHEMA, temperature: 0, signal: workSignal(ms) }),
-        elapsed: () => Date.now() - began,
-      }, await readFile(first), character, outfit);
-      const [imageUrl, videoUrl] = await Promise.all([share(frame, "jpg", who), share(reference.bytes, "mp4", who)]);
-      // A slowed short clip: the task id carries the factor so the result is sped back to the original length.
-      return withSlow(await falSubmit(simple ? MOTION_FALLBACK : MOTION, {
-        image_url: imageUrl,
-        video_url: videoUrl,
-        character_orientation: "video",
-        keep_original_sound: false,
-        prompt: `${MATCH} ${CAMERA} ${LOOK}${fix}`,
-      }), reference.factor);
+      // The face reference and the clip are prepared side by side; a library character's face is ready-made.
+      const [face, sent] = await Promise.all([character.image ? faceRef(character.image, dir, character.id) : Promise.resolve(null), reference(clip, dir)]);
+      const [videoUrl, faceUrl, photoUrl] = await Promise.all([
+        share(sent.bytes, "mp4", who),
+        face ? share(face, "jpg", who) : Promise.resolve(null),
+        character.image ? share(await asJpeg(character.image, dir), "jpg", who) : Promise.resolve(null),
+      ]);
+      const input = faceUrl && photoUrl
+        ? { prompt: `${SWAP_PROMPT}${fix}`, video_url: videoUrl, image_urls: [faceUrl, photoUrl] }
+        : { prompt: `${swapPromptFor(character.words)}${fix}`, video_url: videoUrl };
+      // The task id carries the slowdown and the length sent, so the result comes back at the original length.
+      return withLength(withSlow(await falSubmit(SWAP, { ...input, resolution: "720p", keep_audio: false }), sent.factor), sent.seconds);
     }
 
     // A described hook: no original motion to follow.
     const doing = run.hook.describe?.trim() || "they look at their laptop screen, shocked, then cover their mouth and smile";
     const prompt = `${doing.slice(0, 600)}. ${LOOK}${fix}`;
     if (character.image) {
-      const imageUrl = await share(Buffer.from(character.image.data, "base64"), "jpg", who);
+      const imageUrl = await share(await asJpeg(character.image, dir), "jpg", who);
       return falSubmit(IMAGE_TO_VIDEO, { start_image_url: imageUrl, prompt: `The person in the image, in the same place. ${prompt}`, duration: String(DESCRIBED_SECONDS), generate_audio: false, negative_prompt: NEGATIVE });
     }
     return falSubmit(TEXT_TO_VIDEO, { prompt: `Vertical 9:16 phone selfie of ${character.words}. ${prompt}`, duration: String(DESCRIBED_SECONDS), aspect_ratio: "9:16", generate_audio: false, negative_prompt: NEGATIVE });
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    // Best effort: a cleanup error must never hide an accepted (paid) task id and trigger a second submission.
+    await rm(dir, { recursive: true, force: true }).catch((error) => console.error("hook temp cleanup", error));
   }
 }
 
-export type HookTask = { state: "running"; progress: number } | { state: "done"; video: Buffer; seconds: number } | { state: "failed"; error: string };
+/** `final`: the provider refused this input (safety); the identical retry would be refused too, so no fallback. */
+export type HookTask = { state: "running"; progress: number } | { state: "done"; video: Buffer; seconds: number } | { state: "failed"; error: string; final?: boolean };
 
 /** Length of an MP4 from its movie header (mvhd), without ffmpeg. */
 export function mp4Seconds(buf: Buffer): number | null {
@@ -266,7 +248,7 @@ export function mp4Seconds(buf: Buffer): number | null {
 
 /** Where a generation is; when it is done, the video itself (fal's link expires). */
 export async function checkHook(taskId: string): Promise<HookTask> {
-  const { model, id, factor } = parseTask(taskId);
+  const { model, id, factor, length } = parseTask(taskId);
   if (!model || !id || !/^[\w./-]+$/.test(model) || !/^[\w-]+$/.test(id)) return { state: "failed", error: "Unknown generation." };
   // fal's queue paths use the app (owner/name), not the full model path.
   const app = model.split("/").slice(0, 2).join("/");
@@ -280,30 +262,34 @@ export async function checkHook(taskId: string): Promise<HookTask> {
   // An interrupted or malformed result response does not establish provider failure.
   // Leave the paid task recoverable instead of starting another paid attempt.
   // An explicit 400/422 is a provider failure even when its body is not JSON.
-  const body = (result.ok ? await result.json() : await result.json().catch(() => null)) as { video?: { url?: string }; detail?: unknown } | null;
+  // A failure's body is read as text first: a plain-text refusal must still be recognized as one (Codex 2026-11-21).
+  const raw = result.ok ? "" : await result.text().catch(() => "");
+  const body = (result.ok ? await result.json() : (() => { try { return JSON.parse(raw); } catch { return null; } })()) as { video?: { url?: string }; detail?: unknown } | null;
   if (result.ok && !body?.video?.url) throw new Error("Provider result is incomplete");
   // Explicit provider errors can trigger the job's single fallback.
   if (!result.ok) {
     console.error("fal result", taskId, result.status, JSON.stringify(body?.detail ?? body).slice(0, 300));
-    return { state: "failed", error: /safety|nsfw|moderation/i.test(JSON.stringify(body)) ? "The video model refused this one. Try another character or hook." : "The generation failed. Try again." };
+    const refused = /safety|nsfw|moderation|content[_ ]?policy|policy[_ ]?violation|prohibited/i.test(`${raw} ${JSON.stringify(body)}`);
+    return refused ? { state: "failed", error: "The video model refused this one. Try another character or hook.", final: true } : { state: "failed", error: "The generation failed. Try again." };
   }
   const res = await fetch(body!.video!.url!, { signal: AbortSignal.timeout(60_000) });
   if (!res.ok) throw new Error("Couldn't download the result");
   const generated = Buffer.from(await res.arrayBuffer());
-  // A short hook was slowed for the model: back to the original speed and length (short-hook.ts).
-  const video = factor > 1 ? await restoreSpeed(generated, factor) : generated;
+  // Kling 4.0: its own audio off, cut to the length sent, a slowed short hook back to speed (short-hook.ts). Older
+  // tasks (no length, no slowdown) come back untouched as before.
+  const video = factor > 1 || length > 0 ? await finish(generated, factor, length) : generated;
   const seconds = mp4Seconds(video) ?? await probeSeconds(video);
   if (seconds === null) throw new Error("Generated video duration is unavailable");
   return { state: "done", video, seconds };
 }
 
-/** The generated clip sped up by `factor` (undoing a short hook's slowdown), without sound like every hook clip. */
-async function restoreSpeed(video: Buffer, factor: number): Promise<Buffer> {
+/** The generated clip without sound, cut to `length` seconds (0: as is) and sped up by `factor` (1: as is). */
+async function finish(video: Buffer, factor: number, length: number): Promise<Buffer> {
   const dir = await mkdtemp(path.join(tmpdir(), "mavya-speed-"));
   try {
     const file = path.join(dir, "in.mp4"), out = path.join(dir, "out.mp4");
     await writeFile(file, video);
-    await exec(await ffmpegPath(), ["-nostdin", "-v", "error", "-y", "-i", file, "-an", ...restoreArgs(factor), "-c:v", "libx264", "-crf", "16", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-movflags", "+faststart", out], { timeout: 60_000 });
+    await exec(await ffmpegPath(), ["-nostdin", "-v", "error", "-y", "-i", file, ...finishArgs(factor, length), "-c:v", "libx264", "-crf", "16", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-movflags", "+faststart", out], { timeout: 60_000 });
     return await readFile(out);
   } finally {
     await rm(dir, { recursive: true, force: true });

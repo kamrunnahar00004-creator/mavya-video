@@ -58,6 +58,9 @@ function loadProduct(): ProductInfo {
   return { name: "", audience: "" };
 }
 
+
+/** About how long one hook takes, in seconds, for the progress cover (Kling 4.0 swap: 65-117 s in tests, founder 2026-11-21). */
+const HOOK_ESTIMATE = 100;
 /** Steps 2 and 3 are hidden while step 1 is built on its own. */
 const LATER_STEPS = false as boolean;
 
@@ -1193,7 +1196,7 @@ export function RunView() {
         </div>
 
         <aside className="flex shrink-0 flex-col items-center justify-center border-l border-line bg-raised p-6 xl:min-h-0 xl:overflow-y-auto">
-          <RunPreview run={run} source={source} texts={texts} hookCover={gen.busy && !hook.generated ? <Suspense fallback={<span className="absolute inset-0 bg-ink" />}><GenerateProgress photo={facePhoto} who={ch ? ch.name : "your character"} startedAt={gen.startedAt} estimate={220} /></Suspense> : undefined} />
+          <RunPreview run={run} source={source} texts={texts} hookCover={gen.busy && !hook.generated ? <Suspense fallback={<span className="absolute inset-0 bg-ink" />}><GenerateProgress photo={facePhoto} who={ch ? ch.name : "your character"} startedAt={gen.startedAt} estimate={HOOK_ESTIMATE} /></Suspense> : undefined} />
           <button
             type="button"
             onClick={() => {
@@ -1673,7 +1676,7 @@ const optionBtn = (on: boolean) =>
 type Generation = ReturnType<typeof useHookGeneration>;
 
 /** The hook generation job, owned by the page so it keeps running (and polling) while step 4 is closed.
- * Generate runs Kling Motion Control (fal.ai) on the server, as a background job: POST /api/runs/[id]/generate, then poll until the clip is saved. */
+ * Generate runs the Kling 4.0 character swap (fal.ai) on the server, as a background job: POST /api/runs/[id]/generate, then poll until the clip is saved. */
 function useHookGeneration(runId: string, onGenerated: (updated: Run) => void, onFailed: () => void) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -1820,7 +1823,7 @@ function GenerateStep({ run, source, seg, texts, gen, onGenerate, onUploadHook, 
   const facePhoto = ch ? ch.view : face?.kind === "photo" ? `/api/media/${face.mediaId}` : null;
   const who = ch ? ch.name : "your character";
   const cover = busy ? (
-    <GenerateProgress photo={facePhoto} who={who} startedAt={startedAt} estimate={220} />
+    <GenerateProgress photo={facePhoto} who={who} startedAt={startedAt} estimate={HOOK_ESTIMATE} />
   ) : !hook.generated ? (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4">
       {facePhoto && (
