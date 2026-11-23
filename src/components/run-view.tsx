@@ -684,8 +684,10 @@ export function RunView() {
   /* ----- Step 4: demo clips ----- */
   /** A text over one clip in the same look and spot as the subtitle before it in the video, so the video keeps one text style. */
   /** Puts an uploaded video into a demo clip. Texts after it move later by its length (or by the change, when replacing). */
-  const fillClip = async (clipId: string, file: File, startClips?: DemoClip[], mode?: "single" | "clips") => placeClip(clipId, await clipFromFile(file), startClips, mode);
-  const placeClip = (clipId: string, c: Awaited<ReturnType<typeof clipFromFile>>, startClips?: DemoClip[], mode?: "single" | "clips") => {
+  // Uploading into one shot (clip by clip) brings that shot's caption; the bulk Upload never does (founder 2026-11-23:
+  // "we do that when selected clip by clip, not when i clicked upload").
+  const fillClip = async (clipId: string, file: File, startClips?: DemoClip[], mode?: "single" | "clips") => placeClip(clipId, await clipFromFile(file), startClips, mode, true);
+  const placeClip = (clipId: string, c: Awaited<ReturnType<typeof clipFromFile>>, startClips?: DemoClip[], mode?: "single" | "clips", withCaptions = false) => {
     setLibraryKey((k) => k + 1);
     const cur = runRef.current ?? run;
     if (cur.id !== id) return;
@@ -708,7 +710,7 @@ export function RunView() {
     // TikTok Sans, white with a black outline; only the position follows the viral video. To the millisecond: the first
     // starts on the clip's first frame, the last ends on its last, no gap between them.
     const suggested = list.find((x) => x.id === clipId)?.text;
-    if (now && !old && suggested) {
+    if (withCaptions && now && !old && suggested) {
       const captions = suggested.split(/\s+\/\s+/).map((t) => t.trim()).filter(Boolean);
       const each = now.len / captions.length;
       const edge = (k: number) => (k === captions.length ? ms(now.offset + now.len) : ms(now.offset + k * each));
