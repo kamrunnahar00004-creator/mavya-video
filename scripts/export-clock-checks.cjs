@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 9;
+const EXPECTED = 12;
 const eq = (a, b, msg) => { checks++; assert.equal(a, b, msg); };
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 
@@ -21,6 +21,10 @@ finish('export-clock-checks', EXPECTED, () => checks, () => {
   eq(c.exportClockLabel(-5, 0), '1:00 left', 'a clock read before the start is the start');
   eq(c.exportClockLabel(NaN, 0), '1:00 left', 'no time yet: the start');
   const b = fs.readFileSync('src/components/export-button.tsx', 'utf8');
-  ok(/\{busy \? <ExportClock startedAt=\{startedAt\} progress=\{progress\} \/> : [^\n]*"Export"\}/.test(b) && /useState\(startedAt\);[\s\S]{0,80}setInterval\(\(\) => setNow\(Date\.now\(\)\), 250\)/.test(b) && /exportClockLabel\(\(now - startedAt\) \/ 1000, progress\)/.test(b), 'the button shows the timer and ticks while busy');
-  ok(/blocked\.current=true;setStartedAt\(clockNow\(\)\);setProgress\(0\);\n/.test(b) && /reply\?\.job\)\{blocked\.current=true;setStartedAt\(clockNow\(\)\);setProgress\(0\);setJobId/.test(b), 'the timer starts on Export and on a running export found again');
+  ok(/\{busy \? \(saving \? SAVING_LABEL : <ExportClock startedAt=\{startedAt\} progress=\{progress\} \/>\) : [^\n]*"Export"\}/.test(b) && /useState\(startedAt\);[\s\S]{0,80}setInterval\(\(\) => setNow\(Date\.now\(\)\), 250\)/.test(b) && /exportClockLabel\(\(now - startedAt\) \/ 1000, progress\)/.test(b), 'the button shows the timer and ticks while busy');
+  ok(/blocked\.current=true;setStartedAt\(clockNow\(\)\);setProgress\(0\);setSaving\(false\);\n/.test(b) && /reply\?\.job\)\{blocked\.current=true;setStartedAt\(clockNow\(\)\);setProgress\(0\);setSaving\(false\);setJobId/.test(b), 'the timer starts on Export and on a running export found again');
+  // Founder 2026-11-24: after the download opened, "99% · 0:32 left" kept spinning while the copy went to My files.
+  eq(c.SAVING_LABEL, 'Saving to My files', 'the saving words');
+  ok(/setDone\(\{src:local\.current,[^\n]*\}\);setSaving\(true\);\}/.test(b) && /setProgress\(0\);setSaving\(false\);\n/.test(b), 'once the video is downloadable the button says it is saving, and a new export starts from the timer again');
+  ok(/reply\?\.job\)\{blocked\.current=true;setStartedAt\(clockNow\(\)\);setProgress\(0\);setSaving\(false\);setJobId/.test(b), 'a job found again later shows the timer, never stale saving words (Codex 2026-11-24)');
 });

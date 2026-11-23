@@ -8,7 +8,7 @@ import { uploadWhileAlive } from "@/lib/upload-put";
 import { pollDelay, waitForPoll } from "@/lib/polling";
 import { exportLayers } from "@/lib/export-layers";
 import { downloadHref, exportFileName } from "@/lib/export-name";
-import { exportClockLabel } from "@/lib/export-clock";
+import { SAVING_LABEL, exportClockLabel } from "@/lib/export-clock";
 import { renderLimitError } from "@/lib/render-limits";
 import { timeline, videoLength } from "@/lib/edit";
 import { soundPieces } from "@/lib/sound";
@@ -53,6 +53,8 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
   // The timer on the button (export-clock.ts): from the click, or from when a running export was found again.
   const [startedAt, setStartedAt] = useState(0);
   const busy = progress !== null;
+  // The video is downloadable already; the button only waits for its copy in My files (export-clock.ts SAVING_LABEL).
+  const [saving, setSaving] = useState(false);
   const alive = useRef(true);
   // Leaving the page stops a browser export (downloads, rendering, upload) and frees its video.
   const lifetime = useRef<AbortController | null>(null);
@@ -104,7 +106,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
   useEffect(()=>{
     let stop=false;
     void fetch(`/api/runs/${run.id}/export`,{cache:"no-store",signal:AbortSignal.timeout(30_000)}).then(r=>r.ok?r.json():null).then(reply=>{
-      if(!stop&&!blocked.current&&reply?.job){blocked.current=true;setStartedAt(clockNow());setProgress(0);setJobId(reply.job);}
+      if(!stop&&!blocked.current&&reply?.job){blocked.current=true;setStartedAt(clockNow());setProgress(0);setSaving(false);setJobId(reply.job);}
     }).catch(()=>undefined);
     return ()=>{stop=true;};
   },[run.id]);
@@ -134,7 +136,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
 
   async function start() {
     if(blocked.current)return;
-    blocked.current=true;setStartedAt(clockNow());setProgress(0);
+    blocked.current=true;setStartedAt(clockNow());setProgress(0);setSaving(false);
     if(local.current){URL.revokeObjectURL(local.current);local.current=null;}
     try{
       await beforeExport();
@@ -213,7 +215,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
     // or a file too large to save never throws it away or renders it again on the server (Codex 2026-11-05).
     if(local.current)URL.revokeObjectURL(local.current);
     local.current=URL.createObjectURL(blob);
-    if(alive.current)setDone({src:local.current,seconds:Math.round(total*10)/10,at:new Date().toISOString()});
+    if(alive.current){setDone({src:local.current,seconds:Math.round(total*10)/10,at:new Date().toISOString()});setSaving(true);}
     const unsaved=(message:string)=>{blocked.current=false;if(alive.current){setProgress(null);onToast(message);}return "started" as const;};
     if(blob.size>300*1024*1024||(made.demo?.size??0)>300*1024*1024)return unsaved("This video is too large to save in My files. Download it now.");
     const reserved=await post("local",{size:blob.size,encoder:made.encoder,...(made.demo?{demoSize:made.demo.size}:{})}).catch(()=>null);
@@ -255,7 +257,7 @@ export function ExportButton({ run, beforeExport, ready, onToast, onDone }: { ru
         className="btn-primary ml-1 min-w-[150px] px-4 py-2 text-[14px] tabular-nums"
       >
         {busy || (ready && preparing) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-        {busy ? <ExportClock startedAt={startedAt} progress={progress} /> : ready && preparing ? (prep?.key === uploads ? <>Preparing <PrepClock key={prep.at} seconds={prep.seconds} at={prep.at} /></> : "Preparing") : "Export"}
+        {busy ? (saving ? SAVING_LABEL : <ExportClock startedAt={startedAt} progress={progress} />) : ready && preparing ? (prep?.key === uploads ? <>Preparing <PrepClock key={prep.at} seconds={prep.seconds} at={prep.at} /></> : "Preparing") : "Export"}
       </button>
       {done && (
         <div role="dialog" aria-modal="true" aria-labelledby="export-title" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && setDone(null)}>

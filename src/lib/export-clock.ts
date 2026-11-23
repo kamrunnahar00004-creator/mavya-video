@@ -13,3 +13,9 @@ export function exportClockLabel(elapsed: number, progress: number): string {
   const left = EXPORT_ESTIMATE - e;
   return left > 0 ? `${pct}${clock(Math.ceil(left))} left` : `${pct}Almost done ${clock(e)}`;
 }
+
+/**
+ * The button's words once a browser export's video is already downloadable and only its copy is going to My files
+ * (founder 2026-11-24: "99% · 0:32 left" kept spinning after the download, as if the export were still running).
+ */
+export const SAVING_LABEL = "Saving to My files";
