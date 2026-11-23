@@ -29,6 +29,9 @@ const PIECE_OUT = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "12", "-pi
 
 /** Smooth (ease in-out) value of keyframe field `k` at file time `at` + p0, as an ffmpeg expression. */
 function curve(keys, k, p0, at = "it") {
+  // Microseconds, not milliseconds: a piece starting 0.4 ms in picked the wrong side of a key 10 ms long (Codex
+  // 2026-11-23); the browser export and the preview use the exact time.
+  const r = (n) => Math.round(n * 1e6) / 1e6;
   const F = `(${at}+${r(p0)})`;
   let e = `${keys[keys.length - 1][k]}`;
   for (let i = keys.length - 2; i >= 0; i--) {
@@ -67,9 +70,12 @@ function look(a, p0, W, H, fps, at = `(in-1)/${fps}`) {
     // 2026-11-11: "when it is zooming, it is shaking"); the browser export never did. One output frame per input
     // frame; `in` counts frames from 1 and the input is already at `fps`, so slot j = in - 1 is at file time
     // j / fps + p0 (in / fps ran one frame early, measured 2026-11-11).
-    const z = `(1+(${curve(keys, "zoom", p0, at)})/100)`;
-    const left = `((W-W/${z})/2*(1-(${curve(keys, "panX", p0, at)})/100))`;
-    const top = `((H-H/${z})/2*(1-(${curve(keys, "panY", p0, at)})/100))`;
+    // Like CapCut (src/lib/adjust.ts motionAt): zoom and the place on screen (pan x zoom) blend together, so
+    // left = (W - W/z)/2 x (1 - pan/100) = W x ((z - 1) - dx) / (2z), with dx = pan/100 x (z - 1) blended.
+    const ks = keys.map((k) => ({ ...k, dx: (k.panX * k.zoom) / 1e4, dy: (k.panY * k.zoom) / 1e4 }));
+    const z = `(1+(${curve(ks, "zoom", p0, at)})/100)`;
+    const left = `(W*((${z}-1)-(${curve(ks, "dx", p0, at)}))/(2*${z}))`;
+    const top = `(H*((${z}-1)-(${curve(ks, "dy", p0, at)}))/(2*${z}))`;
     const right = `(${left}+W/${z})`, bottom = `(${top}+H/${z})`;
     out.push(`perspective=x0='${left}':y0='${top}':x1='${right}':y1='${top}':x2='${left}':y2='${bottom}':x3='${right}':y3='${bottom}':interpolation=linear:sense=source:eval=frame`);
   } else if (v.zoom) {

@@ -19,8 +19,9 @@ finish('zoom-smooth-checks', EXPECTED, () => checks, () => {
   const exact = [0.10, 0.11, 0.12, 0.13].map((t) => a.motionAt(look, t, true).zoom);
   ok(exact.every((z, i) => i === 0 || z > exact[i - 1]) && exact.some((z) => z !== Math.round(z * 10) / 10), 'drawing uses exact, ever-growing zoom values');
   ok([0.10, 0.11, 0.12].map((t) => a.motionAt(look, t).zoom).every((z) => z === Math.round(z * 10) / 10), 'the controls still show values rounded to 0.1');
-  const pans = [0.10, 0.11, 0.12].map((t) => a.motionAt(look, t, true));
-  ok(pans.every((m, i) => i === 0 || (m.panX > pans[i - 1].panX && m.panY < pans[i - 1].panY)) && pans.some((m) => m.panX !== Math.round(m.panX * 10) / 10), 'position moves by exact fractions too');
+  // The place on screen is pan x zoom (CapCut path, founder 2026-11-23); it moves by exact fractions too.
+  const places = [0.10, 0.11, 0.12].map((t) => { const m = a.motionAt(look, t, true); return { x: m.panX * m.zoom, y: m.panY * m.zoom }; });
+  ok(places.every((m, i) => i === 0 || (m.x > places[i - 1].x && m.y < places[i - 1].y)) && places.some((m) => m.x !== Math.round(m.x * 10) / 10), 'position moves by exact fractions too');
   const style = (t) => a.videoStyle(look, t).transform;
   const scale = (t) => Number(style(t).match(/scale\(([\d.]+)\)/)[1]);
   ok(scale(0.11) > scale(0.10) && scale(0.12) > scale(0.11) && String(scale(0.11)).length > 5, 'the preview transform carries the exact scale, frame by frame');

@@ -261,16 +261,16 @@ function makeYuv(gl: WebGL2RenderingContext, W: number, H: number) {
 }
 
 /** Smooth (ease in-out) keyframe value at file time F, as curve() in render.mjs. */
-function curveAt(keys: NonNullable<Look["keys"]>, k: "zoom" | "panX" | "panY", F: number) {
-  if (F < keys[0].t) return keys[0][k];
+function curveAt<K extends { t: number }>(keys: K[], k: { [P in keyof K]: K[P] extends number ? P : never }[keyof K], F: number): number {
+  if (F < keys[0].t) return keys[0][k] as number;
   for (let i = 0; i < keys.length - 1; i++) {
     const a = keys[i], b = keys[i + 1];
     if (F < b.t) {
       const P = (F - a.t) / Math.max(0.001, b.t - a.t);
-      return a[k] + (b[k] - a[k]) * P * P * (3 - 2 * P);
+      return (a[k] as number) + ((b[k] as number) - (a[k] as number)) * P * P * (3 - 2 * P);
     }
   }
-  return keys[keys.length - 1][k];
+  return keys[keys.length - 1][k] as number;
 }
 
 // ---------- sound ----------
@@ -480,6 +480,7 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
     const own = seg.pieces[st.pi ?? 0] as { look?: Look | null };
     const look = { brightness: 0, contrast: 0, saturation: 0, warmth: 0, zoom: 0, panX: 0, panY: 0, flip: false, keys: [] as NonNullable<Look["keys"]>, ...(own.look ?? seg.look ?? {}) };
     const keys = [...(look.keys ?? [])].sort((a, b) => a.t - b.t);
+    const placed = keys.map((k) => ({ ...k, dx: (k.panX * k.zoom) / 1e4, dy: (k.panY * k.zoom) / 1e4 }));
     const { track, first } = await trackOf(seg.url);
     const dw = track.displayWidth, dh = track.displayHeight;
     const cw = Math.min(dw, (dh * W) / H), ch = Math.min(dh, (dw * H) / W);
@@ -511,8 +512,9 @@ async function render(spec: Spec, textsReady: BrowserText[] | Promise<BrowserTex
       }
       const F = files[k];
       const z = 1 + (keys.length ? curveAt(keys, "zoom", F) : look.zoom) / 100;
-      const px = keys.length ? curveAt(keys, "panX", F) : look.panX, py = keys.length ? curveAt(keys, "panY", F) : look.panY;
-      gl.uniform3f(u("zoom"), ((1 - 1 / z) / 2) * (1 - px / 100), ((1 - 1 / z) / 2) * (1 - py / 100), 1 / z);
+      // Like CapCut (adjust.ts motionAt, render.mjs): the place on screen, dx = pan/100 x (z - 1), blends with the zoom.
+      const dx = keys.length ? curveAt(placed, "dx", F) : (look.panX / 100) * (z - 1), dy = keys.length ? curveAt(placed, "dy", F) : (look.panY / 100) * (z - 1);
+      gl.uniform3f(u("zoom"), (z - 1 - dx) / (2 * z), (z - 1 - dy) / (2 * z), 1 / z);
       if (last) {
         gl.bindTexture(gl.TEXTURE_2D, video);
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);

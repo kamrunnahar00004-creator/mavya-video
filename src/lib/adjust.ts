@@ -57,16 +57,24 @@ export function motionAt(a: Partial<Adjust> | null | undefined, t?: number, exac
   const v = fullAdjust(a);
   const ks = sortKeys(v.keys);
   if (!ks.length || t === undefined) return pick(v);
-  if (t <= ks[0].t) return pick(ks[0]);
+  // The same rule as both exports (render.mjs curve, browser-export curveAt): before the first key, the first key; from
+  // a key's time on, the segment after it, so two keys sharing a time show the later one (Codex 2026-11-23).
+  if (t < ks[0].t) return pick(ks[0]);
   const last = ks[ks.length - 1];
   if (t >= last.t) return pick(last);
   const i = ks.findIndex((k, j) => k.t <= t && t < ks[j + 1].t);
   const [from, to] = [ks[i], ks[i + 1]];
   const p = (t - from.t) / (to.t - from.t);
   const e = p * p * (3 - 2 * p); // ease in-out
+  const lerp = (x: number, y: number) => x + (y - x) * e;
+  // Like CapCut (founder 2026-11-23): the zoom and the picture's real place on screen move together. The place on
+  // screen is pan x zoom (pan is a share of the room the zoom leaves), so that product is what is blended; blending
+  // pan and zoom apart made a zoom in from 0 hug the center, then rush to the side at the end.
+  const zoom = lerp(from.zoom, to.zoom);
+  const pan = (a: number, b: number) => (zoom > 1e-9 ? Math.max(-100, Math.min(100, lerp(a * from.zoom, b * to.zoom) / zoom)) : lerp(a, b));
   // Drawing uses the exact value: rounding to 0.1 made a slow zoom move in uneven steps (founder 2026-11-11).
-  const mix = (x: number, y: number) => (exact ? x + (y - x) * e : Math.round((x + (y - x) * e) * 10) / 10);
-  return { zoom: mix(from.zoom, to.zoom), panX: mix(from.panX, to.panX), panY: mix(from.panY, to.panY) };
+  const out = (x: number) => (exact ? x : Math.round(x * 10) / 10);
+  return { zoom: out(zoom), panX: out(pan(from.panX, to.panX)), panY: out(pan(from.panY, to.panY)) };
 }
 
 /** Index of the keyframe at file time t (within a frame or two), or -1. */
@@ -78,7 +86,10 @@ export function setMotion(a: Partial<Adjust> | null | undefined, t: number, patc
   if (!v.keys.length) return { ...v, ...patch };
   const ks = sortKeys(v.keys);
   const i = keyAt(v, t);
-  const next: MotionKey = { ...motionAt(v, t), ...patch, t: i >= 0 ? ks[i].t : Math.round(t * 100) / 100 };
+  // An existing keyframe changes only what the patch says, from its own values: the blended value at the playhead
+  // (a frame or two off) would carry the next key's place into it (Codex 2026-11-23). A new key starts exactly where
+  // the picture is, so adding it does not move anything.
+  const next: MotionKey = i >= 0 ? { ...ks[i], ...patch } : { ...motionAt(v, t, true), ...patch, t: Math.round(t * 100) / 100 };
   return { ...v, keys: sortKeys(i >= 0 ? ks.map((k, j) => (j === i ? next : k)) : [...ks, next]) };
 }
 
@@ -87,7 +98,7 @@ export function toggleKey(a: Partial<Adjust> | null | undefined, t: number): Adj
   const v = fullAdjust(a);
   const ks = sortKeys(v.keys);
   const i = keyAt(v, t);
-  if (i < 0) return { ...v, keys: sortKeys([...ks, { ...motionAt(v, t), t: Math.round(t * 100) / 100 }]) };
+  if (i < 0) return { ...v, keys: sortKeys([...ks, { ...motionAt(v, t, true), t: Math.round(t * 100) / 100 }]) };
   const rest = ks.filter((_, j) => j !== i);
   return rest.length ? { ...v, keys: rest } : { ...v, ...pick(ks[i]), keys: [] };
 }
@@ -95,7 +106,11 @@ export function toggleKey(a: Partial<Adjust> | null | undefined, t: number): Adj
 /** Move keyframe i (in time order) to file time t. */
 export function moveKey(a: Partial<Adjust> | null | undefined, i: number, t: number): Adjust {
   const v = fullAdjust(a);
-  return { ...v, keys: sortKeys(sortKeys(v.keys).map((k, j) => (j === i ? { ...k, t: Math.round(t * 100) / 100 } : k))) };
+  const ks = sortKeys(v.keys);
+  // Never onto another key's time (two keys at one moment have no in-between; Codex 2026-11-23): stays where it was.
+  const at = Math.round(t * 100) / 100;
+  if (ks.some((k, j) => j !== i && Math.abs(k.t - at) < 0.005)) return v;
+  return { ...v, keys: sortKeys(ks.map((k, j) => (j === i ? { ...k, t: at } : k))) };
 }
 
 /*
@@ -185,7 +200,10 @@ export function videoStyle(a?: Partial<Adjust> | null, t?: number): CSSPropertie
   // rotate(0.02deg) (0.09 px of tilt across the preview, invisible) keeps Chrome from snapping the zoomed video to
   // whole screen pixels: without it a keyframed zoom wobbled 0.5 px every frame in the small preview, ~2 px of the
   // video (founder 2026-11-11: "in the preview there is the wobble"; measured 0.54 px, with it 0.13, perfect 0.06).
-  const move = v.zoom ? [`scale(${s})`, `translate(${(v.panX / 100) * room}%, ${(v.panY / 100) * room}%)`, "rotate(0.02deg)"] : [];
+  // The tilt would bare a hair of edge in a corner when the picture is pushed fully to one side (Codex 2026-11-23);
+  // 0.2 % more scale covers it at any zoom (the tilt needs 0.13 %; 1.4 px on a 720 px frame, invisible; the exports
+  // have no tilt and need none).
+  const move = v.zoom ? [`scale(${s * 1.002})`, `translate(${(v.panX / 100) * room}%, ${(v.panY / 100) * room}%)`, "rotate(0.02deg)"] : [];
   if (v.flip) move.push("scaleX(-1)");
   return {
     filter: parts.length ? parts.join(" ") : undefined,
