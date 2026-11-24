@@ -70,7 +70,7 @@ for user, wanted in need.items():
     for _ in range(5):  # newest 500 posts at most
         page = f".after({after})" if after else ""
         fields = f"business_discovery.username({user}){{followers_count,media.limit(100){page}{{{MEDIA}}}}}"
-        url = f"https://graph.facebook.com/v26.0/{env['IG_USER_ID']}?" + urllib.parse.urlencode({"fields": fields, "access_token": env["META_ACCESS_TOKEN"]})
+        url = f"https://graph.facebook.com/v26.0/{env['IG_USER_ID']}?" + urllib.parse.urlencode({"fields": fields, "access_token": env.get("META_PAGE_TOKEN") or env["META_ACCESS_TOKEN"]})
         try:
             bd = json.load(urllib.request.urlopen(url, timeout=30))["business_discovery"]
         except urllib.error.HTTPError as e:
