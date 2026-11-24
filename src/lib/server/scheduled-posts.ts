@@ -5,7 +5,7 @@ import { fileSources } from "@/lib/server/my-files";
 import { getFilePrefs, mediaAccess } from "@/lib/server/store";
 import { buildFiles, mediaOf } from "@/lib/my-files";
 import { schedulerAllowed, schedulerUsers } from "@/lib/posts-access";
-import { badPost, hookWords, DEFAULT_TEMPLATES, MAX_BATCH, rollUp, TARGETS, type Post, type Target, type TargetResult, type Templates } from "@/lib/scheduled-posts";
+import { badPost, hookWords, DEFAULT_TEMPLATES, MAX_BATCH, rollUp, TARGETS, TRIAL_GRADUATION, type Post, type Target, type TargetResult, type Templates } from "@/lib/scheduled-posts";
 
 /**
  * Scheduled posts (founder 2026-11-15). Owner-only: SCHEDULED_POSTS_USERS (src/lib/posts-access.ts) lists the account
@@ -103,7 +103,9 @@ async function stepInstagram(post: Post, r: TargetResult, ctx: Ctx): Promise<Tar
       if (q && typeof q.quota_usage === "number" && typeof q.config?.quota_total === "number" && q.quota_usage >= q.config.quota_total) {
         return { ...r, state: "waiting", note: "Instagram's daily limit is reached. It posts as soon as there's room." };
       }
-      const c = await graph(ctx, `${ig}/media`, { media_type: "REELS", video_url: await ctx.link(post.mediaId), caption: post.captions.instagram ?? "", share_to_feed: "true" }, "POST");
+      // A trial reel goes to non-followers first, so it is not shared to the feed (founder 2026-11-25).
+      const kind: Record<string, string> = post.trial ? { trial_params: JSON.stringify({ graduation_strategy: TRIAL_GRADUATION }) } : { share_to_feed: "true" };
+      const c = await graph(ctx, `${ig}/media`, { media_type: "REELS", video_url: await ctx.link(post.mediaId), caption: post.captions.instagram ?? "", ...kind }, "POST");
       r = { state: "working", step: "processing", container: need(c, "id"), since: iso(ctx.now) };
       await ctx.save("instagram", r);
       continue;
@@ -216,8 +218,8 @@ export async function advancePost(post: Post, attempts: number, ctx: Ctx): Promi
   return { state, result, error: state === "failed" ? errors.join(" · ") || "Posting failed." : null, attempts: tries };
 }
 
-type Row = { id: string; user_id: string; media_id: string; title: string; hook: string; captions: Post["captions"]; targets: Target[]; at: string; state: Post["state"]; result: Post["result"]; attempts: number; error: string | null; created_at: string; lease_token: string | null };
-const toPost = (r: Row): Post => ({ id: r.id, mediaId: r.media_id, title: r.title, hook: r.hook, captions: r.captions ?? {}, targets: r.targets, at: r.at, state: r.state, result: r.result ?? {}, error: r.error, createdAt: r.created_at });
+type Row = { id: string; user_id: string; media_id: string; title: string; hook: string; captions: Post["captions"]; targets: Target[]; at: string; state: Post["state"]; result: Post["result"]; attempts: number; error: string | null; created_at: string; lease_token: string | null; ig_trial?: boolean };
+const toPost = (r: Row): Post => ({ id: r.id, mediaId: r.media_id, title: r.title, hook: r.hook, captions: r.captions ?? {}, targets: r.targets, at: r.at, state: r.state, result: r.result ?? {}, error: r.error, createdAt: r.created_at, trial: r.ig_trial === true && (r.targets ?? []).includes("instagram") });
 const db = () => createSupabaseAdminClient();
 
 /** A claim lasts longer than a post's whole pass can (its deadline), so two runs never work on one post. */
@@ -320,7 +322,7 @@ export async function listPosts(who: string, from: string, to: string): Promise<
   return ((data ?? []) as Row[]).map(toPost);
 }
 
-export type NewPost = { mediaId: string; at: string; targets: Target[]; captions: Post["captions"]; title?: string; hook?: string };
+export type NewPost = { mediaId: string; at: string; targets: Target[]; captions: Post["captions"]; title?: string; hook?: string; trial?: boolean };
 
 /** Adds a batch; every video must be the user's own file. Returns the error to show, or the new posts. */
 export async function createPosts(who: string, items: NewPost[], now = Date.now()): Promise<{ error: string } | { posts: Post[] }> {
@@ -334,9 +336,14 @@ export async function createPosts(who: string, items: NewPost[], now = Date.now(
     rows.push({
       id: crypto.randomUUID(), user_id: who, media_id: it.mediaId, title: String(it.title ?? "").slice(0, 200), hook: String(it.hook ?? "").slice(0, 500),
       captions: Object.fromEntries(it.targets.map((t) => [t, it.captions[t]])), targets: it.targets, at: iso(Date.parse(it.at)),
+      ig_trial: it.trial === true && it.targets.includes("instagram"),
     });
   }
-  const { data, error } = await db().from("scheduled_posts").insert(rows).select("*");
+  // The trial column is sent only when a post in the batch uses it, so scheduling keeps working before migration 0022;
+  // then it is set on every row, since a bulk insert writes NULL for a missing key (Codex 2026-11-25).
+  const trial = rows.some((r) => r.ig_trial);
+  const { data, error } = await db().from("scheduled_posts").insert(trial ? rows : rows.map((r) => { const copy: Partial<typeof r> = { ...r }; delete copy.ig_trial; return copy; })).select("*");
+  if (error && trial && (error.code === "PGRST204" || error.code === "42703")) return { error: "Trial reels need the database update (migration 0022) first." };
   if (error) throw error;
   return { posts: ((data ?? []) as Row[]).map(toPost) };
 }

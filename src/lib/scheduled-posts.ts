@@ -30,7 +30,12 @@ export type Post = {
   result: Partial<Record<Target, TargetResult>>;
   error: string | null;
   createdAt: string;
+  /** Instagram as a trial reel: shown to non-followers first; Instagram shares it with followers if it does well. */
+  trial: boolean;
 };
+
+/** Trial reels move to the main feed by themselves when they do well (Graph API graduation_strategy). */
+export const TRIAL_GRADUATION = "SS_PERFORMANCE";
 
 export type Templates = Record<Target, string>;
 

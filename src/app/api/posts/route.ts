@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   catch (error) { return unavailable(error); }
 }
 
-/** Schedules a batch: { items: [{ mediaId, at, targets, captions, title, hook }] }. */
+/** Schedules a batch: { items: [{ mediaId, at, targets, captions, title, hook, trial }] }. */
 export async function POST(request: Request) {
   const user = await postsUser();
   if ("response" in user) return user.response;

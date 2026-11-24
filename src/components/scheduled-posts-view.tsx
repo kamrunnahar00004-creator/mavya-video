@@ -172,6 +172,7 @@ const PostCard = memo(function PostCard({ post, onOpen, onRetry }: { post: Post;
                 <span key={t} title={`${NAMES[t]}: not posted yet`} className="opacity-45"><NetworkLogo t={t} className="h-4 w-4" /><span className="sr-only">{NAMES[t]}: not posted yet</span></span>
               );
             })}
+            {post.trial && <span title="Instagram trial reel" className="border border-line-strong px-1 text-[10px] font-bold uppercase leading-4 text-muted">Trial</span>}
             <span className="ml-auto pl-1"><Status post={post} /></span>
           </div>
         </div>
@@ -259,6 +260,7 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
   const [mode, setMode] = useState<"now" | "schedule">("schedule");
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 2 ** 31));
   const [targets, setTargets] = useState<Target[]>(["instagram", "facebook"]);
+  const [trial, setTrial] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [opened] = useState(() => Date.now());
@@ -326,7 +328,7 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
     try {
       const items = picked.map((id, i) => {
         const e = byId.get(id)!;
-        return { mediaId: id, at: postNow ?? new Date(times[i]!).toISOString(), targets, title: e.title, hook: e.hook, captions: Object.fromEntries(targets.map((t) => [t, drafts[id]?.[t] ?? fillCaption(templates[t], e.hook)])) };
+        return { mediaId: id, at: postNow ?? new Date(times[i]!).toISOString(), targets, trial: trial && targets.includes("instagram"), title: e.title, hook: e.hook, captions: Object.fromEntries(targets.map((t) => [t, drafts[id]?.[t] ?? fillCaption(templates[t], e.hook)])) };
       });
       const out = await call<{ posts: Post[] }>("/api/posts", { method: "POST", body: JSON.stringify({ items }) });
       onDone(out.posts);
@@ -448,6 +450,12 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
             </>
           )}
           {picked.length > 0 && <div><p className="mb-1 text-[12.5px] font-semibold">Post to</p><Targets value={targets} onChange={setTargets} /></div>}
+          {picked.length > 0 && targets.includes("instagram") && (
+            <label className="flex cursor-pointer items-start gap-2 text-[12.5px]">
+              <input type="checkbox" checked={trial} onChange={(e) => setTrial(e.target.checked)} className="mt-0.5" />
+              <span><span className="font-semibold">Post as trial reel</span><span className="block text-[11.5px] text-soft">Instagram shows it to non-followers first, then to your followers if it does well.</span></span>
+            </label>
+          )}
           {picked.length > 0 && !now && <p className="text-[11.5px] text-soft">Times in {zone}.</p>}
           <p className="text-[11.5px] text-soft">Captions come from your Captions templates with each video&apos;s hook filled in. Click a post on the calendar to change its caption or time.</p>
           {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
@@ -532,7 +540,7 @@ function EditDialog({ post, onClose, onSaved }: { post: Post; onClose: () => voi
             )}
             {post.targets.map((x) => (
               <div key={x}>
-                <p className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold text-muted"><NetworkLogo t={x} className="h-3.5 w-3.5" />{NAMES[x]} caption</p>
+                <p className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold text-muted"><NetworkLogo t={x} className="h-3.5 w-3.5" />{NAMES[x]} caption{x === "instagram" && post.trial && " (trial reel)"}</p>
                 <p className="whitespace-pre-wrap break-words border-l-2 border-line-strong pl-3 text-[13px] leading-relaxed">{post.captions[x] || <i className="text-soft">No caption</i>}</p>
               </div>
             ))}

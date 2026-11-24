@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 135;
+const EXPECTED = 149;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -38,7 +38,7 @@ function meta(opts = {}) {
     const json = (o, status = 200) => ({ ok: status < 400, status, json: async () => o });
     if (opts.refuse && p.endsWith('/media') && init.method === 'POST') return json({ error: { message: 'The video file is too short.', code: 100 } }, 400);
     if (p.endsWith('/content_publishing_limit')) return json({ data: [{ quota_usage: m.quota, config: { quota_total: 100 } }] });
-    if (p.endsWith('/IG/media') && init.method === 'POST') { m.creates++; m.lastCaption = body.get('caption'); m.lastVideoUrl = body.get('video_url'); m.reelType = body.get('media_type'); return json({ id: 'C1' }); }
+    if (p.endsWith('/IG/media') && init.method === 'POST') { m.creates++; m.lastCaption = body.get('caption'); m.lastVideoUrl = body.get('video_url'); m.reelType = body.get('media_type'); m.trialParams = body.get('trial_params'); m.shareToFeed = body.get('share_to_feed'); return json({ id: 'C1' }); }
     if (p.endsWith('/C1')) return json({ status_code: m.igStatus.length > 1 ? m.igStatus.shift() : m.igStatus[0] });
     if (p.endsWith('/IG/media_publish')) { m.publishes++; return json({ id: 'M1' }); }
     if (p.endsWith('/M1')) return json({ permalink: 'https://www.instagram.com/reel/M1/' });
@@ -128,6 +128,35 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   ok((await sp.createPosts(OWNER, [{ ...item, mediaId: 'someone-elses.mp4' }], T0)).error, 'another account\'s video refused');
   ok((await sp.createPosts(OWNER, [{ ...item, at: new Date(T0 - 3600e3).toISOString() }], T0)).error, 'a time that has passed refused');
   ok((await sp.createPosts(OWNER, Array(101).fill(item), T0)).error, 'over 100 in one batch refused');
+
+  // Trial reels (founder 2026-11-25): Instagram shows it to non-followers first; Facebook posts normally.
+  const trialMade = await sp.createPosts(OWNER, [{ ...item, trial: true }], T0);
+  ok(inserted[0].ig_trial === true && trialMade.posts[0].trial === true, 'a trial post is saved as one and reads back as one');
+  await sp.createPosts(OWNER, [item], T0);
+  ok(!('ig_trial' in inserted[0]), 'a normal post sends no trial column, so scheduling works before migration 0022');
+  await sp.createPosts(OWNER, [{ ...item, targets: ['facebook'], captions: { facebook: 'b' }, trial: true }], T0);
+  ok(!('ig_trial' in inserted[0]), 'Facebook only: no trial flag (trial reels are Instagram only)');
+  await sp.createPosts(OWNER, [{ ...item, trial: 'yes' }], T0);
+  ok(!('ig_trial' in inserted[0]), 'only a real true turns trial on');
+  await sp.createPosts(OWNER, [{ ...item, trial: true }, item], T0);
+  ok(inserted[0].ig_trial === true && inserted[1].ig_trial === false, 'mixed batch: every row gets the column, never NULL (Codex 2026-11-25)');
+  const noCol = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from: () => ({ insert: () => ({ select: async () => ({ data: null, error: { code: 'PGRST204' } }) }) }) }) } }, env, { URLSearchParams });
+  ok(/migration 0022/.test((await noCol.createPosts(OWNER, [{ ...item, trial: true }], T0)).error ?? ''), 'trial before migration 0022: a clear message, not a crash');
+  const fbOnly = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from: () => { const q = { select: () => q, eq: () => q, gte: () => q, lt: () => q, order: () => q, limit: async () => ({ data: [{ id: 'P', media_id: 'm', targets: ['facebook'], ig_trial: true, captions: {}, result: {} }], error: null }) }; return q; } }) } }, env, { URLSearchParams });
+  ok((await fbOnly.listPosts(OWNER, 'a', 'b'))[0].trial === false, 'Instagram taken off a trial post: no Trial badge (Codex 2026-11-25)');
+  let tm = meta();
+  await sp.advancePost(post({ trial: true }), 0, ctxFor(tm));
+  eq(JSON.parse(tm.trialParams), { graduation_strategy: 'SS_PERFORMANCE' }, 'trial: sent with trial_params, moving to the feed by itself if it does well');
+  ok(tm.shareToFeed === null, 'trial: not shared to the feed at once');
+  tm = meta();
+  await sp.advancePost(post(), 0, ctxFor(tm));
+  ok(tm.trialParams === null && tm.shareToFeed === 'true', 'normal post: shared to the feed, no trial_params');
+  const fs0 = require('node:fs');
+  ok(/add column if not exists ig_trial boolean not null default false/.test(fs0.readFileSync('supabase/migrations/0022_trial_reels.sql', 'utf8')), 'migration 0022 adds the trial column');
+  const v0 = fs0.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
+  ok(/Post as trial reel/.test(v0) && /targets\.includes\("instagram"\) && \(\s*<label/.test(v0) && /trial: trial && targets\.includes\("instagram"\)/.test(v0), 'the toggle shows only with Instagram picked and is sent with each item');
+  ok(/post\.trial && <span[^>]*>Trial<\/span>/.test(v0), 'calendar card marks trial posts');
+  ok(!/[\u2013\u2014]/.test(v0), 'no em/en dashes in the page');
 
   // Instagram: container, processing, publish once.
   let m = meta();
@@ -298,7 +327,8 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   const ors = [];
   const claimDb = { from: () => { const q = { select: () => q, update: () => q, in: () => q, eq: () => q, order: () => q, or: (f) => { ors.push(f); return q; }, limit: async () => ({ data: [{ id: 'P1', user_id: OWNER, targets: ['instagram'], result: {}, attempts: 0, at: new Date(T0).toISOString(), state: 'scheduled' }], error: null }), then: (res) => res({ data: [], error: null }) }; return q; } };
   const claimer = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => claimDb } }, env, { URLSearchParams });
-  const worked = await claimer.advancePosts(T0);
+  // The real clock: advancePosts stops claiming 30 s after its "now", so a fixed past time skipped the claim (failing since 2026-11-16).
+  const worked = await claimer.advancePosts(Date.now());
   ok(ors.length === 2 && ors.every((f) => /state\.eq\.scheduled,at\.lte\./.test(f)), 'the claim repeats the due test (time come), not just the state');
   ok(worked === false, 'the row no longer due at claim time: nothing is posted');
 
@@ -359,7 +389,7 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   eq(shared.hookWords([{ id: 'hook', text: 'A', start: 0, end: 2, y: 10 }, { id: 'b', text: 'B', start: 1.5, end: 3, y: 20 }], { start: 0, end: 4 }), 'A B', 'a box that comes on while the hook text is still shown counts');
   eq(shared.hookWords([], { end: 2 }), null, 'no text boxes: none (the library words are the fallback)');
   const serverSrc = fs.readFileSync('src/lib/server/scheduled-posts.ts', 'utf8');
-  ok(/hook: \(e\.runId && onScreen\.get\(e\.runId\)\) \|\| e\.hookText/.test(serverSrc), 'the export list uses the on-screen hook first, the library words only as a fallback');
+  ok(/hook: \(e\.runId && onScreen\.get\(e\.runId\)\) \|\| \(e\.runId && hookless\.has\(e\.runId\) \? \"\" : e\.hookText\)/.test(serverSrc), 'the export list uses the on-screen hook first, the library words only as a fallback');
   ok((view.match(/<HookLine hook=/g) ?? []).length === 2, 'the dialog shows each picked video\'s hook words, for one video and for several');
   const viewNow = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
   ok(!/disabled=\{!editable\}/.test(viewNow) && /\{editable \? \(/.test(viewNow), 'a post that went out shows a summary, never greyed-out form boxes (founder 2026-11-15: "looks broken")');
