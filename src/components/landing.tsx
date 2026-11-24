@@ -1,7 +1,7 @@
 import Link from "@/components/pending-link";
 import { ArrowRight } from "lucide-react";
 import { MarketingFooter, MarketingHeader } from "@/components/marketing-chrome";
-import { HookPair } from "@/components/hook-pair";
+import { HookSlides } from "@/components/hook-pair";
 import { HookDemoExplainer } from "@/components/hook-demo-explainer";
 import { HowItWorks } from "@/components/how-it-works";
 
@@ -13,9 +13,13 @@ import { HowItWorks } from "@/components/how-it-works";
  */
 
 /** The three hero phones play these whole. */
-/** Hero before/after: a viral library hook and the same hook made in Mavya (Kling 4.0), equal length so they play in sync. */
-const BEFORE = { src: "/landing/ba-before.mp4", poster: "/landing/ba-before.webp", label: "Viral hook, 5M views" };
-const AFTER = { src: "/landing/ba-after.mp4", poster: "/landing/ba-after.webp", label: "Made with Mavya", caption: "my app finally got 100 visitors \u{1F62D}" };
+/** Hero before/after: viral library hooks and the founder's posted Mavya hooks (Kling 4.0) cut to the same length, so each pair plays in sync. */
+const MAVYA = "Made with Mavya";
+const PAIRS = [
+  { before: { src: "/landing/pair1-before.mp4", poster: "/landing/pair1-before.webp", label: "Viral hook, 5M views" }, after: { src: "/landing/pair1-after.mp4", poster: "/landing/pair1-after.webp", label: MAVYA } },
+  { before: { src: "/landing/pair2-before.mp4", poster: "/landing/pair2-before.webp", label: "Viral hook, 1.6M views" }, after: { src: "/landing/pair2-after.mp4", poster: "/landing/pair2-after.webp", label: MAVYA } },
+  { before: { src: "/landing/pair3-before.mp4", poster: "/landing/pair3-before.webp", label: "Viral hook, 443K views" }, after: { src: "/landing/pair3-after.mp4", poster: "/landing/pair3-after.webp", label: MAVYA } },
+];
 
 /** The explainer plays this one whole; its hook ends at the first cut. */
 const EXPLAIN = { code: "Dd--YQOqo16", hookEnd: 5.93, length: 20 };
@@ -31,8 +35,8 @@ const FAQ = [
 export function Landing() {
   return (
     <div className="landing-theme min-h-full bg-bg">
-      <link rel="preload" as="image" href="/landing/ba-before.webp" fetchPriority="high" />
-      <link rel="preload" as="image" href="/landing/ba-after.webp" fetchPriority="high" />
+      <link rel="preload" as="image" href="/landing/pair1-before.webp" fetchPriority="high" />
+      <link rel="preload" as="image" href="/landing/pair1-after.webp" fetchPriority="high" />
       <MarketingHeader />
 
       {/* Hero: text left, a before/after right (a viral reel and the same hook made in Mavya), both in the first screen */}
@@ -59,8 +63,8 @@ export function Landing() {
             </div>
             <p className="mt-4 text-[13.5px] font-semibold text-soft">For Reels, TikTok and Shorts.</p>
           </div>
-          <div role="group" aria-label="Before and after: a viral hook with 5M views, and the same hook made with Mavya" className="flex justify-center py-4">
-            <HookPair before={BEFORE} after={AFTER} />
+          <div role="group" aria-label="Before and after: viral hooks, and the same hooks made with Mavya" className="flex justify-center py-4">
+            <HookSlides pairs={PAIRS} />
           </div>
         </div>
       </section>
