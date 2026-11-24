@@ -52,7 +52,7 @@ export function HookPair({ before, after }: { before: Side; after: Side }) {
     };
   }, []);
   return (
-    <div data-hook-pair className="keep-round grid w-full max-w-[460px] grid-cols-2 gap-[3px] overflow-hidden rounded-[22px] bg-ink shadow-[0_40px_80px_-32px_rgba(21,18,31,0.55)]">
+    <div data-hook-pair className="grid w-full max-w-[460px] grid-cols-2 gap-[2px] overflow-hidden border-2 border-ink bg-ink shadow-[6px_6px_0_var(--ink)]">
       {[{ side: before, ref: a }, { side: after, ref: b }].map(({ side, ref }, i) => (
         <figure key={side.src} className="relative aspect-[9/16] bg-black">
           <video ref={ref} data-src={side.src} poster={side.poster} muted playsInline preload="none" aria-hidden className="absolute inset-0 h-full w-full object-cover" />

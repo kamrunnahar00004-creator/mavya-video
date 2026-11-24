@@ -29,4 +29,6 @@ ok(/v\.preload = "auto"/.test(pair) && /v\.load\(\)/.test(pair), "files actually
 // Both clips must be the same length (within 0.1 s) or the lockstep restart cuts one short.
 const dur = (f) => { const b = fs.readFileSync("public/landing/" + f); const i = b.indexOf("mvhd"); const v = b[i + 4]; const scale = v === 1 ? b.readUInt32BE(i + 24) : b.readUInt32BE(i + 16); const len = v === 1 ? Number(b.readBigUInt64BE(i + 28)) : b.readUInt32BE(i + 20); return len / scale; };
 ok(Math.abs(dur("ba-before.mp4") - dur("ba-after.mp4")) < 0.1, "hook clips equal length");
+// Square like the rest of the landing: ink border, hard offset shadow, no rounded corners (founder, 2026-11-24).
+ok(/data-hook-pair className="[^"]*border-2 border-ink[^"]*shadow-\[6px_6px_0_var\(--ink\)\]/.test(pair) && !/keep-round|rounded-/.test(pair), "hook card is square");
 console.log(`landing-hero-checks: ${n} passed`);
