@@ -13,30 +13,22 @@ import { HowItWorks } from "@/components/how-it-works";
  */
 
 /** The three hero phones play these whole. */
-/** Hero before/after: a library reel that went viral, and the same hook made in Mavya (Kling 4.0). */
-const BEFORE = { src: "/landing/ba-before.mp4", poster: "/landing/ba-before.webp", views: "5M" };
-const AFTER = { src: "/landing/ba-after.mp4", poster: "/landing/ba-after.webp", caption: "my app finally got 100 visitors 😭" };
+/** Hero before/after: a library reel that went viral, and the founder's reel that copies its hook (Kling 4.0), both whole. */
+const BEFORE = { src: "/landing/lib-Dd--YQOqo16-full.mp4", poster: "/landing/lib-Dd--YQOqo16.webp" };
+const AFTER = { src: "/landing/ba-after.mp4", poster: "/landing/ba-after.webp" };
 
-/** A phone playing a short loop, with a label above it. */
-function Phone({ src, poster, label, accent = false, views, caption }: { src: string; poster: string; label: string; accent?: boolean; views?: string; caption?: string }) {
+/** A phone playing a whole reel on loop: dark frame, side buttons, camera island. */
+function Phone({ src, poster, highlight = false }: { src: string; poster: string; highlight?: boolean }) {
   return (
-    <figure className="flex flex-col items-center gap-3">
-      <figcaption className={`text-[13px] font-bold uppercase tracking-[0.08em] ${accent ? "text-accent" : "text-soft"}`}>{label}</figcaption>
-      <div className="keep-round relative w-[38vw] max-w-[140px] shrink-0 rounded-[30px] bg-ink p-[6px] shadow-[0_30px_60px_-24px_rgba(21,18,31,0.55)] sm:w-[190px] sm:max-w-none sm:rounded-[32px]">
-        <div className="keep-round relative aspect-[9/16] overflow-hidden rounded-[24px] bg-[#1c2633] sm:rounded-[28px]">
-          <LoopVideo src={src} poster={poster} className="absolute inset-0 h-full w-full object-cover" />
-          {caption && (
-            <span className="absolute inset-x-3 top-[58%] text-center text-[12px] font-bold leading-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)] sm:text-[14px]">{caption}</span>
-          )}
-          {views && (
-            <span className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10.5px] font-bold text-white">
-              <Play className="h-2.5 w-2.5" fill="currentColor" />
-              {views} views
-            </span>
-          )}
-        </div>
+    <div className={`keep-round relative w-[36vw] max-w-[150px] shrink-0 rounded-[30px] bg-[#0b0910] p-[5px] shadow-[0_40px_70px_-28px_rgba(21,18,31,0.6)] sm:w-[210px] sm:max-w-none sm:rounded-[40px] sm:p-[7px] ${highlight ? "ring-4 ring-accent/25" : "ring-1 ring-black/10"}`}>
+      <span aria-hidden className="absolute -left-[3px] top-[22%] h-8 w-[3px] rounded-l-full bg-[#0b0910] sm:h-10" />
+      <span aria-hidden className="absolute -left-[3px] top-[34%] h-8 w-[3px] rounded-l-full bg-[#0b0910] sm:h-10" />
+      <span aria-hidden className="absolute -right-[3px] top-[28%] h-12 w-[3px] rounded-r-full bg-[#0b0910] sm:h-16" />
+      <div className="keep-round relative aspect-[9/16] overflow-hidden rounded-[25px] bg-black sm:rounded-[33px]">
+        <LoopVideo src={src} poster={poster} className="absolute inset-0 h-full w-full object-cover" />
+        <span aria-hidden className="keep-round absolute left-1/2 top-2 h-[14px] w-[52px] -translate-x-1/2 rounded-full bg-black sm:top-2.5 sm:h-[18px] sm:w-[66px]" />
       </div>
-    </figure>
+    </div>
   );
 }
 
@@ -54,7 +46,7 @@ const FAQ = [
 export function Landing() {
   return (
     <div className="landing-theme min-h-full bg-bg">
-      <link rel="preload" as="image" href="/landing/ba-before.webp" fetchPriority="high" />
+      <link rel="preload" as="image" href="/landing/lib-Dd--YQOqo16.webp" fetchPriority="high" />
       <link rel="preload" as="image" href="/landing/ba-after.webp" fetchPriority="high" />
       <MarketingHeader />
 
@@ -82,10 +74,23 @@ export function Landing() {
             </div>
             <p className="mt-4 text-[13.5px] font-semibold text-soft">For Reels, TikTok and Shorts.</p>
           </div>
-          <div role="group" aria-label="Before and after: a viral video with 5M views, and the same hook made with Mavya" className="flex items-center justify-center py-4">
-            <Phone {...BEFORE} label="Viral video" />
-            <ArrowRight aria-hidden className="mx-2 h-6 w-6 shrink-0 text-soft sm:mx-5" />
-            <Phone {...AFTER} label="Made with Mavya" accent />
+          <div role="group" aria-label="Before and after: a viral video with 5M views, and the same hook made with Mavya" className="flex items-start justify-center gap-3 py-4 sm:gap-6">
+            <figure className="flex flex-col items-center gap-4">
+              <Phone {...BEFORE} />
+              <figcaption className="keep-round flex items-center gap-1.5 rounded-full border border-line bg-panel px-3 py-1.5 text-[12px] font-bold text-muted shadow-sm sm:text-[13px]">
+                <Play className="h-3 w-3" fill="currentColor" />
+                Viral video, 5M views
+              </figcaption>
+            </figure>
+            <div aria-hidden className="keep-round mt-[115px] flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-panel text-accent shadow-[0_8px_20px_-8px_rgba(21,18,31,0.35)] ring-1 ring-line sm:mt-[165px] sm:h-11 sm:w-11">
+              <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <figure className="flex flex-col items-center gap-4">
+              <Phone {...AFTER} highlight />
+              <figcaption className="keep-round flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-[12px] font-bold text-white shadow-sm sm:text-[13px]">
+                Made with Mavya
+              </figcaption>
+            </figure>
           </div>
         </div>
       </section>
