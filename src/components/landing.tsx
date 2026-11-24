@@ -15,7 +15,7 @@ import { HowItWorks } from "@/components/how-it-works";
 /** The three hero phones play these whole. */
 /** Hero before/after: viral library hooks and the founder's posted Mavya hooks (Kling 4.0) cut to the same length, so each pair plays in sync. */
 // Sources (founder-picked, 2026-11-24). Before: library reel. After: founder's posted IG reel, hook only.
-// 1: Dd--YQOqo16 (@creativeinezz) / IG 17958187635319647 "my app finally got 100 visitors", 3.17 s
+// 1: Dd--YQOqo16 (@creativeinezz) from 2.13 s / IG 17958187635319647 "my app finally got 100 visitors", 3.17 s (founder trimmed the hook start)
 // 2: DaFCnEnNxTM (@blair.buildsthingss) / IG 17895093048620048 "Insta + App = 🤯", 2.6 s (not the POV reel: that one drifted to the original's face)
 // 3: DaBzNCqtACr (@blair.buildsthingss) / IG 18486222580115318 "Insta + App = 🤑", 3.17 s
 const MAVYA = "Made with Mavya";
