@@ -13,25 +13,30 @@ import { HowItWorks } from "@/components/how-it-works";
  */
 
 /** The three hero phones play these whole. */
-const HERO = [
-  { lib: "DdLjyNctVi9", views: "3.6M" },
-  { lib: "DcOiTp0xxTK", views: "5.6M" },
-  { lib: "DbHo7QFIvD4", views: "3.3M" },
-];
+/** Hero before/after: a library reel that went viral, and the same hook made in Mavya (Kling 4.0). */
+const BEFORE = { src: "/landing/ba-before.mp4", poster: "/landing/ba-before.webp", views: "5M" };
+const AFTER = { src: "/landing/ba-after.mp4", poster: "/landing/ba-after.webp", caption: "my app finally got 100 visitors 😭" };
 
-/** A phone playing a library video whole, with its view count. */
-function Phone({ lib, views, className = "" }: { lib: string; views: string; className?: string }) {
+/** A phone playing a short loop, with a label above it. */
+function Phone({ src, poster, label, accent = false, views, caption }: { src: string; poster: string; label: string; accent?: boolean; views?: string; caption?: string }) {
   return (
-    <div className={`keep-round relative w-[180px] shrink-0 rounded-[32px] xl:w-[190px] bg-ink p-[6px] shadow-[0_30px_60px_-24px_rgba(21,18,31,0.55)] ${className}`}>
-      <div className="keep-round relative aspect-[9/19.5] overflow-hidden rounded-[28px] bg-[#1c2633]">
-        <LoopVideo src={`/landing/lib-${lib}.mp4`} poster={`/landing/lib-${lib}.webp`} className="absolute inset-0 h-full w-full object-cover" />
-        <span className="keep-round absolute left-1/2 top-2.5 h-4 w-16 -translate-x-1/2 rounded-full bg-black" />
-        <span className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10.5px] font-bold text-white">
-          <Play className="h-2.5 w-2.5" fill="currentColor" />
-          {views} views
-        </span>
+    <figure className="flex flex-col items-center gap-3">
+      <figcaption className={`text-[13px] font-bold uppercase tracking-[0.08em] ${accent ? "text-accent" : "text-soft"}`}>{label}</figcaption>
+      <div className="keep-round relative w-[38vw] max-w-[140px] shrink-0 rounded-[30px] bg-ink p-[6px] shadow-[0_30px_60px_-24px_rgba(21,18,31,0.55)] sm:w-[190px] sm:max-w-none sm:rounded-[32px]">
+        <div className="keep-round relative aspect-[9/16] overflow-hidden rounded-[24px] bg-[#1c2633] sm:rounded-[28px]">
+          <LoopVideo src={src} poster={poster} className="absolute inset-0 h-full w-full object-cover" />
+          {caption && (
+            <span className="absolute inset-x-3 top-[58%] text-center text-[12px] font-bold leading-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)] sm:text-[14px]">{caption}</span>
+          )}
+          {views && (
+            <span className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10.5px] font-bold text-white">
+              <Play className="h-2.5 w-2.5" fill="currentColor" />
+              {views} views
+            </span>
+          )}
+        </div>
       </div>
-    </div>
+    </figure>
   );
 }
 
@@ -49,10 +54,11 @@ const FAQ = [
 export function Landing() {
   return (
     <div className="landing-theme min-h-full bg-bg">
-      <link rel="preload" as="image" href="/landing/lib-DcOiTp0xxTK.webp" fetchPriority="high" />
+      <link rel="preload" as="image" href="/landing/ba-before.webp" fetchPriority="high" />
+      <link rel="preload" as="image" href="/landing/ba-after.webp" fetchPriority="high" />
       <MarketingHeader />
 
-      {/* Hero: text left (semibold, three clean lines), the three phones fanned right, both in the first screen */}
+      {/* Hero: text left, a before/after right (a viral reel and the same hook made in Mavya), both in the first screen */}
       <section className="relative overflow-hidden">
         {/* blue glow behind the phones, a little stronger, so the dark card below feels like a continuation */}
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[600px] bg-[radial-gradient(46%_58%_at_72%_32%,rgba(74,168,224,0.2)_0%,transparent_100%)] [mask-image:linear-gradient(to_bottom,transparent,black_180px)]" />
@@ -76,10 +82,10 @@ export function Landing() {
             </div>
             <p className="mt-4 text-[13.5px] font-semibold text-soft">For Reels, TikTok and Shorts.</p>
           </div>
-          <div className="flex items-center justify-center py-4">
-            <Phone {...HERO[0]} className="-mr-14 translate-y-6 -rotate-[8deg] scale-[0.86]" />
-            <Phone {...HERO[1]} className="relative z-10" />
-            <Phone {...HERO[2]} className="-ml-14 translate-y-6 rotate-[8deg] scale-[0.86]" />
+          <div role="group" aria-label="Before and after: a viral video with 5M views, and the same hook made with Mavya" className="flex items-center justify-center py-4">
+            <Phone {...BEFORE} label="Viral video" />
+            <ArrowRight aria-hidden className="mx-2 h-6 w-6 shrink-0 text-soft sm:mx-5" />
+            <Phone {...AFTER} label="Made with Mavya" accent />
           </div>
         </div>
       </section>
