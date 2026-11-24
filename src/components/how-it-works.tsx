@@ -48,7 +48,7 @@ function useLivePlay() {
 const STEPS = [
   { key: "hook", title: "Find your hook", body: "Hooks that already pulled millions of views. Pick one.", url: "mavya.app/library", Panel: LibraryPanel },
   { key: "remix", title: "Make it yours", body: "Your face, one from our library, or one you describe. Mavya recreates the hook with it.", url: "mavya.app/studio/new/character", Panel: CharacterPanel },
-  { key: "demo", title: "Film your demo", body: "Mavya writes the script, shot by shot. Film it on your phone in a minute.", url: "mavya.app/studio/new/demo", Panel: DemoPanel },
+  { key: "demo", title: "Film your demo", body: "Get a viral script for your app, shot by shot. Film it on your phone in a minute.", url: "mavya.app/studio/new/demo", Panel: DemoPanel },
   { key: "sound", title: "Add sound and export", body: "The hook's original audio or a trending track. Ready to post.", url: "mavya.app/studio/new/sound", Panel: SoundPanel },
 ];
 

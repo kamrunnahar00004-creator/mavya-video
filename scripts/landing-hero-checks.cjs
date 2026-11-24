@@ -45,4 +45,6 @@ ok(/2: DaFCnEnNxTM .* IG 17895093048620048/.test(landing) && Math.abs(dur("pair2
 for (const n of pairs) ok(Math.abs(dur(`pair${n}-before.mp4`) - dur(`pair${n}-after.mp4`)) < 0.1, `pair ${n} clips equal length`);
 // Square like the rest of the landing: ink border, hard offset shadow, no rounded corners (founder, 2026-11-24).
 ok(/data-hook-pair className="[^"]*border-2 border-ink[^"]*shadow-\[6px_6px_0_var\(--ink\)\]/.test(pair) && !/keep-round|rounded-/.test(pair), "hook card is square");
+// How it works, "Film your demo" step copy (founder, 2026-11-24).
+ok(fs.readFileSync("src/components/how-it-works.tsx", "utf8").includes('body: "Get a viral script for your app, shot by shot. Film it on your phone in a minute."'), "film your demo copy");
 console.log(`landing-hero-checks: ${n} passed`);
