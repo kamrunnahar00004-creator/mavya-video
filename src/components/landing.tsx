@@ -63,7 +63,7 @@ export function Landing() {
               <span className="block text-balance text-accent">into a viral reel</span>
             </h1>
             <p className="mt-7 max-w-[480px] text-[18px] leading-relaxed text-muted">
-              Add an AI reaction hook, drop in your screen recording and export in under 2 minutes.
+              Pick a viral video. Add your app. Your reel is ready in under 2 minutes.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Link href="/studio" className="btn-primary h-12 px-7 text-[16px]">
