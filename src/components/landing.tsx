@@ -59,11 +59,11 @@ export function Landing() {
         <div className="relative mx-auto grid max-w-[1160px] items-center gap-12 px-5 pb-24 pt-16 lg:grid-cols-[1.1fr_1fr] lg:pt-24">
           <div>
             <h1 className="text-[40px] font-semibold leading-[1.12] tracking-[-0.035em] sm:text-[48px]">
-              <span className="block">AI made building easy.</span>
-              <span className="block text-balance text-accent">Mavya makes marketing easy.</span>
+              <span className="block">Turn your app demo</span>
+              <span className="block text-balance text-accent">into a viral reel</span>
             </h1>
             <p className="mt-7 max-w-[480px] text-[18px] leading-relaxed text-muted">
-              Hook + demo videos are the #1 way to market your app. Create your next viral video in under 2 minutes.
+              Add an AI reaction hook, drop in your screen recording and export in under 2 minutes.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Link href="/studio" className="btn-primary h-12 px-7 text-[16px]">
