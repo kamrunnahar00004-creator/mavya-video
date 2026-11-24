@@ -38,6 +38,8 @@ ok(/onClick=\{\(\) => \{ setAuto\(false\); setIndex\(i\); \}\}/.test(pair) && /i
 ok(/addEventListener\("error", onError\)/.test(pair) && /clearTimeout\(failed\)/.test(pair), "failed clip moves on");
 // Each pair's clips must be the same length (within 0.1 s) or the lockstep restart cuts one short.
 const dur = (f) => { const b = fs.readFileSync("public/landing/" + f); const i = b.indexOf("mvhd"); const v = b[i + 4]; const scale = v === 1 ? b.readUInt32BE(i + 24) : b.readUInt32BE(i + 16); const len = v === 1 ? Number(b.readBigUInt64BE(i + 28)) : b.readUInt32BE(i + 20); return len / scale; };
+// Founder 2026-11-24: pair 2's Mavya side is the "Insta + App" reel (Olivia), not the POV reel that looks like the original.
+ok(/2: DaFCnEnNxTM .* IG 17895093048620048/.test(landing) && Math.abs(dur("pair2-after.mp4") - 2.6) < 0.1, "pair 2 uses the Insta + App reel");
 for (const n of pairs) ok(Math.abs(dur(`pair${n}-before.mp4`) - dur(`pair${n}-after.mp4`)) < 0.1, `pair ${n} clips equal length`);
 // Square like the rest of the landing: ink border, hard offset shadow, no rounded corners (founder, 2026-11-24).
 ok(/data-hook-pair className="[^"]*border-2 border-ink[^"]*shadow-\[6px_6px_0_var\(--ink\)\]/.test(pair) && !/keep-round|rounded-/.test(pair), "hook card is square");
