@@ -586,41 +586,55 @@ function SetupDialog({ templates, app, rev, onClose, onSaved, onStale }: { templ
     }
   }
   const preview: AppProfile = { ...current, hashtags: tags.split(/[\s,]+/).filter(Boolean).map((x) => (x.startsWith("#") ? x : `#${x}`)) };
+  // One platform at a time (founder 2026-11-26: four boxes at once was "too congested").
+  const [tab, setTab] = useState<Target>("instagram");
+  const heading = "text-[12px] font-bold uppercase tracking-wide text-soft";
 
   return (
-    <Dialog title="Your app & captions" onClose={onClose} wide>
-      <fieldset disabled={busy !== null} className="grid min-w-0 gap-0 border-0 p-0 md:grid-cols-[320px_1fr]">
-        <div className="space-y-3 border-b border-line p-5 md:border-b-0 md:border-r">
-          <label className="block text-[12.5px] font-semibold">Your app&apos;s link
-            <input value={url} disabled={busy === "analyze"} onChange={(e) => setUrl(e.target.value)} placeholder="yourapp.com" className={`${field} mt-1`} />
+    <Dialog title="Your app & captions" onClose={onClose}>
+      <fieldset disabled={busy !== null} className="min-w-0 border-0 p-0">
+        <section className="space-y-3 border-b border-line px-6 py-5">
+          <h3 className={heading}>Your app</h3>
+          <div className="flex gap-2">
+            <input aria-label="Your app's link" value={url} disabled={busy === "analyze"} onChange={(e) => setUrl(e.target.value)} placeholder="yourapp.com" className={`${field} min-w-0 flex-1`} />
+            <button type="button" disabled={busy !== null || !url.trim()} onClick={() => void analyze()} className="btn-primary shrink-0 px-4 py-2 text-[14px]">
+              {busy === "analyze" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{current.analyzedAt ? "Analyze again" : "Analyze"}
+            </button>
+          </div>
+          <p className="text-[12px] text-soft">{current.name ? <>Analyzed <b className="text-text">{current.name}</b>. Edit the hashtags below if you want.</> : "Mavya reads your site once and picks hashtags for your niche."}</p>
+          <label className="block text-[13px] font-semibold">Hashtags
+            {/* A text area, so hashtags pasted on separate lines stay separate (Codex 2026-11-26). */}
+            <textarea rows={2} value={tags} disabled={busy === "analyze"} onChange={(e) => setTags(e.target.value)} placeholder="#appmarketing #indiehacker" className={`${field} mt-1 resize-y text-[13px]`} />
           </label>
-          <button type="button" disabled={busy !== null || !url.trim()} onClick={() => void analyze()} className="btn-primary w-full px-4 py-2 text-[14px]">
-            {busy === "analyze" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{current.analyzedAt ? "Analyze again" : "Analyze my app"}
-          </button>
-          <p className="text-[11.5px] text-soft">Mavya reads your site once and picks hashtags for your niche. Captions show your link without https://.</p>
-          {current.name && <p className="text-[12px] text-muted">Analyzed: <b className="text-text">{current.name}</b></p>}
-          <label className="block text-[12.5px] font-semibold">Hashtags
-            <textarea rows={4} value={tags} disabled={busy === "analyze"} onChange={(e) => setTags(e.target.value)} placeholder="#appmarketing #indiehacker" className={`${field} mt-1 resize-y text-[13px]`} />
-          </label>
-          <p className="text-[11.5px] text-soft">Best first. Instagram and TikTok use the first {HASHTAGS.instagram}, Facebook and YouTube the first {HASHTAGS.youtube}.</p>
-        </div>
-        <div className="space-y-3 p-5">
-          <p className="text-[13px] text-muted">One format for every platform. <code className="bg-raised px-1">{"{hook}"}</code> is the video&apos;s hook words, <code className="bg-raised px-1">{"{domain}"}</code> your link, <code className="bg-raised px-1">{"{hashtags}"}</code> your hashtags.</p>
-          <div className="grid gap-3 md:grid-cols-2">
+          <p className="text-[12px] text-soft">Best first. Instagram and TikTok use the first {HASHTAGS.instagram}, Facebook and YouTube the first {HASHTAGS.youtube}.</p>
+        </section>
+        <section className="space-y-3 px-6 py-5">
+          <h3 className={heading}>Captions</h3>
+          <div role="tablist" aria-label="Platform" className="flex gap-1 border-b border-line">
             {TARGETS.map((t) => (
-              <div key={t}>
-                <label className="block text-[12.5px] font-semibold"><span className="flex items-center gap-1.5"><NetworkLogo t={t} />{NAMES[t]}</span>
-                  <textarea rows={5} value={value[t]} onChange={(e) => setValue({ ...value, [t]: e.target.value })} className={`${field} mt-1 resize-y text-[13px]`} />
-                </label>
-                <p className="mt-1 whitespace-pre-wrap break-words border-l-2 border-line-strong pl-2 text-[11.5px] text-muted">{captionFor(t, value[t], "my app had 0 users… then i found this 😳", preview)}</p>
-              </div>
+              <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+                className={`-mb-px flex cursor-pointer items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-semibold ${tab === t ? "border-accent text-text" : "border-transparent text-muted hover:text-text"}`}>
+                <NetworkLogo t={t} />{NAMES[t]}
+              </button>
             ))}
           </div>
-          {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}{plans && <> <a href="/pricing" className="underline">See plans</a></>}</p>}
-          <div className="flex gap-2">
-            <button type="button" disabled={busy !== null} onClick={() => void save()} className="btn-primary px-4 py-2 text-[14px]">Save</button>
-            <button type="button" onClick={() => setValue(DEFAULT_TEMPLATES)} className="cursor-pointer px-3 py-2 text-[13px] font-semibold text-muted hover:bg-raised">Reset to default</button>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <textarea aria-label={`${NAMES[tab]} caption format`} rows={7} value={value[tab]} onChange={(e) => setValue({ ...value, [tab]: e.target.value })} className={`${field} resize-y text-[13px]`} />
+              <div className="mt-1.5 flex items-center justify-between gap-2 text-[11.5px] text-soft">
+                <span><code>{"{hook}"}</code> hook · <code>{"{domain}"}</code> link · <code>{"{hashtags}"}</code></span>
+                <button type="button" onClick={() => setValue({ ...value, [tab]: DEFAULT_TEMPLATES[tab] })} className="cursor-pointer font-semibold text-accent hover:underline">Reset to default</button>
+              </div>
+            </div>
+            <div>
+              <p className="mb-1 text-[11.5px] font-semibold text-soft">Preview</p>
+              <p className="whitespace-pre-wrap break-words bg-raised p-3 text-[13px] leading-relaxed">{captionFor(tab, value[tab], "my app had 0 users… then i found this 😳", preview)}</p>
+            </div>
           </div>
+        </section>
+        <div className="flex items-center gap-3 border-t border-line px-6 py-3">
+          {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}{plans && <> <a href="/pricing" className="underline">See plans</a></>}</p>}
+          <button type="button" disabled={busy !== null} onClick={() => void save()} className="btn-primary ml-auto px-5 py-2 text-[14px]">Save</button>
         </div>
       </fieldset>
     </Dialog>

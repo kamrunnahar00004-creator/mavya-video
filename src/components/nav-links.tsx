@@ -2,12 +2,14 @@
 
 import Link from "@/components/pending-link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Clapperboard, Flame, Settings } from "lucide-react";
+import { CalendarDays, Clapperboard, Settings } from "lucide-react";
 
-/** The sidebar's items. Content calendar sits under Viral library, for every account (founder 2026-11-26). */
+/**
+ * The sidebar's items, for every account. No Viral library (founder 2026-11-26): it duplicated "Browse hooks" inside a
+ * video; the page stays at /library so old links still work.
+ */
 export const NAV = [
   { href: "/studio", label: "Videos", icon: Clapperboard },
-  { href: "/library", label: "Viral library", icon: Flame },
   { href: "/posts", label: "Content calendar", icon: CalendarDays },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

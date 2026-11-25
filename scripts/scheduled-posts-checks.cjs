@@ -9,7 +9,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 157;
+const EXPECTED = 160;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -292,8 +292,12 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   ok(!/graph\.facebook\.com|rupload|META_PAGE_TOKEN|media_publish/.test(serverSrc), 'no auto-posting left (founder: "not useful")');
   ok(!fs.existsSync('src/lib/posts-access.ts') && !fs.existsSync('src/lib/posts-nav.ts'), 'the owner-only gate is gone');
   const nav = load('src/components/nav-links.tsx', { '@/components/pending-link': {}, 'next/navigation': {}, 'lucide-react': {}, 'react/jsx-runtime': { jsx() {}, jsxs() {}, Fragment: {} } });
-  eq(nav.NAV.map((i) => i.href), ['/studio', '/library', '/posts', '/settings'], 'every account: Content calendar right under Viral library');
-  eq(nav.NAV[2].label, 'Content calendar', 'named Content calendar');
+  eq(nav.NAV.map((i) => i.href), ['/studio', '/posts', '/settings'], 'every account: Videos, Content calendar, Settings (no Viral library: Browse hooks inside a video does the same)');
+  eq(nav.NAV[1].label, 'Content calendar', 'named Content calendar');
+  ok(fs.existsSync('src/app/(app)/library/page.tsx'), 'the library page stays, so old links still work');
+  const setupSrc = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
+  ok(/role="tablist" aria-label="Platform"/.test(setupSrc) && (setupSrc.match(/aria-label=\{`\$\{NAMES\[tab\]\} caption format`\}/g) ?? []).length === 1, 'captions: one platform at a time in tabs, not four boxes at once (founder: "too congested")');
+  ok(/<textarea rows=\{2\} value=\{tags\}/.test(setupSrc), 'hashtags pasted on separate lines stay separate');
   const session = fs.readFileSync('src/lib/supabase/session.ts', 'utf8');
   ok(/APP_PAGES = \[[^\]]*"\/posts"/.test(session) && /\\\/api\\\/posts\(\\\/\|\$\)/.test(session), 'the page and its API sit behind the paid-plan gate like the rest of the app');
   ok(!/isPostsPage|schedulerAllowed/.test(session) && !/scheduler/.test(fs.readFileSync('src/app/api/profile/route.ts', 'utf8')), 'no owner-only 404 or profile flag left');
