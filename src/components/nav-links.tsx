@@ -2,23 +2,18 @@
 
 import Link from "@/components/pending-link";
 import { usePathname } from "next/navigation";
-import { usePostsNav } from "@/lib/posts-nav";
-import { CalendarClock, Clapperboard, Flame, Settings } from "lucide-react";
+import { CalendarDays, Clapperboard, Flame, Settings } from "lucide-react";
 
-const NAV = [
+/** The sidebar's items. Content calendar sits under Viral library, for every account (founder 2026-11-26). */
+export const NAV = [
   { href: "/studio", label: "Videos", icon: Clapperboard },
   { href: "/library", label: "Viral library", icon: Flame },
+  { href: "/posts", label: "Content calendar", icon: CalendarDays },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-/** Scheduled posts sits under Viral library, for the accounts the server allows (owner-only for now). */
-const POSTS = { href: "/posts", label: "Scheduled posts", icon: CalendarClock };
-
-/** The sidebar's items: Scheduled posts right under Viral library, only when the server allows this account. */
-export const navItems = (posts: boolean) => (posts ? [NAV[0], NAV[1], POSTS, ...NAV.slice(2)] : NAV);
-
 function Links({ pathname }: { pathname: string | null }) {
-  return navItems(usePostsNav()).map(({ href, label, icon: Icon }) => {
+  return NAV.map(({ href, label, icon: Icon }) => {
     const on = pathname?.startsWith(href) ?? false;
     return (
       <Link

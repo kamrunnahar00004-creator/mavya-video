@@ -6,7 +6,6 @@ import { Avatar } from "@/components/profile-view";
 import { NO_PROFILE, PROFILE_EVENT, displayName, type Profile } from "@/lib/profile";
 import { planById, type PlanId } from "@/lib/plans";
 import { newestWrites } from "@/lib/account-loader";
-import { setPostsNav } from "@/lib/posts-nav";
 
 // The last values this page saw: a remounted chip (moving between the studio and Settings) shows them at once
 // while it refreshes. Memory only; signing out reloads the page, so they never outlive the session.
@@ -23,8 +22,6 @@ export function AccountChip() {
     const profileTicket = lastProfile.ticket();
     fetch("/api/profile")
       .then((r) => { if (!r.ok) throw Error("Profile unavailable"); return r.json() as Promise<Profile>; })
-      // Scheduled posts' menu item: shown only when this account's own profile says so (the owner's).
-      .then((p) => { setPostsNav(p.scheduler === true); return p; })
       .then((p) => { if (lastProfile.write(profileTicket, p) && alive) setProfile(p); })
       .catch(() => undefined);
     const planTicket = lastPlan.ticket();

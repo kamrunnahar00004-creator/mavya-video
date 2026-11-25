@@ -1,14 +1,14 @@
 "use client";
 
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { CalendarClock, ChevronLeft, ChevronRight, CircleCheck, CircleX, ExternalLink, LoaderCircle, Plus, RotateCcw, Timer, Trash2, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, CircleCheck, Copy, Download, ExternalLink, Eye, LoaderCircle, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { ThumbImg } from "@/components/thumb-img";
-import { CAPTION_MAX, countdown, DEFAULT_TEMPLATES, draftCaptions, type Drafts, fillCaption, finalTimes, randomSlots, seeded, slotMoments, timeProblem, MAX_BATCH, TARGETS, type Post, type Target, type Templates } from "@/lib/scheduled-posts";
+import { fileDownload } from "@/lib/export-name";
+import { CAPTION_MAX, captionFor, DEFAULT_TEMPLATES, draftCaptions, type Drafts, finalTimes, HASHTAGS, MAX_BATCH, NAMES, NO_APP, randomSlots, seeded, slotMoments, TARGETS, TITLE_MAX, totalViews, type AppProfile, type Post, type Target, type Templates } from "@/lib/scheduled-posts";
 
 type ExportChoice = { mediaId: string; title: string; hook: string; at: string; seconds: number; src: string };
 
 const DAY = 86_400_000;
-const NAMES: Record<Target, string> = { instagram: "Instagram", facebook: "Facebook" };
 const field = "w-full border border-line-strong bg-panel px-3 py-2 text-[14px] text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";
 
 /** Monday 00:00 (local) of the week holding `t`. */
@@ -23,27 +23,25 @@ const sameDay = (a: number, b: number) => new Date(a).toDateString() === new Dat
 const timeText = (t: number) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 const dateInput = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const toMinutes = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + (m || 0); };
-/** "Now", read at the click. */
-const nowIso = () => new Date().toISOString();
-/** Checked at the click against the real clock, not the last tick (Codex 2026-11-15). */
-const passedAt = (times: (number | null)[]) => { const now = Date.now(); return times.some((t) => timeProblem(t, now)) ? now : null; };
+const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 const without = (o: Record<string, number | null>, id: string) => Object.fromEntries(Object.entries(o).filter(([k]) => k !== id));
 /** A time as a datetime-local value (local), and back. */
 const localInput = (t: number) => `${dateInput(t)}T${hhmm(new Date(t).getHours() * 60 + new Date(t).getMinutes())}`;
 const fromLocalInput = (v: string) => { const t = v ? new Date(v).getTime() : NaN; return Number.isFinite(t) ? t : null; };
-const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 /** Local date (yyyy-mm-dd) + minutes after midnight, as a time. */
 const at = (date: string, minutes: number) => { const [y, m, d] = date.split("-").map(Number); return new Date(y, m - 1, d, Math.floor(minutes / 60), minutes % 60).getTime(); };
+const compact = (n: number) => new Intl.NumberFormat([], { notation: "compact", maximumFractionDigits: 1 }).format(n);
 
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: { "content-type": "application/json", ...(init?.headers ?? {}) }, cache: "no-store" });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json?.error ?? "Something went wrong. Try again.");
+  if (!res.ok) throw Object.assign(new Error(json?.error ?? "Something went wrong. Try again."), { plans: res.status === 402, status: res.status });
   return json as T;
 }
 
 /**
- * Scheduled posts (owner-only): a week calendar of exported videos that post to Instagram and Facebook by themselves.
+ * Content calendar (founder 2026-11-26): plan exported videos for Instagram, Facebook, TikTok and YouTube Shorts,
+ * copy each platform's caption, post by hand, then mark it posted with its link and views. Nothing posts by itself.
  * Lists show still pictures (ThumbImg), never videos (founder 2026-11-09; 2026-11-15: the picker showed black tiles).
  */
 export function ScheduledPostsView() {
@@ -53,8 +51,10 @@ export function ScheduledPostsView() {
   const [now, setNow] = useState(() => Date.now());
   const [adding, setAdding] = useState<number | null>(null);
   const [editing, setEditing] = useState<Post | null>(null);
-  const [captions, setCaptions] = useState(false);
+  const [setup, setSetup] = useState(false);
   const [templates, setTemplates] = useState<Templates>(DEFAULT_TEMPLATES);
+  const [app, setApp] = useState<AppProfile | null>(null);
+  const [setupRev, setSetupRev] = useState("");
 
   // The week's posts; a reply for a week no longer shown is dropped.
   const shown = useRef(week);
@@ -64,94 +64,79 @@ export function ScheduledPostsView() {
 
   useEffect(() => { shown.current = week; void load(); }, [week, load]);
   const goWeek = (w: number) => { if (w !== week) { setPosts(null); setWeek(w); } };
-  useEffect(() => { void call<{ templates: Templates }>("/api/posts/templates").then((o) => setTemplates(o.templates)).catch(() => undefined); }, []);
-  // The page's clock moves every 15 s (which days have passed, what is about to post); each countdown ticks by itself
-  // (Countdown), so the calendar is not redrawn every second (Codex 2026-11-15). The list refreshes every 15 s while
-  // something is about to post or posting.
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 15_000); return () => clearInterval(t); }, []);
-  const busy = (posts ?? []).some((p) => p.state === "posting" || (p.state === "scheduled" && Date.parse(p.at) - now < 5 * 60_000));
-  useEffect(() => {
-    if (!busy) return;
-    const t = setInterval(() => void load(), 15_000);
-    return () => clearInterval(t);
-  }, [busy, load]);
+  // Settings must load before "Your app & captions" opens, or saving it would write defaults over them (Codex 2026-11-26).
+  const [settingsError, setSettingsError] = useState(false);
+  const loadSettings = useCallback(() => call<{ templates: Templates; app: AppProfile; rev: string }>("/api/posts/templates")
+    .then((o) => { setTemplates(o.templates); setApp(o.app); setSetupRev(o.rev); setSettingsError(false); })
+    .catch(() => setSettingsError(true)), []);
+  useEffect(() => { void loadSettings(); }, [loadSettings]);
+  // Which days have passed: moves every minute.
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(week, i)), [week]);
   const byDay = (d: number) => (posts ?? []).filter((p) => sameDay(Date.parse(p.at), d)).sort((a, b) => a.at.localeCompare(b.at));
-  const counts = { scheduled: 0, posting: 0, posted: 0, failed: 0 };
-  for (const p of posts ?? []) counts[p.state]++;
-
-  // Stable, so the memoised cards don't redraw when the page does.
-  const retryRef = useCallback((p: Post) => {
-    call<{ post: Post }>(`/api/posts/${p.id}`, { method: "PATCH", body: JSON.stringify({ retry: true }) })
-      .then((out) => setPosts((all) => (all ?? []).map((x) => x.id === p.id ? out.post : x)))
-      .catch((e: Error) => setError(e.message));
-  }, []);
+  const planned = (posts ?? []).filter((p) => p.state !== "posted").length;
+  const posted = (posts ?? []).length - planned;
+  const views = (posts ?? []).reduce((sum, p) => sum + (totalViews(p) ?? 0), 0);
+  const replace = (p: Post) => setPosts((all) => (all ?? []).map((x) => x.id === p.id ? p : x).filter((x) => Date.parse(x.at) >= week && Date.parse(x.at) < addDays(week, 7)));
 
   return (
     <div className="card flex h-full flex-col overflow-hidden">
       <header className="flex flex-wrap items-center gap-3 border-b border-line bg-panel px-6 py-4">
-        <h1 className="text-[20px] font-extrabold tracking-tight">Scheduled posts</h1>
+        <h1 className="text-[20px] font-extrabold tracking-tight">Content calendar</h1>
         <div className="ml-2 flex items-center gap-1">
           <button type="button" aria-label="Previous week" onClick={() => goWeek(addDays(week, -7))} className="flex h-8 w-8 cursor-pointer items-center justify-center text-muted hover:bg-raised hover:text-text"><ChevronLeft className="h-4 w-4" /></button>
           <button type="button" onClick={() => goWeek(weekStart(Date.now()))} className="h-8 cursor-pointer px-2 text-[13px] font-semibold text-muted hover:bg-raised hover:text-text">This week</button>
           <button type="button" aria-label="Next week" onClick={() => goWeek(addDays(week, 7))} className="flex h-8 w-8 cursor-pointer items-center justify-center text-muted hover:bg-raised hover:text-text"><ChevronRight className="h-4 w-4" /></button>
           <span className="ml-2 text-[14px] font-semibold">{new Date(week).toLocaleDateString([], { month: "short", day: "numeric" })} to {new Date(addDays(week, 6)).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</span>
         </div>
-        <p className="text-[13px] text-soft">{counts.scheduled} scheduled · {counts.posted} posted{counts.failed ? ` · ${counts.failed} failed` : ""}</p>
+        <p className="text-[13px] text-soft">{planned} planned · {posted} posted{views ? ` · ${compact(views)} views` : ""}</p>
         <div className="ml-auto flex items-center gap-2">
-          <button type="button" onClick={() => setCaptions(true)} className="h-9 cursor-pointer border border-line-strong px-3 text-[13px] font-semibold hover:bg-raised">Captions</button>
-          <button type="button" onClick={() => setAdding(Math.max(Date.now(), week))} className="btn-primary px-3 py-1.5 text-[13px]"><Plus className="h-4 w-4" />Schedule videos</button>
+          <button type="button" disabled={!app} onClick={() => setSetup(true)} className="h-9 cursor-pointer border border-line-strong px-3 text-[13px] font-semibold hover:bg-raised disabled:cursor-default disabled:opacity-50">Your app & captions</button>
+          <button type="button" onClick={() => setAdding(Math.max(Date.now(), week))} className="btn-primary px-3 py-1.5 text-[13px]"><Plus className="h-4 w-4" />Add videos</button>
         </div>
       </header>
+      {app && !app.domain && (
+        <div className="flex flex-wrap items-center gap-3 border-b border-line bg-accent-tint px-6 py-2.5 text-[13px]">
+          <Sparkles className="h-4 w-4 text-accent" />
+          <span>Add your app&apos;s link once. Every caption then gets your link and hashtags for each platform.</span>
+          <button type="button" onClick={() => setSetup(true)} className="cursor-pointer font-bold text-accent hover:underline">Add your app</button>
+        </div>
+      )}
       {error && <p role="alert" className="border-b border-line bg-red-50 px-6 py-2 text-[13px] font-semibold text-red-700">{error}</p>}
+      {settingsError && <p role="alert" className="border-b border-line bg-red-50 px-6 py-2 text-[13px] font-semibold text-red-700">Couldn&apos;t load your captions. <button type="button" onClick={() => void loadSettings()} className="cursor-pointer underline">Try again</button></p>}
       <div className="grid min-h-0 flex-1 grid-cols-7 divide-x divide-line overflow-y-auto">
         {days.map((d) => {
           const list = byDay(d);
-          const past = addDays(d, 1) <= now;
           return (
             <section key={d} className={`flex min-w-0 flex-col ${sameDay(d, now) ? "bg-accent-tint" : ""}`}>
               <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-panel/95 px-2 py-2">
                 <span className="text-[12.5px] font-bold">{new Date(d).toLocaleDateString([], { weekday: "short", day: "numeric" })}</span>
-                {!past && <button type="button" aria-label="Schedule on this day" onClick={() => setAdding(Math.max(d, Date.now()))} className="flex h-6 w-6 cursor-pointer items-center justify-center text-soft hover:bg-raised hover:text-text"><Plus className="h-3.5 w-3.5" /></button>}
+                <button type="button" aria-label="Add videos on this day" onClick={() => setAdding(d)} className="flex h-6 w-6 cursor-pointer items-center justify-center text-soft hover:bg-raised hover:text-text"><Plus className="h-3.5 w-3.5" /></button>
               </div>
               <div className="space-y-1.5 p-1.5">
-                {posts === null ? <div className="h-24 animate-pulse bg-raised" /> : list.map((p) => <PostCard key={p.id} post={p} onOpen={setEditing} onRetry={retryRef} />)}
-                {posts !== null && !list.length && !past && <button type="button" onClick={() => setAdding(Math.max(d, Date.now()))} className="w-full cursor-pointer border border-dashed border-line-strong py-3 text-[12px] text-soft hover:bg-raised hover:text-text">+ Add</button>}
+                {posts === null ? <div className="h-24 animate-pulse bg-raised" /> : list.map((p) => <PostCard key={p.id} post={p} onOpen={setEditing} />)}
+                {posts !== null && !list.length && addDays(d, 1) > now && <button type="button" onClick={() => setAdding(Math.max(d, Date.now()))} className="w-full cursor-pointer border border-dashed border-line-strong py-3 text-[12px] text-soft hover:bg-raised hover:text-text">+ Add</button>}
               </div>
             </section>
           );
         })}
       </div>
-      {adding !== null && <ScheduleDialog day={adding} templates={templates} onClose={() => setAdding(null)} onDone={(made) => { setAdding(null); setPosts((all) => [...(all ?? []), ...made.filter((p) => Date.parse(p.at) >= week && Date.parse(p.at) < addDays(week, 7))]); }} />}
-      {editing && <EditDialog post={editing} onClose={() => setEditing(null)} onSaved={(p) => { setEditing(null); setPosts((all) => p ? (all ?? []).map((x) => x.id === p.id ? p : x).filter((x) => Date.parse(x.at) >= week && Date.parse(x.at) < addDays(week, 7)) : (all ?? []).filter((x) => x.id !== editing.id)); }} />}
-      {captions && <CaptionsDialog templates={templates} onClose={() => setCaptions(false)} onSaved={(t) => { setTemplates(t); setCaptions(false); }} />}
+      {adding !== null && <AddDialog day={adding} templates={templates} app={app ?? NO_APP} onClose={() => setAdding(null)} onDone={(made) => { setAdding(null); setPosts((all) => [...(all ?? []), ...made.filter((p) => Date.parse(p.at) >= week && Date.parse(p.at) < addDays(week, 7))]); }} />}
+      {editing && <PostDialog post={editing} templates={templates} app={app ?? NO_APP} onStale={() => void load()} onClose={() => setEditing(null)} onSaved={(p) => { setEditing(null); if (p) replace(p); else setPosts((all) => (all ?? []).filter((x) => x.id !== editing.id)); }} />}
+      {setup && app && <SetupDialog templates={templates} app={app} rev={setupRev} onClose={() => setSetup(false)} onSaved={(t, a, r) => { setTemplates(t); setApp(a); setSetupRev(r); }} onStale={() => void loadSettings()} />}
     </div>
   );
 }
 
-/** The time left before a post goes out, ticking every second on its own. */
-function Countdown({ at }: { at: string }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
-  return <>{countdown(Date.parse(at) - now)}</>;
-}
-
-function Status({ post }: { post: Post }) {
-  if (post.state === "posted") return <span className="flex items-center gap-1 whitespace-nowrap text-[11px] font-bold text-green-700"><CircleCheck className="h-3.5 w-3.5 fill-green-600 text-white" />Posted</span>;
-  if (post.state === "failed") return <span className="flex items-center gap-1 whitespace-nowrap text-[11px] font-bold text-red-700"><CircleX className="h-3.5 w-3.5" />Failed</span>;
-  if (post.state === "posting") return <span className="flex items-center gap-1 whitespace-nowrap text-[11px] font-bold text-accent"><LoaderCircle className="h-3 w-3 animate-spin" />Posting</span>;
-  return <span className="flex items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-muted"><Timer className="h-3 w-3" /><Countdown at={post.at} /></span>;
-}
-
-const EDGE: Record<Post["state"], string> = { scheduled: "border-l-line-strong", posting: "border-l-accent", posted: "border-l-green-600", failed: "border-l-red-600" };
+const EDGE: Record<Post["state"], string> = { scheduled: "border-l-line-strong", posted: "border-l-green-600" };
 
 /**
- * One post on the calendar (founder 2026-11-15: "make it better"): picture, time, name, then one row of network logos
- * and the status. A logo is grey until that network has the post, then in colour and a link to it.
+ * One post on the calendar: picture, time, name, then one logo per platform. A logo is grey until it is marked
+ * posted there, then in colour (and a link to the post when one was added).
  */
-const PostCard = memo(function PostCard({ post, onOpen, onRetry }: { post: Post; onOpen: (p: Post) => void; onRetry: (p: Post) => void }) {
-  const waiting = TARGETS.map((t) => post.result[t]?.note).find(Boolean);
+const PostCard = memo(function PostCard({ post, onOpen }: { post: Post; onOpen: (p: Post) => void }) {
+  const views = totalViews(post);
   return (
     <div className={`border border-l-[3px] border-line bg-panel transition-colors hover:border-t-line-strong hover:border-r-line-strong hover:border-b-line-strong ${EDGE[post.state]}`}>
       <div className="flex gap-2 p-1.5">
@@ -163,27 +148,20 @@ const PostCard = memo(function PostCard({ post, onOpen, onRetry }: { post: Post;
             <span className="block text-[13px] font-bold leading-tight">{timeText(Date.parse(post.at))}</span>
             <span className="block truncate text-[11.5px] text-muted">{post.title || "Untitled video"}</span>
           </button>
-          <div className="mt-auto flex items-center gap-1 pt-1.5">
+          <div className="mt-auto flex flex-wrap items-center gap-1 pt-1.5">
             {post.targets.map((t) => {
-              const url = post.result[t]?.url;
-              return url ? (
-                <a key={t} href={url} target="_blank" rel="noreferrer" title={`Open on ${NAMES[t]}`} aria-label={`Open on ${NAMES[t]}`} className="transition-transform hover:scale-110"><NetworkLogo t={t} className="h-4 w-4" /></a>
-              ) : (
-                <span key={t} title={`${NAMES[t]}: not posted yet`} className="opacity-45"><NetworkLogo t={t} className="h-4 w-4" /><span className="sr-only">{NAMES[t]}: not posted yet</span></span>
-              );
+              const r = post.result[t];
+              if (r?.url) return <a key={t} href={r.url} target="_blank" rel="noreferrer" title={`Open on ${NAMES[t]}`} aria-label={`Open on ${NAMES[t]}`} className="transition-transform hover:scale-110"><NetworkLogo t={t} className="h-4 w-4" /></a>;
+              return <span key={t} title={`${NAMES[t]}: ${r?.postedAt ? "posted" : "not posted yet"}`} className={r?.postedAt ? "" : "opacity-40"}><NetworkLogo t={t} className="h-4 w-4" /><span className="sr-only">{NAMES[t]}: {r?.postedAt ? "posted" : "not posted yet"}</span></span>;
             })}
-            {post.trial && <span title="Instagram trial reel" className="border border-line-strong px-1 text-[10px] font-bold uppercase leading-4 text-muted">Trial</span>}
-            <span className="ml-auto pl-1"><Status post={post} /></span>
+            <span className="ml-auto pl-1">
+              {post.state === "posted"
+                ? <span className="flex items-center gap-1 whitespace-nowrap text-[11px] font-bold text-green-700">{views !== null ? <><Eye className="h-3.5 w-3.5" />{compact(views)}</> : <><CircleCheck className="h-3.5 w-3.5 fill-green-600 text-white" />Posted</>}</span>
+                : <span className="whitespace-nowrap text-[11px] font-semibold text-muted">Planned</span>}
+            </span>
           </div>
         </div>
       </div>
-      {waiting && post.state === "posting" && <p className="px-2 pb-1.5 text-[11px] text-muted">{waiting}</p>}
-      {post.state === "failed" && (
-        <div className="border-t border-line px-2 py-1.5">
-          <p className="line-clamp-2 text-[11px] text-red-700" title={post.error ?? ""}>{post.error}</p>
-          <button type="button" onClick={() => onRetry(post)} className="mt-1 flex cursor-pointer items-center gap-1 text-[11.5px] font-bold text-accent hover:underline"><RotateCcw className="h-3 w-3" />Retry</button>
-        </div>
-      )}
     </div>
   );
 });
@@ -196,7 +174,7 @@ function Dialog({ title, onClose, wide, children }: { title: string; onClose: ()
   }, [onClose]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1c2633]/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label={title} className={`relative flex max-h-full w-full flex-col bg-panel text-text shadow-[0_24px_64px_-16px_rgba(21,18,31,0.45)] ${wide ? "max-w-[980px]" : "max-w-[560px]"}`}>
+      <div role="dialog" aria-modal="true" aria-label={title} className={`relative flex max-h-full w-full flex-col bg-panel text-text shadow-[0_24px_64px_-16px_rgba(21,18,31,0.45)] ${wide ? "max-w-[1040px]" : "max-w-[620px]"}`}>
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <h2 className="text-[17px] font-bold">{title}</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 cursor-pointer items-center justify-center text-soft hover:bg-raised hover:text-text"><X className="h-5 w-5" /></button>
@@ -207,20 +185,23 @@ function Dialog({ title, onClose, wide, children }: { title: string; onClose: ()
   );
 }
 
-/**
- * The hook words the caption will use (the video's on-screen hook text now; founder 2026-11-15 chose to see them
- * here rather than change the export). Any caption can still be changed by clicking the post on the calendar.
- */
+/** The hook words the caption will use: the video's own on-screen hook text. */
 function HookLine({ hook }: { hook?: string }) {
   return <p className="truncate text-[11px] text-muted" title={hook ?? ""}>Hook: {hook ? `“${hook}”` : <i>none, the caption skips the hook line</i>}</p>;
 }
 
-/** The Instagram and Facebook marks, in their own colours (they link to the posts on those apps). */
+/** Each platform's mark, in its own colours. */
 function NetworkLogo({ t, className = "h-4 w-4" }: { t: Target; className?: string }) {
   // Each logo its own gradient id: many on one page must not share one (Codex 2026-11-15).
   const grad = `ig-${useId().replace(/:/g, "")}`;
   if (t === "facebook") return (
     <svg viewBox="0 0 24 24" aria-hidden className={className}><circle cx="12" cy="12" r="12" fill="#1877F2" /><path fill="#fff" d="M13.4 19.5v-6.3h2.1l.3-2.5h-2.4V9.2c0-.7.2-1.2 1.2-1.2h1.3V5.8c-.2 0-1-.1-1.9-.1-1.9 0-3.2 1.2-3.2 3.3v1.8H8.7v2.5h2.1v6.3h2.6z" /></svg>
+  );
+  if (t === "tiktok") return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className}><rect width="24" height="24" rx="6" fill="#000" /><path fill="#25F4EE" d="M10.2 10.6v-.8a5.6 5.6 0 0 0-.8-.1 4.7 4.7 0 0 0-2.7 8.6 4.7 4.7 0 0 1 3.5-7.7z" /><path fill="#25F4EE" d="M10.4 18.4a2.2 2.2 0 0 0 2.2-2.1V5.2h2a3.8 3.8 0 0 1-.1-.7h-2.8v11.1a2.2 2.2 0 0 1-3.2 1.9 2.2 2.2 0 0 0 1.9.9zm8-9.6v-.8a3.8 3.8 0 0 1-2.1-.6 3.8 3.8 0 0 0 2.1 1.4z" /><path fill="#FE2C55" d="M16.3 7.4a3.8 3.8 0 0 1-.9-2.5h-.7a3.8 3.8 0 0 0 1.6 2.5zm-6.9 5.5a2.2 2.2 0 0 0-1 4.2 2.2 2.2 0 0 1 2.6-3.5v-2.8a5 5 0 0 0-.8-.1h-.1v2.1a2.2 2.2 0 0 0-.7.1zm9-4.1v2.1a6.3 6.3 0 0 1-3.7-1.2v5.5a4.7 4.7 0 0 1-7.4 3.9 4.7 4.7 0 0 0 8.1-3.2V10.4a6.3 6.3 0 0 0 3.7 1.2V8.9a3.8 3.8 0 0 1-.7-.1z" /><path fill="#fff" d="M14.7 15.9v-5.5a6.3 6.3 0 0 0 3.7 1.2V9.5a3.8 3.8 0 0 1-2.1-1.4 3.8 3.8 0 0 1-1.6-2.5h-2.1v11.1a2.2 2.2 0 0 1-4.2.9 2.2 2.2 0 0 1 2.6-3.5v-2.1a4.7 4.7 0 0 0-3.5 7.7 4.7 4.7 0 0 0 7.2-3.8z" /></svg>
+  );
+  if (t === "youtube") return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className}><rect width="24" height="24" rx="6" fill="#FF0000" /><path fill="#fff" d="M9.8 8.3v7.4l6.2-3.7z" /></svg>
   );
   return (
     <svg viewBox="0 0 24 24" aria-hidden className={className}>
@@ -234,7 +215,7 @@ function NetworkLogo({ t, className = "h-4 w-4" }: { t: Target; className?: stri
 
 function Targets({ value, onChange }: { value: Target[]; onChange: (t: Target[]) => void }) {
   return (
-    <div className="flex gap-4">
+    <div className="flex flex-wrap gap-4">
       {TARGETS.map((t) => (
         <label key={t} title={NAMES[t]} className="flex cursor-pointer items-center gap-1.5">
           <input type="checkbox" aria-label={NAMES[t]} checked={value.includes(t)} onChange={(e) => onChange(e.target.checked ? TARGETS.filter((x) => x === t || value.includes(x)) : value.filter((x) => x !== t))} />
@@ -245,90 +226,107 @@ function Targets({ value, onChange }: { value: Target[]; onChange: (t: Target[])
   );
 }
 
+/** Copies a caption; shows "Copied" for a moment. */
+function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
+  const [done, setDone] = useState(false);
+  useEffect(() => { if (!done) return; const t = setTimeout(() => setDone(false), 1500); return () => clearTimeout(t); }, [done]);
+  return (
+    <button type="button" onClick={() => void navigator.clipboard.writeText(text).then(() => setDone(true), () => undefined)} className="flex cursor-pointer items-center gap-1 px-1.5 py-0.5 text-[12px] font-semibold text-accent hover:bg-raised">
+      {done ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{done ? "Copied" : label}
+    </button>
+  );
+}
+
+/** A caption box with its counter; YouTube's first line is the Short's title (100 characters). */
+function CaptionBox({ t, value, onChange, rows }: { t: Target; value: string; onChange: (v: string) => void; rows?: number }) {
+  const title = value.split("\n")[0] ?? "";
+  return (
+    <div className="block text-[12px] font-semibold">
+      <span className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5"><NetworkLogo t={t} className="h-5 w-5" />{NAMES[t]}</span>
+        <span className="flex items-center gap-1">
+          <span className={value.length > CAPTION_MAX ? "text-red-600" : "font-normal text-soft"}>{value.length}/{CAPTION_MAX}</span>
+          <CopyButton text={value} />
+        </span>
+      </span>
+      <textarea aria-label={`${NAMES[t]} caption`} rows={rows ?? 5} value={value} onChange={(e) => onChange(e.target.value)} className={`${field} mt-1 resize-y text-[13px]`} />
+      {t === "youtube" && <span className={`block text-[11px] font-normal ${title.length > TITLE_MAX ? "text-red-600" : "text-soft"}`}>First line is the Short&apos;s title ({title.length}/{TITLE_MAX}).</span>}
+    </div>
+  );
+}
+
 /**
- * Pick exported videos (founder 2026-11-15). One video: Now, or Schedule at one time. Several: random times through
- * the day, 1.5 to 2 hours apart and never on a round time (against spam filters), rolling over to the next days; any
- * one can be changed by hand. Times are the device's local time, shown with its time zone.
+ * Pick exported videos for the calendar. One video: a time. Several: spread through the days, 1.5 to 2 hours apart;
+ * any one can be changed by hand. Times may be in the past, to log videos already posted. Then a last look at every
+ * caption before saving.
  */
-function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; templates: Templates; onClose: () => void; onDone: (posts: Post[]) => void }) {
+function AddDialog({ day, templates, app, onClose, onDone }: { day: number; templates: Templates; app: AppProfile; onClose: () => void; onDone: (posts: Post[]) => void }) {
   const [exports, setExports] = useState<ExportChoice[] | null>(null);
   const [used, setUsed] = useState<Map<string, Post["state"]>>(new Map());
   const [picked, setPicked] = useState<string[]>([]);
   const [date, setDate] = useState(dateInput(day));
   const [from, setFrom] = useState("09:00");
   const [to, setTo] = useState("22:00");
-  const [mode, setMode] = useState<"now" | "schedule">("schedule");
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 2 ** 31));
-  const [targets, setTargets] = useState<Target[]>(["instagram", "facebook"]);
-  const [trial, setTrial] = useState(false);
+  const [targets, setTargets] = useState<Target[]>([...TARGETS]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [opened] = useState(() => Date.now());
 
   useEffect(() => {
     void call<{ exports: ExportChoice[] }>("/api/posts/exports").then((o) => setExports(o.exports)).catch((e) => { setExports([]); setError((e as Error).message); });
-    // Which videos are already on the calendar (60 days back and ahead), to mark them.
+    // Which videos are already on the calendar (30 days back and ahead), to mark them.
     const t = Date.now();
     void call<{ posts: Post[] }>(`/api/posts?from=${new Date(t - 30 * DAY).toISOString()}&to=${new Date(t + 30 * DAY).toISOString()}`).then((o) => setUsed(new Map(o.posts.map((p) => [p.mediaId, p.state])))).catch(() => undefined);
   }, []);
 
-  /** Random times in pick order (randomSlots), from `date`; a first day that is today starts a few minutes from now. */
+  /** Times in pick order: one video at the next hour (or 9:00 on a later day); several spread from `date`. */
   const spread = useMemo(() => {
-    if (picked.length < 2) return [opened + 60 * 60_000 - ((opened + 60 * 60_000) % (5 * 60_000))];
+    if (picked.length < 2) {
+      const nextHour = opened + 60 * 60_000 - ((opened + 60 * 60_000) % (5 * 60_000));
+      return [dateInput(opened) === date ? nextHour : at(date, toMinutes(from))];
+    }
     const start = at(date, 0);
-    // Today: from the clock's own hour and minute (not time since midnight, which a clock change shifts).
     const o = new Date(opened);
     const today = dateInput(opened) === date ? o.getHours() * 60 + o.getMinutes() + 5 : 0;
     const minutes = randomSlots(picked.length, toMinutes(from), toMinutes(to), seeded(seed), today);
     const lo = toMinutes(from), hi = toMinutes(to);
     const clockMin = (t: number) => { const d = new Date(t); return d.getHours() * 60 + d.getMinutes(); };
-    // Inside Earliest-Latest on the local clock; else the next window's start (today's if still before it).
     const fits = (t: number) => clockMin(t) >= lo && clockMin(t) <= hi;
     const nextStart = (t: number) => at(dateInput(clockMin(t) < lo ? t : addDays(t, 1)), lo + (Math.floor(t / 60_000) % 23));
-    return slotMoments(minutes, (m) => at(dateInput(addDays(start, Math.floor(m / 1440))), m % 1440), opened + 5 * 60_000, fits, nextStart);
+    return slotMoments(minutes, (m) => at(dateInput(addDays(start, Math.floor(m / 1440))), m % 1440), 0, fits, nextStart);
   }, [picked.length, from, to, date, opened, seed]);
   const single = picked.length === 1;
-  const now = single && mode === "now";
-  // Times set by hand for single videos; the rest follow the spread.
+  // Times set by hand; the rest follow the spread.
   const [own, setOwn] = useState<Record<string, number | null>>({});
   const times = finalTimes(picked, spread, own);
-  // A clock for "has it passed": moves every 15 s while the dialog is open.
-  const [clock, setClock] = useState(opened);
-  useEffect(() => { const t = setInterval(() => setClock(Date.now()), 15_000); return () => clearInterval(t); }, []);
-  const problems = now ? [] : times.map((t) => timeProblem(t, clock));
+  const missing = times.some((t) => t === null);
   const zone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
-
   const byId = new Map((exports ?? []).map((e) => [e.mediaId, e]));
   const toggle = (id: string) => {
     if (picked.includes(id)) setOwn((o) => without(o, id));
     setPicked((p) => p.includes(id) ? p.filter((x) => x !== id) : p.length >= MAX_BATCH ? p : [...p, id]);
   };
 
-  // The final review screen: every caption, editable, before anything is scheduled (founder 2026-11-15).
+  // The review screen: every caption, editable, before anything is saved (founder 2026-11-15).
   const [drafts, setDrafts] = useState<Drafts>({});
   const [reviewing, setReviewing] = useState(false);
   function review() {
-    if (!picked.length || !targets.length) return;
-    const passed = now ? null : passedAt(times);
-    if (passed !== null) { setClock(passed); setError("A time has passed. Pick a later one."); return; }
+    if (!picked.length || !targets.length || missing) return;
     setError(null);
-    setDrafts((kept) => draftCaptions(picked, (id) => byId.get(id)?.hook ?? "", targets, templates, kept));
+    setDrafts((kept) => draftCaptions(picked, (id) => byId.get(id)?.hook ?? "", targets, templates, app, kept));
     setReviewing(true);
   }
   const tooLong = picked.some((id) => targets.some((t) => (drafts[id]?.[t] ?? "").length > CAPTION_MAX));
 
   async function save() {
-    if (!picked.length || !targets.length || tooLong) return;
-    // Checked again at the click, not at the last clock tick (Codex 2026-11-15).
-    const passed = now ? null : passedAt(times);
-    if (passed !== null) { setClock(passed); setReviewing(false); setError("A time has passed. Pick a later one."); return; }
-    const postNow = now ? nowIso() : null;
+    if (!picked.length || !targets.length || tooLong || missing) return;
     setSaving(true);
     setError(null);
     try {
       const items = picked.map((id, i) => {
         const e = byId.get(id)!;
-        return { mediaId: id, at: postNow ?? new Date(times[i]!).toISOString(), targets, trial: trial && targets.includes("instagram"), title: e.title, hook: e.hook, captions: Object.fromEntries(targets.map((t) => [t, drafts[id]?.[t] ?? fillCaption(templates[t], e.hook)])) };
+        return { mediaId: id, at: new Date(times[i]!).toISOString(), targets, title: e.title, hook: e.hook, captions: Object.fromEntries(targets.map((t) => [t, drafts[id]?.[t] ?? captionFor(t, templates[t], e.hook, app)])) };
       });
       const out = await call<{ posts: Post[] }>("/api/posts", { method: "POST", body: JSON.stringify({ items }) });
       onDone(out.posts);
@@ -339,10 +337,10 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
   }
 
   return (
-    <Dialog title={reviewing ? "Check captions" : "Schedule videos"} onClose={onClose} wide>
+    <Dialog title={reviewing ? "Check captions" : "Add videos"} onClose={onClose} wide>
       {reviewing ? (
         <div>
-          <p className="border-b border-line px-5 py-3 text-[13px] text-muted">Last look before it goes out. Change any caption, then {now ? "post" : "schedule"}.</p>
+          <p className="border-b border-line px-5 py-3 text-[13px] text-muted">Change any caption, then save. You can copy them later from the calendar too.</p>
           <div className="max-h-[62vh] divide-y divide-line overflow-y-auto">
             {picked.map((id, i) => (
               <div key={id} className="flex gap-4 px-5 py-4">
@@ -350,18 +348,10 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
                 <div className="min-w-0 flex-1 space-y-2.5">
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="truncate text-[14px] font-bold">{byId.get(id)?.title}</p>
-                    <p className="shrink-0 text-[12.5px] font-semibold text-muted">{now ? "Now" : times[i] ? new Date(times[i]!).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""}</p>
+                    <p className="shrink-0 text-[12.5px] font-semibold text-muted">{times[i] ? new Date(times[i]!).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""}</p>
                   </div>
                   <div className={`grid gap-3 ${targets.length > 1 ? "md:grid-cols-2" : ""}`}>
-                    {targets.map((t) => {
-                      const text = drafts[id]?.[t] ?? "";
-                      return (
-                        <label key={t} className="block text-[12px] font-semibold">
-                          <span className="flex items-center justify-between"><span title={NAMES[t]}><NetworkLogo t={t} className="h-5 w-5" /><span className="sr-only">{NAMES[t]} caption</span></span><span className={text.length > CAPTION_MAX ? "text-red-600" : "font-normal text-soft"}>{text.length}/{CAPTION_MAX}</span></span>
-                          <textarea rows={t === "instagram" ? 6 : 4} value={text} onChange={(e) => setDrafts((d) => ({ ...d, [id]: { ...d[id], [t]: e.target.value } }))} className={`${field} mt-1 resize-y text-[13px]`} />
-                        </label>
-                      );
-                    })}
+                    {targets.map((t) => <CaptionBox key={t} t={t} value={drafts[id]?.[t] ?? ""} onChange={(v) => setDrafts((d) => ({ ...d, [id]: { ...d[id], [t]: v } }))} />)}
                   </div>
                 </div>
               </div>
@@ -371,14 +361,14 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
             <button type="button" disabled={saving} onClick={() => setReviewing(false)} className="cursor-pointer px-3 py-2 text-[13.5px] font-semibold text-muted hover:bg-raised">Back</button>
             {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
             <button type="button" disabled={saving || tooLong} onClick={() => void save()} className="btn-primary ml-auto px-5 py-2.5 text-[14px]">
-              {saving ? "Publishing..." : "Publish"}
+              {saving ? "Saving..." : "Save to calendar"}
             </button>
           </div>
         </div>
       ) : (
       <div className="grid gap-0 md:grid-cols-[1fr_300px]">
         <div className="border-b border-line p-4 md:border-b-0 md:border-r">
-          <p className="mb-2 text-[13px] text-muted">Pick exported videos in the order they should go out. {picked.length ? <b className="text-text">{picked.length} picked</b> : null}</p>
+          <p className="mb-2 text-[13px] text-muted">Pick exported videos in the order you&apos;ll post them. {picked.length ? <b className="text-text">{picked.length} picked</b> : null}</p>
           {exports === null ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-2">{Array.from({ length: 10 }, (_, i) => <div key={i} className="aspect-[9/16] animate-pulse bg-raised" />)}</div>
           ) : !exports.length ? (
@@ -392,7 +382,7 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
                   <button key={e.mediaId} type="button" onClick={() => toggle(e.mediaId)} className={`relative cursor-pointer border-2 text-left ${n >= 0 ? "border-accent" : "border-transparent hover:border-line-strong"}`}>
                     <ThumbImg src={e.src} className="block aspect-[9/16] w-full bg-raised object-cover" />
                     {n >= 0 && <span className="absolute left-1 top-1 flex h-6 min-w-6 items-center justify-center bg-accent px-1 text-[12px] font-bold text-white">{n + 1}</span>}
-                    {state && <span className={`absolute right-1 top-1 px-1 text-[10px] font-bold text-white ${state === "posted" ? "bg-green-700" : state === "failed" ? "bg-red-700" : "bg-ink/80"}`}>{state === "posted" ? "Posted" : state === "failed" ? "Failed" : "Scheduled"}</span>}
+                    {state && <span className={`absolute right-1 top-1 px-1 text-[10px] font-bold text-white ${state === "posted" ? "bg-green-700" : "bg-ink/80"}`}>{state === "posted" ? "Posted" : "Planned"}</span>}
                     <span className="block truncate px-1 pt-1 text-[11.5px] font-semibold">{e.title}</span>
                     <span className="block px-1 pb-1 text-[10.5px] text-soft">{new Date(e.at).toLocaleDateString([], { month: "short", day: "numeric" })} · {Math.round(e.seconds)} s</span>
                   </button>
@@ -402,32 +392,23 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
           )}
         </div>
         <div className="space-y-3.5 p-4">
-          {!picked.length && <p className="text-[13px] text-muted">Pick one video to post now or at a time, or several to spread through the day.</p>}
+          {!picked.length && <p className="text-[13px] text-muted">Pick one video for a time, or several to spread through the days.</p>}
           {single && (
             <>
               <div className="border border-line bg-raised p-2 text-[12px]"><p className="truncate font-semibold">{byId.get(picked[0])?.title}</p><HookLine hook={byId.get(picked[0])?.hook} /></div>
-              <div className="grid grid-cols-2 gap-2">
-                {(["now", "schedule"] as const).map((m) => (
-                  <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)} className={`cursor-pointer border-2 py-2 text-[14px] font-bold ${mode === m ? "border-ink bg-accent text-white" : "border-line-strong hover:bg-raised"}`}>{m === "now" ? "Now" : "Schedule"}</button>
-                ))}
-              </div>
-              {mode === "schedule" && (
-                <label className="block text-[12.5px] font-semibold">Post at
-                  <input type="datetime-local" value={times[0] !== null ? localInput(times[0]!) : ""} min={localInput(opened)} onChange={(e) => { const t = fromLocalInput(e.target.value); setOwn((o) => ({ ...o, [picked[0]]: t })); }}
-                    className={`${field} mt-1 ${problems[0] ? "border-red-400" : ""}`} />
-                  {problems[0] && <span className="block text-[11px] font-semibold text-red-600">{problems[0]}</span>}
-                </label>
-              )}
+              <label className="block text-[12.5px] font-semibold">When
+                <input type="datetime-local" value={times[0] !== null ? localInput(times[0]!) : ""} onChange={(e) => { const t = fromLocalInput(e.target.value); setOwn((o) => ({ ...o, [picked[0]]: t })); }} className={`${field} mt-1`} />
+              </label>
             </>
           )}
           {picked.length > 1 && (
             <>
-              <label className="block text-[12.5px] font-semibold">Starting day<input type="date" value={date} min={dateInput(opened)} onChange={(e) => setDate(e.target.value)} className={`${field} mt-1`} /></label>
+              <label className="block text-[12.5px] font-semibold">Starting day<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${field} mt-1`} /></label>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block text-[12.5px] font-semibold">Earliest<input type="time" value={from} onChange={(e) => setFrom(e.target.value)} className={`${field} mt-1`} /></label>
                 <label className="block text-[12.5px] font-semibold">Latest<input type="time" value={to} onChange={(e) => setTo(e.target.value)} className={`${field} mt-1`} /></label>
               </div>
-              <p className="text-[11.5px] text-soft">Random times, 1.5 to 2 hours apart, so it doesn&apos;t look automated. What doesn&apos;t fit goes to the next day.</p>
+              <p className="text-[11.5px] text-soft">Spread 1.5 to 2 hours apart. What doesn&apos;t fit goes to the next day.</p>
               <div className="max-h-[260px] space-y-1.5 overflow-y-auto border border-line bg-raised p-2 text-[12px]">
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] text-soft">Change any time if you want.</p>
@@ -438,28 +419,21 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
                     <p className="truncate font-semibold">{i + 1}. {byId.get(id)?.title}</p>
                     <HookLine hook={byId.get(id)?.hook} />
                     <div className="mt-0.5 flex items-center gap-1">
-                      <input type="datetime-local" aria-label={`Time for ${byId.get(id)?.title ?? "video"}`} value={times[i] !== null ? localInput(times[i]!) : ""} min={localInput(opened)}
+                      <input type="datetime-local" aria-label={`Time for ${byId.get(id)?.title ?? "video"}`} value={times[i] !== null ? localInput(times[i]!) : ""}
                         onChange={(e) => { const t = fromLocalInput(e.target.value); setOwn((o) => ({ ...o, [id]: t })); }}
-                        className={`min-w-0 flex-1 border bg-panel px-1.5 py-1 text-[12px] ${problems[i] ? "border-red-400" : "border-line-strong"}`} />
+                        className={`min-w-0 flex-1 border bg-panel px-1.5 py-1 text-[12px] ${times[i] === null ? "border-red-400" : "border-line-strong"}`} />
                       {Object.hasOwn(own, id) && <button type="button" onClick={() => setOwn((o) => without(o, id))} className="cursor-pointer px-1 text-[11px] font-semibold text-accent hover:underline">Auto</button>}
                     </div>
-                    {problems[i] && <p className="text-[11px] font-semibold text-red-600">{problems[i]}</p>}
                   </div>
                 ))}
               </div>
             </>
           )}
-          {picked.length > 0 && <div><p className="mb-1 text-[12.5px] font-semibold">Post to</p><Targets value={targets} onChange={setTargets} /></div>}
-          {picked.length > 0 && targets.includes("instagram") && (
-            <label className="flex cursor-pointer items-start gap-2 text-[12.5px]">
-              <input type="checkbox" checked={trial} onChange={(e) => setTrial(e.target.checked)} className="mt-0.5" />
-              <span><span className="font-semibold">Post as trial reel</span><span className="block text-[11.5px] text-soft">Instagram shows it to non-followers first, then to your followers if it does well.</span></span>
-            </label>
-          )}
-          {picked.length > 0 && !now && <p className="text-[11.5px] text-soft">Times in {zone}.</p>}
-          <p className="text-[11.5px] text-soft">Captions come from your Captions templates with each video&apos;s hook filled in. Click a post on the calendar to change its caption or time.</p>
+          {picked.length > 0 && <div><p className="mb-1 text-[12.5px] font-semibold">Platforms</p><Targets value={targets} onChange={setTargets} /></div>}
+          {picked.length > 0 && <p className="text-[11.5px] text-soft">Times in {zone}.</p>}
+          {!app.domain && picked.length > 0 && <p className="text-[11.5px] text-soft">Tip: add your app under Your app &amp; captions, so captions get your link and hashtags.</p>}
           {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
-          <button type="button" disabled={!picked.length || !targets.length || saving || problems.some(Boolean)} onClick={review} className="btn-primary w-full px-4 py-2.5 text-[14px]">
+          <button type="button" disabled={!picked.length || !targets.length || saving || missing} onClick={review} className="btn-primary w-full px-4 py-2.5 text-[14px]">
             Next
           </button>
         </div>
@@ -469,116 +443,186 @@ function ScheduleDialog({ day, templates, onClose, onDone }: { day: number; temp
   );
 }
 
-/** One post: change its time, networks and captions before it goes out; see its links after. */
-function EditDialog({ post, onClose, onSaved }: { post: Post; onClose: () => void; onSaved: (p: Post | null) => void }) {
+type MarkDraft = { posted: boolean; url: string; views: string };
+
+/**
+ * One post: download the video, copy each caption, post it yourself, then tick Posted with the link (and views).
+ * Time, platforms and captions can change any time.
+ */
+function PostDialog({ post, templates, app, onStale, onClose, onSaved }: { post: Post; templates: Templates; app: AppProfile; onStale: () => void; onClose: () => void; onSaved: (p: Post | null) => void }) {
   const t = Date.parse(post.at);
   const [date, setDate] = useState(dateInput(t));
   const [time, setTime] = useState(hhmm(new Date(t).getHours() * 60 + new Date(t).getMinutes()));
   const [targets, setTargets] = useState<Target[]>(post.targets);
-  const [captions, setCaptions] = useState<Post["captions"]>({ instagram: post.captions.instagram ?? "", facebook: post.captions.facebook ?? "", ...post.captions });
+  const [captions, setCaptions] = useState<Post["captions"]>({ ...post.captions });
+  const [marks, setMarks] = useState<Record<Target, MarkDraft>>(() => Object.fromEntries(TARGETS.map((x) => {
+    const r = post.result[x];
+    return [x, { posted: Boolean(r?.postedAt), url: r?.url ?? "", views: typeof r?.views === "number" ? String(r.views) : "" }];
+  })) as Record<Target, MarkDraft>);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const editable = post.state === "scheduled";
+  const download = fileDownload(`/api/media/${post.mediaId}`, post.title || "video");
+  const tooLong = targets.some((x) => (captions[x] ?? "").length > CAPTION_MAX);
 
   async function save() {
     setSaving(true);
     setError(null);
     try {
-      const out = await call<{ post: Post }>(`/api/posts/${post.id}`, { method: "PATCH", body: JSON.stringify({ at: new Date(at(date, toMinutes(time))).toISOString(), targets, captions }) });
+      // Unchanged day and time keep the exact moment (a clock-change hour would otherwise shift it). Codex 2026-11-26.
+      const sameWhen = date === dateInput(t) && time === hhmm(new Date(t).getHours() * 60 + new Date(t).getMinutes());
+      const body = {
+        at: sameWhen ? post.at : new Date(at(date, toMinutes(time))).toISOString(), targets, rev: post.updatedAt,
+        captions: Object.fromEntries(targets.map((x) => [x, captions[x] ?? ""])),
+        marks: Object.fromEntries(targets.map((x) => [x, { posted: marks[x].posted, url: marks[x].url, views: marks[x].views }])),
+      };
+      const out = await call<{ post: Post }>(`/api/posts/${post.id}`, { method: "PATCH", body: JSON.stringify(body) });
       onSaved(out.post);
-    } catch (e) { setError((e as Error).message); setSaving(false); }
+    } catch (e) {
+      // Changed elsewhere: the calendar reloads, so opening it again shows the latest copy.
+      if ((e as { status?: number }).status === 409) onStale();
+      setError((e as Error).message);
+      setSaving(false);
+    }
   }
   async function remove() {
-    if (!window.confirm(post.state === "posted" ? "Remove it from the calendar? It stays on Instagram and Facebook." : "Remove this scheduled post?")) return;
+    if (!window.confirm("Remove it from the calendar? Nothing changes on the platforms.")) return;
     setSaving(true);
-    try { await call(`/api/posts/${post.id}`, { method: "DELETE" }); onSaved(null); }
-    catch (e) { setError((e as Error).message); setSaving(false); }
+    try { await call(`/api/posts/${post.id}${post.updatedAt ? `?rev=${encodeURIComponent(post.updatedAt)}` : ""}`, { method: "DELETE" }); onSaved(null); }
+    catch (e) { if ((e as { status?: number }).status === 409) onStale(); setError((e as Error).message); setSaving(false); }
   }
+  const setMark = (x: Target, m: Partial<MarkDraft>) => setMarks((all) => ({ ...all, [x]: { ...all[x], ...m } }));
+  // A platform added later starts from its caption format (Codex 2026-11-26: it was blank).
+  const pickTargets = (next: Target[]) => {
+    setCaptions((c) => ({ ...Object.fromEntries(next.filter((x) => !c[x]).map((x) => [x, captionFor(x, templates[x], post.hook, app)])), ...c }));
+    setTargets(next);
+  };
 
-  const when = new Date(t).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   return (
-    <Dialog title={post.title || "Untitled video"} onClose={onClose}>
-      <div className="flex gap-5 p-5">
-        <video src={`/api/media/${post.mediaId}`} poster={`/api/media/${post.mediaId}/thumb`} preload="none" controls playsInline className="aspect-[9/16] w-[150px] shrink-0 self-start bg-ink object-cover" />
-        {editable ? (
-          <div className="min-w-0 flex-1 space-y-3">
-            <p className="flex items-center gap-1.5 text-[13px] font-semibold text-muted"><Timer className="h-4 w-4" />Scheduled</p>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block text-[12.5px] font-semibold">Day<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${field} mt-1`} /></label>
-              <label className="block text-[12.5px] font-semibold">Time<input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={`${field} mt-1`} /></label>
-            </div>
-            <Targets value={targets} onChange={setTargets} />
-            {TARGETS.filter((x) => targets.includes(x)).map((x) => (
-              <label key={x} className="block text-[12.5px] font-semibold"><span className="flex items-center gap-1.5"><NetworkLogo t={x} />{NAMES[x]} caption</span>
-                <textarea rows={x === "instagram" ? 6 : 3} value={captions[x] ?? ""} onChange={(e) => setCaptions({ ...captions, [x]: e.target.value })} className={`${field} mt-1 resize-y`} />
-              </label>
-            ))}
-            {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
-            <div className="flex items-center gap-2 pt-1">
-              <button type="button" disabled={saving || !targets.length} onClick={() => void save()} className="btn-primary px-4 py-2 text-[14px]">Save</button>
-              <button type="button" disabled={saving} onClick={() => void remove()} className="ml-auto flex cursor-pointer items-center gap-1 px-2 py-2 text-[13px] font-semibold text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4" />Remove</button>
-            </div>
+    <Dialog title={post.title || "Untitled video"} onClose={onClose} wide>
+      {/* Locked while saving, so nothing typed meanwhile is lost when it closes (Codex 2026-11-26). */}
+      <fieldset disabled={saving} className="flex min-w-0 flex-col gap-5 border-0 p-5 md:flex-row">
+        <div className="shrink-0 space-y-2 md:w-[170px]">
+          <video src={`/api/media/${post.mediaId}`} poster={`/api/media/${post.mediaId}/thumb`} preload="none" controls playsInline className="aspect-[9/16] w-[170px] bg-ink object-cover" />
+          {download && <a href={download.href} download={download.file} className="flex w-[170px] items-center justify-center gap-1.5 border border-line-strong py-2 text-[13px] font-semibold hover:bg-raised"><Download className="h-4 w-4" />Download video</a>}
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <label className="block text-[12px] font-semibold">Day<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${field} mt-1 px-1.5 text-[12px]`} /></label>
+            <label className="block text-[12px] font-semibold">Time<input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={`${field} mt-1 px-1.5 text-[12px]`} /></label>
           </div>
-        ) : (
-          // Gone out (or going): a summary, not greyed-out boxes.
-          <div className="min-w-0 flex-1 space-y-4">
-            <div>
-              {post.state === "posted" && <p className="flex items-center gap-1.5 text-[15px] font-bold text-green-700"><CircleCheck className="h-5 w-5 fill-green-600 text-white" />Posted</p>}
-              {post.state === "posting" && <p className="flex items-center gap-1.5 text-[15px] font-bold text-accent"><LoaderCircle className="h-4 w-4 animate-spin" />Posting now</p>}
-              {post.state === "failed" && <p className="flex items-center gap-1.5 text-[15px] font-bold text-red-700"><CircleX className="h-5 w-5" />Failed</p>}
-              <p className="mt-0.5 text-[13px] text-muted">{when}</p>
-              {post.state === "failed" && <p className="mt-1 text-[12.5px] text-red-700">{post.error}</p>}
+          <div><p className="mb-1 text-[12px] font-semibold">Platforms</p><Targets value={targets} onChange={pickTargets} /></div>
+        </div>
+        <div className="min-w-0 flex-1 space-y-4">
+          {TARGETS.filter((x) => targets.includes(x)).map((x) => (
+            <div key={x} className="space-y-2 border border-line p-3">
+              <CaptionBox t={x} rows={4} value={captions[x] ?? ""} onChange={(v) => setCaptions((c) => ({ ...c, [x]: v }))} />
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex cursor-pointer items-center gap-1.5 text-[12.5px] font-semibold">
+                  <input type="checkbox" checked={marks[x].posted} onChange={(e) => setMark(x, { posted: e.target.checked })} />Posted
+                </label>
+                {marks[x].posted && (
+                  <>
+                    <input type="url" aria-label={`${NAMES[x]} post link`} placeholder={`${NAMES[x]} link (optional)`} value={marks[x].url} onChange={(e) => setMark(x, { url: e.target.value })} className="min-w-0 flex-1 border border-line-strong bg-panel px-2 py-1 text-[12.5px]" />
+                    {post.result[x]?.url && <a href={post.result[x]!.url} target="_blank" rel="noreferrer" aria-label={`Open on ${NAMES[x]}`} className="text-soft hover:text-text"><ExternalLink className="h-4 w-4" /></a>}
+                    <input inputMode="numeric" aria-label={`${NAMES[x]} views`} placeholder="Views" value={marks[x].views} onChange={(e) => setMark(x, { views: e.target.value })} className="w-24 border border-line-strong bg-panel px-2 py-1 text-[12.5px]" />
+                  </>
+                )}
+              </div>
             </div>
-            {post.targets.some((x) => post.result[x]?.url) && (
-              <div className="flex flex-wrap gap-2">
-                {post.targets.map((x) => post.result[x]?.url && (
-                  <a key={x} href={post.result[x]!.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 border border-line-strong px-3 py-2 text-[13px] font-semibold hover:bg-raised">
-                    <NetworkLogo t={x} className="h-5 w-5" />{NAMES[x]}<ExternalLink className="h-3.5 w-3.5 text-soft" />
-                  </a>
-                ))}
-              </div>
-            )}
-            {post.targets.map((x) => (
-              <div key={x}>
-                <p className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold text-muted"><NetworkLogo t={x} className="h-3.5 w-3.5" />{NAMES[x]} caption{x === "instagram" && post.trial && " (trial reel)"}</p>
-                <p className="whitespace-pre-wrap break-words border-l-2 border-line-strong pl-3 text-[13px] leading-relaxed">{post.captions[x] || <i className="text-soft">No caption</i>}</p>
-              </div>
-            ))}
-            {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
-            {post.state !== "posting" && (
-              <button type="button" disabled={saving} onClick={() => void remove()} className="flex cursor-pointer items-center gap-1 px-0 py-1 text-[12.5px] font-semibold text-red-700 hover:underline"><Trash2 className="h-3.5 w-3.5" />Remove from calendar</button>
-            )}
+          ))}
+          {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={saving || !targets.length || tooLong || !date || !time} onClick={() => void save()} className="btn-primary px-4 py-2 text-[14px]">{saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}Save</button>
+            <button type="button" disabled={saving} onClick={() => void remove()} className="ml-auto flex cursor-pointer items-center gap-1 px-2 py-2 text-[13px] font-semibold text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4" />Remove</button>
           </div>
-        )}
-      </div>
+        </div>
+      </fieldset>
     </Dialog>
   );
 }
 
-function CaptionsDialog({ templates, onClose, onSaved }: { templates: Templates; onClose: () => void; onSaved: (t: Templates) => void }) {
+/**
+ * Your app & captions: paste the app's link once and Analyze (AI, paid plans) to get its hashtags, or type them; then
+ * the caption format per platform, with {hook}, {domain} and {hashtags} filled in for every video.
+ */
+function SetupDialog({ templates, app, rev, onClose, onSaved, onStale }: { templates: Templates; app: AppProfile; rev: string; onClose: () => void; onSaved: (t: Templates, a: AppProfile, rev: string) => void; onStale: () => void }) {
+  const [currentRev, setCurrentRev] = useState(rev);
   const [value, setValue] = useState<Templates>(templates);
+  const [url, setUrl] = useState(app.url || app.domain);
+  const [tags, setTags] = useState(app.hashtags.join(" "));
+  const [current, setCurrent] = useState<AppProfile>(app);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  async function save() {
-    setSaving(true);
-    try { await call("/api/posts/templates", { method: "PUT", body: JSON.stringify({ templates: value }) }); onSaved(value); }
-    catch (e) { setError((e as Error).message); setSaving(false); }
+  const [plans, setPlans] = useState(false);
+  const [busy, setBusy] = useState<"analyze" | "save" | null>(null);
+
+  async function analyze() {
+    setBusy("analyze");
+    setError(null);
+    setPlans(false);
+    try {
+      const out = await call<{ app: AppProfile; rev: string }>("/api/posts/app", { method: "POST", body: JSON.stringify({ url, rev: currentRev }) });
+      setCurrent(out.app);
+      setUrl(out.app.url);
+      setTags(out.app.hashtags.join(" "));
+      setCurrentRev(out.rev);
+      onSaved(templates, out.app, out.rev);
+    } catch (e) {
+      if ((e as { status?: number }).status === 409) onStale();
+      setError((e as Error).message);
+      setPlans(Boolean((e as { plans?: boolean }).plans));
+    }
+    setBusy(null);
   }
+  async function save() {
+    setBusy("save");
+    setError(null);
+    try {
+      const out = await call<{ templates: Templates; app: AppProfile; rev: string }>("/api/posts/templates", { method: "PUT", body: JSON.stringify({ templates: value, url, hashtags: tags, rev: currentRev }) });
+      onSaved(out.templates, out.app, out.rev);
+      onClose();
+    } catch (e) {
+      // Saved elsewhere: the page reloads the latest; this form keeps what was typed.
+      if ((e as { status?: number }).status === 409) onStale();
+      setError((e as Error).message);
+      setBusy(null);
+    }
+  }
+  const preview: AppProfile = { ...current, hashtags: tags.split(/[\s,]+/).filter(Boolean).map((x) => (x.startsWith("#") ? x : `#${x}`)) };
+
   return (
-    <Dialog title="Captions" onClose={onClose}>
-      <div className="space-y-3 p-5">
-        <p className="flex items-center gap-1.5 text-[13px] text-muted"><CalendarClock className="h-4 w-4" />Used for new scheduled posts. <code className="bg-raised px-1">{"{hook}"}</code> becomes the video&apos;s hook words.</p>
-        {TARGETS.map((t) => (
-          <label key={t} className="block text-[12.5px] font-semibold">{NAMES[t]}
-            <textarea rows={t === "instagram" ? 7 : 4} value={value[t]} onChange={(e) => setValue({ ...value, [t]: e.target.value })} className={`${field} mt-1 resize-y`} />
+    <Dialog title="Your app & captions" onClose={onClose} wide>
+      <fieldset disabled={busy !== null} className="grid min-w-0 gap-0 border-0 p-0 md:grid-cols-[320px_1fr]">
+        <div className="space-y-3 border-b border-line p-5 md:border-b-0 md:border-r">
+          <label className="block text-[12.5px] font-semibold">Your app&apos;s link
+            <input value={url} disabled={busy === "analyze"} onChange={(e) => setUrl(e.target.value)} placeholder="yourapp.com" className={`${field} mt-1`} />
           </label>
-        ))}
-        {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
-        <div className="flex gap-2">
-          <button type="button" disabled={saving} onClick={() => void save()} className="btn-primary px-4 py-2 text-[14px]">Save</button>
-          <button type="button" onClick={() => setValue(DEFAULT_TEMPLATES)} className="cursor-pointer px-3 py-2 text-[13px] font-semibold text-muted hover:bg-raised">Reset to default</button>
+          <button type="button" disabled={busy !== null || !url.trim()} onClick={() => void analyze()} className="btn-primary w-full px-4 py-2 text-[14px]">
+            {busy === "analyze" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{current.analyzedAt ? "Analyze again" : "Analyze my app"}
+          </button>
+          <p className="text-[11.5px] text-soft">Mavya reads your site once and picks hashtags for your niche. Captions show your link without https://.</p>
+          {current.name && <p className="text-[12px] text-muted">Analyzed: <b className="text-text">{current.name}</b></p>}
+          <label className="block text-[12.5px] font-semibold">Hashtags
+            <textarea rows={4} value={tags} disabled={busy === "analyze"} onChange={(e) => setTags(e.target.value)} placeholder="#appmarketing #indiehacker" className={`${field} mt-1 resize-y text-[13px]`} />
+          </label>
+          <p className="text-[11.5px] text-soft">Best first. Instagram and TikTok use the first {HASHTAGS.instagram}, Facebook and YouTube the first {HASHTAGS.youtube}.</p>
         </div>
-      </div>
+        <div className="space-y-3 p-5">
+          <p className="text-[13px] text-muted">One format for every platform. <code className="bg-raised px-1">{"{hook}"}</code> is the video&apos;s hook words, <code className="bg-raised px-1">{"{domain}"}</code> your link, <code className="bg-raised px-1">{"{hashtags}"}</code> your hashtags.</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            {TARGETS.map((t) => (
+              <div key={t}>
+                <label className="block text-[12.5px] font-semibold"><span className="flex items-center gap-1.5"><NetworkLogo t={t} />{NAMES[t]}</span>
+                  <textarea rows={5} value={value[t]} onChange={(e) => setValue({ ...value, [t]: e.target.value })} className={`${field} mt-1 resize-y text-[13px]`} />
+                </label>
+                <p className="mt-1 whitespace-pre-wrap break-words border-l-2 border-line-strong pl-2 text-[11.5px] text-muted">{captionFor(t, value[t], "my app had 0 users… then i found this 😳", preview)}</p>
+              </div>
+            ))}
+          </div>
+          {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}{plans && <> <a href="/pricing" className="underline">See plans</a></>}</p>}
+          <div className="flex gap-2">
+            <button type="button" disabled={busy !== null} onClick={() => void save()} className="btn-primary px-4 py-2 text-[14px]">Save</button>
+            <button type="button" onClick={() => setValue(DEFAULT_TEMPLATES)} className="cursor-pointer px-3 py-2 text-[13px] font-semibold text-muted hover:bg-raised">Reset to default</button>
+          </div>
+        </div>
+      </fieldset>
     </Dialog>
   );
 }

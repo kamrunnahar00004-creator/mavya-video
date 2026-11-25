@@ -1,24 +1,21 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import { notFound } from "next/navigation";
-import { currentUser } from "@/lib/server/who";
-import { schedulerAllowed } from "@/lib/server/scheduled-posts";
 import { ScheduledPostsView } from "@/components/scheduled-posts-view";
 
-export const metadata: Metadata = { title: "Scheduled posts · Mavya" };
+export const metadata: Metadata = { title: "Content calendar · Mavya" };
 
-/** Owner-only for now (SCHEDULED_POSTS_USERS); everyone else gets the 404 page. */
-async function OwnerOnly() {
+/** Rendered per request: the calendar reads the clock (this week, today), so it is never prerendered at build time. */
+async function Calendar() {
   await connection();
-  if (!schedulerAllowed(await currentUser())) notFound();
   return <ScheduledPostsView />;
 }
 
+/** Content calendar, for every signed-in account (founder 2026-11-26). */
 export default function PostsPage() {
   return (
     <Suspense fallback={<div className="card h-full" />}>
-      <OwnerOnly />
+      <Calendar />
     </Suspense>
   );
 }

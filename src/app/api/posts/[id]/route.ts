@@ -1,26 +1,30 @@
-import { deletePost, retryPost, updatePost } from "@/lib/server/scheduled-posts";
+import { deletePost, updatePost, type Mark } from "@/lib/server/scheduled-posts";
 import { postsUser, unavailable } from "@/lib/server/posts-route";
 import type { Post, Target } from "@/lib/scheduled-posts";
 
-/** { at, targets, captions } edits a post that hasn't started; { retry: true } sends a failed one again. */
+/** { at, targets, captions, marks } edits a post: its time, platforms, captions, and each platform's posted record. */
 export async function PATCH(request: Request, ctx: RouteContext<"/api/posts/[id]">) {
   const user = await postsUser();
   if ("response" in user) return user.response;
   const { id } = await ctx.params;
-  const body = (await request.json().catch(() => null)) as { retry?: unknown; at?: string; targets?: Target[]; captions?: Post["captions"] } | null;
+  const body = (await request.json().catch(() => null)) as { at?: string; targets?: Target[]; captions?: Post["captions"]; marks?: Partial<Record<Target, Mark>>; rev?: unknown } | null;
   if (!body) return Response.json({ error: "Bad request" }, { status: 400 });
   try {
-    const out = body.retry === true ? await retryPost(user.who, id) : await updatePost(user.who, id, { at: body.at as string, targets: body.targets as Target[], captions: body.captions ?? {} });
-    return "error" in out ? Response.json(out, { status: 409 }) : Response.json(out);
+    const marks = body.marks && typeof body.marks === "object" ? body.marks : undefined;
+    const out = await updatePost(user.who, id, { at: body.at as string, targets: body.targets as Target[], captions: body.captions ?? {}, marks, rev: body.rev });
+    return "error" in out ? Response.json(out, { status: /changed|removed/.test(out.error) ? 409 : 400 }) : Response.json(out);
   } catch (error) { return unavailable(error); }
 }
 
-/** Removes a post from the calendar (it stays on Instagram and Facebook if it went out). */
-export async function DELETE(_request: Request, ctx: RouteContext<"/api/posts/[id]">) {
+/** Removes a post from the calendar (it stays wherever it was posted). */
+export async function DELETE(request: Request, ctx: RouteContext<"/api/posts/[id]">) {
   const user = await postsUser();
   if ("response" in user) return user.response;
   const { id } = await ctx.params;
+  const rev = new URL(request.url).searchParams.get("rev") ?? undefined;
   try {
-    return (await deletePost(user.who, id)) ? Response.json({ ok: true }) : Response.json({ error: "It's being posted right now. Try again in a minute." }, { status: 409 });
+    const out = await deletePost(user.who, id, rev);
+    if (out === "changed") return Response.json({ error: "This post changed. Open it again." }, { status: 409 });
+    return out === "ok" ? Response.json({ ok: true }) : Response.json({ error: "This post was already removed." }, { status: 404 });
   } catch (error) { return unavailable(error); }
 }

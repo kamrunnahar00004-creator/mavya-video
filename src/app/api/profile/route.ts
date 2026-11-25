@@ -4,7 +4,6 @@ import path from "node:path";
 import { connection } from "next/server";
 import { NO_PROFILE, type Profile } from "@/lib/profile";
 import { authEnabled, createSupabaseServerClient, getSessionUser } from "@/lib/supabase/server";
-import { schedulerAllowed } from "@/lib/posts-access";
 
 /**
  * The signed-in person's profile: email from sign-in (read-only), names and picture from the `profiles` table
@@ -32,8 +31,7 @@ async function readAccount(): Promise<Profile | null> {
   const { data, error } = await readPhase("sql", async () => await supabase.from("profiles").select("first_name, last_name, avatar_url").eq("id", user.id).maybeSingle<Row>());
   if (error) throw error;
   const profile: Profile = { email: user.email ?? "", firstName: data?.first_name ?? "", lastName: data?.last_name ?? "", avatar: data?.avatar_url ?? "" };
-  // Scheduled posts' menu item rides on this request (no extra one); everyone else's profile is exactly as before.
-  return schedulerAllowed(user.id) ? { ...profile, scheduler: true } : profile;
+  return profile;
 }
 
 export async function GET() {

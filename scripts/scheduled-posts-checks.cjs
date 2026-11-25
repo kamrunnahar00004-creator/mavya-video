@@ -1,461 +1,309 @@
-// Scheduled posts (founder 2026-11-15): captions, spreading times, the owner-only gate, and posting to Instagram Reels
-// and the Facebook Page against a simulated Meta, including a tick that dies mid-way never posting twice, the daily
-// limit, Meta refusing, network blips, and slow processing. Offline.
+// Content calendar (founder 2026-11-26; was owner-only "Scheduled posts", 2026-11-15): every account plans exported
+// videos for Instagram, Facebook, TikTok and YouTube Shorts, copies a caption per platform (hook, app domain, niche
+// hashtags), posts by hand and marks each one posted with its link and views. No auto-posting. The app analyzer is
+// AI, so paid or trial only. Views are typed in for every platform (founder 2026-11-26: no automatic views). Offline.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
 const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 149;
+const EXPECTED = 157;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
 const shared = load('src/lib/scheduled-posts.ts');
-const OWNER = 'c4d71805-588e-4af9-acf0-d42b7eb80941';
-let inserted = null;
-const fakeDb = { from: () => ({ insert: (rows) => { inserted = rows; return { select: async () => ({ data: rows.map((r) => ({ ...r, state: 'scheduled', result: {}, error: null, created_at: r.at })), error: null }) }; } }) };
+const ME = 'c4d71805-588e-4af9-acf0-d42b7eb80941';
+const T0 = Date.parse('2026-11-26T09:00:00Z');
+
+/** An in-memory Supabase table store with just the query calls the server module makes. */
+function fakeDb() {
+  const tables = { scheduled_posts: [], scheduled_post_settings: [] };
+  const get = (row, col) => {
+    const m = col.match(/^(\w+)->(\w+)->>(\w+)$/);
+    if (!m) return row[col];
+    const v = row[m[1]]?.[m[2]]?.[m[3]];
+    return v === undefined ? null : v;
+  };
+  function query(name) {
+    let rows = null, op = 'select', patch = null, filters = [], limit = Infinity;
+    const q = {
+      select() { return q; },
+      insert(r) { op = 'insert'; rows = Array.isArray(r) ? r : [r]; return q; },
+      update(p) { op = 'update'; patch = p; return q; },
+      delete() { op = 'delete'; return q; },
+      upsert(r) { op = 'upsert'; rows = [r]; return q; },
+      eq(c, v) { filters.push((x) => get(x, c) === v); return q; },
+      in(c, v) { filters.push((x) => v.includes(get(x, c))); return q; },
+      gte(c, v) { filters.push((x) => get(x, c) >= v); return q; },
+      lt(c, v) { filters.push((x) => get(x, c) < v); return q; },
+      not(c) { filters.push((x) => get(x, c) !== null); return q; },
+      or(expr) {
+        // "col.is.null,col.lt.value": any one of them.
+        const parts = expr.split(',').map((p) => { const m = p.match(/^(.+?)\.(is|lt)\.(.+)$/); return m; });
+        filters.push((x) => parts.some(([, c, op, v]) => (op === 'is' ? get(x, c) === null : get(x, c) !== null && get(x, c) < v)));
+        return q;
+      },
+      order() { return q; },
+      limit(n) { limit = n; return q; },
+      abortSignal() { return q; },
+      maybeSingle() { return run().then((r) => ({ data: r.data[0] ?? null, error: r.error })); },
+      then(res, rej) { return run().then(res, rej); },
+    };
+    async function run() {
+      const table = tables[name];
+      const hit = () => table.filter((x) => filters.every((f) => f(x))).slice(0, limit);
+      if (op === 'insert' && name === 'scheduled_post_settings' && rows.some((r) => table.some((x) => x.user_id === r.user_id))) return { data: null, error: { code: '23505' } };
+      if (op === 'insert') { const made = rows.map((r) => ({ created_at: r.at, ...structuredClone(r) })); table.push(...made); return { data: structuredClone(made), error: null }; }
+      if (op === 'upsert') { const r = rows[0]; const i = table.findIndex((x) => x.user_id === r.user_id); if (i >= 0) table[i] = structuredClone(r); else table.push(structuredClone(r)); return { data: null, error: null }; }
+      if (op === 'update') { const h = hit(); for (const x of h) Object.assign(x, structuredClone(patch)); return { data: structuredClone(h), error: null }; }
+      if (op === 'delete') { const h = hit(); tables[name] = table.filter((x) => !h.includes(x)); return { data: structuredClone(h), error: null }; }
+      return { data: structuredClone(hit()), error: null };
+    }
+    return q;
+  }
+  return { tables, from: query };
+}
+const store = fakeDb();
 const owned = new Set(['mine.mp4']);
 const stubs = {
-  '@/lib/supabase/server': { createSupabaseAdminClient: () => fakeDb },
-  '@/lib/server/r2': { signedGet: async (key) => `https://r2.example/${key}?sig` },
+  '@/lib/supabase/server': { createSupabaseAdminClient: () => store },
   '@/lib/server/my-files': { fileSources: async () => ({}) },
   '@/lib/server/store': { getFilePrefs: async () => ({ names: {}, hidden: [] }), mediaAccess: async (id) => (owned.has(id) ? { mime: 'video/mp4', size: 1 } : null) },
   '@/lib/scheduled-posts': shared,
-  '@/lib/posts-access': null,
 };
-const env = { SCHEDULED_POSTS_USERS: ` ${OWNER} ` };
-stubs['@/lib/posts-access'] = load('src/lib/posts-access.ts', {}, env);
-const sp = load('src/lib/server/scheduled-posts.ts', stubs, env, { URLSearchParams });
-
-/** A simulated Meta: answers by URL, counts every call that would post. */
-function meta(opts = {}) {
-  const m = { calls: [], creates: 0, publishes: 0, finishes: 0, uploads: 0, igStatus: opts.igStatus ?? ['IN_PROGRESS', 'FINISHED'], fbStatus: opts.fbStatus ?? [], quota: opts.quota ?? 0 };
-  m.fetch = async (url, init = {}) => {
-    m.calls.push(url);
-    if (opts.down) throw new TypeError('fetch failed');
-    const u = new URL(url), p = u.pathname, body = new URLSearchParams(init.body ?? '');
-    const json = (o, status = 200) => ({ ok: status < 400, status, json: async () => o });
-    if (opts.refuse && p.endsWith('/media') && init.method === 'POST') return json({ error: { message: 'The video file is too short.', code: 100 } }, 400);
-    if (p.endsWith('/content_publishing_limit')) return json({ data: [{ quota_usage: m.quota, config: { quota_total: 100 } }] });
-    if (p.endsWith('/IG/media') && init.method === 'POST') { m.creates++; m.lastCaption = body.get('caption'); m.lastVideoUrl = body.get('video_url'); m.reelType = body.get('media_type'); m.trialParams = body.get('trial_params'); m.shareToFeed = body.get('share_to_feed'); return json({ id: 'C1' }); }
-    if (p.endsWith('/C1')) return json({ status_code: m.igStatus.length > 1 ? m.igStatus.shift() : m.igStatus[0] });
-    if (p.endsWith('/IG/media_publish')) { m.publishes++; return json({ id: 'M1' }); }
-    if (p.endsWith('/M1')) return json({ permalink: 'https://www.instagram.com/reel/M1/' });
-    if (p.endsWith('/PAGE/video_reels')) {
-      if (body.get('upload_phase') === 'start') return json({ video_id: 'V1' });
-      if (body.get('upload_phase') === 'finish') { m.finishes++; m.fbCaption = body.get('description'); m.fbState = body.get('video_state'); return json({ success: true }); }
-    }
-    if (u.host === 'rupload.facebook.com') { m.uploads++; m.uploadHeaders = init.headers; return json({ success: true }); }
-    if (p.endsWith('/V1')) return json({ status: m.fbStatus.length > 1 ? m.fbStatus.shift() : m.fbStatus[0] ?? {}, permalink_url: '/reel/V1' });
-    return json({ error: { message: `unexpected ${p}` } }, 400);
-  };
-  return m;
-}
-const creds = { pageId: 'PAGE', pageToken: 'PAGETOKEN', igUserId: 'IG' };
-const T0 = Date.parse('2026-11-16T09:00:00Z');
-function ctxFor(m, now = T0, saves = []) { return { fetch: m.fetch, creds, now, link: async (id) => `https://r2.example/media/${id}?sig`, save: async (t, r) => { saves.push([t, r]); } }; }
-const post = (over = {}) => ({ id: 'P1', mediaId: 'mine.mp4', title: 'x', hook: 'h', captions: { instagram: 'IG caption', facebook: 'FB caption' }, targets: ['instagram'], at: new Date(T0).toISOString(), state: 'posting', result: {}, error: null, createdAt: '', ...over });
+const sp = load('src/lib/server/scheduled-posts.ts', stubs, {}, { structuredClone });
+const app = { domain: 'cybershield.app', hashtags: ['#appmarketing', '#indiehacker', '#buildinpublic', '#saasmarketing', '#ugcads', '#startup'] };
 
 finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
-  // Captions and times.
-  eq(shared.fillCaption(shared.DEFAULT_TEMPLATES.facebook, '  how did he get\n198 users? '), 'how did he get 198 users?\n\nCreate your own video 👉 mavya.app', 'the hook fills {hook}, on one line');
-  eq(shared.fillCaption('{hook}\n\nlink in bio', ''), 'link in bio', 'no hook: its line goes, no blank first line');
-  ok(shared.fillCaption('{hook}', 'x'.repeat(3000)).length === shared.CAPTION_MAX, 'a caption never exceeds Instagram\'s 2,200 characters');
-  eq(shared.spreadTimes(7, 9 * 60, 21 * 60), [540, 660, 780, 900, 1020, 1140, 1260], '7 a day from 9:00 to 21:00: every 2 hours');
-  eq(shared.spreadTimes(1, 600, 1200), [600], 'one post: at the first time');
-  ok(shared.spreadTimes(10, 540, 1260).every((m) => m % 5 === 0 && m >= 540 && m <= 1260), 'times land on 5 minutes, inside the window');
-  eq(shared.rollUp(['instagram', 'facebook'], { instagram: { state: 'done' }, facebook: { state: 'done' } }), 'posted', 'both done: posted');
-  eq(shared.rollUp(['instagram', 'facebook'], { instagram: { state: 'failed' }, facebook: { state: 'working' } }), 'posting', 'one failed, one still going: still posting');
-  eq(shared.rollUp(['instagram', 'facebook'], { instagram: { state: 'failed' }, facebook: { state: 'done' } }), 'failed', 'one failed, the other done: failed');
-  const good = { at: new Date(T0 + 3600e3).toISOString(), targets: ['instagram', 'facebook'], captions: { instagram: 'a', facebook: 'b' } };
-  eq(shared.badPost(good, T0), null, 'a good post passes');
-  ok(shared.badPost({ ...good, targets: ['tiktok'] }, T0), 'unknown network refused');
-  ok(shared.badPost({ ...good, targets: [] }, T0), 'no network refused');
-  ok(shared.badPost({ ...good, at: new Date(T0 + 61 * 86400e3).toISOString() }, T0), 'more than 60 days ahead refused');
-  ok(shared.badPost({ ...good, captions: { instagram: 'x'.repeat(2201), facebook: 'b' } }, T0), 'over-long caption refused');
+  // Four platforms, one caption format (founder 2026-11-26).
+  eq(shared.TARGETS, ['instagram', 'facebook', 'tiktok', 'youtube'], 'Instagram, Facebook, TikTok and YouTube Shorts');
+  const hook = 'my app had 0 users… then i found this 😳';
+  const ig = shared.captionFor('instagram', shared.DEFAULT_TEMPLATES.instagram, hook, app);
+  eq(ig, 'my app had 0 users… then i found this 😳\n\ncybershield.app 🔗 link in bio, or comment "APP" and i\'ll DM it\n\n#appmarketing #indiehacker #buildinpublic #saasmarketing #ugcads', 'Instagram: the founder\'s format with the app domain and 5 hashtags');
+  ok(!/https?:\/\//.test(ig), 'the domain shows without https:// (founder: "only app name")');
+  eq(shared.captionFor('facebook', shared.DEFAULT_TEMPLATES.facebook, hook, app).split('\n').pop(), '#appmarketing #indiehacker #buildinpublic', 'Facebook: 3 hashtags');
+  eq(shared.captionFor('youtube', shared.DEFAULT_TEMPLATES.youtube, hook, app).split('\n').pop().split(' ').length, 3, 'YouTube: 3 hashtags (the ones shown above the title)');
+  eq(shared.captionFor('tiktok', shared.DEFAULT_TEMPLATES.tiktok, hook, app).split('\n').pop().split(' ').length, 5, 'TikTok: 5 hashtags');
+  ok(/comment "APP"/.test(shared.DEFAULT_TEMPLATES.tiktok.split('\n')[2]) && /comment "APP"/.test(shared.DEFAULT_TEMPLATES.youtube.split('\n')[2]), 'TikTok and YouTube lead with "comment" (bio links need 1,000 followers; Shorts links aren\'t clickable)');
+  ok(!/link in bio/.test(shared.DEFAULT_TEMPLATES.facebook), 'Facebook has no "link in bio" (Pages have none)');
+  eq(shared.captionFor('youtube', shared.DEFAULT_TEMPLATES.youtube, hook, app).split('\n')[0], hook, 'YouTube\'s first line (the Short\'s title) is the hook');
+  for (const t of shared.TARGETS) ok(shared.HASHTAGS[t] <= 5, `${t}: at most 5 hashtags (Instagram's cap)`);
+  const bare = shared.captionFor('instagram', shared.DEFAULT_TEMPLATES.instagram, '', { domain: '', hashtags: [] });
+  ok(!/\{|\}/.test(bare) && !bare.startsWith('\n') && !bare.endsWith('\n') && !/\n /.test(bare), 'no app or hook yet: no "{domain}", no blank first line, no stray spaces');
+  ok(!/\n{3,}/.test(bare), 'no app yet: no empty blocks left behind');
+  ok(shared.captionFor('instagram', '{hook}', 'x'.repeat(3000), app).length === shared.CAPTION_MAX, 'a caption never exceeds 2,200 characters');
+  eq(Object.keys(shared.captionsFor(['tiktok', 'youtube'], shared.DEFAULT_TEMPLATES, hook, app)), ['tiktok', 'youtube'], 'captions only for the picked platforms');
+  eq(shared.fillCaption('{hook}\n\nlink in bio', ''), 'link in bio', 'no hook: its line goes');
 
-  // Owner-only.
-  ok(sp.schedulerAllowed(OWNER), 'the owner may use it');
-  ok(!sp.schedulerAllowed('someone-else') && !sp.schedulerAllowed(null), 'nobody else may (or a signed-out visitor)');
-  const off = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/posts-access': load('src/lib/posts-access.ts', {}, { SCHEDULED_POSTS_USERS: '' }) }, { SCHEDULED_POSTS_USERS: '' }, { URLSearchParams });
-  ok(!off.schedulerAllowed(OWNER), 'empty list: off for everyone');
-  const route = load('src/lib/server/posts-route.ts', { '@/lib/server/who': { currentUser: async () => 'someone-else', signInFirst: () => new Response(null, { status: 401 }) }, '@/lib/server/scheduled-posts': sp });
-  eq((await route.postsUser()).response?.status, 404, 'API: another signed-in user gets 404, as if it did not exist');
-  const routeOwner = load('src/lib/server/posts-route.ts', { '@/lib/server/who': { currentUser: async () => OWNER, signInFirst: () => new Response(null, { status: 401 }) }, '@/lib/server/scheduled-posts': sp });
-  eq((await routeOwner.postsUser()).who, OWNER, 'API: the owner gets through');
-  eq(sp.metaCreds({ META_PAGE_ID: '1', META_PAGE_TOKEN: 't' }), null, 'missing Instagram id: posting not set up');
+  // Hashtags and the app's domain.
+  eq(shared.tag('App Marketing'), '#appmarketing', 'a tag: lower case, no spaces');
+  eq(shared.tag('#build-in-public!'), '#buildinpublic', 'symbols dropped');
+  eq(shared.tag('###'), '', 'nothing left: no tag');
+  eq(shared.tagList('#a, #b #a  c'), ['#a', '#b', '#c'], 'typed tags: split on spaces and commas, no repeats');
+  eq(shared.tagList(Array.from({ length: 30 }, (_, i) => `t${i}`)).length, 15, 'at most 15 kept');
+  eq(shared.tagList(42), [], 'not a list or text: none');
+  eq(shared.domainOf('https://www.CyberShield.app/pricing?x=1'), 'cybershield.app', 'domain: no https, no www, no path');
+  eq(shared.domainOf('cybershield.app'), 'cybershield.app', 'a bare domain works');
+  eq(shared.domainOf('not a site'), '', 'not a web address: none');
+  eq(shared.domainOf('javascript:alert(1)'), '', 'a script link is not a domain');
+  eq(shared.domainOf('localhost'), '', 'no dot: not a public site');
 
-  // Sidebar: every other account sees exactly the old menu.
-  const navStore = load('src/lib/posts-nav.ts', { react: { useSyncExternalStore: (_s, get) => get() } });
-  const nav = load('src/components/nav-links.tsx', { 'react/jsx-runtime': { jsx: () => null, jsxs: () => null }, 'next/navigation': { usePathname: () => null }, 'lucide-react': new Proxy({}, { get: (_, k) => k }), '@/components/pending-link': {}, '@/lib/posts-nav': navStore });
-  eq(navStore.usePostsNav(), false, 'menu flag starts off: nothing shows before the owner\'s own profile says so');
-  const navSrc = require('node:fs').readFileSync('src/components/nav-links.tsx', 'utf8') + require('node:fs').readFileSync('src/lib/posts-nav.ts', 'utf8');
-  ok(!/fetch\(|sessionStorage|localStorage/.test(navSrc), 'the sidebar makes no extra request and keeps nothing across accounts (Codex 2026-11-15)');
-  eq(nav.navItems(false).map((i) => i.href), ['/studio', '/library', '/settings'], 'not allowed: the sidebar is unchanged');
-  eq(nav.navItems(true).map((i) => i.href), ['/studio', '/library', '/posts', '/settings'], 'owner: Scheduled posts right under Viral library');
+  // Post links: only to that platform.
+  eq(shared.postLink('instagram', 'instagram.com/reel/abc/'), 'https://instagram.com/reel/abc/', 'Instagram link without https: cleaned');
+  eq(shared.postLink('tiktok', 'https://www.tiktok.com/@maya/video/123'), 'https://www.tiktok.com/@maya/video/123', 'TikTok link kept');
+  ok(shared.postLink('facebook', 'https://fb.watch/xyz/') && shared.postLink('facebook', 'https://www.facebook.com/reel/1'), 'Facebook: facebook.com and fb.watch');
+  ok(shared.postLink('youtube', 'https://youtube.com/shorts/abcdefghijk') && shared.postLink('youtube', 'youtu.be/abcdefghijk'), 'YouTube: youtube.com and youtu.be');
+  eq(shared.postLink('tiktok', 'https://www.instagram.com/reel/abc/'), null, 'another platform\'s link refused');
+  eq(shared.postLink('instagram', 'https://instagram.com.evil.example/reel'), null, 'a look-alike host refused');
+  eq(shared.postLink('instagram', 'https://evilinstagram.com/reel'), null, 'a host merely ending in the name refused');
+  eq(shared.postLink('youtube', 'javascript:alert(1)//youtube.com'), null, 'a script link refused');
+  eq(shared.postLink('instagram', 'http://instagram.com/reel/a'), 'https://instagram.com/reel/a', 'http becomes https');
+  eq(shared.postLink('instagram', 'https://instagram.com/' + 'a'.repeat(600)), null, 'over-long link refused');
+  eq(shared.youtubeId('https://www.youtube.com/shorts/dQw4w9WgXcQ?feature=share'), 'dQw4w9WgXcQ', 'Shorts link: its id');
+  eq(shared.youtubeId('https://youtu.be/dQw4w9WgXcQ'), 'dQw4w9WgXcQ', 'youtu.be: its id');
+  eq(shared.youtubeId('https://m.youtube.com/watch?v=dQw4w9WgXcQ'), 'dQw4w9WgXcQ', 'watch link: its id');
+  eq(shared.youtubeId('https://www.youtube.com/@channel'), null, 'a channel link has no video');
 
-  // Thumbnails (2026-11-15: the picker showed black tiles): lists show still pictures, never a video per tile.
-  const view = require('node:fs').readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
-  ok((view.match(/<ThumbImg /g) ?? []).length === 3, 'calendar cards, the picker and the review screen show still pictures');
-  ok((view.match(/<video /g) ?? []).length === 1 && /<video [^>]*preload="none"/.test(view), 'the only video is the one opened post, loaded when played');
+  // Posted state and views.
+  eq(shared.stateOf(['instagram', 'tiktok'], { instagram: { postedAt: 'x' } }), 'scheduled', 'one of two posted: still planned');
+  eq(shared.stateOf(['instagram', 'tiktok'], { instagram: { postedAt: 'x' }, tiktok: { postedAt: 'y' } }), 'posted', 'every platform posted: posted');
+  eq(shared.totalViews({ targets: ['instagram', 'youtube', 'tiktok'], result: { instagram: { views: 120 }, youtube: { views: 30 } } }), 150, 'views add up across platforms');
+  eq(shared.totalViews({ targets: ['instagram'], result: {} }), null, 'no views known: none (not 0)');
+  eq(shared.totalViews({ targets: ['instagram'], result: { facebook: { views: 9 } } }), null, 'a platform no longer picked doesn\'t count');
 
-  // Its own every-minute job (Codex 2026-11-15): the shared recovery cron is exactly as before, so a slow Meta call can
-  // never hold up anyone's exports, generations or cleanup.
-  const fs = require('node:fs');
-  const shared_ = fs.readFileSync('src/app/api/internal/generations/route.ts', 'utf8');
-  ok(!/advancePosts|scheduled/.test(shared_), 'the shared recovery cron does not touch scheduled posts');
-  const crons = JSON.parse(fs.readFileSync('vercel.json', 'utf8')).crons;
-  ok(crons[0].path === '/api/internal/generations' && crons.some((c) => c.path === '/api/internal/posts' && c.schedule === '* * * * *'), 'posting has its own per-minute cron');
-  const secret = 'x'.repeat(40);
-  let ran = 0;
-  const postsCron = load('src/app/api/internal/posts/route.ts', { 'node:crypto': require('node:crypto'), '@/lib/server/scheduled-posts': { advancePosts: async () => { ran++; return false; } } }, { CRON_SECRET: secret });
-  eq((await postsCron.GET(new Request('https://m/api/internal/posts'))).status, 401, 'posting cron: no secret, refused');
-  eq((await postsCron.GET(new Request('https://m/api/internal/posts', { headers: { authorization: `Bearer ${secret}` } }))).status, 200, 'posting cron: with the secret, runs');
-  ok(ran === 1, 'and runs the posting pass once');
-  let queried = false;
-  const offDb = { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => { queried = true; return fakeDb; } } };
-  const offPosts = load('src/lib/server/scheduled-posts.ts', offDb, { SCHEDULED_POSTS_USERS: '' }, { URLSearchParams });
-  ok((await offPosts.advancePosts()) === false && !queried, 'scheduler off: no database read at all');
-  const missing = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from: () => { const q = { select: () => q, or: () => q, order: () => q, limit: async () => ({ data: null, error: { code: 'PGRST205' } }), in: () => q }; return q; } }) } }, env, { URLSearchParams });
-  ok((await missing.advancePosts()) === false, 'database update not applied yet: quietly nothing to post, not an error every minute');
+  // Times: any platform, past times allowed (log a video already posted), within a year back and 60 days ahead.
+  const good = { at: new Date(T0 + 3600e3).toISOString(), targets: ['tiktok', 'youtube'], captions: { tiktok: 'a', youtube: 'b' } };
+  eq(shared.badPost(good, T0), null, 'TikTok and YouTube accepted');
+  eq(shared.badPost({ ...good, at: new Date(T0 - 30 * 86400e3).toISOString() }, T0), null, 'a past time is fine (logging)');
+  ok(shared.badPost({ ...good, at: new Date(T0 - 400 * 86400e3).toISOString() }, T0), 'over a year back refused');
+  ok(shared.badPost({ ...good, at: new Date(T0 + 61 * 86400e3).toISOString() }, T0), 'over 60 days ahead refused');
+  ok(shared.badPost({ ...good, targets: ['myspace'] }, T0), 'unknown platform refused');
+  ok(shared.badPost({ ...good, targets: ['tiktok', 'tiktok'] }, T0), 'a platform twice refused');
+  ok(shared.badPost({ ...good, targets: [] }, T0), 'no platform refused');
+  ok(/TikTok/.test(shared.badPost({ ...good, captions: { tiktok: 'x'.repeat(2201), youtube: 'b' } }, T0)), 'over-long caption refused, naming the platform');
 
-  // Creating: only the user's own videos, never in the past.
-  const item = { mediaId: 'mine.mp4', at: new Date(T0 + 3600e3).toISOString(), targets: ['instagram'], captions: { instagram: 'a', facebook: 'never stored' } };
-  const made = await sp.createPosts(OWNER, [item], T0);
-  ok(made.posts?.length === 1 && inserted[0].user_id === OWNER, 'a batch is saved for the owner');
-  eq(inserted[0].captions, { instagram: 'a' }, 'only the chosen networks\' captions are kept');
-  ok((await sp.createPosts(OWNER, [{ ...item, mediaId: 'someone-elses.mp4' }], T0)).error, 'another account\'s video refused');
-  ok((await sp.createPosts(OWNER, [{ ...item, at: new Date(T0 - 3600e3).toISOString() }], T0)).error, 'a time that has passed refused');
-  ok((await sp.createPosts(OWNER, Array(101).fill(item), T0)).error, 'over 100 in one batch refused');
+  // Marking a platform posted.
+  eq(sp.markResult('instagram', undefined, { posted: false }, T0), { r: undefined }, 'unticked: no record');
+  eq(sp.markResult('instagram', undefined, { posted: true }, T0), { r: { postedAt: new Date(T0).toISOString() } }, 'ticked with no link: posted now');
+  eq(sp.markResult('instagram', { postedAt: '2026-11-01T00:00:00.000Z' }, { posted: true }, T0).r.postedAt, '2026-11-01T00:00:00.000Z', 'ticked again: keeps when it was first marked');
+  ok(sp.markResult('tiktok', undefined, { posted: true, url: 'https://instagram.com/reel/1' }, T0).error, 'a wrong platform\'s link is refused');
+  eq(sp.markResult('tiktok', undefined, { posted: true, url: 'tiktok.com/@a/video/1', views: '1,234' }, T0).r.views, 1234, 'typed views: "1,234" is 1234');
+  ok(sp.markResult('instagram', undefined, { posted: true, views: '12.5' }, T0).error && sp.markResult('instagram', undefined, { posted: true, views: '-3' }, T0).error, 'views must be a whole number, not negative');
+  eq(sp.markResult('instagram', undefined, { posted: true, views: '' }, T0).r.views, undefined, 'empty views: none');
+  eq(sp.markResult('youtube', undefined, { posted: true, url: 'https://youtu.be/dQw4w9WgXcQ', views: '999' }, T0).r.views, 999, 'YouTube views are typed in like every platform (founder 2026-11-26)');
 
-  // Trial reels (founder 2026-11-25): Instagram shows it to non-followers first; Facebook posts normally.
-  const trialMade = await sp.createPosts(OWNER, [{ ...item, trial: true }], T0);
-  ok(inserted[0].ig_trial === true && trialMade.posts[0].trial === true, 'a trial post is saved as one and reads back as one');
-  await sp.createPosts(OWNER, [item], T0);
-  ok(!('ig_trial' in inserted[0]), 'a normal post sends no trial column, so scheduling works before migration 0022');
-  await sp.createPosts(OWNER, [{ ...item, targets: ['facebook'], captions: { facebook: 'b' }, trial: true }], T0);
-  ok(!('ig_trial' in inserted[0]), 'Facebook only: no trial flag (trial reels are Instagram only)');
-  await sp.createPosts(OWNER, [{ ...item, trial: 'yes' }], T0);
-  ok(!('ig_trial' in inserted[0]), 'only a real true turns trial on');
-  await sp.createPosts(OWNER, [{ ...item, trial: true }, item], T0);
-  ok(inserted[0].ig_trial === true && inserted[1].ig_trial === false, 'mixed batch: every row gets the column, never NULL (Codex 2026-11-25)');
-  const noCol = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from: () => ({ insert: () => ({ select: async () => ({ data: null, error: { code: 'PGRST204' } }) }) }) }) } }, env, { URLSearchParams });
-  ok(/migration 0022/.test((await noCol.createPosts(OWNER, [{ ...item, trial: true }], T0)).error ?? ''), 'trial before migration 0022: a clear message, not a crash');
-  const fbOnly = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => ({ from: () => { const q = { select: () => q, eq: () => q, gte: () => q, lt: () => q, order: () => q, limit: async () => ({ data: [{ id: 'P', media_id: 'm', targets: ['facebook'], ig_trial: true, captions: {}, result: {} }], error: null }) }; return q; } }) } }, env, { URLSearchParams });
-  ok((await fbOnly.listPosts(OWNER, 'a', 'b'))[0].trial === false, 'Instagram taken off a trial post: no Trial badge (Codex 2026-11-25)');
-  let tm = meta();
-  await sp.advancePost(post({ trial: true }), 0, ctxFor(tm));
-  eq(JSON.parse(tm.trialParams), { graduation_strategy: 'SS_PERFORMANCE' }, 'trial: sent with trial_params, moving to the feed by itself if it does well');
-  ok(tm.shareToFeed === null, 'trial: not shared to the feed at once');
-  tm = meta();
-  await sp.advancePost(post(), 0, ctxFor(tm));
-  ok(tm.trialParams === null && tm.shareToFeed === 'true', 'normal post: shared to the feed, no trial_params');
-  const fs0 = require('node:fs');
-  ok(/add column if not exists ig_trial boolean not null default false/.test(fs0.readFileSync('supabase/migrations/0022_trial_reels.sql', 'utf8')), 'migration 0022 adds the trial column');
-  const v0 = fs0.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
-  ok(/Post as trial reel/.test(v0) && /targets\.includes\("instagram"\) && \(\s*<label/.test(v0) && /trial: trial && targets\.includes\("instagram"\)/.test(v0), 'the toggle shows only with Instagram picked and is sent with each item');
-  ok(/post\.trial && <span[^>]*>Trial<\/span>/.test(v0), 'calendar card marks trial posts');
-  ok(!/[\u2013\u2014]/.test(v0), 'no em/en dashes in the page');
+  // Creating: own videos only; planned; any time in range.
+  const item = { mediaId: 'mine.mp4', at: new Date(T0 - 86400e3).toISOString(), targets: ['instagram', 'tiktok'], captions: { instagram: 'a', tiktok: 'b', facebook: 'extra' }, title: 'Reel', hook: 'h' };
+  const made = await sp.createPosts(ME, [item], T0);
+  ok(made.posts?.length === 1 && made.posts[0].state === 'scheduled', 'a video from yesterday is logged, as planned until marked posted');
+  eq(Object.keys(made.posts[0].captions), ['instagram', 'tiktok'], 'only the picked platforms\' captions are kept');
+  ok((await sp.createPosts(ME, [{ ...item, mediaId: 'someone-elses.mp4' }], T0)).error, 'another account\'s video refused');
+  ok((await sp.createPosts(ME, Array(101).fill(item), T0)).error, 'over 100 in one batch refused');
+  ok((await sp.createPosts(ME, [{ ...item, targets: ['snapchat'] }], T0)).error, 'unknown platform refused');
 
-  // Instagram: container, processing, publish once.
-  let m = meta();
-  let saves = [];
-  let next = await sp.advancePost(post(), 0, ctxFor(m, T0, saves));
-  ok(next.state === 'posting' && next.result.instagram.container === 'C1' && m.publishes === 0, 'tick 1: container made, Meta still processing, nothing published');
-  ok(m.reelType === 'REELS' && m.lastCaption === 'IG caption' && m.lastVideoUrl.includes('media/mine.mp4'), 'posted as a Reel with its caption, from the video\'s link');
-  ok(saves.some(([t, r]) => t === 'instagram' && r.container === 'C1'), 'the container is saved before waiting');
-  next = await sp.advancePost(post({ result: next.result }), 0, ctxFor(m, T0 + 60e3));
-  ok(next.state === 'posted' && m.publishes === 1 && m.creates === 1, 'tick 2: published exactly once, no second container');
-  eq(next.result.instagram.url, 'https://www.instagram.com/reel/M1/', 'the post links to the reel');
-  next = await sp.advancePost(post({ result: next.result }), 0, ctxFor(m, T0 + 120e3));
-  ok(m.publishes === 1 && next.state === 'posted', 'a done post is never published again');
+  // Editing and marking posted.
+  const id = made.posts[0].id;
+  let out = await sp.updatePost(ME, id, { rev: store.tables.scheduled_posts.find((r) => r.id === id)?.updated_at, at: item.at, targets: ['instagram', 'tiktok'], captions: item.captions, marks: { instagram: { posted: true, url: 'instagram.com/reel/abc', views: '130' } } }, T0);
+  ok(out.post && out.post.result.instagram.url === 'https://instagram.com/reel/abc' && out.post.result.instagram.views === 130, 'Instagram marked posted with its link and views');
+  eq(out.post.state, 'scheduled', 'TikTok not posted yet: still planned');
+  out = await sp.updatePost(ME, id, { rev: store.tables.scheduled_posts.find((r) => r.id === id)?.updated_at, at: item.at, targets: ['instagram', 'tiktok'], captions: item.captions, marks: { tiktok: { posted: true } } }, T0);
+  eq(out.post.state, 'posted', 'both posted: posted');
+  ok(out.post.result.instagram.views === 130, 'a platform not in this edit keeps its record');
+  ok((await sp.updatePost('someone-else', id, { at: item.at, targets: ['instagram'], captions: { instagram: 'x' } }, T0)).error, 'another account can\'t edit it');
+  out = await sp.updatePost(ME, id, { rev: store.tables.scheduled_posts.find((r) => r.id === id)?.updated_at, at: item.at, targets: ['instagram'], captions: { instagram: 'x' } }, T0);
+  ok(out.post.state === 'posted' && !('tiktok' in out.post.result), 'TikTok removed: its record goes; Instagram alone is posted');
+  ok((await sp.updatePost(ME, id, { rev: store.tables.scheduled_posts.find((r) => r.id === id)?.updated_at, at: item.at, targets: ['instagram'], captions: { instagram: 'x' }, marks: { instagram: { posted: true, url: 'https://evil.example' } } }, T0)).error, 'a bad link is refused and nothing saves');
+  eq(await sp.deletePost('someone-else', id), 'gone', 'another account can\'t remove it');
+  eq(await sp.deletePost(ME, id, 'an-older-rev'), store.tables.scheduled_posts.find((r) => r.id === id)?.updated_at ? 'changed' : 'ok', 'removing an older copy: refused when it changed since');
+  ok(['ok', 'gone'].includes(await sp.deletePost(ME, id, store.tables.scheduled_posts.find((r) => r.id === id)?.updated_at)), 'removing the copy that was opened: removed');
+  const lockSrc = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
+  ok(/await connection\(\)/.test(fs.readFileSync('src/app/(app)/posts/page.tsx', 'utf8')), 'the page renders per request, never prerendered (it reads the clock; the build failed without this)');
+  ok(/<fieldset disabled=\{saving\}/.test(lockSrc) && /<fieldset disabled=\{busy !== null\}/.test(lockSrc), 'post and settings forms are locked while saving');
 
-  // A tick that died right after Meta published: no repost.
-  m = meta({ igStatus: ['PUBLISHED'] });
-  next = await sp.advancePost(post({ result: { instagram: { state: 'working', step: 'publishing', container: 'C1', since: new Date(T0).toISOString() } } }), 0, ctxFor(m));
-  ok(next.state === 'posted' && m.publishes === 0, 'container already PUBLISHED: marked done, not published twice');
+  // Old auto-posted rows read as posted.
+  store.tables.scheduled_posts.push({ id: 'old', user_id: ME, media_id: 'mine.mp4', title: '', hook: '', captions: {}, targets: ['instagram', 'facebook'], at: new Date(T0).toISOString(), state: 'posted', result: { instagram: { state: 'done', id: 'M1', url: 'https://www.instagram.com/reel/M1/' }, facebook: { state: 'done' } }, created_at: '' });
+  const old = (await sp.listPosts(ME, new Date(T0 - 1).toISOString(), new Date(T0 + 1).toISOString())).find((p) => p.id === 'old');
+  ok(old.state === 'posted' && old.result.instagram.url === 'https://www.instagram.com/reel/M1/', 'an old auto-posted reel stays posted with its link');
+  ok(!('step' in old.result.instagram) && !('id' in old.result.instagram), 'old posting internals aren\'t sent to the page');
 
-  // Instagram's daily limit: wait, don't fail, don't make a container.
-  m = meta({ quota: 100 });
-  next = await sp.advancePost(post(), 0, ctxFor(m));
-  ok(next.state === 'posting' && m.creates === 0 && /daily limit/.test(next.result.instagram.note), 'limit reached: waits with a note, nothing sent');
+  // The app: typed by hand (free) or analyzed (paid).
+  const T = shared.DEFAULT_TEMPLATES;
+  ok((await sp.saveSetup(ME, { templates: T, url: 'not a site', hashtags: '' })).error, 'a bad website refused');
+  ok((await sp.saveSetup(ME, { templates: { ...T, tiktok: 'x'.repeat(2201) }, url: 'a.app' })).error, 'an over-long template refused');
+  ok(!store.tables.scheduled_post_settings.some((r) => r.user_id === ME), 'a refused save writes nothing at all (no half save)');
+  const typed = await sp.saveSetup(ME, { rev: (await sp.getSetup(ME)).rev, templates: { ...T, tiktok: 'mine {hook}' }, url: 'https://www.cybershield.app/', hashtags: 'appmarketing, #IndieHacker' });
+  eq([typed.app.domain, typed.app.hashtags], ['cybershield.app', ['#appmarketing', '#indiehacker']], 'typed app: domain and cleaned hashtags saved');
+  eq((await sp.getTemplates(ME)).tiktok, 'mine {hook}', 'templates saved per platform, in the same write');
+  const claims = await Promise.all(Array.from({ length: 8 }, (_, i) => sp.claimAnalysis(ME, T0 + i)));
+  ok(claims.filter(Boolean).length <= 5, '8 parallel clicks: never more than 5 pass');
+  eq(store.tables.scheduled_post_settings.find((r) => r.user_id === ME).templates.app.runs.length, claims.filter(Boolean).length, 'every analysis that passed is counted (none lost to a parallel write)');
+  for (let i = claims.filter(Boolean).length; i < 5; i++) await sp.claimAnalysis(ME, T0 + 5);
+  ok(!(await sp.claimAnalysis(ME, T0 + 10)), 'the 6th that day refused');
+  ok(await sp.claimAnalysis(ME, T0 + 86400e3 + 10), 'next day: allowed again');
+  const tokenA = await sp.claimAnalysis(ME, T0 + 86400e3 + 11);
+  const tokenB = await sp.claimAnalysis(ME, T0 + 86400e3 + 12);
+  eq(await sp.saveAnalysis(ME, tokenA, 'https://old.app/', { name: 'Old', hashtags: ['#old'] }, T0), null, 'a slower, older analysis never overwrites the newer one');
+  const saved = (await sp.saveAnalysis(ME, tokenB, 'https://cybershield.app/', { name: 'CyberShield', hashtags: ['#a', 'b'] }, T0)).app;
+  ok(saved.analyzedAt && saved.domain === 'cybershield.app' && saved.hashtags.join() === '#a,#b', 'analysis saved with domain and hashtags');
+  const tokenC = await sp.claimAnalysis(ME, T0 + 86400e3 + 13);
+  await sp.saveSetup(ME, { rev: (await sp.getSetup(ME)).rev, templates: { ...T, tiktok: 'mine {hook}' }, url: 'typed.app', hashtags: '#typed' });
+  ok(await sp.saveAnalysis(ME, tokenC, 'https://late.app/', { name: 'Late', hashtags: ['#late'] }, T0) === null && (await sp.getApp(ME)).domain === 'typed.app', 'typed while an analysis ran: the typed app wins');
+  ok(!('runs' in (await sp.getApp(ME))), 'the run log is never sent to the page');
+  ok((await sp.getTemplates(ME)).tiktok === 'mine {hook}', 'an analysis keeps the templates');
 
-  // Meta refuses: failed with Meta's reason.
-  m = meta({ refuse: true });
-  next = await sp.advancePost(post(), 0, ctxFor(m));
-  ok(next.state === 'failed' && /too short/.test(next.error) && next.error.startsWith('Instagram:'), 'Meta refuses: failed, with its reason');
+  // No automatic views (founder 2026-11-26: "only youtube doesn't make sense").
+  ok(!/refreshYouTubeViews|YOUTUBE_API_KEY|googleapis/.test(fs.readFileSync('src/lib/server/scheduled-posts.ts', 'utf8')), 'no YouTube views job or API key');
+  ok(!fs.existsSync('src/app/api/internal/posts/route.ts') && !JSON.parse(fs.readFileSync('vercel.json', 'utf8')).crons.some((c) => c.path === '/api/internal/posts') && !/internal\/posts/.test(fs.readFileSync('src/lib/supabase/session.ts', 'utf8')), 'no calendar cron at all');
+  ok(!/updated daily|fill in daily/.test(fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8')), 'the page has a views box for YouTube too');
 
-  // Network blips: retried each minute, then failed.
-  m = meta({ down: true });
-  next = await sp.advancePost(post(), 0, ctxFor(m));
-  ok(next.state === 'posting' && next.attempts === 1, 'network blip: stays posting, tries again next minute');
-  next = await sp.advancePost(post(), 7, ctxFor(m));
-  ok(next.state === 'failed' && next.attempts === 8, 'eighth blip in a row: failed');
+  // Codex 2026-11-26 round 1.
+  store.tables.scheduled_posts.push({ id: 'partial', user_id: ME, media_id: 'mine.mp4', title: '', hook: '', captions: {}, targets: ['instagram', 'facebook'], at: new Date(T0).toISOString(), state: 'failed', result: { instagram: { state: 'done', id: 'M2', url: 'https://www.instagram.com/reel/M2/' }, facebook: { state: 'failed', error: 'x' } }, created_at: '' });
+  const partial = (await sp.listPosts(ME, new Date(T0 - 1).toISOString(), new Date(T0 + 1).toISOString())).find((p) => p.id === 'partial');
+  ok(partial.result.instagram.postedAt && partial.result.instagram.url && !partial.result.facebook && partial.state === 'scheduled', 'an old partly posted row: the platform that went out stays posted with its link');
+  const raced = (await sp.createPosts(ME, [{ ...item, targets: ['instagram'], captions: { instagram: 'a' } }], T0)).posts[0];
+  const rowR = store.tables.scheduled_posts.find((r) => r.id === raced.id);
+  rowR.updated_at = '2026-11-26T09:00:00.000Z';
+  const realFrom = store.from;
+  let bumped = false;
+  store.from = (name) => { const q = realFrom(name); const update = q.update; q.update = (p) => { if (!bumped && name === 'scheduled_posts') { bumped = true; rowR.updated_at = '2026-11-26T09:00:05.000Z'; } return update(p); }; return q; };
+  const lost = await sp.updatePost(ME, raced.id, { rev: '2026-11-26T09:00:00.000Z', at: item.at, targets: ['instagram'], captions: { instagram: 'b' } }, T0);
+  store.from = realFrom;
+  ok(lost.error && rowR.captions.instagram === 'a', 'a post changed between the read and the write (another tab): the stale edit is refused, nothing overwritten');
+  ok((await sp.updatePost(ME, raced.id, { at: item.at, targets: ['instagram'], captions: { instagram: 'b' } }, T0)).error, 'an edit without the revision it opened is refused');
+  ok((await sp.updatePost(ME, raced.id, { at: item.at, targets: ['instagram'], captions: { instagram: 'b' }, rev: rowR.updated_at }, T0)).post?.captions.instagram === 'b' && rowR.updated_at > '2026-11-26T09:00:05.000Z', 'opened again: it saves and moves updated_at on');
+  eq(shared.postLink('instagram', 'https://instagram.com/'), null, 'a home page is not a post');
+  eq(shared.postLink('tiktok', 'https://user:pw@tiktok.com/@a/video/1'), null, 'login details in a link refused');
+  eq(shared.postLink('facebook', 'https://facebook.com:8443/reel/1'), null, 'a custom port refused');
+  eq(shared.postLink('youtube', 'https://youtube.com/@channel'), null, 'YouTube: only a link to one video ');
+  eq(shared.youtubeId('https://youtube.com/feed?v=dQw4w9WgXcQ'), null, 'a v= on another YouTube page is not a video');
+  const [, both] = await Promise.all([sp.claimAnalysis(ME, T0 + 3 * 86400e3), sp.saveSetup(ME, { rev: (await sp.getSetup(ME)).rev, templates: { ...shared.DEFAULT_TEMPLATES, facebook: 'both {hook}' }, url: 'both.app', hashtags: '#both' })]);
+  ok(both.app && (await sp.getTemplates(ME)).facebook === 'both {hook}' && (await sp.getApp(ME)).domain === 'both.app' && store.tables.scheduled_post_settings.find((r) => r.user_id === ME).templates.app.runs.length === 1, 'a save and an analysis claim at the same moment: both kept (no stale overwrite)');
+  const staleRev = (await sp.getSetup(ME)).rev;
+  await sp.saveSetup(ME, { rev: staleRev, templates: { ...shared.DEFAULT_TEMPLATES, facebook: 'both {hook}' }, url: 'tabone.app', hashtags: '#one' });
+  const tabTwo = await sp.saveSetup(ME, { rev: staleRev, templates: { ...shared.DEFAULT_TEMPLATES, facebook: 'tab two' }, url: 'tabtwo.app', hashtags: '#two' });
+  ok(tabTwo.stale && (await sp.getApp(ME)).domain === 'tabone.app' && (await sp.getTemplates(ME)).facebook === 'both {hook}', 'a second tab with an older copy of the settings is refused, never overwrites');
+  ok(/onStale=\{\(\) => void loadSettings\(\)\}/.test(fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8')), 'a refused settings save reloads the latest, keeping the form');
+  const oldPost = (await sp.createPosts(ME, [{ ...item, targets: ['instagram'], captions: { instagram: 'a' } }], T0)).posts[0];
+  const oldRow = store.tables.scheduled_posts.find((r) => r.id === oldPost.id);
+  oldRow.at = new Date(T0 - 400 * 86400e3).toISOString();
+  ok((await sp.updatePost(ME, oldPost.id, { rev: oldRow.updated_at, at: oldRow.at, targets: ['instagram'], captions: { instagram: 'a' }, marks: { instagram: { posted: true, views: '50' } } }, T0)).post?.result.instagram.views === 50, 'a post over a year old still takes views and links (its time unchanged)');
+  ok((await sp.updatePost(ME, oldPost.id, { rev: oldRow.updated_at, at: new Date(T0 - 500 * 86400e3).toISOString(), targets: ['instagram'], captions: { instagram: 'a' } }, T0)).error, 'moving a post outside the window is still refused');
+  ok(/at: sameWhen \? post\.at/.test(fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8')), 'an untouched day and time keep the exact moment (clock changes)');
+  ok((await sp.saveSetup(ME, { templates: shared.DEFAULT_TEMPLATES, url: 'blind.app' })).error && (await sp.getApp(ME)).domain !== 'blind.app', 'a settings save without its revision is refused (no blind overwrite)');
+  eq(await sp.claimAnalysis(ME, T0 + 4 * 86400e3, 'old-rev'), 'stale', 'Analyze from an out-of-date dialog: refused before using a run');
+  ok(typeof (await sp.claimAnalysis(ME, T0 + 4 * 86400e3, (await sp.getSetup(ME)).rev)) === 'string', 'Analyze from an up-to-date dialog: claimed');
+  const appRoute = fs.readFileSync('src/app/api/posts/app/route.ts', 'utf8');
+  ok(/claimAnalysis\(user\.who, Date\.now\(\), rev\)/.test(appRoute) && /status: 409/.test(appRoute) && /JSON\.stringify\(\{ url, rev: currentRev \}\)/.test(fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8')), 'the dialog sends its revision with Analyze; out of date is a 409');
+  eq(shared.postLink('instagram', 'https://www.instagram.com/mayagrace180/'), null, 'an Instagram profile is not a post');
+  eq(shared.postLink('tiktok', 'https://www.tiktok.com/@maya'), null, 'a TikTok profile is not a post');
+  ok(shared.postLink('tiktok', 'https://vm.tiktok.com/ZMabc123/') && shared.postLink('instagram', 'https://www.instagram.com/p/Cabc_12/') && shared.postLink('facebook', 'https://www.facebook.com/SummerViola/videos/123456/'), 'short links and every usual post address pass');
+  eq(shared.postLink('facebook', 'https://www.facebook.com/settings'), null, 'a Facebook settings page is not a post');
+  for (const bad of ['https://www.facebook.com/watch/', 'https://www.facebook.com/reels/', 'https://www.facebook.com/story.php', 'https://fb.watch/']) eq(shared.postLink('facebook', bad), null, `not one post: ${bad}`);
+  for (const good of ['https://www.facebook.com/watch/?v=123', 'https://www.facebook.com/reel/987', 'https://www.facebook.com/share/r/1AbC/', 'https://fb.watch/abC1/', 'https://www.facebook.com/story.php?story_fbid=55&id=1']) ok(shared.postLink('facebook', good), `a Facebook post: ${good}`);
+  const viewR3 = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
+  ok(/status === 409\) onStale\(\)/.test(viewR3) && /onStale=\{\(\) => void load\(\)\}/.test(viewR3), 'a 409 reloads the calendar, so reopening shows the latest copy');
+  ok((viewR3.match(/disabled=\{busy === "analyze"\}/g) ?? []).length === 2, 'the link and hashtags are locked while Analyze runs');
+  ok(/getSetup\(user\.who\)/.test(fs.readFileSync('src/app/api/posts/templates/route.ts', 'utf8')), 'templates and app load from one read');
+  const two = (await sp.createPosts(ME, [{ ...item, targets: ['instagram'], captions: { instagram: 'a' } }], T0)).posts[0];
+  store.tables.scheduled_posts.find((r) => r.id === two.id).updated_at = '2026-11-26T10:00:00.000Z';
+  const tabA = (await sp.listPosts(ME, new Date(T0 - 2 * 86400e3).toISOString(), new Date(T0 + 1).toISOString())).find((p) => p.id === two.id);
+  ok((await sp.updatePost(ME, two.id, { at: item.at, targets: ['instagram'], captions: { instagram: 'tab A' }, rev: tabA.updatedAt }, T0)).post, 'tab A saves');
+  const stale = await sp.updatePost(ME, two.id, { at: item.at, targets: ['instagram'], captions: { instagram: 'tab B' }, rev: tabA.updatedAt }, T0);
+  ok(/changed/.test(stale.error ?? '') && store.tables.scheduled_posts.find((r) => r.id === two.id).captions.instagram === 'tab A', 'tab B, opened before A saved: refused, A\'s edit kept');
+  ok(/rev: post\.updatedAt/.test(fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8')), 'the page sends the revision it opened');
+  const viewSrc = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
+  ok(/onChange=\{pickTargets\}/.test(viewSrc) && /captionFor\(x, templates\[x\], post\.hook, app\)/.test(viewSrc), 'a platform added to a post starts from its caption format');
 
-  // Meta too slow.
-  m = meta({ igStatus: ['IN_PROGRESS'] });
-  next = await sp.advancePost(post({ result: { instagram: { state: 'working', step: 'processing', container: 'C1', since: new Date(T0).toISOString() } } }), 0, ctxFor(m, T0 + 31 * 60e3));
-  ok(next.state === 'failed' && /30 minutes/.test(next.error), 'still processing after 30 minutes: failed');
-
-  // Facebook Page Reels: start, upload from the link, wait, publish once, live.
-  const fbPost = (result = {}) => post({ targets: ['facebook'], result });
-  m = meta({ fbStatus: [{ uploading_phase: { status: 'in_progress' } }] });
-  next = await sp.advancePost(fbPost(), 0, ctxFor(m));
-  ok(next.result.facebook.video === 'V1' && next.result.facebook.step === 'uploaded' && m.uploads === 1 && m.finishes === 0, 'tick 1: started and uploaded, waits for Meta to receive it');
-  ok(m.uploadHeaders.file_url.includes('media/mine.mp4') && m.uploadHeaders.Authorization === 'OAuth PAGETOKEN', 'uploaded from the video\'s link with the Page token');
-  m.fbStatus = [{ uploading_phase: { status: 'complete' } }, { uploading_phase: { status: 'complete' }, publishing_phase: { status: 'complete' }, video_status: 'ready' }];
-  next = await sp.advancePost(fbPost(next.result), 0, ctxFor(m, T0 + 60e3));
-  ok(next.state === 'posted' && m.finishes === 1 && m.fbState === 'PUBLISHED' && m.fbCaption === 'FB caption', 'tick 2: published once, with its caption');
-  eq(next.result.facebook.url, 'https://www.facebook.com/reel/V1', 'the post links to the Facebook reel');
-  m = meta({ fbStatus: [{ uploading_phase: { status: 'complete' }, publishing_phase: { status: 'in_progress' } }] });
-  next = await sp.advancePost(fbPost({ facebook: { state: 'working', step: 'finishing', video: 'V1', since: new Date(T0).toISOString() } }), 0, ctxFor(m));
-  ok(m.finishes === 0 && next.result.facebook.step === 'published', 'a tick that died after publishing: not published twice');
-  m = meta({ fbStatus: [{ video_status: 'error', processing_phase: { status: 'error', error: { message: 'Bad aspect ratio' } } }] });
-  next = await sp.advancePost(fbPost({ facebook: { state: 'working', step: 'uploaded', video: 'V1', since: new Date(T0).toISOString() } }), 0, ctxFor(m));
-  ok(next.state === 'failed' && /Bad aspect ratio/.test(next.error), 'Facebook rejects the video: failed with its reason');
-
-  // Both networks: one failing doesn't undo the other, and a retry never reposts where it went out.
-  m = meta({ refuse: true });
-  next = await sp.advancePost(post({ targets: ['instagram', 'facebook'], result: { facebook: { state: 'done', id: 'V1', url: 'u' } } }), 0, ctxFor(m));
-  ok(next.state === 'failed' && next.result.facebook.state === 'done' && !m.calls.some((u) => u.includes('video_reels') || u.includes('rupload')), 'Facebook already done: untouched while Instagram fails');
-  ok(!/Facebook/.test(next.error), 'the error names only the network that failed');
-
-  // Progress is never lost (Codex 2026-11-15 P1): an error after a step was saved keeps that step.
-  m = meta();
-  const flaky = m.fetch;
-  let n = 0;
-  m.fetch = async (u, i) => { if (++n > 2) throw new TypeError('fetch failed'); return flaky(u, i); };
-  next = await sp.advancePost(post(), 0, ctxFor(m));
-  ok(next.result.instagram.container === 'C1' && next.result.instagram.step === 'processing', 'network dies after the container was made: the container is kept, not started over');
-  m = meta({ igStatus: ['FINISHED'] });
-  const publishFlaky = m.fetch;
-  m.fetch = async (u, i) => { if (u.includes('media_publish')) { m.publishes++; throw new TypeError('timeout'); } return publishFlaky(u, i); };
-  next = await sp.advancePost(post({ result: { instagram: { state: 'working', step: 'processing', container: 'C1', since: new Date(T0).toISOString() } } }), 0, ctxFor(m));
-  ok(next.result.instagram.step === 'publishing' && next.result.instagram.container === 'C1', 'publish call lost in the network: the publish mark stays, so the next pass asks Meta first');
-  m = meta({ igStatus: ['PUBLISHED'] });
-  next = await sp.advancePost(post({ result: next.result }), 0, ctxFor(m));
-  ok(next.state === 'posted' && m.publishes === 0 && m.creates === 0, 'next pass: Meta says it went out, so done without a second post');
-
-  // A run that lost its claim stops before calling Meta again (Codex P1).
-  m = meta({ igStatus: ['FINISHED'] });
-  const lost = ctxFor(m);
-  lost.save = async () => { throw new sp.LostLease('taken over'); };
-  let threw = null;
-  await sp.advancePost(post(), 0, lost).catch((e) => { threw = e; });
-  ok(threw instanceof sp.LostLease && m.publishes === 0 && m.creates === 1, 'lost the claim after making the container: stops, publishes nothing');
-
-  // Time limits (Codex P1): each Meta call has a timeout; nothing starts after the post's deadline.
-  m = meta();
-  let signals = 0;
-  const timed = m.fetch;
-  m.fetch = async (u, i) => { if (i?.signal) signals++; return timed(u, i); };
-  await sp.advancePost(post(), 0, ctxFor(m));
-  ok(signals > 0 && signals === m.calls.length, 'every Meta call carries a timeout');
-  m = meta();
-  next = await sp.advancePost(post(), 0, { ...ctxFor(m), deadline: Date.now() - 1 });
-  ok(m.calls.length === 0 && next.state === 'posting', 'past the deadline: no call to Meta, it carries on next minute');
-
-  // Retry never reposts something that may have gone out (Codex P1).
-  const kept = sp.retryResult({
-    instagram: { state: 'failed', step: 'publishing', container: 'C1', error: 'x' },
-    facebook: { state: 'failed', step: 'uploaded', video: 'V9', error: 'y' },
-  });
-  ok(kept.instagram?.state === 'working' && kept.instagram.container === 'C1' && kept.instagram.step === 'publishing', 'retry keeps an Instagram attempt that may have published, to check it first');
-  ok(kept.facebook === undefined, 'retry starts fresh only where nothing could have gone out');
-  const fbKept = sp.retryResult({ facebook: { state: 'failed', step: 'finishing', video: 'V1' }, instagram: { state: 'done', id: 'M1' } });
-  ok(fbKept.facebook?.state === 'working' && fbKept.facebook.video === 'V1' && fbKept.instagram.state === 'done', 'retry keeps a Facebook publish that may have happened, and what is done');
-  m = meta({ igStatus: ['PUBLISHED'] });
-  next = await sp.advancePost(post({ result: kept, targets: ['instagram'] }), 0, ctxFor(m));
-  ok(next.state === 'posted' && m.publishes === 0 && m.creates === 0, 'after Retry: Meta says it went out, so no second post');
-
-  // Only listed accounts' posts are ever picked up (Codex P2).
-  const filters = [];
-  const spyDb = { from: () => { const q = { select: () => q, update: () => q, in: (col, v) => { filters.push([col, v]); return q; }, or: () => q, order: () => q, eq: () => q, limit: async () => ({ data: [], error: null }) }; return q; } };
-  const listed = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => spyDb } }, env, { URLSearchParams });
-  await listed.advancePosts();
-  ok(filters.some(([c, v]) => c === 'user_id' && JSON.stringify(v) === JSON.stringify([OWNER])), 'the due-posts read is limited to the listed accounts');
-
-  // The page: a real 404 for everyone else, before anything renders (Codex P2).
-  const res404 = { status: 404 };
-  const next_ = { cookies: { getAll: () => [], set() {} } };
-  const NextResponse = { next: () => next_, rewrite: (_u, init) => ({ ...res404, ...init, rewritten: true, cookies: { set() {} } }), redirect: (u) => ({ status: 307, to: String(u), cookies: { set() {} } }), json: (b, i) => ({ status: i?.status ?? 200, body: b, cookies: { set() {} } }) };
-  const session = (sub) => load('src/lib/supabase/session.ts', { 'next/server': { NextResponse }, '@supabase/ssr': { createServerClient: () => ({ auth: { getClaims: async () => ({ data: sub ? { claims: { sub } } : null }) } }) }, '@/lib/posts-access': stubs['@/lib/posts-access'], '@/lib/supabase/server': { createSupabaseAdminClient: () => ({}) } }, { ...env, NEXT_PUBLIC_SUPABASE_URL: 'https://s', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'k' });
-  const reqTo = (path) => ({ nextUrl: new URL(`https://mavya.app${path}`), url: `https://mavya.app${path}`, method: 'GET', cookies: { getAll: () => [], set() {} } });
-  eq((await session('someone-else').updateSession(reqTo('/posts'))).status, 404, '/posts for another signed-in user: 404');
-  eq((await session(null).updateSession(reqTo('/posts'))).status, 404, '/posts signed out: 404, not a sign-in prompt');
-  ok((await session(OWNER).updateSession(reqTo('/posts'))) === next_, '/posts for the owner: goes through');
-  const proxySrc = fs.readFileSync('src/proxy.ts', 'utf8'), sessionSrc = fs.readFileSync('src/lib/supabase/session.ts', 'utf8');
-  ok(proxySrc.includes('"/posts/:path*"') && /PUBLIC_API = \[[^\]]*"\/api\/internal\/posts"/.test(sessionSrc), 'the proxy guards /posts; the posting cron gets through without a session');
-
-  // The profile: everyone else's is exactly as before; only the owner's carries the menu flag (no extra request).
-  const profileFor = (id) => load('src/app/api/profile/route.ts', {
-    'node:fs/promises': {}, 'node:path': require('node:path'), 'next/server': { connection: async () => {} }, '@/lib/profile': { NO_PROFILE: {} },
-    '@/lib/supabase/server': { authEnabled: () => true, getSessionUser: async () => ({ id, email: 'a@b.c' }), createSupabaseServerClient: async () => ({ from: () => { const q = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: { first_name: 'A', last_name: 'B', avatar_url: '' }, error: null }) }; return q; } }) },
-    '@/lib/posts-access': stubs['@/lib/posts-access'],
-  }, env);
-  const other = await (await profileFor('someone-else').GET()).json();
-  eq(Object.keys(other).sort(), ['avatar', 'email', 'firstName', 'lastName'], 'another user\'s profile: the same four fields as before, nothing added');
-  eq((await (await profileFor(OWNER).GET()).json()).scheduler, true, 'the owner\'s profile: scheduler: true');
-
-  // Codex round 2: an unreadable or incomplete answer from Meta is "unknown", never success.
-  m = meta({ igStatus: ['FINISHED'] });
-  const cut = m.fetch;
-  m.fetch = async (u, i) => { const r = await cut(u, i); if (u.includes('media_publish')) return { ok: true, status: 200, json: async () => { throw new Error('body timed out'); } }; return r; };
-  next = await sp.advancePost(post({ result: { instagram: { state: 'working', step: 'processing', container: 'C1', since: new Date(T0).toISOString() } } }), 0, ctxFor(m));
-  ok(next.state === 'posting' && next.result.instagram.step === 'publishing', 'publish answer cut off mid-body: not marked posted, the publish mark stays to check');
-  m = meta();
-  const noId = m.fetch;
-  m.fetch = async (u, i) => (u.endsWith('/IG/media') ? { ok: true, status: 200, json: async () => ({}) } : noId(u, i));
-  next = await sp.advancePost(post(), 0, ctxFor(m));
-  ok(next.state === 'posting' && !next.result.instagram?.container, 'container answer without an id: nothing saved as made, tried again next minute');
-  m = meta({ fbStatus: [{ uploading_phase: { status: 'complete' } }] });
-  const noSuccess = m.fetch;
-  m.fetch = async (u, i) => (u.includes('rupload') ? { ok: true, status: 200, json: async () => ({ success: false }) } : noSuccess(u, i));
-  next = await sp.advancePost(fbPost({ facebook: { state: 'working', step: 'upload', video: 'V1', since: new Date(T0).toISOString() } }), 0, ctxFor(m));
-  ok(next.result.facebook.step === 'upload' && next.state === 'posting', 'upload not confirmed: stays at upload, not marked uploaded');
-
-  // Codex round 2: a Facebook publishing error is a failure, never a green check.
-  m = meta({ fbStatus: [{ video_status: 'ready', uploading_phase: { status: 'complete' }, publishing_phase: { status: 'error' } }] });
-  next = await sp.advancePost(fbPost({ facebook: { state: 'working', step: 'finishing', video: 'V1', since: new Date(T0).toISOString() } }), 0, ctxFor(m));
-  ok(next.state === 'failed' && /publish/.test(next.error) && m.finishes === 0, 'publishing phase in error with video "ready": failed, not posted');
-  m = meta({ fbStatus: [{ video_status: 'ready', uploading_phase: { status: 'complete' }, publishing_phase: { status: 'in_progress' } }] });
-  next = await sp.advancePost(fbPost({ facebook: { state: 'working', step: 'published', video: 'V1', since: new Date(T0).toISOString() } }), 0, ctxFor(m));
-  ok(next.state === 'posting', 'video "ready" while publishing is still in progress: not yet posted');
-
-  // Codex round 2: the claim re-checks "due", so a post moved later between the read and the claim is not taken.
-  const ors = [];
-  const claimDb = { from: () => { const q = { select: () => q, update: () => q, in: () => q, eq: () => q, order: () => q, or: (f) => { ors.push(f); return q; }, limit: async () => ({ data: [{ id: 'P1', user_id: OWNER, targets: ['instagram'], result: {}, attempts: 0, at: new Date(T0).toISOString(), state: 'scheduled' }], error: null }), then: (res) => res({ data: [], error: null }) }; return q; } };
-  const claimer = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => claimDb } }, env, { URLSearchParams });
-  // The real clock: advancePosts stops claiming 30 s after its "now", so a fixed past time skipped the claim (failing since 2026-11-16).
-  const worked = await claimer.advancePosts(Date.now());
-  ok(ors.length === 2 && ors.every((f) => /state\.eq\.scheduled,at\.lte\./.test(f)), 'the claim repeats the due test (time come), not just the state');
-  ok(worked === false, 'the row no longer due at claim time: nothing is posted');
-
-  // Per-video times (founder 2026-11-15: "per video, i can schedule anytime i want").
+  // Helpers still used by the planner.
   const spreadT = [T0 + 1e6, T0 + 2e6, T0 + 3e6];
-  eq(shared.finalTimes(['a', 'b', 'c'], spreadT, {}), spreadT, 'no hand-set times: each video follows the spread');
   eq(shared.finalTimes(['a', 'b', 'c'], spreadT, { b: T0 + 9e6 }), [T0 + 1e6, T0 + 9e6, T0 + 3e6], 'a hand-set time replaces only that video\'s time');
-  eq(shared.finalTimes(['a', 'b'], [T0 + 1e6], {}), [T0 + 1e6, null], 'no spread slot left and no hand-set time: no time (blocked)');
-  eq(shared.timeProblem(null, T0), 'Pick a time', 'missing time blocks scheduling');
-  ok(shared.timeProblem(T0 + 30e3, T0) && shared.timeProblem(T0 + 120e3, T0) === null, 'a time under a minute ahead is refused, later is fine');
-  ok(/type="datetime-local"/.test(view) && /disabled=\{[^}]*problems\.some\(Boolean\)/.test(view), 'each picked video has its own time box; any bad time blocks the Schedule button');
-  eq(shared.finalTimes(['a', 'b'], spreadT, { a: null }), [null, T0 + 2e6], 'a time box cleared by hand stays empty (blocks), never falls back to the spread');
-  ok(/const passed = now \? null : passedAt\(times\);\s*if \(passed !== null\)/.test(view) && /const passedAt = [^\n]*Date\.now\(\)[^\n]*timeProblem\(t, now\)/.test(view), 'times are checked again at the click, not at the last clock tick');
-
-  // Random spread (founder 2026-11-15, against spam filters): 1.5 to 2 hours apart, never on a round time, rolls over.
+  eq(shared.finalTimes(['a', 'b'], spreadT, { a: null }), [null, T0 + 2e6], 'a time box cleared by hand stays empty');
   const many = shared.randomSlots(40, 9 * 60, 22 * 60, shared.seeded(11));
-  const gaps = many.slice(1).map((x, i) => x - many[i]);
-  ok(many.length === 40 && gaps.every((g) => g >= shared.MIN_GAP), '40 videos: every gap at least 1.5 hours, overnight too');
-  ok(gaps.filter((g) => g < 600).every((g) => g <= shared.MAX_GAP), 'within a day, gaps at most 2 hours');
-  ok(new Set(gaps.filter((g) => g < 600)).size > 5, 'gaps vary (random), not a fixed pattern');
-  ok(many.every((m) => m % 1440 >= 9 * 60 && m % 1440 <= 22 * 60), 'every time inside the day\'s window');
-  ok(many.every((m) => m % 15 !== 0), 'never on the hour or a quarter hour');
-  ok(Math.floor(many[many.length - 1] / 1440) >= 4, 'more than fit in a day roll over to the next days');
+  ok(many.length === 40 && many.slice(1).every((t, i) => t - many[i] >= shared.MIN_GAP), 'spread: at least 1.5 hours apart');
   eq(shared.randomSlots(5, 540, 1320, shared.seeded(3)), shared.randomSlots(5, 540, 1320, shared.seeded(3)), 'same seed, same times (the screen doesn\'t jump)');
-  ok(shared.randomSlots(3, 540, 1320, shared.seeded(5), 20 * 60)[0] >= 20 * 60, 'starting today: the first time is after now');
-  ok(/aria-pressed=\{mode === m\}/.test(view) && /"Now" : "Schedule"/.test(view) && />\s*\{saving \? "Publishing\.\.\." : "Publish"\}/.test(view) && /Times in \{zone\}/.test(view) && !/[\u2013\u2014]/.test(view), 'one video: Now and Schedule buttons; time zone shown; no dashes in the screen');
+  const texts = [{ id: 'b', text: 'how tf did i get ', start: 0, end: 2.4, y: 73.8, x: 50 }, { id: 'hook', text: 'WAIT...', start: 0, end: 2.4, y: 67.2, x: 50 }, { id: 'd', text: 'pick AI face', start: 5.5, end: 7.2, y: 20, x: 50 }];
+  eq(shared.hookWords(texts, { start: 0, end: 2.672 }), 'WAIT... how tf did i get', 'the caption hook is the video\'s own on-screen hook text');
+  eq(shared.draftCaptions(['v'], () => 'hi', ['tiktok'], shared.DEFAULT_TEMPLATES, app, { v: { tiktok: 'edited' } }).v.tiktok, 'edited', 'an edited caption is kept on the review screen');
 
-  // Clock changes (Codex round 6): spacing and "not in the past" hold on the real clock.
-  const H = 3600e3, base = Date.parse('2027-03-14T05:00:00Z');
-  const springForward = (m) => base + m * 60e3 + (m >= 120 ? -H : 0) + (m >= 120 && m < 180 ? 2 * H : 0); // 02:00-03:00 doesn't exist
-  const sf = shared.slotMoments([68, 158, 254], springForward, 0);
-  ok(sf.slice(1).every((t, i) => t - sf[i] >= shared.MIN_GAP * 60e3), 'spring-forward day: posts stay at least 1.5 hours apart on the real clock');
-  const fallBack = (m) => base + m * 60e3 + (m >= 120 ? H : 0);
-  ok(shared.slotMoments([60, 200], fallBack, base + 5 * H)[0] >= base + 5 * H, 'a time before "now" is moved after now');
-  ok(shared.slotMoments([60, 200, 400], fallBack, 0).every((t) => Math.floor(t / 60e3) % 15 !== 0), 'moved times still avoid round times');
-  // Codex round 7: final moments stay inside Earliest/Latest; one pushed out rolls to the next window.
-  const winFits = (t) => { const m = ((t - base) / 60e3) % 1440; return m >= 60 && m <= 180; };
-  const winNext = (t) => base + (Math.floor((t - base) / 86400e3) + 1) * 86400e3 + 60 * 60e3 + 7 * 60e3;
-  const inWin = shared.slotMoments([68, 158], springForward, 0, winFits, winNext);
-  ok(inWin.every(winFits), 'a spring-forward time pushed past Latest moves into the next day\'s window');
-  ok(inWin[1] - inWin[0] >= shared.MIN_GAP * 60e3, 'and keeps the 1.5 hour gap');
-
-  // Caption hook = the video's own on-screen hook (founder 2026-11-15: "the hook should be the hook of my video").
-  const texts = [
-    { id: 'b', text: 'how tf did i get ', start: 0, end: 2.4, y: 73.8, x: 50 },
-    { id: 'hook', text: 'WAIT...', start: 0, end: 2.4, y: 67.2, x: 50 },
-    { id: 'c', text: '198 users in 1 day?', start: 0, end: 2.4, y: 79.8, x: 50 },
-    { id: 'd', text: 'pick AI face', start: 5.5, end: 7.2, y: 20, x: 50 },
-    { id: 'e', text: '', start: 0, end: 2.4, y: 76, x: 50 },
-  ];
-  eq(shared.hookWords(texts, { start: 0, end: 2.672 }), 'WAIT... how tf did i get 198 users in 1 day?', 'all hook text boxes, top to bottom, on one line');
-  ok(!/pick AI face/.test(shared.hookWords(texts, { start: 0, end: 2.672 })), 'demo texts after the hook are left out');
-  eq(shared.hookWords([{ id: 'x', text: 'SaaS + Insta reels =', start: 0, end: 3, y: 20 }, { id: 'y', text: '🔥', start: 0.2, end: 3, y: 30 }], { start: 1, end: 3.5 }), 'SaaS + Insta reels = 🔥', 'hook length is its trimmed length (end - start)');
-  eq(shared.hookWords([{ id: 'hook', text: 'How is this legal?', start: 0, end: 3, y: 22 }, { id: 'z', text: 'browse', start: 3, end: 5, y: 9 }], {}), 'How is this legal?', 'no hook timing saved: the hook text box\'s own end');
-  // Founder 2026-11-15: "this reel got 1.6M views" came on after the hook text but inside the 3.3 s hook clip.
-  const reel = [{ id: 'hook', text: 'why is my app suddenly', start: 0, end: 2.604, x: 49.6, y: 63.5 }, { id: '931ev8cc', text: 'blowing up on insta??🤯', start: 0, end: 2.604, x: 50.5, y: 69.6 }, { id: 'ndbkkhme', text: 'this reel got 1.6M views', start: 2.604, end: 5.366, x: 49.8, y: 81.7 }, { id: 'sgrb9e8q', text: 'pick AI face', start: 5.366, end: 7.119, x: 49.7, y: 75.4 }];
-  eq(shared.hookWords(reel, { start: 1.493, end: 4.748 }), 'why is my app suddenly blowing up on insta??🤯', 'only the words shown with the hook text: a line that comes on after it is left out');
-  eq(shared.hookWords([{ id: 'hook', text: 'A', start: 0, end: 2, y: 10 }, { id: 'b', text: 'B', start: 1.5, end: 3, y: 20 }], { start: 0, end: 4 }), 'A B', 'a box that comes on while the hook text is still shown counts');
-  eq(shared.hookWords([], { end: 2 }), null, 'no text boxes: none (the library words are the fallback)');
+  // Wiring.
   const serverSrc = fs.readFileSync('src/lib/server/scheduled-posts.ts', 'utf8');
-  ok(/hook: \(e\.runId && onScreen\.get\(e\.runId\)\) \|\| \(e\.runId && hookless\.has\(e\.runId\) \? \"\" : e\.hookText\)/.test(serverSrc), 'the export list uses the on-screen hook first, the library words only as a fallback');
-  ok((view.match(/<HookLine hook=/g) ?? []).length === 2, 'the dialog shows each picked video\'s hook words, for one video and for several');
-  const viewNow = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
-  ok(!/disabled=\{!editable\}/.test(viewNow) && /\{editable \? \(/.test(viewNow), 'a post that went out shows a summary, never greyed-out form boxes (founder 2026-11-15: "looks broken")');
-  ok(/function NetworkLogo/.test(viewNow) && !/Open on \{NAMES\[x\]\}<ExternalLink/.test(viewNow) && (viewNow.match(/<NetworkLogo /g) ?? []).length >= 6, 'Instagram and Facebook logos instead of "Open on Instagram / Open on Facebook" text');
-  ok(!/id="ig-grad"/.test(viewNow) && /useId\(\)/.test(viewNow), 'each Instagram logo has its own gradient id');
-  const card = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8').match(/const PostCard = memo[\s\S]*?\n\}\);/)[0];
-  ok((card.match(/<NetworkLogo /g) ?? []).length === 2 && /url \? \(/.test(card), 'a card shows each network logo once: grey until posted, then a link');
-
-  // Final review screen (founder 2026-11-15: "a final screen where they can edit their caption ... and then the publish button").
-  const dr = shared.draftCaptions(['v1', 'v2'], (id) => (id === 'v1' ? 'SaaS + Insta reels =' : ''), ['instagram', 'facebook'], shared.DEFAULT_TEMPLATES, {});
-  ok(dr.v1.instagram.startsWith('SaaS + Insta reels =') && dr.v1.facebook.startsWith('SaaS + Insta reels =') && !dr.v2.facebook.startsWith('{hook}'), 'review captions start filled from the templates with each video\'s hook');
-  const kept2 = shared.draftCaptions(['v1'], () => 'x', ['instagram', 'facebook'], shared.DEFAULT_TEMPLATES, { v1: { instagram: 'my edit' } });
-  ok(kept2.v1.instagram === 'my edit' && kept2.v1.facebook.startsWith('x'), 'an edit made on the review screen is kept (Back and forth)');
-  const viewR = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
-  ok(/onClick=\{review\}/.test(viewR) && /reviewing \? \(/.test(viewR) && /drafts\[id\]\?\.\[t\] \?\? fillCaption/.test(viewR), 'Schedule goes to the review screen first, and what is published is the reviewed caption');
-  ok(/: "Publish"\}/.test(viewR) && !/Publish on schedule|Publish now/.test(viewR) && /disabled=\{saving \|\| tooLong\}/.test(viewR), 'the review screen ends with Publish; an over-long caption blocks it');
-  let dd = shared.draftCaptions(['v1', 'v2'], () => 'h', ['instagram', 'facebook'], shared.DEFAULT_TEMPLATES, { v1: { facebook: 'fb edit' }, v2: { instagram: 'v2 edit' } });
-  dd = shared.draftCaptions(['v1'], () => 'h', ['instagram'], shared.DEFAULT_TEMPLATES, dd);
-  dd = shared.draftCaptions(['v1', 'v2'], () => 'h', ['instagram', 'facebook'], shared.DEFAULT_TEMPLATES, dd);
-  ok(dd.v1.facebook === 'fb edit', 'Facebook unticked and ticked again: its edited caption comes back');
-  ok(dd.v2.instagram === 'v2 edit', 'a video unpicked and picked again: its edited caption comes back');
-  ok(/onClick=\{review\}[^>]*>\s*Next\s*</.test(fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8')), 'the button to the caption check just says "Next" (founder 2026-11-15)');
-  const viewL = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
-  ok(/aria-label=\{NAMES\[t\]\} checked=/.test(viewL) && /<NetworkLogo t=\{t\} className="h-6 w-6" \/>\s*<\/label>/.test(viewL), 'Post to shows the logos only (founder 2026-11-15), still named for screen readers');
-
-  // One line on the card (founder 2026-11-15): a short countdown, never wrapped.
-  eq([shared.countdown(41 * 60e3 + 48e3), shared.countdown(110 * 60e3), shared.countdown(51 * 3600e3), shared.countdown(45e3)], ['in 41m', 'in 1h 50m', 'in 2d 3h', 'in 45s'], 'countdowns are short: 41m, 1h 50m, 2d 3h, 45s');
-  ok(/whitespace-nowrap[^"]*"><Timer/.test(fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8')), 'the countdown never wraps to a second line');
-  // A post can't be moved into the past (it would go out within the minute).
-  const editDb = { from: () => { const q = { update: () => q, eq: () => q, select: async () => ({ data: [{ id: 'P1', state: 'scheduled', result: {}, captions: {}, targets: ['instagram'], at: new Date(T0).toISOString(), created_at: '' }], error: null }) }; return q; } };
-  const editor = load('src/lib/server/scheduled-posts.ts', { ...stubs, '@/lib/supabase/server': { createSupabaseAdminClient: () => editDb } }, env, { URLSearchParams });
-  ok((await editor.updatePost(OWNER, 'P1', { at: new Date(T0 - 3600e3).toISOString(), targets: ['instagram'], captions: { instagram: 'a' } }, T0)).error, 'editing a post to a time that has passed is refused');
-  ok((await editor.updatePost(OWNER, 'P1', { at: new Date(T0 + 3600e3).toISOString(), targets: ['instagram'], captions: { instagram: 'a' } }, T0)).post, 'editing it to a later time works');
-
-  // Founder 2026-11-15: Facebook showed "failed" though the reel was live. A status question that errors is asked
-  // again next minute, never a failure; a posting step that Meta refuses still fails.
-  m = meta({ fbStatus: [] });
-  const flakyStatus = m.fetch;
-  let statusCalls = 0;
-  m.fetch = async (u, i) => (u.includes('/V1?') && ++statusCalls === 1 ? { ok: false, status: 400, json: async () => ({ error: { message: 'Unsupported get request', code: 100 } }) } : flakyStatus(u, i));
-  next = await sp.advancePost(fbPost({ facebook: { state: 'working', step: 'published', video: 'V1', since: new Date(T0).toISOString() } }), 0, ctxFor(m));
-  ok(next.state === 'posting' && next.result.facebook.step === 'published' && next.attempts === 1, 'Facebook status check errors once: still posting, asked again next minute (not failed)');
-  m = meta({ igStatus: ['IN_PROGRESS'] });
-  const igFlaky = m.fetch;
-  m.fetch = async (u, i) => (u.includes('/C1?') ? { ok: false, status: 400, json: async () => ({ error: { message: 'Media not ready', code: 100 } }) } : igFlaky(u, i));
-  next = await sp.advancePost(post({ result: { instagram: { state: 'working', step: 'processing', container: 'C1', since: new Date(T0).toISOString() } } }), 0, ctxFor(m));
-  ok(next.state === 'posting' && next.result.instagram.container === 'C1', 'Instagram status check errors: still posting, the container is kept');
-  m = meta({ refuse: true });
-  next = await sp.advancePost(post(), 0, ctxFor(m));
-  ok(next.state === 'failed', 'a posting step Meta refuses still fails (with its reason)');
-  m = meta({ igStatus: ['IN_PROGRESS'] });
-  const htmlErr = m.fetch;
-  m.fetch = async (u, i) => (u.includes('/C1?') ? { ok: false, status: 403, json: async () => { throw new Error('not json'); } } : htmlErr(u, i));
-  next = await sp.advancePost(post({ result: { instagram: { state: 'working', step: 'processing', container: 'C1', since: new Date(T0).toISOString() } } }), 0, ctxFor(m));
-  ok(next.state === 'posting', 'a status check answered with an unreadable 403 page: asked again, not failed');
-  m = meta({ igStatus: ['IN_PROGRESS'] });
-  const keepErr = m.fetch;
-  m.fetch = async (u, i) => (u.includes('/C1?') ? { ok: false, status: 400, json: async () => ({ error: { message: 'x', code: 100 } }) } : keepErr(u, i));
-  next = await sp.advancePost(post({ result: { instagram: { state: 'working', step: 'publishing', container: 'C1', since: new Date(T0).toISOString() } } }), 7, ctxFor(m));
-  ok(next.state === 'failed' && next.result.instagram.container === 'C1' && next.result.instagram.step === 'publishing', 'status errors that never stop: fails after the retry budget, keeping the publish mark for a safe Retry');
-  m = meta({ igStatus: ['PUBLISHED'] });
-  let first = true;
-  const onceErr = m.fetch;
-  m.fetch = async (u, i) => (u.includes('/C1?') && first ? ((first = false), { ok: false, status: 400, json: async () => ({ error: { message: 'x', code: 100 } }) }) : onceErr(u, i));
-  const mark = { instagram: { state: 'working', step: 'publishing', container: 'C1', since: new Date(T0).toISOString() } };
-  next = await sp.advancePost(post({ result: mark }), 0, ctxFor(m));
-  next = await sp.advancePost(post({ result: next.result }), next.attempts, ctxFor(m));
-  ok(next.state === 'posted' && m.publishes === 0, 'one status error, then Meta says published: done, with no second publish');
+  ok(!/graph\.facebook\.com|rupload|META_PAGE_TOKEN|media_publish/.test(serverSrc), 'no auto-posting left (founder: "not useful")');
+  ok(!fs.existsSync('src/lib/posts-access.ts') && !fs.existsSync('src/lib/posts-nav.ts'), 'the owner-only gate is gone');
+  const nav = load('src/components/nav-links.tsx', { '@/components/pending-link': {}, 'next/navigation': {}, 'lucide-react': {}, 'react/jsx-runtime': { jsx() {}, jsxs() {}, Fragment: {} } });
+  eq(nav.NAV.map((i) => i.href), ['/studio', '/library', '/posts', '/settings'], 'every account: Content calendar right under Viral library');
+  eq(nav.NAV[2].label, 'Content calendar', 'named Content calendar');
+  const session = fs.readFileSync('src/lib/supabase/session.ts', 'utf8');
+  ok(/APP_PAGES = \[[^\]]*"\/posts"/.test(session) && /\\\/api\\\/posts\(\\\/\|\$\)/.test(session), 'the page and its API sit behind the paid-plan gate like the rest of the app');
+  ok(!/isPostsPage|schedulerAllowed/.test(session) && !/scheduler/.test(fs.readFileSync('src/app/api/profile/route.ts', 'utf8')), 'no owner-only 404 or profile flag left');
+  const analyzer = fs.readFileSync('src/app/api/posts/app/route.ts', 'utf8');
+  const gate = analyzer.indexOf('subscriptionOf(user.who)'), ai = analyzer.indexOf('await geminiJSON');
+  ok(gate > 0 && ai > gate && analyzer.indexOf('claimAnalysis') < ai && /status: 402/.test(analyzer), 'the analyzer checks the plan and the daily limit before any AI call (no free AI)');
+  ok(/`https:\/\/\$\{parsed\.hostname\}\$\{parsed\.pathname\}`/.test(analyzer), 'only the site address reaches the prompt');
+  const view = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
+  ok((view.match(/<ThumbImg /g) ?? []).length === 3 && (view.match(/<video /g) ?? []).length === 1 && /<video [^>]*preload="none"/.test(view), 'lists show still pictures; the only video is the opened post, loaded when played');
+  ok(/<CopyButton text=\{value\}/.test(view) && /Download video/.test(view), 'each caption has Copy; the post has Download');
+  ok(!/Scheduled posts|Posting now|Retry|trial reel/i.test(view), 'no auto-posting words left on the page');
+  ok(!/[—–]/.test(view + fs.readFileSync('src/lib/scheduled-posts.ts', 'utf8')), 'no em or en dashes in the copy');
 });
