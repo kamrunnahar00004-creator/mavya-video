@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "
 import { Check, ChevronLeft, ChevronRight, CircleCheck, Copy, Download, ExternalLink, Eye, LoaderCircle, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { ThumbImg } from "@/components/thumb-img";
 import { fileDownload } from "@/lib/export-name";
-import { CAPTION_MAX, captionFor, DEFAULT_TEMPLATES, draftCaptions, type Drafts, finalTimes, HASHTAGS, MAX_BATCH, NAMES, NO_APP, randomSlots, seeded, slotMoments, TARGETS, TITLE_MAX, totalViews, type AppProfile, type Post, type Target, type Templates } from "@/lib/scheduled-posts";
+import { CAPTION_MAX, captionFor, DEFAULT_TEMPLATES, tagList, draftCaptions, type Drafts, finalTimes, HASHTAGS, MAX_BATCH, NAMES, NO_APP, randomSlots, seeded, slotMoments, TARGETS, TITLE_MAX, totalViews, type AppProfile, type Post, type Target, type Templates } from "@/lib/scheduled-posts";
 
 type ExportChoice = { mediaId: string; title: string; hook: string; at: string; seconds: number; src: string };
 
@@ -166,7 +166,7 @@ const PostCard = memo(function PostCard({ post, onOpen }: { post: Post; onOpen: 
   );
 });
 
-function Dialog({ title, onClose, wide, children }: { title: string; onClose: () => void; wide?: boolean; children: React.ReactNode }) {
+function Dialog({ title, onClose, wide, medium, children }: { title: string; onClose: () => void; wide?: boolean; medium?: boolean; children: React.ReactNode }) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", key);
@@ -174,7 +174,7 @@ function Dialog({ title, onClose, wide, children }: { title: string; onClose: ()
   }, [onClose]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1c2633]/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label={title} className={`relative flex max-h-full w-full flex-col bg-panel text-text shadow-[0_24px_64px_-16px_rgba(21,18,31,0.45)] ${wide ? "max-w-[1040px]" : "max-w-[620px]"}`}>
+      <div role="dialog" aria-modal="true" aria-label={title} className={`relative flex max-h-full w-full flex-col bg-panel text-text shadow-[0_24px_64px_-16px_rgba(21,18,31,0.45)] ${wide ? "max-w-[1040px]" : medium ? "max-w-[780px]" : "max-w-[620px]"}`}>
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <h2 className="text-[17px] font-bold">{title}</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 cursor-pointer items-center justify-center text-soft hover:bg-raised hover:text-text"><X className="h-5 w-5" /></button>
@@ -602,13 +602,26 @@ function SetupDialog({ templates, app, rev, onClose, onSaved, onStale }: { templ
       setBusy(null);
     }
   }
-  const preview: AppProfile = { ...current, hashtags: tags.split(/[\s,]+/).filter(Boolean).map((x) => (x.startsWith("#") ? x : `#${x}`)) };
+  // Hashtags as chips (founder 2026-11-26: the box hid most of them behind a scrollbar). Kept as one string for Save.
+  const list = tagList(tags);
+  const preview: AppProfile = { ...current, hashtags: list };
+  const [draft, setDraft] = useState("");
+  const addTags = (raw: string) => { const next = tagList(`${tags} ${raw}`); if (next.length !== list.length) setTags(next.join(" ")); setDraft(""); };
+  const removeTag = (i: number) => setTags(list.filter((_, j) => j !== i).join(" "));
   // One platform at a time (founder 2026-11-26: four boxes at once was "too congested").
   const [tab, setTab] = useState<Target>("instagram");
   const heading = "text-[12px] font-bold uppercase tracking-wide text-soft";
+  // The placeholders insert at the cursor, so nobody types braces by hand.
+  const box = useRef<HTMLTextAreaElement>(null);
+  const insert = (token: string) => {
+    const el = box.current, text = value[tab];
+    const at0 = el ? el.selectionStart : text.length, at1 = el ? el.selectionEnd : text.length;
+    setValue({ ...value, [tab]: text.slice(0, at0) + token + text.slice(at1) });
+    requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(at0 + token.length, at0 + token.length); });
+  };
 
   return (
-    <Dialog title="Your app & captions" onClose={onClose}>
+    <Dialog title="Your app & captions" onClose={onClose} medium>
       <fieldset disabled={busy !== null} className="min-w-0 border-0 p-0">
         <section className="space-y-3 border-b border-line px-6 py-5">
           <h3 className={heading}>Your app</h3>
@@ -618,34 +631,53 @@ function SetupDialog({ templates, app, rev, onClose, onSaved, onStale }: { templ
               {busy === "analyze" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{current.analyzedAt ? "Analyze again" : "Analyze"}
             </button>
           </div>
-          <p className="text-[12px] text-soft">{current.name ? <>Analyzed <b className="text-text">{current.name}</b>. Edit the hashtags below if you want.</> : "Mavya reads your site once and picks hashtags for your niche."}</p>
-          <label className="block text-[13px] font-semibold">Hashtags
-            {/* A text area, so hashtags pasted on separate lines stay separate (Codex 2026-11-26). */}
-            <textarea rows={2} value={tags} disabled={busy === "analyze"} onChange={(e) => setTags(e.target.value)} placeholder="#appmarketing #indiehacker" className={`${field} mt-1 resize-y text-[13px]`} />
-          </label>
-          <p className="text-[12px] text-soft">Best first. Instagram and TikTok use the first {HASHTAGS.instagram}, Facebook and YouTube the first {HASHTAGS.youtube}.</p>
+          <p className="text-[12px] text-soft">{current.name ? <>Analyzed <b className="text-text">{current.name}</b>.</> : "Mavya reads your site once and picks hashtags for your niche."}</p>
+          <div>
+            <p className="text-[13px] font-semibold">Hashtags</p>
+            <div className={`mt-1 flex flex-wrap items-center gap-1.5 border border-line-strong bg-panel p-2 ${busy === "analyze" ? "opacity-60" : ""}`}>
+              {list.map((h, i) => (
+                <span key={h} className="flex items-center gap-1 bg-raised py-0.5 pl-2 pr-1 text-[12.5px] font-semibold">
+                  {h}
+                  <button type="button" aria-label={`Remove ${h}`} onClick={() => removeTag(i)} className="cursor-pointer opacity-70 hover:opacity-100"><X className="h-3.5 w-3.5" /></button>
+                </span>
+              ))}
+              <input aria-label="Add hashtags" value={draft} disabled={busy === "analyze"} placeholder={list.length ? "Add" : "#appmarketing #indiehacker"}
+                onChange={(e) => { const v = e.target.value; if (/[\s,]$/.test(v)) addTags(v); else setDraft(v); }}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTags(draft); } else if (e.key === "Backspace" && !draft && list.length) removeTag(list.length - 1); }}
+                // Pasted on separate lines: each one stays its own tag (Codex 2026-11-26).
+                onPaste={(e) => { e.preventDefault(); addTags(`${draft} ${e.clipboardData.getData("text")}`); }}
+                onBlur={() => draft && addTags(draft)}
+                className="min-w-[110px] flex-1 bg-transparent px-1 py-0.5 text-[13px] outline-none" />
+            </div>
+            <p className="mt-1.5 text-[12px] text-soft">Order matters: the first {HASHTAGS.youtube} go on every platform, the first {HASHTAGS.instagram} on Instagram and TikTok.</p>
+          </div>
         </section>
         <section className="space-y-3 px-6 py-5">
           <h3 className={heading}>Captions</h3>
-          <div role="tablist" aria-label="Platform" className="flex gap-1 border-b border-line">
-            {TARGETS.map((t) => (
-              <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-                className={`-mb-px flex cursor-pointer items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-semibold ${tab === t ? "border-accent text-text" : "border-transparent text-muted hover:text-text"}`}>
-                <NetworkLogo t={t} />{NAMES[t]}
-              </button>
-            ))}
+          <div className="flex items-end border-b border-line">
+            <div role="tablist" aria-label="Platform" className="flex gap-1">
+              {TARGETS.map((t) => (
+                <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+                  className={`-mb-px flex cursor-pointer items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-semibold ${tab === t ? "border-accent text-text" : "border-transparent text-muted hover:text-text"}`}>
+                  <NetworkLogo t={t} />{NAMES[t]}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => setValue({ ...value, [tab]: DEFAULT_TEMPLATES[tab] })} className="ml-auto cursor-pointer whitespace-nowrap pb-2 text-[12px] font-semibold text-muted hover:text-accent">Reset to default</button>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <textarea aria-label={`${NAMES[tab]} caption format`} rows={7} value={value[tab]} onChange={(e) => setValue({ ...value, [tab]: e.target.value })} className={`${field} resize-y text-[13px]`} />
-              <div className="mt-1.5 flex items-center justify-between gap-2 text-[11.5px] text-soft">
-                <span><code>{"{hook}"}</code> hook · <code>{"{domain}"}</code> link · <code>{"{hashtags}"}</code></span>
-                <button type="button" onClick={() => setValue({ ...value, [tab]: DEFAULT_TEMPLATES[tab] })} className="cursor-pointer font-semibold text-accent hover:underline">Reset to default</button>
+              <p className="mb-1 text-[12px] font-semibold text-soft">Format</p>
+              {/* Grows with its text: no scrollbar inside the box. */}
+              <textarea ref={box} aria-label={`${NAMES[tab]} caption format`} value={value[tab]} onChange={(e) => setValue({ ...value, [tab]: e.target.value })} className={`${field} min-h-[180px] resize-none text-[13px] leading-relaxed [field-sizing:content]`} />
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[12px] text-soft">
+                Add:
+                {([["{hook}", "Hook"], ["{domain}", "Link"], ["{hashtags}", "Hashtags"]] as const).map(([k, label]) => <button key={k} type="button" onClick={() => insert(k)} className="cursor-pointer border border-line-strong px-2 py-0.5 font-semibold text-text hover:border-accent hover:text-accent">+ {label}</button>)}
               </div>
             </div>
             <div>
-              <p className="mb-1 text-[11.5px] font-semibold text-soft">Preview</p>
-              <p className="whitespace-pre-wrap break-words bg-raised p-3 text-[13px] leading-relaxed">{captionFor(tab, value[tab], "my app had 0 users… then i found this 😳", preview)}</p>
+              <p className="mb-1 text-[12px] font-semibold text-soft">Preview</p>
+              <p className="min-h-[180px] whitespace-pre-wrap break-words bg-raised px-3 py-2 text-[13px] leading-relaxed">{captionFor(tab, value[tab], "my app had 0 users… then i found this 😳", preview)}</p>
             </div>
           </div>
         </section>

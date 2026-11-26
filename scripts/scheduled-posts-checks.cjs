@@ -9,7 +9,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 162;
+const EXPECTED = 164;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -297,7 +297,9 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   ok(fs.existsSync('src/app/(app)/library/page.tsx'), 'the library page stays, so old links still work');
   const setupSrc = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
   ok(/role="tablist" aria-label="Platform"/.test(setupSrc) && (setupSrc.match(/aria-label=\{`\$\{NAMES\[tab\]\} caption format`\}/g) ?? []).length === 1, 'captions: one platform at a time in tabs, not four boxes at once (founder: "too congested")');
-  ok(/<textarea rows=\{2\} value=\{tags\}/.test(setupSrc), 'hashtags pasted on separate lines stay separate');
+  ok(/onPaste=\{\(e\) => \{ e\.preventDefault\(\); addTags\(`\$\{draft\} \$\{e\.clipboardData\.getData\("text"\)\}`\); \}\}/.test(setupSrc), 'hashtags pasted on separate lines stay separate tags, and a half-typed tag is kept');
+  ok(/aria-label=\{`Remove \$\{h\}`\}/.test(setupSrc) && /\[field-sizing:content\]/.test(setupSrc), 'hashtags show as removable chips, all visible; the caption box grows with its text (founder: scrollbars)');
+  eq(shared.tagList('#indie\n#saas, b2b'), ['#indie', '#saas', '#b2b'], 'tags on separate lines or with commas stay separate');
   ok((setupSrc.match(/role="tablist" aria-label="Platform"/g) ?? []).length === 2 && /<CaptionBox t=\{active\} rows=\{9\}/.test(setupSrc), 'the opened post: one platform at a time in tabs, one big caption box (founder: four stacked boxes "looks shit")');
   ok(/type="datetime-local" value=\{when\}/.test(setupSrc) && !/type="time" value=\{time\}/.test(setupSrc), 'the opened post: one When field, not a cramped day + time pair');
   const session = fs.readFileSync('src/lib/supabase/session.ts', 'utf8');
