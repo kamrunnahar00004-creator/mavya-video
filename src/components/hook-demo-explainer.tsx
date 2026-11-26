@@ -65,11 +65,18 @@ export function HookDemoExplainer({ src, poster, strip, hookEnd, length }: { src
         </div>
 
         <div className="max-w-[600px]">
-          <h2 className="text-balance text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] text-white! sm:text-[40px]">
-            What’s a <span className="whitespace-nowrap">hook + demo</span> video?
+          {/* Founder 2026-11-26: the heading says why the format wins; one word rotates (cheapest, fastest, easiest). */}
+          <h2 className="text-[34px] font-semibold leading-[1.12] tracking-[-0.03em] text-white! sm:text-[40px]">
+            <span className="sr-only">Hook + demo videos are the fastest way to go viral</span>
+            {/* Fixed lines, so a shorter or longer word never moves a line break: "...are the" / word / "way to go
+                viral" on a phone, "...are the" / "word way to go viral" from sm up. */}
+            <span aria-hidden>
+              <span className="block"><span className="whitespace-nowrap">Hook + demo</span> videos are the</span>
+              <span className="block sm:whitespace-nowrap"><RotatingWord words={WHY} /><span className="max-sm:block"><span className="max-sm:hidden"> </span>way to go viral</span></span>
+            </span>
           </h2>
           <p className="mt-5 text-[18px] leading-relaxed text-white/75">
-            A scroll-stopping face <span className="font-semibold" style={{ color: LIGHT_VIOLET }}>(the hook)</span> followed by your product in action <span className="font-semibold" style={{ color: LIGHT_VIOLET }}>(the demo)</span>.
+            A scroll-stopping face <span className="font-semibold" style={{ color: LIGHT_VIOLET }}>(the hook)</span>, then your app in action <span className="font-semibold" style={{ color: LIGHT_VIOLET }}>(the demo)</span>.
           </p>
           <div className="mt-12 border-t border-white/10 pt-10">
             <h3 className="text-[20px] font-semibold text-white!">The game is volume.</h3>
@@ -79,6 +86,52 @@ export function HookDemoExplainer({ src, poster, strip, hookEnd, length }: { src
         </div>
       </div>
     </div>
+  );
+}
+
+const WHY = ["fastest", "cheapest", "easiest"];
+
+/**
+ * One word that changes every 2.5 s: the old word fades up and out, then the new one rises in, while the slot's width
+ * slides to the new word's, so the line never shows a gap or jumps. Widths are read from the words themselves
+ * (ResizeObserver, so font loading and breakpoints stay right). Reduced motion: the first word, still.
+ */
+function RotatingWord({ words }: { words: string[] }) {
+  const [i, setI] = useState(0);
+  const [widths, setWidths] = useState<number[]>([]);
+  const [still, setStill] = useState(false);
+  const refs = useRef<(HTMLSpanElement | null)[]>([]);
+  useEffect(() => {
+    const ro = new ResizeObserver(() => setWidths(refs.current.map((el) => el?.offsetWidth ?? 0)));
+    for (const el of refs.current) if (el) ro.observe(el);
+    // Follows the setting live (Codex 2026-11-26): turned on while open, the word stops; turned off, it starts.
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const follow = () => setStill(mq.matches);
+    follow();
+    mq.addEventListener("change", follow);
+    return () => { ro.disconnect(); mq.removeEventListener("change", follow); };
+  }, []);
+  useEffect(() => {
+    if (still) return;
+    const id = setInterval(() => setI((n) => (n + 1) % words.length), 2500);
+    return () => clearInterval(id);
+  }, [still, words.length]);
+  const shown = still ? 0 : i;
+  const prev = (shown + words.length - 1) % words.length;
+  // The slot resizes only after the old word has faded (delay-200), so a wider old word never paints over the rest.
+  return (
+    <span className="inline-grid align-bottom transition-[width] delay-200 duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none" style={{ width: widths[shown] || undefined }}>
+      {words.map((w, n) => (
+        <span
+          key={w}
+          ref={(el) => { refs.current[n] = el; }}
+          className={`col-start-1 row-start-1 justify-self-start whitespace-nowrap transition-[opacity,transform] ease-[cubic-bezier(0.22,1,0.36,1)] ${n === shown ? "translate-y-0 opacity-100 delay-300 duration-500" : n === prev && !still ? "-translate-y-[0.3em] opacity-0 duration-200" : "translate-y-[0.3em] opacity-0 duration-0"}`}
+          style={{ color: LIGHT_VIOLET }}
+        >
+          {w}
+        </span>
+      ))}
+    </span>
   );
 }
 
@@ -136,15 +189,21 @@ function VolumeMatrix() {
   }, []);
   const op = "pb-7 text-[30px] font-light text-white/35";
   return (
-    <div ref={ref} className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-6 sm:gap-x-8">
+    // "= 100" wraps as one piece: on a phone it is "hooks × demos" then "= 100" under it, never a lone operator.
+    <div ref={ref} className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-6 max-sm:justify-center sm:gap-x-8">
       <Hand cards={MX_HOOKS} label="10 hooks" on={on} />
-      <span className={op}>×</span>
-      <Hand cards={MX_DEMOS} label="10 demos" on={on} />
-      <span className={op}>=</span>
-      <figure className="flex flex-col items-center pb-1">
-        <div className="text-[72px] font-semibold leading-none tracking-[-0.045em] sm:text-[84px]" style={{ color: LIGHT_VIOLET }}>100</div>
-        <figcaption className="mt-3 text-[14px] font-semibold text-white/75">videos</figcaption>
-      </figure>
+      {/* "×" travels with the demos, so it never ends a row alone (Codex 2026-11-26). */}
+      <span className="flex items-center gap-x-4 sm:gap-x-8">
+        <span className={op}>×</span>
+        <Hand cards={MX_DEMOS} label="10 demos" on={on} />
+      </span>
+      <span className="flex items-center gap-x-4 sm:gap-x-8">
+        <span className={op}>=</span>
+        <figure className="flex flex-col items-center pb-1">
+          <div className="text-[72px] font-semibold leading-none tracking-[-0.045em] sm:text-[84px]" style={{ color: LIGHT_VIOLET }}>100</div>
+          <figcaption className="mt-3 text-[14px] font-semibold text-white/75">videos</figcaption>
+        </figure>
+      </span>
     </div>
   );
 }
