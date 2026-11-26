@@ -9,7 +9,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 171;
+const EXPECTED = 165;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -292,17 +292,9 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   ok(!/graph\.facebook\.com|rupload|META_PAGE_TOKEN|media_publish/.test(serverSrc), 'no auto-posting left (founder: "not useful")');
   ok(!fs.existsSync('src/lib/posts-access.ts') && !fs.existsSync('src/lib/posts-nav.ts'), 'the owner-only gate is gone');
   const nav = load('src/components/nav-links.tsx', { '@/components/pending-link': {}, 'next/navigation': {}, 'lucide-react': {}, 'react/jsx-runtime': { jsx() {}, jsxs() {}, Fragment: {} } });
-  eq(nav.NAV.map((i) => i.href), ['/studio', '/guides', '/posts', '/settings'], 'every account: Videos, Guides, Content calendar, Settings (no Viral library: Browse hooks inside a video does the same)');
-  eq(nav.NAV[2].label, 'Content calendar', 'named Content calendar');
-  eq(nav.NAV[1].label, 'Guides', 'Guides sits under Videos, above Content calendar (founder 2026-11-26)');
-  const guides = load('src/lib/guides.ts');
-  ok(guides.GUIDES.every((g) => g.steps.length && g.steps.every((s) => s.image.startsWith('/guides/') && fs.existsSync('public' + s.image) && s.alt && s.text)), 'every guide step has its screenshot on disk, alt text and words');
-  ok(guides.GUIDES.flatMap((g) => g.steps).filter((s) => s.video).length >= 7 && guides.GUIDES.flatMap((g) => g.steps).every((s) => !s.video || (fs.existsSync('public' + s.video) && fs.statSync('public' + s.video).size < 2e6)), 'guides show real-app clips (founder: stills "look shit"), each on disk and small');
-  const gv = fs.readFileSync('src/components/guides-view.tsx', 'utf8');
-  ok(/muted loop playsInline/.test(gv) && /v\.play\(\)/.test(gv), 'clips play by themselves, muted and looping (browsers only autoplay muted video)');
-  ok(/prefers-reduced-motion: reduce/.test(gv) && /aria-label=\{paused \? `Play: \$\{label\}` : `Pause: \$\{label\}`\}/.test(gv), 'clips can be paused by click or keyboard, and start paused with reduce motion on');
-  ok(/"\/guides\/:path\*"/.test(fs.readFileSync('src/proxy.ts', 'utf8')) && /APP_PAGES = \[[^\]]*"\/guides"/.test(fs.readFileSync('src/lib/supabase/session.ts', 'utf8')), 'Guides sits behind sign-in and the plan gate like the rest of the app');
-  ok(!/[—–]/.test(fs.readFileSync('src/lib/guides.ts', 'utf8')), 'no em or en dashes in the guide copy');
+  eq(nav.NAV.map((i) => i.href), ['/studio', '/posts', '/settings'], 'every account: Videos, Content calendar, Settings (Guides removed 2026-11-26: the founder gives demos to buyers instead)');
+  eq(nav.NAV[1].label, 'Content calendar', 'named Content calendar');
+  ok(!fs.existsSync('src/app/(app)/guides') && !fs.existsSync('public/guides'), 'no Guides page or assets left');
   ok(fs.existsSync('src/app/(app)/library/page.tsx'), 'the library page stays, so old links still work');
   const setupSrc = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
   ok(/role="tablist" aria-label="Platform"/.test(setupSrc) && (setupSrc.match(/aria-label=\{`\$\{NAMES\[tab\]\} caption format`\}/g) ?? []).length === 1, 'captions: one platform at a time in tabs, not four boxes at once (founder: "too congested")');

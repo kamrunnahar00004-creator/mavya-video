@@ -70,7 +70,7 @@ export async function updateSession(request: NextRequest) {
   return response;
 }
 
-const APP_PAGES = ["/studio", "/library", "/posts", "/guides"];
+const APP_PAGES = ["/studio", "/library", "/posts"];
 const PAID_API = [/^\/api\/uploads(\/|$)/, /^\/api\/media\/?$/, /^\/api\/runs\/[^/]+\/export(\/|$)/, /^\/api\/posts(\/|$)/];
 const PAID_CONTENT_WRITES = [/^\/api\/songs\/[^/]+\/?$/, /^\/api\/(runs|references)(\/[^/]+)?\/?$/];
 
