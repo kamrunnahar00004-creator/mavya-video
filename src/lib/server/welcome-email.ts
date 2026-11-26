@@ -40,13 +40,15 @@ export function welcomeEmail(name: string): { subject: string; text: string; htm
     "Rooting for you,",
     "The Mavya team",
   ].join("\n");
-  const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:15px;line-height:1.55;color:#111;max-width:480px">
-<p>${esc(hi)}</p>
-<p>Thanks for joining Mavya. Let's make your first reel.</p>
-<p>Open Mavya on your laptop or desktop, pick a hook, add your app demo, and export.</p>
-<p><a href="${WELCOME_LINK}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:600">Create your first reel &rarr;</a></p>
-<p>Need a hand? Just reply.</p>
-<p>Rooting for you,<br>The Mavya team</p>
+  // Every margin set inline (Gmail drops <style> and resets <p>): 16 px between lines, 28 px around the button.
+  const p = 'style="margin:0 0 16px"';
+  const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:15px;line-height:1.6;color:#111;max-width:480px">
+<p ${p}>${esc(hi)}</p>
+<p ${p}>Thanks for joining Mavya. Let's make your first reel.</p>
+<p style="margin:0">Open Mavya on your laptop or desktop, pick a hook, add your app demo, and export.</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0"><tr><td style="border-radius:8px;background:#111"><a href="${WELCOME_LINK}" style="display:inline-block;color:#fff;text-decoration:none;padding:12px 22px;font-weight:600;font-size:15px">Create your first reel &rarr;</a></td></tr></table>
+<p ${p}>Need a hand? Just reply.</p>
+<p style="margin:0">Rooting for you,<br>The Mavya team</p>
 </div>`;
   return { subject, text, html };
 }
