@@ -54,7 +54,7 @@ export function Landing() {
               <span className="block text-balance text-accent">into a viral reel</span>
             </h1>
             <p className="mt-6 max-w-[470px] text-pretty text-[18px] leading-[1.6] text-muted">
-              Pick a reel that already went viral. Mavya rewrites its script for your app and makes your reel in under 2 minutes.
+              Pick a viral reel. Mavya remakes the hook with an AI face (or yours) and rewrites the script for your app. Ready in under 2 minutes.
             </p>
 
             <div className="mt-9 flex flex-wrap items-center gap-3">

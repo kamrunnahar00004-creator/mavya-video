@@ -9,7 +9,7 @@ let checks = 0;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const s = fs.readFileSync('src/components/landing.tsx', 'utf8');
 
-ok(/Mavya rewrites its script for your app/.test(s), 'subtitle says the script is rewritten for your app');
+ok(/Mavya remakes the hook with an AI face \(or yours\) and rewrites the script for your app\./.test(s), 'subtitle: the hook remade with an AI face, the script rewritten for your app');
 ok(!/For your app<\/span>/.test(s) && !/My sister is actually nuts/.test(s), 'no script card: the video on the right explains it');
 ok((s.match(/>\s*Start free trial\s*</g) || []).length === 2 && !/>\s*Sign up\s*</.test(s), 'hero and last call say Start free trial');
 ok(/>\s*See pricing\s*</.test(s) && !/>\s*Billing\s*</.test(s), 'secondary button says See pricing');
