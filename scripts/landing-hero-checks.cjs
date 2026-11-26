@@ -7,7 +7,7 @@ let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
 ok(landing.includes("Turn your app demo"), "hero line 1");
 ok(landing.includes("into a viral reel"), "hero line 2");
-ok(landing.includes("Pick a viral video. Add your app. Your reel is ready in under 2 minutes."), "subhead");
+ok(landing.includes("Pick a reel that already went viral. Mavya rewrites its script for your app and makes your reel in under 2 minutes."), "subhead (founder 2026-11-26: says the script is rewritten for your app)");
 ok(!landing.includes("AI made building easy"), "old slogan gone from hero");
 ok(page.includes('title: "Mavya: turn your app demo into a viral reel"'), "page title");
 ok(!/[–—]/.test(landing + page), "no em/en dashes");

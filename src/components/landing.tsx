@@ -27,6 +27,8 @@ const PAIRS = [
 
 /** The explainer plays this one whole; its hook ends at the first cut. */
 const EXPLAIN = { code: "Dd--YQOqo16", hookEnd: 5.93, length: 20 };
+/** Hero avatars: small crops of five built-in characters (public/landing/faces, 96 px). */
+const FACES = ["olivia", "zuri", "mei", "jake", "sienna"];
 const FAQ = [
   { q: "Do I need to be on camera?", a: "No. Pick one of 70 AI characters, or use your own photo." },
   { q: "Where do the hooks come from?", a: "A library of short-form videos that already went viral. You copy the format, your character performs it, and the words are yours." },
@@ -49,23 +51,46 @@ export function Landing() {
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[600px] bg-[radial-gradient(46%_58%_at_72%_32%,rgba(74,168,224,0.2)_0%,transparent_100%)] [mask-image:linear-gradient(to_bottom,transparent,black_180px)]" />
         <div className="relative mx-auto grid max-w-[1160px] items-center gap-12 px-5 pb-24 pt-16 lg:grid-cols-[1.1fr_1fr] lg:pt-24">
           <div>
-            <h1 className="text-[40px] font-semibold leading-[1.12] tracking-[-0.02em] sm:text-[48px]">
+            <h1 className="text-[38px] font-semibold leading-[1.06] tracking-[-0.02em] sm:text-[52px] lg:text-[56px]">
               <span className="block">Turn your app demo</span>
               <span className="block text-balance text-accent">into a viral reel</span>
             </h1>
-            <p className="mt-7 max-w-[480px] text-[18px] leading-relaxed text-muted">
-              Pick a viral video. Add your app. Your reel is ready in under 2 minutes.
+            <p className="mt-6 max-w-[470px] text-pretty text-[18px] leading-[1.6] text-muted">
+              Pick a reel that already went viral. Mavya rewrites its script for your app and makes your reel in under 2 minutes.
             </p>
-            <div className="mt-9 flex flex-wrap items-center gap-3">
-              <Link href="/studio" className="btn-primary h-12 px-7 text-[16px]">
-                Sign up
+
+            {/* The selling point (founder 2026-11-26): the viral script, copied and rewritten for an app. Real lines
+                from the first hero pair, so the claim is shown, not told. */}
+            <figure className="mt-8 max-w-[470px] border border-line-strong bg-panel">
+              <div className="flex flex-col items-start gap-1.5 px-4 py-3.5 sm:flex-row sm:gap-3">
+                <span className="shrink-0 sm:mt-0.5 sm:w-[104px] bg-raised px-1.5 py-0.5 text-center text-[11.5px] font-bold uppercase tracking-[0.04em] text-soft">5M views</span>
+                <p className="text-[15px] leading-snug text-muted">&ldquo;My sister is actually nuts, why is this her wedding invitation&rdquo;</p>
+              </div>
+              <div className="flex flex-col items-start gap-1.5 border-t border-line-strong bg-accent-tint px-4 py-3.5 sm:flex-row sm:gap-3">
+                <span className="shrink-0 sm:mt-0.5 sm:w-[104px] bg-accent px-1.5 py-0.5 text-center text-[11.5px] font-bold uppercase tracking-[0.04em] text-white">For your app</span>
+                <p className="text-[15px] font-semibold leading-snug text-text">&ldquo;my app finally got 100 visitors&rdquo;</p>
+              </div>
+              <figcaption className="sr-only">A viral reel&apos;s script, rewritten by Mavya for an app</figcaption>
+            </figure>
+
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link href="/studio" className="btn-primary h-[52px] px-5 text-[16px] sm:px-7">
+                Start free trial
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="/pricing" className="inline-flex h-12 items-center justify-center rounded-lg border border-line-strong bg-panel px-7 text-[16px] font-bold text-text transition-colors hover:border-ink">
-                Billing
+              <Link href="/pricing" className="inline-flex h-[52px] items-center justify-center border border-line-strong bg-panel px-5 text-[16px] sm:px-7 font-bold text-text transition-colors hover:border-ink">
+                See pricing
               </Link>
             </div>
-            <p className="mt-4 text-[13.5px] font-semibold text-soft">For Reels, TikTok and Shorts.</p>
+            <div className="mt-5 flex items-center gap-3">
+              <div className="flex shrink-0 -space-x-2" aria-hidden>
+                {FACES.map((f) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={f} src={`/landing/faces/${f}.webp`} alt="" width={30} height={30} className="h-[30px] w-[30px] border-2 border-bg object-cover" />
+                ))}
+              </div>
+              <p className="text-[13.5px] font-semibold text-soft">3-day free trial. 70 AI faces. Cancel anytime.</p>
+            </div>
           </div>
           <div role="group" aria-label="Before and after: viral hooks, and the same hooks made with Mavya" className="flex justify-center py-4">
             <HookSlides pairs={PAIRS} />
@@ -102,7 +127,7 @@ export function Landing() {
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 h-[460px] w-[760px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-[radial-gradient(closest-side,rgba(74,168,224,0.38),transparent)]" />
           <h2 className="relative max-w-[640px] text-[34px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px] text-white!">Start with a hook that already went viral.</h2>
           <Link href="/studio" className="btn-primary relative mt-8 h-12 px-7 text-[16px]">
-            Sign up
+            Start free trial
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
