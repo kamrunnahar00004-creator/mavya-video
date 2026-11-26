@@ -4,6 +4,7 @@ import { billingRpc, withBillingLock } from "@/lib/server/billing-state";
 import { stripe, subscriptionRow } from "@/lib/server/stripe";
 import { createSupabaseAdminClient, getSessionUser } from "@/lib/supabase/server";
 import { advanceDeletion } from "@/lib/server/account-deletion";
+import { CONVERSION_COOKIE, conversionCookie, conversionEventId } from "@/lib/meta-pixel";
 
 /**
  * Stripe Checkout's success page (founder 2026-10-26: someone who pays goes straight into the app and can start at
@@ -14,6 +15,8 @@ import { advanceDeletion } from "@/lib/server/account-deletion";
  */
 export const maxDuration = 120;
 const FALLBACK = "/settings/billing?paid=1";
+/** Stripe amounts are in the smallest unit; these currencies have no decimals (https://docs.stripe.com/currencies). */
+const ZERO_DECIMAL = new Set(["bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga", "pyg", "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf"]);
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -45,8 +48,10 @@ export async function GET(request: NextRequest) {
       if (live) await advanceDeletion(user.id);
       return to(FALLBACK);
     }
+    let confirmed: Stripe.Subscription | null = null;
     const result = await withBillingLock(user.id, async (token) => {
       const current: Stripe.Subscription = await stripe().subscriptions.retrieve(subId);
+      confirmed = current;
       if (current.metadata?.user_id && current.metadata.user_id !== user.id) throw new Error("Subscription metadata mismatch");
       return billingRpc<string>("mavya_billing_event", {
         p_user: user.id, p_token: token, p_event: `checkout-return:${session.id}`, p_type: "checkout.return",
@@ -58,7 +63,19 @@ export async function GET(request: NextRequest) {
       return to(FALLBACK);
     }
     // A full page load into the app; the proxy gate now sees the plan.
-    return to("/studio");
+    const response = to("/studio");
+    // Meta Pixel (src/components/meta-pixel.tsx): StartTrial for a card trial, Subscribe for a direct purchase, once.
+    const sub = confirmed as Stripe.Subscription | null;
+    // Only on the first return from a fresh checkout (an old link opened again later sends nothing), and the event follows
+    // the checkout itself: a trial checkout is StartTrial even after the trial has converted (Codex 2026-11-26).
+    const fresh = Date.now() / 1000 - session.created < 3600;
+    if (sub && fresh && ["trialing", "active"].includes(sub.status)) {
+      const price = sub.items?.data?.[0]?.price;
+      const currency = price?.currency ?? "usd";
+      const value = typeof price?.unit_amount === "number" ? price.unit_amount / (ZERO_DECIMAL.has(currency.toLowerCase()) ? 1 : 100) : 0;
+      response.cookies.set(CONVERSION_COOKIE, conversionCookie({ kind: sub.trial_end ? "trial" : "subscribe", eventId: await conversionEventId(session.id), value, currency }), { path: "/", maxAge: 600, sameSite: "lax", secure: true });
+    }
+    return response;
   } catch (error) {
     console.error("checkout return", sessionId, error);
     return to(FALLBACK);

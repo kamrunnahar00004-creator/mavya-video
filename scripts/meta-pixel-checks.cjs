@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 26;
+const EXPECTED = 34;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(a, b, msg); };
 
@@ -72,4 +72,18 @@ finish('meta-pixel-checks', EXPECTED, () => checks, async () => {
   ok(r2.headers.get('location') === 'https://mavya.app/studio' && !(r2.headers.get('set-cookie') || '').includes('mv_signup'), 'returning login: no cookie, normal redirect');
   const r3 = await run(null, false);
   ok(r3.headers.get('location') === 'https://mavya.app/?auth=login' && !(r3.headers.get('set-cookie') || '').includes('mv_signup'), 'signed out: login, no cookie');
+
+  // StartTrial / Subscribe for paid ads (founder 2026-11-26).
+  const eid = await px.conversionEventId('cs_test_abc');
+  ok(/^checkout-[0-9a-f]{24}$/.test(eid) && eid === await px.conversionEventId('cs_test_abc') && eid !== await px.conversionEventId('cs_test_abd'), 'one event id per Checkout Session: a reload never counts twice');
+  const raw = px.conversionCookie({ kind: 'trial', eventId: eid, value: 29, currency: 'usd' });
+  ok(JSON.stringify(px.readConversionCookie(`a=1; ${px.CONVERSION_COOKIE}=${raw}; b=2`)) === JSON.stringify({ kind: 'trial', eventId: eid, value: 29, currency: 'USD' }), 'a trial cookie reads back: StartTrial, $29');
+  ok(px.readConversionCookie(`${px.CONVERSION_COOKIE}=${encodeURIComponent(px.conversionCookie({ kind: 'subscribe', eventId: eid, value: 59.5, currency: 'usd' }))}`)?.kind === 'subscribe', 'an encoded cookie (| as %7C) reads too');
+  ok(px.readConversionCookie(`${px.CONVERSION_COOKIE}=trial|checkout-xyz|29|USD`) === null && px.readConversionCookie(`${px.CONVERSION_COOKIE}=refund|${eid}|29|USD`) === null, 'anything else is ignored');
+  const ret = require('node:fs').readFileSync('src/app/checkout/return/route.ts', 'utf8');
+  ok(ret.indexOf('response.cookies.set(CONVERSION_COOKIE') > ret.indexOf('withBillingLock') && /\["trialing", "active"\]\.includes\(sub\.status\)/.test(ret), 'set only after Stripe confirms the buyer\'s own checkout and the subscription is recorded');
+  ok(/kind: sub\.trial_end \? "trial" : "subscribe"/.test(ret) && /session\.created < 3600/.test(ret), 'a trial checkout is always StartTrial, and an old return link opened later sends nothing (no double count)');
+  ok(/ZERO_DECIMAL\.has\(currency\.toLowerCase\(\)\) \? 1 : 100/.test(ret) && /"jpy"/.test(ret), 'values right for zero-decimal currencies too');
+  const comp = require('node:fs').readFileSync('src/components/meta-pixel.tsx', 'utf8');
+  ok(/"StartTrial"/.test(comp) && /eventID: conversion\.eventId/.test(comp) && comp.indexOf('readConversionCookie(document.cookie)') < comp.indexOf('if (!pixelAllowed(zone)) return;'), 'fired once with its id, and the cookie is deleted even where the Pixel may not run (EU)');
 });

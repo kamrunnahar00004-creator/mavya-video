@@ -40,6 +40,24 @@ export async function signupEventId(userId: string): Promise<string> {
 }
 
 /** The signup cookie's value, if it is one this app set (hex event id); anything else is ignored. */
+/**
+ * StartTrial / Subscribe (founder 2026-11-26, for paid ads): /checkout/return sets this cookie once Stripe confirms the
+ * buyer's own checkout; the browser fires the event once and deletes it. Value: "trial|<eventId>|<amount>|<currency>"
+ * or "subscribe|...". The event id is derived from the Checkout Session, so a reload never counts twice.
+ */
+export const CONVERSION_COOKIE = "mv_conv";
+export type Conversion = { kind: "trial" | "subscribe"; eventId: string; value: number; currency: string };
+
+export async function conversionEventId(sessionId: string): Promise<string> {
+  const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`mavya-checkout:${sessionId}`)));
+  return `checkout-${Array.from(bytes.slice(0, 12), (b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+export const conversionCookie = (c: Conversion) => `${c.kind}|${c.eventId}|${Math.max(0, Math.round(c.value * 100) / 100)}|${c.currency.toUpperCase().slice(0, 3)}`;
+export function readConversionCookie(cookie: string): Conversion | null {
+  const m = cookie.match(new RegExp(`(?:^|;\\s*)${CONVERSION_COOKIE}=(trial|subscribe)(?:\\||%7C)(checkout-[0-9a-f]{24})(?:\\||%7C)(\\d+(?:\\.\\d{1,2})?)(?:\\||%7C)([A-Za-z]{3})(?:;|$)`));
+  return m ? { kind: m[1] as Conversion["kind"], eventId: m[2], value: Number(m[3]), currency: m[4].toUpperCase() } : null;
+}
+
 export function readSignupCookie(cookie: string): string | null {
   const m = cookie.match(new RegExp(`(?:^|;\\s*)${SIGNUP_COOKIE}=(signup-[0-9a-f]{24})(?:;|$)`));
   return m ? m[1] : null;
