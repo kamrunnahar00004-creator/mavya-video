@@ -7,6 +7,7 @@ import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { MetaPixel } from "@/components/meta-pixel";
+import { OpenInBrowser } from "@/components/open-in-browser";
 import { pixelId } from "@/lib/meta-pixel";
 
 // UI type: Satoshi (Fontshare, free for commercial use), self-hosted.
@@ -41,6 +42,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${fonts} h-full antialiased`}>
       <body className="h-full">
         {children}
+        {/* Inside Instagram / Facebook / TikTok: asks to open Mavya in the real browser (src/lib/in-app-browser.ts). */}
+        <OpenInBrowser />
         {/* Vercel Speed Insights (real-user page speed, Vercel Pro). */}
         <SpeedInsights />
         {/* Vercel Web Analytics (visitors and page views, no cookies). */}
