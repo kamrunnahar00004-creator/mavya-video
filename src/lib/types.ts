@@ -214,6 +214,8 @@ export type VideoScript = {
   /** What the character does in the hook, beat by beat. */
   hookBeats: { start: number; end: number; action: string }[];
   shots: ScriptShot[];
+  /** Why this many shots (the model's judgment of what gets the most views), kept to review what works. */
+  shotPlan?: string;
   /** The library hook it was modelled on (null when the user described their own hook). */
   refId: string | null;
   at: string;

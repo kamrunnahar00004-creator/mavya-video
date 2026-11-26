@@ -5,13 +5,15 @@ import "server-only";
  * pages itself, which cannot be combined with a schema) the JSON is taken from the text answer.
  */
 const MODEL = "gemini-flash-latest";
+/** For judgment-heavy writing (the video script, founder 2026-11-26): slower, better at story and shot choices. */
+export const PRO_MODEL = "gemini-pro-latest";
 
 export class GeminiError extends Error {}
 
 /** A prompt part: text, or a file sent inline (a short video or an image, base64). */
 export type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
 
-export async function geminiJSON<T>(prompt: string | GeminiPart[], opts: { schema?: object; urlContext?: boolean; temperature?: number; signal?: AbortSignal } = {}): Promise<T> {
+export async function geminiJSON<T>(prompt: string | GeminiPart[], opts: { schema?: object; urlContext?: boolean; temperature?: number; signal?: AbortSignal; model?: string; timeoutMs?: number } = {}): Promise<T> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new GeminiError("GEMINI_API_KEY is not set.");
   const body = {
@@ -22,11 +24,11 @@ export async function geminiJSON<T>(prompt: string | GeminiPart[], opts: { schem
       ...(opts.schema ? { responseMimeType: "application/json", responseSchema: opts.schema } : {}),
     },
   };
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${opts.model ?? MODEL}:generateContent`, {
     method: "POST",
     headers: { "x-goog-api-key": key, "content-type": "application/json" },
     body: JSON.stringify(body),
-    signal: opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000),
+    signal: opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(opts.timeoutMs ?? 120_000)]) : AbortSignal.timeout(opts.timeoutMs ?? 120_000),
   });
   if (!res.ok) throw new GeminiError(`Gemini ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const out = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };

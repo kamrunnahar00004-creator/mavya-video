@@ -3,6 +3,7 @@ import { GeminiError, geminiJSON } from "@/lib/server/gemini";
 import { getReference, getRun } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import type { VideoScript } from "@/lib/types";
+import { scriptRulesText } from "@/lib/script-rules";
 
 /**
  * Regenerate (the icon on the hook text): three new on-screen hook lines for THIS product, in the voice of the video
@@ -38,6 +39,9 @@ ${JSON.stringify(voice)}
 
 ALREADY USED, write something different from each:
 ${JSON.stringify(avoid)}
+
+HOUSE RULES (apply only where the viral hook's voice does not already decide; never override it):
+${scriptRulesText()}
 
 Each line makes people curious about what is on the screen without naming the product. Answer {"lines": [3 strings]}.`;
 

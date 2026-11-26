@@ -1,11 +1,12 @@
 import { beginAI, finishAI } from "@/lib/server/ai-budget";
-import { GeminiError, geminiJSON } from "@/lib/server/gemini";
+import { GeminiError, PRO_MODEL, geminiJSON } from "@/lib/server/gemini";
 import { getRun, getReference, listReferences, mediaAccess, mediaToFile } from "@/lib/server/store";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import type { Reference, VideoScript } from "@/lib/types";
+import { scriptRulesText } from "@/lib/script-rules";
 
 /**
  * Write the video script for this run's product and hook (on the "Write my script" click):
@@ -21,6 +22,8 @@ type Recipe = {
   demo?: { method?: string; pacing?: string; shots?: { label?: string; seconds?: number; text?: string; hint?: string; camera?: string; steps?: string[] }[] };
   whyItWorks?: string;
 };
+/** At most 10 shots; when there are more, the first 9 and the last (the payoff). */
+export const capShots = <T,>(shots: T[]): T[] => (shots.length > 10 ? [...shots.slice(0, 9), shots[shots.length - 1]] : shots);
 const recipeOf = (r: Reference) => (r as Reference & { recipe?: Recipe }).recipe;
 
 /** The stolen hook in full: its demo shot by shot (camera, actions, captions, timing) is the template for the new one. */
@@ -80,15 +83,17 @@ async function productScreens(ids: string[], who: string) {
 const SCHEMA = {
   type: "OBJECT",
   // payoff and story first: the model settles what the video pays off and the order it is told in before it writes the shots.
-  propertyOrdering: ["payoff", "story", "hookText", "hookAlternatives", "hookBeats", "shots"],
+  propertyOrdering: ["payoff", "story", "shotPlan", "hookText", "hookAlternatives", "hookBeats", "shots"],
   properties: {
     payoff: { type: "STRING", description: "the stolen video's payoff and this product's equivalent concrete win" },
-    story: { type: "ARRAY", items: { type: "STRING" }, description: "the storyline, one short line per beat: hook, before, each step, after, close" },
+    story: { type: "ARRAY", items: { type: "STRING" }, description: "the storyline, one short line per beat, in the viral reel's own story shape" },
+    shotPlan: { type: "STRING", description: "one line: how many demo shots and why that count is most likely to get the most views for this app and this reel" },
     hookText: { type: "STRING", description: "on-screen hook text for this product" },
     hookAlternatives: { type: "ARRAY", items: { type: "STRING" }, description: "exactly 2 other hook texts" },
     hookBeats: { type: "ARRAY", items: { type: "OBJECT", properties: { start: { type: "NUMBER" }, end: { type: "NUMBER" }, action: { type: "STRING" } }, required: ["start", "end", "action"] } },
     shots: {
       type: "ARRAY",
+      maxItems: 10,
       items: {
         type: "OBJECT",
         properties: {
@@ -103,10 +108,12 @@ const SCHEMA = {
       },
     },
   },
-  required: ["payoff", "story", "hookText", "hookAlternatives", "hookBeats", "shots"],
+  required: ["payoff", "story", "shotPlan", "hookText", "hookAlternatives", "hookBeats", "shots"],
 };
 
 export async function POST(_request: Request, ctx: RouteContext<"/api/runs/[id]/script">) {
+  // One deadline for the whole click (Codex 2026-11-26): 10 s of the 180 s kept to save and answer.
+  const deadline = Date.now() + 170_000;
   const { id } = await ctx.params;
   const who = await currentUser();
   if (!who) return signInFirst();
@@ -131,6 +138,12 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/runs/[id]/
   const prompt = `You write short-form marketing videos (HOOK + DEMO) for software founders. Quality comes from data:
 copy what already went viral, adapted to this product. Never invent features, numbers or results the brief and the founder's notes do not support.
 
+PRIORITY, in this order (founder's rule):
+1. ${stolen ? "THE VIRAL REEL THE FOUNDER PICKED leads: most of the script is its format copied to this product (its hook structure, rhythm, tone, length, caption style and story shape). Only the subject changes." : "THE HOOK THE FOUNDER DESCRIBED leads, shaped like the strongest library reels."}
+2. THE TRUTH ABOUT THIS PRODUCT: only its real features, flow and results.
+3. HOUSE RULES (learned from reels that got views): apply them only where the reel does not already decide, or where copying it would not work for an app. Never let them override the reel's voice.
+${scriptRulesText()}
+
 THE PRODUCT (read from its website):
 ${JSON.stringify(brief)}
 ${notes ? `\nTHE FOUNDER'S OWN NOTES (they know the product best; where they differ from the website, follow the notes):\n${JSON.stringify(notes)}\n` : ""}${screens.length ? `\nPHOTOS AND VIDEOS OF THE REAL PRODUCT follow this text (${screens.length}). Name the exact screens, buttons and labels you see in them in hint, steps and text ("Tap Remix", not "Tap the button").\n` : ""}
@@ -142,11 +155,11 @@ ${described}`}
 THE STRONGEST HOOKS IN THE LIBRARY (analyzed viral videos, for patterns of hook text, pacing and demo structure):
 ${JSON.stringify(examples)}
 
-THE VIDEO TELLS ONE STORY, in this order (the offer formula: a big dream outcome, proof it works, little time, little effort):
+THE VIDEO TELLS ONE STORY. Keep the viral reel's own story shape; where it has none that fits an app, use this one (the offer formula: a big dream outcome, proof it works, little time, little effort):
 1. HOOK: the stolen hook, recreated.
-2. BEFORE: the problem this product solves, shown on screen as it looks today (e.g. for a video tool "Show a video that gets low views"; for a sales tool "Show your Stripe with no sales").
+2. BEFORE (the pain; skip this shot only when the hook already shows it): the problem this product solves, shown on screen as it looks today (e.g. for a video tool "Show a video that gets low views"; for a sales tool "Show your Stripe with no sales").
 3. THE STEPS: the product's real main flow, one shot per step, in the order it is used. Make it look as easy as it truly is: the fewest taps the product really needs, nothing extra (no sign up, settings or menus unless they are the point). Never skip a step the product needs and never add a button it does not have.
-4. AFTER: the same thing as BEFORE, now fixed: the dream outcome (e.g. "Show a video that gets high views", "Show your Stripe with sales going up"). If the product has no clear before and after, end on the finished result instead.
+4. AFTER: the pain from the hook or BEFORE, now fixed: the dream outcome (e.g. "Show a video that gets high views", "Show your Stripe with sales going up"). If the product has no clear before and after, end on the finished result instead.
 5. CLOSE: the stolen video's closing line or call to action, if it has one (can share the AFTER shot).
 Each shot follows from the one before; read in order, the captions tell the story with no jumps. Captions describe before and after in words; use numbers only if the founder's notes give them.
 
@@ -156,7 +169,8 @@ Write:
 - hookAlternatives: 2 other hook texts in the same voice.
 - hookBeats: what the person does in the hook, beat by beat with seconds, each action under 12 plain words.${stolen ? " Copy the stolen video's hook exactly: the same actions, expression, gestures and timing (it is recreated from that clip); only the words on screen change." : ""} Say "the creator", never describe a real person.
 - payoff (write it first): ${stolen ? "what the stolen video's hook promises and how its demo pays that off (e.g. \"gets paid $4k for a website the AI built in minutes\"), then THIS product's equivalent concrete win, taken only from the brief" : "the concrete win this product delivers, taken only from the brief"}. One sentence.
-- shots: the demo for THIS product, following the story: BEFORE, the steps, AFTER (3 to 7 shots).${stolen ? ` Copy the stolen demo's FORM, not its actions: its numbered caption style, its rhythm (quick steps, then the payoff), the caption length, casing and emoji, and its closing call to action if it has one. Every action happens in THIS product, from its demoFlow${screens.length ? " and the screenshots" : ""}; never copy the stolen video's gestures or props (yawning, thumbs up, leaning back) unless they are the payoff reaction.` : ` Follow the strongest library demos' structure and pacing and the product's demoFlow.`} Use as many step shots as this product's real flow needs. Seconds follow each action: quick taps 1.5 to 3 seconds, the AFTER shot the longest. The last shot and its caption deliver the payoff. For each: label (2 to 4 plain words, no marketing jargon such as CTA), hint (one short imperative sentence, the action to record, e.g. "Open the Wingmates app."), steps (1 to 3 short on-screen actions in the real product), camera (how to hold the phone and what to point it at), text (the on-screen caption for that shot, same voice as the hook), seconds.
+- shotPlan (write it right after story): decide the number of demo shots with your own judgment: the count most likely to get this reel the most views for THIS app (its real flow, the reel's pace, how fast it reaches the payoff). There is no default count; it can be 2 or 9 (at most 10). Say the count and why in one line.
+- shots: the demo for THIS product, following the story, exactly as many shots as shotPlan says.${stolen ? ` Copy the stolen demo's FORM, not its actions: its numbered caption style, its rhythm (quick steps, then the payoff), the caption length, casing and emoji, and its closing call to action if it has one. Every action happens in THIS product, from its demoFlow${screens.length ? " and the screenshots" : ""}; never copy the stolen video's gestures or props (yawning, thumbs up, leaning back) unless they are the payoff reaction.` : ` Follow the strongest library demos' structure and pacing and the product's demoFlow.`} Every shot must earn its place; when unsure, choose fewer. Seconds follow each action: quick taps 1.5 to 3 seconds, the AFTER shot the longest. The last shot and its caption deliver the payoff. For each: label (2 to 4 plain words, no marketing jargon such as CTA), hint (one short imperative sentence, the action to record, e.g. "Open the Wingmates app."), steps (1 to 3 short on-screen actions in the real product), camera (how to hold the phone and what to point it at), text (the on-screen caption for that shot, same voice as the hook), seconds.
 
 Write hint, steps and camera for someone who has never filmed before: simple everyday English a 10-year-old understands,
 short words, no film or marketing terms (no "screen capture", "B-roll", "angle", "framing", "CTA", "split screen").
@@ -165,9 +179,19 @@ step "Tap the big camera button".`;
 
   const budget = await beginAI(who, run, "script", { product: run.product, source: source, described });
   if (budget.response) return budget.response;
-  let out: Omit<VideoScript, "refId" | "at">;
+  let out: Omit<VideoScript, "refId" | "at"> & { shotPlan?: unknown };
   try {
-    out = await geminiJSON(screens.length ? [{ text: prompt }, ...screens] : prompt, { schema: SCHEMA, temperature: 0.6 });
+    // Gemini Pro writes the script (founder 2026-11-26: judgment of story and shot count); if it fails or runs out of
+    // its time, Flash writes it instead. Both share the click's deadline: Pro always leaves Flash 45 s, and Flash
+    // is skipped when under 15 s remain.
+    const parts = screens.length ? [{ text: prompt }, ...screens] : prompt;
+    const left = () => deadline - Date.now();
+    out = await geminiJSON<typeof out>(parts, { schema: SCHEMA, temperature: 0.6, model: PRO_MODEL, timeoutMs: Math.max(1_000, Math.min(110_000, left() - 45_000)) })
+      .catch((error) => {
+        console.error("script: pro failed, using flash", error instanceof Error ? error.message.slice(0, 200) : error);
+        if (left() < 15_000) throw new GeminiError("No time left for the fallback.");
+        return geminiJSON<typeof out>(parts, { schema: SCHEMA, temperature: 0.6, timeoutMs: left() });
+      });
   } catch (e) {
     console.error("script", e);
     return Response.json({ error: e instanceof GeminiError ? "Couldn't write the script. Try again." : "Something went wrong." }, { status: 502 });
@@ -178,7 +202,9 @@ step "Tap the big camera button".`;
     hookText: s(out.hookText, 200),
     hookAlternatives: (Array.isArray(out.hookAlternatives) ? out.hookAlternatives : []).map((x) => s(x, 200)).filter(Boolean).slice(0, 2),
     hookBeats: (Array.isArray(out.hookBeats) ? out.hookBeats : []).slice(0, 8).map((b) => ({ start: num(b?.start, 0, 30, 0), end: num(b?.end, 0, 30, 1), action: s(b?.action, 300) })),
-    shots: (Array.isArray(out.shots) ? out.shots : []).slice(0, 7).map((x) => ({
+    // The count is the model's judgment (founder 2026-11-26); 10 is only a safety cap, and past it the last shot
+    // (the payoff) is kept (Codex 2026-11-26).
+    shots: capShots(Array.isArray(out.shots) ? out.shots : []).map((x) => ({
       label: s(x?.label, 60),
       hint: s(x?.hint, 300),
       steps: (Array.isArray(x?.steps) ? x.steps : []).map((y) => s(y, 160)).filter(Boolean).slice(0, 3),
@@ -186,6 +212,7 @@ step "Tap the big camera button".`;
       text: s(x?.text, 200),
       seconds: num(x?.seconds, 0.5, 15, 3),
     })),
+    ...(s(out.shotPlan, 300) ? { shotPlan: s(out.shotPlan, 300) } : {}),
     refId: source?.id ?? null,
     at: new Date().toISOString(),
   };
