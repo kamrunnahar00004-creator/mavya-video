@@ -27,8 +27,6 @@ const PAIRS = [
 
 /** The explainer plays this one whole; its hook ends at the first cut. */
 const EXPLAIN = { code: "Dd--YQOqo16", hookEnd: 5.93, length: 20 };
-/** Hero avatars: small crops of five built-in characters (public/landing/faces, 96 px). */
-const FACES = ["olivia", "zuri", "mei", "jake", "sienna"];
 const FAQ = [
   { q: "Do I need to be on camera?", a: "No. Pick one of 70 AI characters, or use your own photo." },
   { q: "Where do the hooks come from?", a: "A library of short-form videos that already went viral. You copy the format, your character performs it, and the words are yours." },
@@ -59,21 +57,7 @@ export function Landing() {
               Pick a reel that already went viral. Mavya rewrites its script for your app and makes your reel in under 2 minutes.
             </p>
 
-            {/* The selling point (founder 2026-11-26): the viral script, copied and rewritten for an app. Real lines
-                from the first hero pair, so the claim is shown, not told. */}
-            <figure className="mt-8 max-w-[470px] border border-line-strong bg-panel">
-              <div className="flex flex-col items-start gap-1.5 px-4 py-3.5 sm:flex-row sm:gap-3">
-                <span className="shrink-0 sm:mt-0.5 sm:w-[104px] bg-raised px-1.5 py-0.5 text-center text-[11.5px] font-bold uppercase tracking-[0.04em] text-soft">5M views</span>
-                <p className="text-[15px] leading-snug text-muted">&ldquo;My sister is actually nuts, why is this her wedding invitation&rdquo;</p>
-              </div>
-              <div className="flex flex-col items-start gap-1.5 border-t border-line-strong bg-accent-tint px-4 py-3.5 sm:flex-row sm:gap-3">
-                <span className="shrink-0 sm:mt-0.5 sm:w-[104px] bg-accent px-1.5 py-0.5 text-center text-[11.5px] font-bold uppercase tracking-[0.04em] text-white">For your app</span>
-                <p className="text-[15px] font-semibold leading-snug text-text">&ldquo;my app finally got 100 visitors&rdquo;</p>
-              </div>
-              <figcaption className="sr-only">A viral reel&apos;s script, rewritten by Mavya for an app</figcaption>
-            </figure>
-
-            <div className="mt-8 flex flex-wrap items-center gap-3">
+            <div className="mt-9 flex flex-wrap items-center gap-3">
               <Link href="/studio" className="btn-primary h-[52px] px-5 text-[16px] sm:px-7">
                 Start free trial
                 <ArrowRight className="h-4 w-4" />
@@ -82,15 +66,7 @@ export function Landing() {
                 See pricing
               </Link>
             </div>
-            <div className="mt-5 flex items-center gap-3">
-              <div className="flex shrink-0 -space-x-2" aria-hidden>
-                {FACES.map((f) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={f} src={`/landing/faces/${f}.webp`} alt="" width={30} height={30} className="h-[30px] w-[30px] border-2 border-bg object-cover" />
-                ))}
-              </div>
-              <p className="text-[13.5px] font-semibold text-soft">3-day free trial. 70 AI faces. Cancel anytime.</p>
-            </div>
+            <p className="mt-4 text-[13.5px] font-semibold text-soft">3-day free trial. Cancel anytime.</p>
           </div>
           <div role="group" aria-label="Before and after: viral hooks, and the same hooks made with Mavya" className="flex justify-center py-4">
             <HookSlides pairs={PAIRS} />
