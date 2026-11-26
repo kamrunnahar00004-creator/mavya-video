@@ -102,7 +102,7 @@ async function share(bytes: Buffer, ext: "jpg" | "mp4", user: string): Promise<s
 type Character = { image: { data: string; mime: string } | null; words: string; id?: string };
 
 /** The character as image bytes, or their description when they were described in words. */
-async function characterOf(run: Run, who: string, dir: string): Promise<Character> {
+export async function characterOf(run: Run, who: string, dir: string): Promise<Character> {
   const face = run.hook.face;
   if (face?.kind === "character") {
     if (!/^[a-z0-9-]+$/.test(face.id)) throw new Error("Unknown character");
@@ -119,7 +119,7 @@ async function characterOf(run: Run, who: string, dir: string): Promise<Characte
 }
 
 /** The hook's video: the library's cut hook clip, else the hook part of an uploaded video (cut into `dir`). */
-async function hookVideo(run: Run, source: Reference | null, who: string, dir: string): Promise<string | null> {
+export async function hookVideo(run: Run, source: Reference | null, who: string, dir: string): Promise<string | null> {
   if (!source) return null;
   const code = source.sourceUrl ? source.sourceUrl.replace(/\/+$/, "").split("/").pop() : "";
   if (code && /^[A-Za-z0-9_-]{5,40}$/.test(code)) {

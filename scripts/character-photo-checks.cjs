@@ -35,7 +35,7 @@ ok(/const clip = await libraryFile\("hooks", code, dir\);\s*\n\s*if \(clip\) ret
 
 // The hook cache serves only founder-approved clips (founder 2026-11-08).
 const cache = load('src/lib/hook-cache.ts');
-ok(JSON.stringify([...cache.APPROVED_HOOK_CLIPS]) === JSON.stringify(['cc4afb16-d2cc-446f-b9fa-ba09688dc4df', '3980486e-aac4-4c6c-b4cb-e651a5d56f86']), 'approved: the PERFECT Olivia clip and the Sienna keyboard clip');
+ok(JSON.stringify([...cache.APPROVED_HOOK_CLIPS]) === JSON.stringify(['e587ac8b-8c34-44ec-bce8-e2090ecd4bab', '24318634-f520-487c-a3e9-9f7d1c78be0d', '68079f04-d468-4882-b145-c5c878ec8075', '02711cc1-6b6e-4820-927d-26cd62a03103', 'a50ff688-667b-4827-a71b-d832b244a636', '3039ce55-7ab8-4c79-9846-1370660ac61b', '48ee5ebf-b5f6-4ef5-a29f-27b76a95e163']) && !cache.APPROVED_HOOK_CLIPS.includes('cc4afb16-d2cc-446f-b9fa-ba09688dc4df'), 'approved: only the 7 Kling 4.0 + face ref clips (founder 2026-11-26); the Kling 3.0 ones are out');
 ok(/\.is\("note", null\)\.in\("id", \[\.\.\.APPROVED_HOOK_CLIPS\]\)/.test(jobs) && /if \(!APPROVED_HOOK_CLIPS\.length\) return null;/.test(jobs), 'the cache only serves approved clips');
 
 if (checks !== EXPECTED) { console.error(`character-photo-checks: ${checks} checks ran, expected ${EXPECTED}`); process.exit(1); }

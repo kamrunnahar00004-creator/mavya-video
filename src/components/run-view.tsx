@@ -7,7 +7,7 @@ import { ThumbImg } from "@/components/thumb-img";
 import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "@/components/pending-link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Check, ChevronDown, Film, FolderOpen, Loader2, PenLine, RefreshCw, Replace, SlidersHorizontal, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Film, FolderOpen, Loader2, PenLine, RefreshCw, Replace, SlidersHorizontal, Sparkles, ThumbsDown, ThumbsUp, Trash2, Upload, X } from "lucide-react";
 
 
 import { analyzeVideo } from "@/lib/analyze";
@@ -1915,6 +1915,7 @@ function GenerateStep({ run, source, seg, texts, gen, onGenerate, onUploadHook, 
               </button>
             </div>
           )}
+          {hook.generated && !busy && !regen && <HookRating key={hook.generated.src} runId={run.id} src={hook.generated.src} />}
           {regen && hook.generated && !busy && (
             <form
               onSubmit={(e) => {
@@ -2304,6 +2305,46 @@ function DemoPicker({ run, onClip, onClear, onFrame }: { run: Run; onClip: (f: F
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Thumbs up or down on a generated hook (founder 2026-11-26): every account sees it. A thumbs up on a clip that passed
+ * the background eval puts it on the founder's shortlist for the instant first-Generate cache (src/lib/hook-cache.ts).
+ */
+function HookRating({ runId, src }: { runId: string; src: string }) {
+  const [rating, setRating] = useState<1 | -1 | 0>(0);
+  const [saving, setSaving] = useState(false);
+  // The saved vote shows again after a reload (Codex 2026-11-26).
+  useEffect(() => {
+    let alive = true;
+    void fetch(`/api/runs/${runId}/hook-rating?src=${encodeURIComponent(src)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? (r.json() as Promise<{ rating?: number }>) : null))
+      .then((o) => { if (alive && (o?.rating === 1 || o?.rating === -1)) setRating(o.rating); }, () => undefined);
+    return () => { alive = false; };
+  }, [runId, src]);
+  // One write at a time, so the saved vote always matches the one shown.
+  const rate = (next: 1 | -1) => {
+    if (saving) return;
+    const value = rating === next ? 0 : next;
+    const before = rating;
+    setRating(value);
+    setSaving(true);
+    void fetch(`/api/runs/${runId}/hook-rating`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ src, rating: value }) })
+      .then((r) => { if (!r.ok) setRating(before); }, () => setRating(before))
+      .finally(() => setSaving(false));
+  };
+  const button = (value: 1 | -1, label: string, Icon: typeof ThumbsUp) => (
+    <button type="button" aria-label={label} aria-pressed={rating === value} disabled={saving} onClick={() => rate(value)}
+      className={`flex h-7 w-7 items-center justify-center rounded-lg ${rating === value ? "bg-white text-ink" : "bg-black/60 text-white hover:bg-black/75"}`}>
+      <Icon className="h-3.5 w-3.5" />
+    </button>
+  );
+  return (
+    <div className="absolute bottom-2 right-2 flex gap-1">
+      {button(1, "Good hook", ThumbsUp)}
+      {button(-1, "Bad hook", ThumbsDown)}
     </div>
   );
 }
