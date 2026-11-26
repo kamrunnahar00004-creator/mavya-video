@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 34;
+const EXPECTED = 35;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(a, b, msg); };
 
@@ -86,4 +86,5 @@ finish('meta-pixel-checks', EXPECTED, () => checks, async () => {
   ok(/ZERO_DECIMAL\.has\(currency\.toLowerCase\(\)\) \? 1 : 100/.test(ret) && /"jpy"/.test(ret), 'values right for zero-decimal currencies too');
   const comp = require('node:fs').readFileSync('src/components/meta-pixel.tsx', 'utf8');
   ok(/"StartTrial"/.test(comp) && /eventID: conversion\.eventId/.test(comp) && comp.indexOf('readConversionCookie(document.cookie)') < comp.indexOf('if (!pixelAllowed(zone)) return;'), 'fired once with its id, and the cookie is deleted even where the Pixel may not run (EU)');
+  ok(/<Suspense fallback=\{null\}><MetaPixel id=\{META_PIXEL_ID\} \/><\/Suspense>/.test(require('node:fs').readFileSync('src/app/layout.tsx', 'utf8')), 'the Pixel sits in its own Suspense (with the id set the build failed: usePathname outside Suspense)');
 });

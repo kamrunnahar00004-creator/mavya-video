@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -44,7 +45,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SpeedInsights />
         {/* Vercel Web Analytics (visitors and page views, no cookies). */}
         <Analytics />
-        {META_PIXEL_ID && <MetaPixel id={META_PIXEL_ID} />}
+        {/* In its own Suspense: it reads the URL (usePathname), which would otherwise stop pages prerendering (the
+            build failed the first time the Pixel id was set, 2026-11-26). */}
+        {META_PIXEL_ID && <Suspense fallback={null}><MetaPixel id={META_PIXEL_ID} /></Suspense>}
         {CLARITY_PROJECT_ID && (
           <Script id="clarity-init" strategy="afterInteractive">
             {`(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","${CLARITY_PROJECT_ID}");`}
