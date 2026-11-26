@@ -2,7 +2,7 @@
 
 import Link from "@/components/pending-link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Clapperboard, Settings } from "lucide-react";
+import { BookOpen, CalendarDays, Clapperboard, Settings } from "lucide-react";
 
 /**
  * The sidebar's items, for every account. No Viral library (founder 2026-11-26): it duplicated "Browse hooks" inside a
@@ -10,6 +10,7 @@ import { CalendarDays, Clapperboard, Settings } from "lucide-react";
  */
 export const NAV = [
   { href: "/studio", label: "Videos", icon: Clapperboard },
+  { href: "/guides", label: "Guides", icon: BookOpen },
   { href: "/posts", label: "Content calendar", icon: CalendarDays },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
