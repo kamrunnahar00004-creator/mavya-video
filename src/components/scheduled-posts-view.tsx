@@ -63,7 +63,7 @@ export function ScheduledPostsView() {
     .catch((e: Error) => { if (shown.current === week) { setError(e.message); setPosts((p) => p ?? []); } }), [week]);
 
   useEffect(() => { shown.current = week; void load(); }, [week, load]);
-  const goWeek = (w: number) => { if (w !== week) { setPosts(null); setWeek(w); } };
+  const goWeek = (w: number) => { if (w !== week) { setPosts(null); setWeek(w); setMobileDay(null); } };
   // Settings must load before "Your app & captions" opens, or saving it would write defaults over them (Codex 2026-11-26).
   const [settingsError, setSettingsError] = useState(false);
   const loadSettings = useCallback(() => call<{ templates: Templates; app: AppProfile; rev: string }>("/api/posts/templates")
@@ -74,6 +74,10 @@ export function ScheduledPostsView() {
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(week, i)), [week]);
+  // The day shown on phones: picked by hand, else today when it is in this week, else Monday.
+  const [mobileDay, setMobileDay] = useState<number | null>(null);
+  const todayIndex = days.findIndex((d) => sameDay(d, now));
+  const shownDay = mobileDay ?? (todayIndex >= 0 ? todayIndex : 0);
   const byDay = (d: number) => (posts ?? []).filter((p) => sameDay(Date.parse(p.at), d)).sort((a, b) => a.at.localeCompare(b.at));
   const planned = (posts ?? []).filter((p) => p.state !== "posted").length;
   const posted = (posts ?? []).length - planned;
@@ -105,11 +109,22 @@ export function ScheduledPostsView() {
       )}
       {error && <p role="alert" className="border-b border-line bg-red-50 px-6 py-2 text-[13px] font-semibold text-red-700">{error}</p>}
       {settingsError && <p role="alert" className="border-b border-line bg-red-50 px-6 py-2 text-[13px] font-semibold text-red-700">Couldn&apos;t load your captions. <button type="button" onClick={() => void loadSettings()} className="cursor-pointer underline">Try again</button></p>}
-      <div className="grid min-h-0 flex-1 grid-cols-7 divide-x divide-line overflow-y-auto">
-        {days.map((d) => {
+      {/* Phones: one day at a time, picked here (founder 2026-11-26); desktop shows the whole week. */}
+      <div role="tablist" aria-label="Day" className="grid grid-cols-7 gap-1 border-b border-line px-2 py-2 md:hidden">
+        {days.map((d, i) => (
+          <button key={d} type="button" role="tab" aria-selected={i === shownDay} onClick={() => setMobileDay(i)}
+            className={`flex cursor-pointer flex-col items-center rounded-lg py-1.5 text-[11px] font-semibold ${i === shownDay ? "bg-accent text-white" : sameDay(d, now) ? "bg-accent-tint text-text" : "text-muted"}`}>
+            {new Date(d).toLocaleDateString([], { weekday: "short" }).slice(0, 2)}
+            <span className="text-[14px] font-bold">{new Date(d).getDate()}</span>
+            <span className={`mt-0.5 h-1 w-1 rounded-full ${byDay(d).length ? (i === shownDay ? "bg-white" : "bg-accent") : "bg-transparent"}`} />
+          </button>
+        ))}
+      </div>
+      <div className="grid min-h-0 flex-1 grid-cols-1 divide-x divide-line overflow-y-auto md:grid-cols-7">
+        {days.map((d, i) => {
           const list = byDay(d);
           return (
-            <section key={d} className={`flex min-w-0 flex-col ${sameDay(d, now) ? "bg-accent-tint" : ""}`}>
+            <section key={d} className={`${i === shownDay ? "flex" : "hidden"} min-w-0 flex-col md:flex ${sameDay(d, now) ? "md:bg-accent-tint" : ""}`}>
               <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-panel/95 px-2 py-2">
                 <span className="text-[12.5px] font-bold">{new Date(d).toLocaleDateString([], { weekday: "short", day: "numeric" })}</span>
                 <button type="button" aria-label="Add videos on this day" onClick={() => setAdding(d)} className="flex h-6 w-6 cursor-pointer items-center justify-center text-soft hover:bg-raised hover:text-text"><Plus className="h-3.5 w-3.5" /></button>

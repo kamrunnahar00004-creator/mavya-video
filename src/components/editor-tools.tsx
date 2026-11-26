@@ -1955,7 +1955,10 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
   );
 
   return (
-    <div ref={editorRoot} role="dialog" aria-modal="true" aria-label="Edit video" onPointerDownCapture={() => { gestureRemembered.current = false; }} onKeyDownCapture={(e) => { if (!e.repeat) gestureRemembered.current = false; }} className="fixed inset-0 z-40 flex flex-col bg-panel">
+    <div ref={editorRoot} role="dialog" aria-modal="true" aria-label="Edit video" onPointerDownCapture={() => { gestureRemembered.current = false; }} onKeyDownCapture={(e) => { if (!e.repeat) gestureRemembered.current = false; }} className="fixed inset-0 z-40 flex flex-col bg-panel max-md:[&>*:not([data-handoff])]:hidden">
+      {/* On phones everything else in the editor is hidden (not just covered), so keyboards and screen readers can't
+          reach it either (Codex 2026-11-26). */}
+      <PhoneHandoff onClose={onClose} />
       <header className="flex items-center gap-2 border-b border-line px-5 py-3">
         <h2 className="text-[16px] font-extrabold tracking-tight">Edit video</h2>
         <button type="button" onClick={onClose} className="btn-primary ml-auto px-4 py-2 text-[14px]">
@@ -3113,3 +3116,26 @@ export function GenerateProgress({ photo, who, startedAt, estimate }: { photo: s
 const SongBrowser = dynamic(() => import("@/components/song-browser").then(m=>m.SongBrowser));
 
 const TextRow = dynamic(() => import("@/components/text-controls").then(m=>m.TextRow));
+
+/**
+ * Phones only (md:hidden), over the editor: the timeline needs a mouse and a big screen (founder 2026-11-26: the
+ * intended path is desktop; ad visitors arrive on phones). The link to this video, to copy or email to yourself.
+ */
+function PhoneHandoff({ onClose }: { onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const link = typeof window === "undefined" ? "" : window.location.href.split("#")[0];
+  return (
+    <div data-handoff className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-panel p-6 text-center md:hidden">
+      <Smartphone className="h-9 w-9 text-accent" />
+      <h2 className="text-[20px] font-extrabold tracking-tight">Editing works best on your computer</h2>
+      <p className="max-w-[320px] text-[14px] leading-relaxed text-muted">Open this video on a laptop or desktop to trim clips, edit text and export. Your work is saved.</p>
+      <div className="flex w-full max-w-[320px] flex-col gap-2">
+        <button type="button" onClick={() => void navigator.clipboard.writeText(link).then(() => setCopied(true), () => undefined)} className="btn-primary w-full px-4 py-3 text-[15px]">
+          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{copied ? "Link copied" : "Copy link"}
+        </button>
+        <a href={`mailto:?subject=${encodeURIComponent("My Mavya video")}&body=${encodeURIComponent(`Open on my computer: ${link}`)}`} className="flex w-full items-center justify-center rounded-lg border border-line-strong px-4 py-3 text-[15px] font-semibold hover:bg-raised">Email me the link</a>
+        <button type="button" onClick={onClose} className="w-full cursor-pointer px-4 py-2.5 text-[14px] font-semibold text-muted hover:bg-raised">Back</button>
+      </div>
+    </div>
+  );
+}

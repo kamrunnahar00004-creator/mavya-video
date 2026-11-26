@@ -182,9 +182,10 @@ export function RunsList() {
 
   return (
     <div className="card flex h-full flex-col overflow-hidden">
-      <header className="flex items-center gap-4 border-b border-line px-6 py-4">
-        <h1 className="text-[22px] font-bold">Your videos</h1>
-        <div role="group" aria-label="View" className="ml-auto flex rounded-lg bg-raised p-0.5">
+      <header className="flex items-center gap-3 border-b border-line px-4 py-4 md:gap-4 md:px-6">
+        <h1 className="whitespace-nowrap text-[20px] font-bold md:text-[22px]">Your videos</h1>
+        {/* Hidden on small phones, so the title and New video fit at 320 px (Codex 2026-11-26). */}
+        <div role="group" aria-label="View" className="ml-auto hidden rounded-lg bg-raised p-0.5 min-[400px]:flex">
           {(
             [
               ["grid", LayoutGrid, "Grid view"],
@@ -204,7 +205,7 @@ export function RunsList() {
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => void newRun()} disabled={creating} className="btn-primary px-4 py-2.5 text-[14px]">
+        <button type="button" onClick={() => void newRun()} disabled={creating} className="btn-primary ml-auto whitespace-nowrap px-4 py-2.5 text-[14px] min-[400px]:ml-0">
           {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" strokeWidth={2.6} />}
           New video
         </button>
