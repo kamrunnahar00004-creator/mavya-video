@@ -369,7 +369,7 @@ function CostStack() {
           </div>
           <ul className="mt-2">
             {STACK.map((x, i) => (
-              <li key={x.tool} className={`flex items-center gap-3.5 py-2.5 transition-[opacity,transform] duration-300 ${i < shown ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"}`}>
+              <li key={x.tool} className={`flex items-center gap-3.5 py-2.5 transition-[opacity,translate] duration-300 ${i < shown ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={`/landing/logos/${x.logo}.png`} alt="" width={36} height={36} className="h-9 w-9 shrink-0 rounded-lg border border-line bg-panel object-contain p-1" />
                 <span className="min-w-0 flex-1">
@@ -387,7 +387,7 @@ function CostStack() {
               <span aria-hidden className={`absolute left-[-4px] right-[-4px] top-1/2 h-[3px] origin-left -translate-y-1/2 rounded-full bg-red-500 transition-transform duration-500 ${totalOn ? "scale-x-100" : "scale-x-0"}`} />
             </span>
           </div>
-          <div className={`mt-5 flex items-center gap-4 rounded-xl bg-accent px-5 py-4 text-white transition-[opacity,transform] duration-500 ${mavyaOn ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"}`}>
+          <div className={`mt-5 flex items-center gap-4 rounded-xl bg-accent px-5 py-4 text-white transition-[opacity,translate] duration-500 ${mavyaOn ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"}`}>
             <MavyaMark className="h-10 w-10 shrink-0" inverted />
             <span className="min-w-0 flex-1">
               <span className="block text-[15px] font-semibold">Mavya {MAVYA.name}</span>

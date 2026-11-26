@@ -92,8 +92,8 @@ export function HookDemoExplainer({ src, poster, strip, hookEnd, length }: { src
 const WHY = ["fastest", "cheapest", "easiest"];
 
 /**
- * One word that changes every 2.5 s: the old word fades up and out, then the new one rises in, while the slot's width
- * slides to the new word's, so the line never shows a gap or jumps. Widths are read from the words themselves
+ * One word that changes every 2.5 s: the old word slides up and out as the new one slides in and the slot's width
+ * eases to it, so the line never shows a gap or jumps. Widths are read from the words themselves
  * (ResizeObserver, so font loading and breakpoints stay right). Reduced motion: the first word, still.
  */
 function RotatingWord({ words }: { words: string[] }) {
@@ -118,14 +118,18 @@ function RotatingWord({ words }: { words: string[] }) {
   }, [still, words.length]);
   const shown = still ? 0 : i;
   const prev = (shown + words.length - 1) % words.length;
-  // The slot resizes only after the old word has faded (delay-200), so a wider old word never paints over the rest.
+  // One roll (founder 2026-11-26: the staged fade felt jerky): the old word rolls up out of the slot while the new
+  // one rolls up into it and the slot's width eases to it, all at once on the same curve. Both stay solid; the slot
+  // clips, so mid-roll shows half of each and a word never paints over its neighbours (padding keeps the "p" of
+  // "cheapest" inside the clip). The waiting word sits below, hidden, and moves there instantly.
+  const move = "duration-[450ms] ease-[cubic-bezier(0.65,0,0.35,1)]";
   return (
-    <span className="inline-grid align-bottom transition-[width] delay-200 duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none" style={{ width: widths[shown] || undefined }}>
+    <span className={`-mb-[0.14em] inline-grid overflow-hidden pb-[0.14em] align-bottom transition-[width] ${move} motion-reduce:transition-none`} style={{ width: widths[shown] || undefined }}>
       {words.map((w, n) => (
         <span
           key={w}
           ref={(el) => { refs.current[n] = el; }}
-          className={`col-start-1 row-start-1 justify-self-start whitespace-nowrap transition-[opacity,transform] ease-[cubic-bezier(0.22,1,0.36,1)] ${n === shown ? "translate-y-0 opacity-100 delay-150 duration-400" : n === prev && !still ? "-translate-y-[0.3em] opacity-0 duration-200" : "translate-y-[0.3em] opacity-0 duration-0"}`}
+          className={`col-start-1 row-start-1 justify-self-start whitespace-nowrap transition-[opacity,translate] ${n === shown ? `translate-y-0 opacity-100 ${move}` : n === prev && !still ? `-translate-y-[115%] opacity-100 ${move}` : "translate-y-[115%] opacity-0 duration-0"}`}
           style={{ color: LIGHT_VIOLET }}
         >
           {w}
