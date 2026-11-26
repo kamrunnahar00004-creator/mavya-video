@@ -65,18 +65,18 @@ export function HookDemoExplainer({ src, poster, strip, hookEnd, length }: { src
         </div>
 
         <div className="max-w-[600px]">
-          {/* Founder 2026-11-26: the heading says why the format wins; one word rotates (cheapest, fastest, easiest). */}
+          {/* Founder 2026-11-26: the heading says why the format wins; one word rotates (fastest, cheapest, easiest); the
+              line under it names the format. */}
           <h2 className="text-[34px] font-semibold leading-[1.12] tracking-[-0.03em] text-white! sm:text-[40px]">
-            <span className="sr-only">Hook + demo videos are the fastest way to go viral</span>
-            {/* Fixed lines, so a shorter or longer word never moves a line break: "...are the" / word / "way to go
-                viral" on a phone, "...are the" / "word way to go viral" from sm up. */}
-            <span aria-hidden>
-              <span className="block"><span className="whitespace-nowrap">Hook + demo</span> videos are the</span>
-              <span className="block sm:whitespace-nowrap"><RotatingWord words={WHY} /><span className="max-sm:block"><span className="max-sm:hidden"> </span>way to go viral</span></span>
+            <span className="sr-only">The fastest way to go viral</span>
+            {/* One line from sm up (founder 2026-11-26: two lines read badly); on a phone "The <word>" / "way to go
+                viral", fixed, so a word change never moves a line break. */}
+            <span aria-hidden className="block sm:whitespace-nowrap">
+              The <RotatingWord words={WHY} /><span className="max-sm:block"><span className="max-sm:hidden"> </span>way to go viral</span>
             </span>
           </h2>
           <p className="mt-5 text-[18px] leading-relaxed text-white/75">
-            A scroll-stopping face <span className="font-semibold" style={{ color: LIGHT_VIOLET }}>(the hook)</span>, then your app in action <span className="font-semibold" style={{ color: LIGHT_VIOLET }}>(the demo)</span>.
+            <span className="font-semibold text-white">Hook + demo videos:</span> a scroll-stopping face <span className="font-semibold" style={{ color: LIGHT_VIOLET }}>(the hook)</span>, then your app in action <span className="font-semibold" style={{ color: LIGHT_VIOLET }}>(the demo)</span>.
           </p>
           <div className="mt-12 border-t border-white/10 pt-10">
             <h3 className="text-[20px] font-semibold text-white!">The game is volume.</h3>
@@ -125,7 +125,7 @@ function RotatingWord({ words }: { words: string[] }) {
         <span
           key={w}
           ref={(el) => { refs.current[n] = el; }}
-          className={`col-start-1 row-start-1 justify-self-start whitespace-nowrap transition-[opacity,transform] ease-[cubic-bezier(0.22,1,0.36,1)] ${n === shown ? "translate-y-0 opacity-100 delay-300 duration-500" : n === prev && !still ? "-translate-y-[0.3em] opacity-0 duration-200" : "translate-y-[0.3em] opacity-0 duration-0"}`}
+          className={`col-start-1 row-start-1 justify-self-start whitespace-nowrap transition-[opacity,transform] ease-[cubic-bezier(0.22,1,0.36,1)] ${n === shown ? "translate-y-0 opacity-100 delay-150 duration-400" : n === prev && !still ? "-translate-y-[0.3em] opacity-0 duration-200" : "translate-y-[0.3em] opacity-0 duration-0"}`}
           style={{ color: LIGHT_VIOLET }}
         >
           {w}

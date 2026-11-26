@@ -19,12 +19,12 @@ ok(!/[–—]/.test(s), 'no em or en dashes');
 
 const x = fs.readFileSync('src/components/hook-demo-explainer.tsx', 'utf8');
 ok(/const WHY = \["fastest", "cheapest", "easiest"\]/.test(x) && /<RotatingWord words=\{WHY\} \/>/.test(x) && !/What’s a/.test(x), 'explainer heading: the fastest / cheapest / easiest way to go viral (founder 2026-11-26)');
-ok(/<span className="sr-only">Hook \+ demo videos are the fastest way to go viral<\/span>/.test(x) && /<span aria-hidden>/.test(x), 'screen readers and search read one full sentence, not the rotating words');
+ok(/<span className="sr-only">The fastest way to go viral<\/span>/.test(x) && /<span aria-hidden className="block sm:whitespace-nowrap">\s*The <RotatingWord/.test(x), 'one line from sm up; screen readers read one sentence, not the rotating words');
 ok(/mq\.addEventListener\("change", follow\)/.test(x) && /if \(still\) return;\s*const id = setInterval\(\(\) => setI\(\(n\) => \(n \+ 1\) % words\.length\), 2500\)/.test(x) && /const shown = still \? 0 : i;/.test(x), 'changes every 2.5 s; still under reduced motion, followed live');
 ok(/style=\{\{ width: widths\[shown\] \|\| undefined \}\}/.test(x) && /transition-\[width\] delay-200/.test(x), 'slot width follows the word, after the old word fades: no gap, no overlap');
-ok(/<span className="block"><span className="whitespace-nowrap">Hook \+ demo<\/span> videos are the<\/span>/.test(x), 'fixed line breaks: a word change never moves a line');
+ok(/>Hook \+ demo videos:<\/span> a scroll-stopping face/.test(x) && !/videos are the/.test(x), 'the line under the heading names the format');
 ok(/<span className="flex items-center gap-x-4 sm:gap-x-8">\s*<span className=\{op\}>=<\/span>/.test(x), '"= 100" wraps as one piece on a phone');
-ok(/<span className=\{op\}>×<\/span>\s*<Hand cards=\{MX_DEMOS\}/.test(x) && /<span className="block sm:whitespace-nowrap">/.test(x), '× travels with the demos; the heading line can wrap on a phone');
+ok(/<span className=\{op\}>×<\/span>\s*<Hand cards=\{MX_DEMOS\}/.test(x), '× travels with the demos');
 const EXPECTED = 14;
 assert.equal(checks, EXPECTED, `landing-cta-checks: ${checks} of ${EXPECTED}`);
 console.log(`landing-cta-checks: ${checks} checks pass`);
