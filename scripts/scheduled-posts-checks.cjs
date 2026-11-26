@@ -9,7 +9,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 168;
+const EXPECTED = 171;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -297,6 +297,10 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   eq(nav.NAV[1].label, 'Guides', 'Guides sits under Videos, above Content calendar (founder 2026-11-26)');
   const guides = load('src/lib/guides.ts');
   ok(guides.GUIDES.every((g) => g.steps.length && g.steps.every((s) => s.image.startsWith('/guides/') && fs.existsSync('public' + s.image) && s.alt && s.text)), 'every guide step has its screenshot on disk, alt text and words');
+  ok(guides.GUIDES.flatMap((g) => g.steps).filter((s) => s.video).length >= 7 && guides.GUIDES.flatMap((g) => g.steps).every((s) => !s.video || (fs.existsSync('public' + s.video) && fs.statSync('public' + s.video).size < 2e6)), 'guides show real-app clips (founder: stills "look shit"), each on disk and small');
+  const gv = fs.readFileSync('src/components/guides-view.tsx', 'utf8');
+  ok(/muted loop playsInline/.test(gv) && /v\.play\(\)/.test(gv), 'clips play by themselves, muted and looping (browsers only autoplay muted video)');
+  ok(/prefers-reduced-motion: reduce/.test(gv) && /aria-label=\{paused \? `Play: \$\{label\}` : `Pause: \$\{label\}`\}/.test(gv), 'clips can be paused by click or keyboard, and start paused with reduce motion on');
   ok(/"\/guides\/:path\*"/.test(fs.readFileSync('src/proxy.ts', 'utf8')) && /APP_PAGES = \[[^\]]*"\/guides"/.test(fs.readFileSync('src/lib/supabase/session.ts', 'utf8')), 'Guides sits behind sign-in and the plan gate like the rest of the app');
   ok(!/[—–]/.test(fs.readFileSync('src/lib/guides.ts', 'utf8')), 'no em or en dashes in the guide copy');
   ok(fs.existsSync('src/app/(app)/library/page.tsx'), 'the library page stays, so old links still work');

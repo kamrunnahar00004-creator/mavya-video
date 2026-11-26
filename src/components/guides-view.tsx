@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GUIDES } from "@/lib/guides";
 
 /** Guides: pick a guide, then its steps in order, each with a screenshot of the real app (click to open it full size). */
@@ -33,15 +33,49 @@ export function GuidesView() {
                     <p className="mt-1 text-[14px] leading-relaxed text-muted">{s.text}</p>
                   </div>
                 </div>
-                <a href={s.image} target="_blank" rel="noreferrer" className="mt-3 block border border-line shadow-[0_8px_24px_-12px_rgba(21,18,31,0.25)] transition-shadow hover:shadow-[0_12px_32px_-12px_rgba(21,18,31,0.35)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={s.image} alt={s.alt} loading={i < 2 ? "eager" : "lazy"} className="block h-auto w-full" />
-                </a>
+                {s.video ? (
+                  // A short loop of the real app (founder 2026-11-26: stills alone "look shit"). Muted, so it can autoplay.
+                  <GuideClip src={s.video} poster={s.image} label={s.alt} eager={i < 3} />
+                ) : (
+                  <a href={s.image} target="_blank" rel="noreferrer" className="mt-3 block border border-line shadow-[0_8px_24px_-12px_rgba(21,18,31,0.25)] transition-shadow hover:shadow-[0_12px_32px_-12px_rgba(21,18,31,0.35)]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={s.image} alt={s.alt} loading={i < 2 ? "eager" : "lazy"} className="block h-auto w-full" />
+                  </a>
+                )}
               </li>
             ))}
           </ol>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * One guide clip: a muted loop that plays by itself (browsers only autoplay muted video). Click, Enter or Space pauses
+ * and resumes it (Codex 2026-11-26: motion must be stoppable); with "reduce motion" on it starts paused.
+ */
+function GuideClip({ src, poster, label, eager }: { src: string; poster: string; label: string; eager: boolean }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  // Follows the video itself (onPlay / onPause), so it is right however playback starts or stops.
+  const [paused, setPaused] = useState(true);
+  useEffect(() => {
+    const v = ref.current;
+    if (v && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) void v.play().catch(() => undefined);
+  }, []);
+  const toggle = () => {
+    const v = ref.current;
+    if (!v) return;
+    if (v.paused) void v.play().catch(() => undefined); else v.pause();
+  };
+  return (
+    <div className="relative mt-3">
+      <video ref={ref} src={src} poster={poster} onPlay={() => setPaused(false)} onPause={() => setPaused(true)} muted loop playsInline preload={eager ? "auto" : "metadata"} aria-label={label}
+        className="block h-auto w-full border border-line shadow-[0_8px_24px_-12px_rgba(21,18,31,0.25)]" />
+      <button type="button" onClick={toggle} aria-label={paused ? `Play: ${label}` : `Pause: ${label}`}
+        className="absolute inset-0 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+        {paused && <span className="absolute bottom-3 right-3 bg-ink/75 px-2.5 py-1 text-[12px] font-semibold text-white">Play</span>}
+      </button>
     </div>
   );
 }
