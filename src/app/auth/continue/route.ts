@@ -1,9 +1,10 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import { safeNext } from "@/lib/auth-next";
 import { allowance } from "@/lib/server/usage";
 import { getSessionUser } from "@/lib/supabase/server";
 import { billingRow } from "@/lib/server/billing-state";
 import { NEW_ACCOUNT_MS, SIGNUP_COOKIE, isNewSignup, signupEventId } from "@/lib/meta-pixel";
+import { sendWelcome } from "@/lib/server/welcome-email";
 
 /**
  * Where people land after signing in or signing up (password, Google or the email link).
@@ -16,6 +17,8 @@ export async function GET(request: NextRequest) {
   // A brand-new account: the Meta Pixel fires CompleteRegistration once on the next page (src/components/meta-pixel.tsx).
   if (user && isNewSignup(user.created_at, Date.now())) {
     response.cookies.set(SIGNUP_COOKIE, await signupEventId(user.id), { path: "/", maxAge: NEW_ACCOUNT_MS / 1000, sameSite: "lax", secure: true });
+    // Welcome email with the link to open on a computer (founder 2026-11-26), after the redirect: signup never waits.
+    after(() => sendWelcome(user));
   }
   return response;
 }

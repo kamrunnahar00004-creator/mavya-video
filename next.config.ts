@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
   // No Next.js dev badge in the corner (it shows up in screenshots of the app).
   devIndicators: false,
   partialPrefetching: true,
+  // Page speed (founder 2026-11-26): the landing videos and pictures were re-downloaded on every visit (max-age=0).
+  // A day in the browser, then at most an hour stale while it checks: a replaced file shows within about a day.
+  async headers() {
+    return ["/landing/:path*", "/characters/:path*"].map((source) => ({
+      source,
+      headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=3600" }],
+    }));
+  },
   // ffmpeg (hook clips, sound extraction): keep the package as is and ship its binary with the
   // routes that run it, or the deployed functions have no ffmpeg.
   serverExternalPackages: ["ffmpeg-static"],

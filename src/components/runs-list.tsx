@@ -18,18 +18,19 @@ const VIEW_KEY = "mavya-videos-view";
 type View = "grid" | "list";
 
 /** A video's picture: the generated hook's first frame, else the stolen hook's cover. */
-function Cover({ run, source }: { run: Run; source?: Reference }) {
+/** `first`: a tile in the first row (founder 2026-11-26, page speed): its picture loads right away, not lazily. */
+function Cover({ run, source, first }: { run: Run; source?: Reference; first?: boolean }) {
   const thumb = (run as Run & {cover?: string}).cover ?? source?.analysis?.segments[0]?.thumb ?? source?.thumbUrl;
-  if (run.hook.generated) return <TileVideo src={`${run.hook.generated.src}#t=0.5`} />;
+  if (run.hook.generated) return <TileVideo src={`${run.hook.generated.src}#t=0.5`} first={first} />;
   if (thumb)
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={thumb} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />;
+    return <img src={thumb} alt="" loading={first ? "eager" : "lazy"} fetchPriority={first ? "high" : undefined} className="absolute inset-0 h-full w-full object-cover" />;
   return null;
 }
 
 /** The generated hook's still picture (thumbOf): a list never decodes videos. */
-function TileVideo({ src }: { src: string }) {
-  return <ThumbImg src={src} className="absolute inset-0 h-full w-full object-cover" />;
+function TileVideo({ src, first }: { src: string; first?: boolean }) {
+  return <ThumbImg src={src} eager={first} className="absolute inset-0 h-full w-full object-cover" />;
 }
 
 /** Progress as a short label: "Ready", or the next step to do. */
@@ -231,12 +232,12 @@ export function RunsList() {
           </div>
         ) : view === "grid" ? (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-x-5 gap-y-6">
-            {runs.map((r) => {
+            {runs.map((r, i) => {
               const p = progress(r);
               return (
                 <Link prefetch={null} key={r.id} href={`/studio/${r.id}`} className="group block" onPointerEnter={() => prefetchRun(r.id)} onFocus={() => prefetchRun(r.id)} onTouchStart={() => prefetchRun(r.id)} onClick={(e) => editing === r.id && e.preventDefault()}>
                   <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-[#243142] transition-transform group-hover:-translate-y-0.5">
-                    <Cover run={r} />
+                    <Cover run={r} first={i < 6} />
                     <span className={`absolute left-2 top-2 rounded-md px-2 py-0.5 text-[12px] font-bold ${p.ready ? "bg-accent text-white" : "bg-white/90 text-text"}`}>{p.label}</span>
                     <div className="absolute right-2 top-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">{actions(r, true)}</div>
                   </div>
@@ -255,7 +256,7 @@ export function RunsList() {
               <span>Created</span>
               <span />
             </div>
-            {runs.map((r) => {
+            {runs.map((r, i) => {
               const p = progress(r);
               return (
                 <Link
@@ -269,7 +270,7 @@ export function RunsList() {
                   className="group grid grid-cols-[56px_minmax(0,1fr)_160px_110px_80px] items-center gap-4 border-b border-line px-4 py-2.5 last:border-b-0 hover:bg-raised"
                 >
                   <div className="relative h-[72px] w-[40px] overflow-hidden rounded-md bg-[#243142]">
-                    <Cover run={r} />
+                    <Cover run={r} first={i < 6} />
                   </div>
                   <Title run={r} editing={editing === r.id} onEdit={(on) => setEditing(on ? r.id : null)} onRename={(t) => void rename(r, t)} className="text-[14.5px] font-semibold" />
                   <div className="flex items-center gap-2.5">

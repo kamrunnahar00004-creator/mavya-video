@@ -7,7 +7,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 35;
+const EXPECTED = 36;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(a, b, msg); };
 
@@ -52,9 +52,11 @@ finish('meta-pixel-checks', EXPECTED, () => checks, async () => {
 
   // /auth/continue: cookie only for a new account, redirects unchanged.
   const nextServer = require('next/server');
+  const welcomed = [];
   async function run(user, plan) {
     const route = load('src/app/auth/continue/route.ts', {
-      'next/server': nextServer,
+      'next/server': { ...nextServer, after: (fn) => welcomed.push(fn) },
+      '@/lib/server/welcome-email': { sendWelcome: async (u) => u.id },
       '@/lib/auth-next': { safeNext: (n) => n || '/studio' },
       '@/lib/server/usage': { allowance: async () => (plan ? { plan: 'starter', limit: 10 } : { plan: null, limit: 0 }) },
       '@/lib/supabase/server': { getSessionUser: async () => user },
@@ -72,6 +74,8 @@ finish('meta-pixel-checks', EXPECTED, () => checks, async () => {
   ok(r2.headers.get('location') === 'https://mavya.app/studio' && !(r2.headers.get('set-cookie') || '').includes('mv_signup'), 'returning login: no cookie, normal redirect');
   const r3 = await run(null, false);
   ok(r3.headers.get('location') === 'https://mavya.app/?auth=login' && !(r3.headers.get('set-cookie') || '').includes('mv_signup'), 'signed out: login, no cookie');
+  // Welcome email (founder 2026-11-26): queued once, only for the new account, after the response.
+  ok(welcomed.length === 1 && await welcomed[0]() === uid, 'only a new account gets the welcome email, sent after the redirect');
 
   // StartTrial / Subscribe for paid ads (founder 2026-11-26).
   const eid = await px.conversionEventId('cs_test_abc');

@@ -7,17 +7,32 @@ import { CONVERSION_COOKIE, SIGNUP_COOKIE, pixelAllowed, readConversionCookie, r
 type Fbq = ((...args: unknown[]) => void) & { callMethod?: (...a: unknown[]) => void; queue: unknown[]; loaded: boolean; version: string; push: unknown };
 declare global { interface Window { fbq?: Fbq; _fbq?: Fbq } }
 
-/** Meta's standard loader, written out so nothing runs until the time-zone check passes. */
-function load(id: string) {
-  if (window.fbq) return;
-  const fbq = function (...args: unknown[]) { if (fbq.callMethod) fbq.callMethod(...args); else fbq.queue.push(args); } as Fbq;
-  fbq.push = fbq; fbq.loaded = true; fbq.version = "2.0"; fbq.queue = [];
-  window.fbq = fbq; window._fbq = fbq;
+let added = false;
+/** Adds Meta's script once. */
+function addScript() {
+  if (added) return;
+  added = true;
   const s = document.createElement("script");
   s.async = true;
   s.src = "https://connect.facebook.net/en_US/fbevents.js";
   document.head.appendChild(s);
-  fbq("init", id);
+}
+
+/**
+ * Meta's standard loader, written out so nothing runs until the time-zone check passes. Page speed (founder
+ * 2026-11-26): Meta's script was the largest block on a phone, so it loads once the page is idle (1.5 s at most);
+ * fbq() queues every event until then. A signup or purchase loads it at once, even if an idle load is still waiting
+ * (Codex 2026-11-26).
+ */
+function load(id: string, now: boolean) {
+  if (!window.fbq) {
+    const fbq = function (...args: unknown[]) { if (fbq.callMethod) fbq.callMethod(...args); else fbq.queue.push(args); } as Fbq;
+    fbq.push = fbq; fbq.loaded = true; fbq.version = "2.0"; fbq.queue = [];
+    window.fbq = fbq; window._fbq = fbq;
+    fbq("init", id);
+  }
+  if (now || !("requestIdleCallback" in window)) addScript();
+  else window.requestIdleCallback(addScript, { timeout: 1500 });
 }
 
 /** PageView on each page, CompleteRegistration once after a new account's first sign-in (set by /auth/continue). */
@@ -32,7 +47,7 @@ export function MetaPixel({ id }: { id: string }) {
     let zone: string | undefined;
     try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { zone = undefined; }
     if (!pixelAllowed(zone)) return;
-    load(id);
+    load(id, Boolean(signup || conversion));
     window.fbq?.("track", "PageView");
     if (signup) window.fbq?.("track", "CompleteRegistration", {}, { eventID: signup });
     // A card trial (or a direct purchase) just confirmed by Stripe: the buyer signal Meta can optimise for.
