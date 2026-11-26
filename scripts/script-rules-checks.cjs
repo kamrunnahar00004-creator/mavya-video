@@ -35,6 +35,18 @@ ok(/export const PRO_MODEL = "gemini-pro-latest"/.test(g) && /models\/\$\{opts\.
 ok(/const deadline = Date\.now\(\) \+ 170_000;/.test(route) && /model: PRO_MODEL, timeoutMs: Math\.max\(1_000, Math\.min\(110_000, left\(\) - 45_000\)\)/.test(route) && /if \(left\(\) < 15_000\) throw/.test(route) && /timeoutMs: left\(\) \}\)/.test(route), 'script: Pro first, Flash fallback, both inside one 170 s deadline from the click');
 ok(!/PRO_MODEL/.test(hook), 'hook-line regenerate stays on Flash (fast, clicked often)');
 ok(rules.SCRIPT_RULES.some((r) => /2 to 5 words/.test(r.rule)) && rules.SCRIPT_RULES.some((r) => /Ad-safe/.test(r.rule)), 'founder-approved rules: short captions, ad-safe wording');
-const EXPECTED = 16;
+// Founder 2026-11-27: the first Pro script copied the viral reel's 6 s shot lengths, left captions empty, used
+// "POV" and vague steps, and invented a record button. Each is now ruled out in the prompt.
+ok(/SECONDS come from THIS product's action, never from the viral reel's shot lengths/.test(route) && /not its actions or timings/.test(route), 'shot seconds follow the product action, never copied from the reel');
+ok(/CAPTIONS \(text\): every shot has one, even when the viral reel's demo has none/.test(route) && /Never empty, never a repeat of the hook text/.test(route), 'every shot has a 2 to 5 word caption, even when the reel has none');
+ok(/The last shot shows the RESULT the product promises/.test(route), 'the demo ends on the result, not just the last screen');
+ok(/never invent one such as a record or export button/.test(route) && /"POV", "close-up", "handheld"/.test(route) && /never "record your app" or "use the app"/.test(route), 'specific steps: real screens and buttons, no invented buttons, no film words');
+// Founder 2026-11-27: "very very actionable and concrete and extremely specific to the product".
+const prod = fs.readFileSync('src/app/api/runs/[id]/product/route.ts', 'utf8');
+ok(/"uiWords": \[/.test(prod) && /then in brackets what it is and where/.test(prod) && /uiWords: list\(brief\?\.uiWords, 20\)/.test(prod), 'step 1 reads the product\'s exact on-screen words, each saying what it is');
+ok(/each one: the screen's name, the exact action with the button or field quoted as the site writes it/i.test(prod), 'demoFlow is concrete steps with quoted buttons');
+ok(/BE EXTREMELY SPECIFIC TO THIS PRODUCT/.test(route) && /could a stranger film it without asking a single question\? If not, rewrite it/.test(route) && /only tap what is a button/.test(route) && /never quote tags, headers or counters just to quote them/.test(route), 'script quotes real buttons and real examples, and passes the stranger test');
+ok(/uiWords\?: string\[\];/.test(fs.readFileSync('src/lib/types.ts', 'utf8')), 'ProductBrief keeps uiWords (older briefs have none)');
+const EXPECTED = 24;
 assert.equal(checks, EXPECTED, `script-rules-checks: ${checks} of ${EXPECTED}`);
 console.log(`script-rules-checks: ${checks} checks pass`);

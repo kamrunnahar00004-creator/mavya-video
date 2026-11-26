@@ -201,6 +201,8 @@ export type ProductBrief = {
   wowMoment: string;
   /** The screens to show in the demo, in order. */
   demoFlow: string[];
+  /** Exact words the product shows (buttons, screens, example content), read from its site. Older briefs have none. */
+  uiWords?: string[];
 };
 
 /** One demo shot to film (same shape the "Film your demo" clips use). */

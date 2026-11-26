@@ -23,8 +23,9 @@ Answer with only this JSON, no other text:
   "audience": "who it is for, specific",
   "problem": "the pain it removes, in the user's words",
   "features": ["3 to 6 concrete things you can do with it"],
-  "wowMoment": "the single most impressive thing to show on screen, a visible result",
-  "demoFlow": ["3 to 6 screens to show in the demo, in order, each one short, ending on the wow moment"]
+  "wowMoment": "the single most impressive thing to show on screen, a visible result, with the real example the site shows",
+  "demoFlow": ["3 to 6 concrete steps to film, in order, ending on the wow moment. Each one: the screen's name, the exact action with the button or field quoted as the site writes it, and what appears, e.g. Library: tap 'Use this hook' under the 5.6M-view reel (quote only words the site really shows)"],
+  "uiWords": ["up to 20 exact words the product shows on screen, each quoted as the site writes it, then in brackets what it is and where, e.g. 'Use this hook' (button under each library reel), 'Viral library' (screen title), '5.6M' (view count on a library reel). Only real product UI, not the website's own menu (Log in, Pricing, FAQ)"]
 }
 If the site cannot be opened or is not a software product, answer {"name": ""}.`;
 
@@ -65,6 +66,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/runs/[id]/p
     features: list(brief?.features, 6),
     wowMoment: str(brief?.wowMoment, 300),
     demoFlow: list(brief?.demoFlow, 6),
+    // The product's real on-screen words, so the script can name exact buttons (founder 2026-11-27: very specific).
+    uiWords: list(brief?.uiWords, 20).map((w) => w.slice(0, 120)),
   };
   if (!clean.name) return Response.json({ error: "Couldn't read a product on that site. Check the link." }, { status: 422 });
   // A new product makes the old script stale.
