@@ -213,15 +213,21 @@ function NetworkLogo({ t, className = "h-4 w-4" }: { t: Target; className?: stri
   );
 }
 
+const SHORT: Record<Target, string> = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", youtube: "YouTube" };
+
+/** The platforms as on/off chips, two to a row. */
 function Targets({ value, onChange }: { value: Target[]; onChange: (t: Target[]) => void }) {
   return (
-    <div className="flex flex-wrap gap-4">
-      {TARGETS.map((t) => (
-        <label key={t} title={NAMES[t]} className="flex cursor-pointer items-center gap-1.5">
-          <input type="checkbox" aria-label={NAMES[t]} checked={value.includes(t)} onChange={(e) => onChange(e.target.checked ? TARGETS.filter((x) => x === t || value.includes(x)) : value.filter((x) => x !== t))} />
-          <NetworkLogo t={t} className="h-6 w-6" />
-        </label>
-      ))}
+    <div className="grid grid-cols-2 gap-1.5">
+      {TARGETS.map((t) => {
+        const on = value.includes(t);
+        return (
+          <button key={t} type="button" role="checkbox" aria-checked={on} aria-label={NAMES[t]} onClick={() => onChange(on ? value.filter((x) => x !== t) : TARGETS.filter((x) => x === t || value.includes(x)))}
+            className={`flex cursor-pointer items-center gap-1.5 border px-2 py-1.5 text-[12.5px] font-semibold ${on ? "border-accent bg-accent-tint text-text" : "border-line-strong text-muted opacity-60 hover:opacity-100"}`}>
+            <NetworkLogo t={t} className="h-4 w-4 shrink-0" />{SHORT[t]}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -451,9 +457,11 @@ type MarkDraft = { posted: boolean; url: string; views: string };
  */
 function PostDialog({ post, templates, app, onStale, onClose, onSaved }: { post: Post; templates: Templates; app: AppProfile; onStale: () => void; onClose: () => void; onSaved: (p: Post | null) => void }) {
   const t = Date.parse(post.at);
-  const [date, setDate] = useState(dateInput(t));
-  const [time, setTime] = useState(hhmm(new Date(t).getHours() * 60 + new Date(t).getMinutes()));
+  const [when, setWhen] = useState(localInput(t));
   const [targets, setTargets] = useState<Target[]>(post.targets);
+  // One platform at a time (founder 2026-11-26: four stacked boxes "looks shit").
+  const [tab, setTab] = useState<Target>(post.targets[0] ?? "instagram");
+  const active = targets.includes(tab) ? tab : targets[0];
   const [captions, setCaptions] = useState<Post["captions"]>({ ...post.captions });
   const [marks, setMarks] = useState<Record<Target, MarkDraft>>(() => Object.fromEntries(TARGETS.map((x) => {
     const r = post.result[x];
@@ -469,9 +477,9 @@ function PostDialog({ post, templates, app, onStale, onClose, onSaved }: { post:
     setError(null);
     try {
       // Unchanged day and time keep the exact moment (a clock-change hour would otherwise shift it). Codex 2026-11-26.
-      const sameWhen = date === dateInput(t) && time === hhmm(new Date(t).getHours() * 60 + new Date(t).getMinutes());
+      const sameWhen = when === localInput(t);
       const body = {
-        at: sameWhen ? post.at : new Date(at(date, toMinutes(time))).toISOString(), targets, rev: post.updatedAt,
+        at: sameWhen ? post.at : new Date(fromLocalInput(when)!).toISOString(), targets, rev: post.updatedAt,
         captions: Object.fromEntries(targets.map((x) => [x, captions[x] ?? ""])),
         marks: Object.fromEntries(targets.map((x) => [x, { posted: marks[x].posted, url: marks[x].url, views: marks[x].views }])),
       };
@@ -500,39 +508,48 @@ function PostDialog({ post, templates, app, onStale, onClose, onSaved }: { post:
   return (
     <Dialog title={post.title || "Untitled video"} onClose={onClose} wide>
       {/* Locked while saving, so nothing typed meanwhile is lost when it closes (Codex 2026-11-26). */}
-      <fieldset disabled={saving} className="flex min-w-0 flex-col gap-5 border-0 p-5 md:flex-row">
-        <div className="shrink-0 space-y-2 md:w-[170px]">
-          <video src={`/api/media/${post.mediaId}`} poster={`/api/media/${post.mediaId}/thumb`} preload="none" controls playsInline className="aspect-[9/16] w-[170px] bg-ink object-cover" />
-          {download && <a href={download.href} download={download.file} className="flex w-[170px] items-center justify-center gap-1.5 border border-line-strong py-2 text-[13px] font-semibold hover:bg-raised"><Download className="h-4 w-4" />Download video</a>}
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <label className="block text-[12px] font-semibold">Day<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${field} mt-1 px-1.5 text-[12px]`} /></label>
-            <label className="block text-[12px] font-semibold">Time<input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={`${field} mt-1 px-1.5 text-[12px]`} /></label>
+      <fieldset disabled={saving} className="min-w-0 border-0 p-0">
+        <div className="flex flex-col gap-6 p-6 md:flex-row">
+          <div className="shrink-0 space-y-3 md:w-[200px]">
+            <video src={`/api/media/${post.mediaId}`} poster={`/api/media/${post.mediaId}/thumb`} preload="none" controls playsInline className="aspect-[9/16] w-full bg-ink object-cover" />
+            {download && <a href={download.href} download={download.file} className="flex w-full items-center justify-center gap-1.5 border border-line-strong py-2 text-[13px] font-semibold hover:bg-raised"><Download className="h-4 w-4" />Download video</a>}
+            <label className="block text-[12.5px] font-semibold">When
+              <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className={`${field} mt-1 px-2 text-[13px]`} />
+            </label>
+            <div><p className="mb-1 text-[12.5px] font-semibold">Platforms</p><Targets value={targets} onChange={pickTargets} /></div>
           </div>
-          <div><p className="mb-1 text-[12px] font-semibold">Platforms</p><Targets value={targets} onChange={pickTargets} /></div>
+          <div className="min-w-0 flex-1">
+            {active ? (
+              <>
+                <div role="tablist" aria-label="Platform" className="mb-4 flex flex-wrap gap-1 border-b border-line">
+                  {TARGETS.filter((x) => targets.includes(x)).map((x) => (
+                    <button key={x} type="button" role="tab" aria-selected={active === x} onClick={() => setTab(x)}
+                      className={`-mb-px flex cursor-pointer items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-semibold ${active === x ? "border-accent text-text" : "border-transparent text-muted hover:text-text"}`}>
+                      <NetworkLogo t={x} />{SHORT[x]}{marks[x].posted && <CircleCheck aria-label="posted" className="h-3.5 w-3.5 fill-green-600 text-white" />}
+                    </button>
+                  ))}
+                </div>
+                <CaptionBox t={active} rows={9} value={captions[active] ?? ""} onChange={(v) => setCaptions((c) => ({ ...c, [active]: v }))} />
+                <div className="mt-4 space-y-2.5 border border-line bg-raised/50 p-3">
+                  <label className="flex cursor-pointer items-center gap-2 text-[13.5px] font-semibold">
+                    <input type="checkbox" checked={marks[active].posted} onChange={(e) => setMark(active, { posted: e.target.checked })} className="h-4 w-4" />I posted it on {NAMES[active]}
+                  </label>
+                  {marks[active].posted && (
+                    <div className="grid gap-2 sm:grid-cols-[1fr_130px]">
+                      <input type="url" aria-label={`${NAMES[active]} post link`} placeholder="Post link (optional)" value={marks[active].url} onChange={(e) => setMark(active, { url: e.target.value })} className={`${field} text-[13px]`} />
+                      <input inputMode="numeric" aria-label={`${NAMES[active]} views`} placeholder="Views" value={marks[active].views} onChange={(e) => setMark(active, { views: e.target.value })} className={`${field} text-[13px]`} />
+                    </div>
+                  )}
+                  {marks[active].posted && post.result[active]?.url && <a href={post.result[active]!.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-accent hover:underline">Open the post<ExternalLink className="h-3.5 w-3.5" /></a>}
+                </div>
+              </>
+            ) : <p className="py-10 text-center text-[14px] text-muted">Pick at least one platform.</p>}
+          </div>
         </div>
-        <div className="min-w-0 flex-1 space-y-4">
-          {TARGETS.filter((x) => targets.includes(x)).map((x) => (
-            <div key={x} className="space-y-2 border border-line p-3">
-              <CaptionBox t={x} rows={4} value={captions[x] ?? ""} onChange={(v) => setCaptions((c) => ({ ...c, [x]: v }))} />
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="flex cursor-pointer items-center gap-1.5 text-[12.5px] font-semibold">
-                  <input type="checkbox" checked={marks[x].posted} onChange={(e) => setMark(x, { posted: e.target.checked })} />Posted
-                </label>
-                {marks[x].posted && (
-                  <>
-                    <input type="url" aria-label={`${NAMES[x]} post link`} placeholder={`${NAMES[x]} link (optional)`} value={marks[x].url} onChange={(e) => setMark(x, { url: e.target.value })} className="min-w-0 flex-1 border border-line-strong bg-panel px-2 py-1 text-[12.5px]" />
-                    {post.result[x]?.url && <a href={post.result[x]!.url} target="_blank" rel="noreferrer" aria-label={`Open on ${NAMES[x]}`} className="text-soft hover:text-text"><ExternalLink className="h-4 w-4" /></a>}
-                    <input inputMode="numeric" aria-label={`${NAMES[x]} views`} placeholder="Views" value={marks[x].views} onChange={(e) => setMark(x, { views: e.target.value })} className="w-24 border border-line-strong bg-panel px-2 py-1 text-[12.5px]" />
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
+        <div className="flex items-center gap-3 border-t border-line px-6 py-3">
+          <button type="button" disabled={saving} onClick={() => void remove()} className="flex cursor-pointer items-center gap-1 px-2 py-2 text-[13px] font-semibold text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4" />Remove</button>
           {error && <p role="alert" className="text-[13px] font-semibold text-red-600">{error}</p>}
-          <div className="flex items-center gap-2">
-            <button type="button" disabled={saving || !targets.length || tooLong || !date || !time} onClick={() => void save()} className="btn-primary px-4 py-2 text-[14px]">{saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}Save</button>
-            <button type="button" disabled={saving} onClick={() => void remove()} className="ml-auto flex cursor-pointer items-center gap-1 px-2 py-2 text-[13px] font-semibold text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4" />Remove</button>
-          </div>
+          <button type="button" disabled={saving || !targets.length || tooLong || fromLocalInput(when) === null} onClick={() => void save()} className="btn-primary ml-auto px-5 py-2 text-[14px]">{saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}Save</button>
         </div>
       </fieldset>
     </Dialog>

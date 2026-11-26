@@ -9,7 +9,7 @@ const { load, finish } = require('./check-module.cjs');
 process.chdir(path.join(__dirname, '..'));
 
 let checks = 0;
-const EXPECTED = 160;
+const EXPECTED = 162;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const eq = (a, b, msg) => { checks++; assert.equal(JSON.stringify(a), JSON.stringify(b), msg); };
 
@@ -298,6 +298,8 @@ finish('scheduled-posts-checks', EXPECTED, () => checks, async () => {
   const setupSrc = fs.readFileSync('src/components/scheduled-posts-view.tsx', 'utf8');
   ok(/role="tablist" aria-label="Platform"/.test(setupSrc) && (setupSrc.match(/aria-label=\{`\$\{NAMES\[tab\]\} caption format`\}/g) ?? []).length === 1, 'captions: one platform at a time in tabs, not four boxes at once (founder: "too congested")');
   ok(/<textarea rows=\{2\} value=\{tags\}/.test(setupSrc), 'hashtags pasted on separate lines stay separate');
+  ok((setupSrc.match(/role="tablist" aria-label="Platform"/g) ?? []).length === 2 && /<CaptionBox t=\{active\} rows=\{9\}/.test(setupSrc), 'the opened post: one platform at a time in tabs, one big caption box (founder: four stacked boxes "looks shit")');
+  ok(/type="datetime-local" value=\{when\}/.test(setupSrc) && !/type="time" value=\{time\}/.test(setupSrc), 'the opened post: one When field, not a cramped day + time pair');
   const session = fs.readFileSync('src/lib/supabase/session.ts', 'utf8');
   ok(/APP_PAGES = \[[^\]]*"\/posts"/.test(session) && /\\\/api\\\/posts\(\\\/\|\$\)/.test(session), 'the page and its API sit behind the paid-plan gate like the rest of the app');
   ok(!/isPostsPage|schedulerAllowed/.test(session) && !/scheduler/.test(fs.readFileSync('src/app/api/profile/route.ts', 'utf8')), 'no owner-only 404 or profile flag left');
