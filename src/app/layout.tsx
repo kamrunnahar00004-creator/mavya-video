@@ -7,7 +7,6 @@ import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { MetaPixel } from "@/components/meta-pixel";
-import { OpenInBrowser } from "@/components/open-in-browser";
 import { HoverTips } from "@/components/hover-tips";
 import { pixelId } from "@/lib/meta-pixel";
 
@@ -44,7 +43,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="h-full">
         {children}
         {/* Inside Instagram / Facebook / TikTok: asks to open Mavya in the real browser (src/lib/in-app-browser.ts). */}
-        <OpenInBrowser />
         <HoverTips />
         {/* Vercel Speed Insights (real-user page speed, Vercel Pro). */}
         <SpeedInsights />

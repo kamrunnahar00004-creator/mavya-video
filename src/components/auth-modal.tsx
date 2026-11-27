@@ -7,6 +7,7 @@ import { createPortal, flushSync } from "react-dom";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2, X } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { inAppBrowser, openInBrowserUrl, type InApp } from "@/lib/in-app-browser";
 
 /*
  * Sign in / sign up, the same popup as the Etsy Mavya app: Google, or email and password, login and signup in one
@@ -15,6 +16,8 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
  * is only the UI.
  */
 type Mode = "login" | "signup" | "forgot";
+const AD_KEY = "mavya-ad-params";
+const AD_PARAM = /^(fbclid|utm_[a-z_]+)$/;
 const noop = () => () => undefined;
 
 
@@ -30,6 +33,14 @@ export function AuthModalHost() {
   const inBrowser = useSyncExternalStore(noop, () => true, () => false);
   const [signedOut, setSignedOut] = useState(false);
   const next = safeNext(params.get("next"));
+  useEffect(() => {
+    // The ad's fbclid / UTMs, kept from the page the visitor landed on: the header's Sign up link replaces the query,
+    // and the in-app Google jump (AuthModal) must carry them to Safari / Chrome so the signup still counts for the ad.
+    try {
+      const keep = [...new URLSearchParams(window.location.search)].filter(([k]) => AD_PARAM.test(k));
+      if (keep.length) sessionStorage.setItem(AD_KEY, JSON.stringify(keep));
+    } catch {}
+  }, []);
   useEffect(() => {
     if (auth !== "login" && auth !== "signup") { queueMicrotask(() => setClosed(false)); return; }
     let active = true;
@@ -69,10 +80,10 @@ export function AuthModalHost() {
       </div>
     </div>, document.body);
 
-  return <AuthModal key={auth} initialMode={auth} next={safeNext(params.get("next"))} error={params.get("error") ? "Sign-in didn't finish. Try again." : null} onClose={close} />;
+  return <AuthModal key={auth} initialMode={auth} next={safeNext(params.get("next"))} autoGoogle={params.get("google") === "1"} error={params.get("error") ? "Sign-in didn't finish. Try again." : null} onClose={close} />;
 }
 
-function AuthModal({ initialMode, next, error: initialError, onClose }: { initialMode: Mode; next: string; error: string | null; onClose: () => void }) {
+function AuthModal({ initialMode, next, autoGoogle, error: initialError, onClose }: { initialMode: Mode; next: string; autoGoogle: boolean; error: string | null; onClose: () => void }) {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -83,6 +94,24 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
   const [error, setError] = useState<string | null>(initialError);
   const emailRef = useRef<HTMLInputElement>(null);
   const [sent, setSent] = useState(false);
+  // Inside Instagram / Facebook / TikTok, Google refuses to sign in (403 disallowed_useragent). Founder 2026-11-27: no
+  // banner (it looked suspicious and cost taps); the Google button itself opens Safari / Chrome on this same popup,
+  // which then starts Google right away (`google=1`): one tap. Email and password keep working inside the app.
+  const [inApp, setInApp] = useState<InApp | null>(null);
+  const [jumpFailed, setJumpFailed] = useState(false);
+  const autoStarted = useRef(false);
+  const jumpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gone = useRef(false);
+  useEffect(() => {
+    gone.current = false;
+    return () => { gone.current = true; if (jumpTimer.current) clearTimeout(jumpTimer.current); };
+  }, []);
+  useEffect(() => {
+    // Back from Google: Safari can restore this page as it was, buttons still waiting. Make them usable again (Codex).
+    const back = (e: PageTransitionEvent) => { if (e.persisted) setLoading(false); };
+    window.addEventListener("pageshow", back);
+    return () => window.removeEventListener("pageshow", back);
+  }, []);
   const isSignup = mode === "signup";
   const isForgot = mode === "forgot";
   const callback = (to: string) => `${window.location.origin}/auth/callback?next=${encodeURIComponent(to)}`;
@@ -90,6 +119,25 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
   useEffect(() => {
     emailRef.current?.focus();
   }, [mode]);
+  useEffect(() => {
+    // Read on the device only (the server never sees it), so the page renders the same everywhere.
+    const env = inAppBrowser(navigator.userAgent);
+    if (autoGoogle && !env) {
+      // Used once in the real browser: Back from Google must not start it again (Codex). Still in the app it stays,
+      // so opening this page from the app's menu starts Google over there.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("google");
+      window.history.replaceState(null, "", url);
+    }
+    // Still in the app with google=1: the jump fell back to this same page (Android without Chrome). Show the tip.
+    if (env) queueMicrotask(() => { setInApp(env); if (autoGoogle) setJumpFailed(true); });
+    // Opened from the in-app browser's Google button: start Google once, here in the real browser.
+    else if (autoGoogle && !initialError && !autoStarted.current) {
+      autoStarted.current = true;
+      queueMicrotask(() => void handleGoogle());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !loading) onClose();
@@ -118,13 +166,48 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
     });
   }
 
+  function googleInBrowser(env: InApp) {
+    const here = new URL(window.location.href);
+    here.searchParams.delete("error"); // an old failed try must not stop Google starting over there
+    try {
+      for (const [k, v] of JSON.parse(sessionStorage.getItem(AD_KEY) ?? "[]") as [string, string][]) {
+        if (AD_PARAM.test(k) && typeof v === "string" && !here.searchParams.has(k)) here.searchParams.set(k, v);
+      }
+    } catch {}
+    here.searchParams.set("auth", mode === "signup" ? "signup" : "login");
+    here.searchParams.set("google", "1");
+    here.searchParams.set("next", next);
+    const target = openInBrowserUrl(here.toString(), env.os);
+    if (target) window.location.href = target;
+    // Still here a moment later: the app blocked the jump; show the manual way. The address bar takes the full
+    // handoff (ad codes and google=1), so opening it from the app's menu also counts for the ad and starts Google.
+    if (jumpTimer.current) clearTimeout(jumpTimer.current);
+    jumpTimer.current = setTimeout(() => {
+      // `auth` stays as the page has it: changing it would reopen the popup and clear what they typed (Codex).
+      const stay = new URL(here);
+      const auth = new URL(window.location.href).searchParams.get("auth");
+      if (auth) stay.searchParams.set("auth", auth);
+      try { window.history.replaceState(null, "", stay); } catch {}
+      setJumpFailed(true);
+    }, target ? 1200 : 0);
+  }
+
   async function handleGoogle() {
+    // Read now, not only from state: a tap before the first effect commits must not start Google in the app (Codex).
+    const env = inApp ?? (typeof navigator === "undefined" ? null : inAppBrowser(navigator.userAgent));
+    if (env) return googleInBrowser(env);
     setError(null);
     await showPending();
+    // Closed while it was starting: never send them to Google anyway (Codex).
+    if (gone.current) return;
     try {
-      const { error: e } = await createSupabaseBrowserClient().auth.signInWithOAuth({ provider: "google", options: { redirectTo: callback(next) } });
+      // Mavya goes to Google itself, after a last check that the popup is still open (Codex: Supabase's own redirect
+      // came after its PKCE setup, so a close in between still left for Google).
+      const { data, error: e } = await createSupabaseBrowserClient().auth.signInWithOAuth({ provider: "google", options: { redirectTo: callback(next), skipBrowserRedirect: true } });
       if (e) throw e;
-      // The browser goes to Google from here.
+      if (!data?.url) throw new Error("Could not start Google sign-in.");
+      if (gone.current) return;
+      window.location.assign(data.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start Google sign-in.");
       setLoading(false);
@@ -239,6 +322,11 @@ function AuthModal({ initialMode, next, error: initialError, onClose }: { initia
           <GoogleIcon />
           Continue with Google
         </button>
+        {jumpFailed && inApp && (
+          <p role="status" className="mt-2 rounded-lg bg-raised px-3 py-2 text-[13px] leading-relaxed">
+            To use Google, tap <b>⋯</b> at the top right, then <b>{inApp.os === "android" ? "Open in Chrome" : "Open in external browser"}</b>{inApp.os === "android" ? " (or your browser)" : ""}. Or sign up with email below.
+          </p>
+        )}
 
         <div className="my-5 flex items-center gap-3">
           <span className="h-px flex-1 bg-line" />
