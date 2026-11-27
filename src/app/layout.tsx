@@ -8,6 +8,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { MetaPixel } from "@/components/meta-pixel";
 import { HoverTips } from "@/components/hover-tips";
+import { FirstTouch } from "@/components/first-touch";
 import { pixelId } from "@/lib/meta-pixel";
 
 // UI type: Satoshi (Fontshare, free for commercial use), self-hosted.
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {children}
         {/* Inside Instagram / Facebook / TikTok: asks to open Mavya in the real browser (src/lib/in-app-browser.ts). */}
         <HoverTips />
+        <Suspense fallback={null}><FirstTouch /></Suspense>
         {/* Vercel Speed Insights (real-user page speed, Vercel Pro). */}
         <SpeedInsights />
         {/* Vercel Web Analytics (visitors and page views, no cookies). */}

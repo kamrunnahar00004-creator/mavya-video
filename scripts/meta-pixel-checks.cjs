@@ -57,6 +57,8 @@ finish('meta-pixel-checks', EXPECTED, () => checks, async () => {
     const route = load('src/app/auth/continue/route.ts', {
       'next/server': { ...nextServer, after: (fn) => welcomed.push(fn) },
       '@/lib/server/welcome-email': { sendWelcome: async (u) => u.id },
+      '@/lib/first-touch': { SOURCE_COOKIE: 'mavya_src', readSource: () => null, beforeSignup: () => false },
+      '@/lib/server/signup-source': { saveSource: async () => true },
       '@/lib/auth-next': { safeNext: (n) => n || '/studio' },
       '@/lib/server/usage': { allowance: async () => (plan ? { plan: 'starter', limit: 10 } : { plan: null, limit: 0 }) },
       '@/lib/supabase/server': { getSessionUser: async () => user },
