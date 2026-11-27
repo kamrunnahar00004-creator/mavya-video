@@ -208,7 +208,7 @@ function SortMenu({ value, onChange }: { value: Sort; onChange: (s: Sort) => voi
   );
 }
 
-function HookCard({ r, busy, disabled, onPick, index }: { index: number; r: Reference; busy: boolean; disabled: boolean; onPick: () => void }) {
+export function HookCard({ r, busy, disabled, onPick, index }: { index: number; r: Reference; busy: boolean; disabled: boolean; onPick: () => void }) {
   const [hover, setHover] = useState(false);
   return (
     <button

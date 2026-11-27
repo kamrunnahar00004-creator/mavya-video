@@ -46,7 +46,8 @@ export async function updateSession(request: NextRequest) {
     return r;
   };
   if (pathname.startsWith("/api/")) {
-    if (PUBLIC_API.includes(pathname)) return response;
+    // Upload from phone: signed in by the QR code's token, checked by the route itself (src/lib/server/phone-link.ts).
+    if (PUBLIC_API.includes(pathname) || /^\/api\/phone\/[^/]+$/.test(pathname)) return response;
     if (!signedIn) return denied({ error: "Sign in first." }, 401);
     // Uploads and exports cost storage and render time: paid plans only (AI routes check their own allowance).
     const writesContent = ["POST", "PATCH"].includes(request.method) && PAID_CONTENT_WRITES.some((p) => p.test(pathname));

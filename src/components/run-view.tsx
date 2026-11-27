@@ -4,10 +4,10 @@ import { RouteSkeleton } from "@/components/route-skeleton";
 import { MediaVideo } from "@/components/media-video";
 import { ThumbImg } from "@/components/thumb-img";
 
-import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "@/components/pending-link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Check, ChevronDown, Film, FolderOpen, Loader2, PenLine, RefreshCw, Replace, SlidersHorizontal, Sparkles, ThumbsDown, ThumbsUp, Trash2, Upload, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Film, FolderOpen, Loader2, PenLine, RefreshCw, Replace, SlidersHorizontal, Sparkles, ThumbsDown, ThumbsUp, Trash2, Upload, X , Smartphone } from "lucide-react";
 
 
 import { analyzeVideo } from "@/lib/analyze";
@@ -29,7 +29,8 @@ import { AvatarPlaceholder } from "@/components/frames";
 import { ExportButton } from "@/components/export-button";
 import { pollDelay, waitForPoll } from "@/lib/polling";
 import dynamic from "next/dynamic";
-import { SourcePicker, UploadDrop, Thumb } from "@/components/source-picker";
+import { SourcePicker, UploadDrop, Thumb, HookCard, HookPreview } from "@/components/source-picker";
+import { suggestHooks } from "@/lib/suggest-hooks";
 import { libraryMore, loadLibrary } from "@/lib/library-cache";
 import { fetchPage } from "@/lib/list-client";
 const loadHistoryPanel = () => import("@/components/history-panel");
@@ -76,6 +77,8 @@ export function RunView() {
   const [run, setRun] = useState<Run | null>(null);
   const [refCursor, setRefCursor] = useState<string | null>(null);
   const [refs, setRefs] = useState<Reference[] | null>(null);
+  /** Phone uploads already placed in this video (Upload from phone), so a note is never placed twice. */
+  const placedPhone = useRef(new Set<string>());
   const [missing, setMissing] = useState<string | null>(null);
   /** A video New video opened before the server finished creating it, and the create failed: offer to retry. */
   const [createFailed, setCreateFailed] = useState<{ id: string; sourceRefId?: string } | null>(null);
@@ -776,6 +779,38 @@ export function RunView() {
       landed?.(i);
     }
   };
+  /**
+   * Videos sent from the phone (Upload from phone): placed like several videos from the computer, in the order the
+   * phone picked them: the shots still to film first, then new clips. Each note is placed once.
+   */
+  const placePhoneClips = async (list: { key: string; mediaId: string; seconds: number | null }[]) => {
+    // Already in the video (placed before a reload, or a note sent twice): only cleared, never placed again (Codex).
+    const inVideo = new Set(demoClips(runRef.current ?? run).map((c) => c.mediaId).filter(Boolean));
+    const fresh = list.filter((x) => !placedPhone.current.has(x.key) && !inVideo.has(x.mediaId));
+    const clear = async (keys: string[]) => {
+      if (!keys.length) return;
+      const res = await fetch(`/api/runs/${id}/phone-inbox`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keys }) }).catch(() => null);
+      // Not cleared: these notes come back on the next check and are cleared then (they are in the video already).
+      if (!res?.ok) keys.forEach((k) => placedPhone.current.delete(k));
+    };
+    if (!fresh.length) return clear(list.map((x) => x.key));
+    fresh.forEach((x) => placedPhone.current.add(x.key));
+    const got = await Promise.all(fresh.map((x) => (x.seconds ? Promise.resolve({ mediaId: x.mediaId, name: "Phone video", kind: "video" as const, offset: 0, length: x.seconds }) : clipFromAsset({ mediaId: x.mediaId, name: "Phone video", kind: "video" }))));
+    setPicked((p) => Array.from(new Set([...(p ?? openSteps), 5])));
+    setLibraryKey((k) => k + 1);
+    const empty = demoClips(runRef.current ?? run).filter((c) => !clipSrc(c));
+    got.forEach((c, i) => {
+      if (i < empty.length) placeClip(empty[i].id, c);
+      else {
+        const seconds = clipSeconds(c.length);
+        const count = demoClips(runRef.current ?? run).length;
+        insertClips([{ id: uid(), label: `Clip ${count + 1}`, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds }]);
+      }
+    });
+    // Cleared only once the clips are saved; a failed save keeps the notes, and the next check places them again (Codex).
+    if (!(await waitRunSaves(id))) { fresh.forEach((x) => placedPhone.current.delete(x.key)); return; }
+    await clear(list.map((x) => x.key));
+  };
   /** Puts demo clips in before demo clip `at` (default: the end). Texts from there on move later by their length. */
   const insertClips = (added: DemoClip[], at?: number) => {
     const cur = runRef.current ?? run;
@@ -926,7 +961,7 @@ export function RunView() {
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:grid xl:grid-cols-[minmax(0,1fr)_400px] xl:overflow-hidden">
         <div className="shrink-0 xl:min-h-0 xl:overflow-y-auto">
-          <div className="mx-auto max-w-[760px] divide-y divide-line px-8">
+          <div className="mx-auto max-w-[760px] space-y-3 px-8">
             <Block n={1} title="Your product" done={stepDone[0]} pending={stepPending[0]} open={openSteps.includes(1)} summary={stepSummary[0]} onToggle={() => toggleStep(1)}>
               <ProductStep
                 key={job?.error ? `failed:${job.url}` : "product"}
@@ -984,7 +1019,10 @@ export function RunView() {
                   )}
                 </>
               ) : (
-                // One box: the library is the main path; upload and describe open right below, on the same page.
+                <>
+                {/* Three hooks to start from (founder 2026-11-27); clicking one opens it big, with its numbers. */}
+                <SuggestedHooks refs={refs ?? []} seed={run.id} onPick={pickHook} />
+                {/* One box: the library is the main path; upload and describe open right below, on the same page. */}
                 <div className="rounded-2xl border border-line bg-panel">
                   <div className="flex flex-wrap items-center gap-2.5 p-4">
                     <button type="button" onClick={() => setPickerOpen(true)} className="btn-primary px-4 py-2.5 text-[14px]">
@@ -1058,6 +1096,7 @@ export function RunView() {
                     </div>
                   )}
                 </div>
+                </>
               )}
               {source?.analysis && <HookTiming duration={source.analysis.duration} start={hook.start ?? 0} end={hook.end ?? 3} onChange={(start, end) => save({ hook: { ...hook, start, end } })} />}
             </Block>
@@ -1146,6 +1185,7 @@ export function RunView() {
                 onMove={moveClip}
                 onSwap={swapClips}
                 onReset={resetDemo}
+                phonePanel={<PhonePanel runId={run.id} onClips={placePhoneClips} />}
               />
             </Block>
 
@@ -1399,6 +1439,9 @@ function CharacterStep({ face, mode, onMode, onFace }: { face: Hook["face"] | nu
   }
 
   return (
+    <>
+    {/* Three characters to start from (founder 2026-11-27); clicking one shows it big. */}
+    <SuggestedCharacters onPick={(id) => pick({ kind: "character", id })} />
     <div className="rounded-2xl border border-line bg-panel">
       <div className="flex flex-wrap items-center gap-2.5 p-4">
         <button type="button" onClick={() => setBrowsing(true)} className="btn-primary px-4 py-2.5 text-[14px]">
@@ -1469,6 +1512,41 @@ function CharacterStep({ face, mode, onMode, onFace }: { face: Hook["face"] | nu
 
       {browsing && <CharacterBrowser current={face} onPick={(id) => pick({ kind: "character", id })} onPickFace={pick} onClose={() => setBrowsing(false)} />}
     </div>
+    </>
+  );
+}
+
+/** Three characters on the character step (founder 2026-11-27). Clicking one shows it big, with "Use this character". */
+function SuggestedCharacters({ onPick }: { onPick: (id: string) => void }) {
+  const [view, setView] = useState<(typeof CHARACTERS)[number] | null>(null);
+  const three = CHARACTERS.slice(0, 3);
+  return (
+    <>
+      <div className="grid grid-cols-3 gap-3">
+        {three.map((c) => (
+          <button key={c.id} type="button" onClick={() => setView(c)} className="group relative aspect-[3/4] overflow-hidden rounded-xl bg-raised outline-2 outline-offset-2 outline-transparent transition-[outline-color] hover:outline-accent">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={c.view} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
+            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-3 pb-2 pt-6 text-left text-[14px] font-bold text-white">{c.name}</span>
+          </button>
+        ))}
+      </div>
+      {view && (
+        <div role="dialog" aria-modal="true" aria-label={view.name} className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" onClick={() => setView(null)}>
+          <div className="fade-in w-full max-w-[420px] overflow-hidden rounded-2xl bg-panel shadow-[0_24px_64px_rgba(0,0,0,0.35)]" onClick={(e) => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={view.view} alt="" className="aspect-[3/4] w-full object-cover object-top" />
+            <div className="flex items-center justify-between gap-3 p-4">
+              <span className="text-[17px] font-extrabold">{view.name}</span>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setView(null)} className="rounded-lg px-3 py-2 text-[13.5px] font-bold text-soft hover:bg-raised hover:text-text">Close</button>
+                <button type="button" onClick={() => { onPick(view.id); setView(null); }} className="btn-primary px-4 py-2.5 text-[14px]">Use this character</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1966,11 +2044,13 @@ function Block({ n, title, done, pending = false, children, open = true, summary
   const [seen, setSeen] = useState(open);
   if (open && !seen) setSeen(true);
   return (
-    <section className={open ? "space-y-4 py-6" : "py-4"}>
+    // Each step is a white card (founder 2026-11-27): a square number box (blue with a check when done) and a black
+    // border on the open step. Any step opens at any time.
+    <section className={`border-2 bg-panel px-5 transition-colors ${open ? "space-y-4 border-ink py-5" : "border-line py-4 hover:border-line-strong"}`}>
       <button type="button" onClick={onToggle} aria-expanded={open} aria-busy={pending || undefined} className="flex w-full items-center gap-3 text-left">
-        <span className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${done ? "bg-accent text-white" : open ? "bg-accent-tint text-accent" : "bg-raised text-soft"}`}>
+        <span className={`relative flex h-8 w-8 shrink-0 items-center justify-center text-[13.5px] font-bold ${done ? "bg-accent text-white" : open ? "bg-ink text-white" : "bg-raised text-soft"}`}>
           {done ? <Check className="h-4 w-4" strokeWidth={3} /> : n}
-          {done && pending && <span aria-hidden className="absolute -inset-[3px] rounded-full border-2 border-accent/20 border-t-accent motion-safe:animate-spin" />}
+          {done && pending && <span aria-hidden className="absolute -inset-[3px] border-2 border-accent/20 border-t-accent motion-safe:animate-spin" />}
         </span>
         <h2 className={`shrink-0 text-[17px] font-extrabold tracking-tight ${open || done ? "text-text" : "text-soft"}`}>{title}</h2>
         {!open && summary && <span className="min-w-0 truncate text-[13.5px] text-muted">{summary}</span>}
@@ -2345,6 +2425,84 @@ function HookRating({ runId, src }: { runId: string; src: string }) {
     <div className="absolute bottom-2 right-2 flex gap-1">
       {button(1, "Good hook", ThumbsUp)}
       {button(-1, "Bad hook", ThumbsDown)}
+    </div>
+  );
+}
+
+
+function SuggestedHooks({ refs, seed, onPick }: { refs: Reference[]; seed: string; onPick: (r: Reference) => void | Promise<void> }) {
+  const [view, setView] = useState<Reference | null>(null);
+  const three = useMemo(() => suggestHooks(refs, seed), [refs, seed]);
+  if (!three.length) return null;
+  return (
+    <>
+      <div className="grid grid-cols-3 gap-3">
+        {three.map((r, i) => <HookCard key={r.id} index={i} r={r} busy={false} disabled={false} onPick={() => setView(r)} />)}
+      </div>
+      {view && <HookPreview r={view} onClose={() => setView(null)} onUse={() => { const r = view; setView(null); void onPick(r); }} />}
+    </>
+  );
+}
+
+
+/**
+ * Upload from phone (founder 2026-11-27): a QR code for this video (src/lib/server/phone-link.ts). The phone picks its
+ * videos; while this is open, the page checks every few seconds and places what arrived. The link is renewed before
+ * its hour is up.
+ */
+function PhonePanel({ runId, onClips }: { runId: string; onClips: (list: { key: string; mediaId: string; seconds: number | null }[]) => Promise<void> }) {
+  const [svg, setSvg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [got, setGot] = useState(0);
+  const take = useRef(onClips);
+  useEffect(() => { take.current = onClips; });
+  useEffect(() => {
+    let alive = true;
+    let renew: ReturnType<typeof setTimeout> | undefined;
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/runs/${runId}/phone-link`, { method: "POST" });
+        const json = (await res.json().catch(() => ({}))) as { url?: string; expiresAt?: number; error?: string };
+        if (!res.ok || !json.url) throw new Error(json.error || "Couldn't make the QR code. Try again.");
+        const QR = (await import("qrcode")).default;
+        const code = await QR.toString(json.url, { type: "svg", margin: 1, width: 176 });
+        if (!alive) return;
+        setSvg(code);
+        setError(null);
+        renew = setTimeout(() => void load(), Math.max(60_000, (json.expiresAt ?? 0) - Date.now() - 5 * 60_000));
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "Couldn't make the QR code. Try again.");
+      }
+    };
+    void load();
+    let checking = false;
+    const poll = setInterval(async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const res = await fetch(`/api/runs/${runId}/phone-inbox`, { cache: "no-store" });
+        const json = (await res.json().catch(() => ({}))) as { clips?: { key: string; mediaId: string; seconds: number | null }[] };
+        if (res.ok && json.clips?.length) {
+          await take.current(json.clips);
+          if (alive) setGot((n) => n + json.clips!.length);
+        }
+      } catch { /* the next check tries again */ }
+      finally { checking = false; }
+    }, 3000);
+    return () => { alive = false; if (renew) clearTimeout(renew); clearInterval(poll); };
+  }, [runId]);
+  return (
+    <div className="flex items-center gap-5 rounded-2xl border border-line bg-panel p-4">
+      <span className="flex h-[184px] w-[184px] shrink-0 items-center justify-center bg-white">
+        {svg ? <span aria-label="QR code" className="block h-[176px] w-[176px]" dangerouslySetInnerHTML={{ __html: svg }} /> : !error && <Loader2 className="h-6 w-6 animate-spin text-soft" />}
+      </span>
+      <div className="min-w-0">
+        <p className="flex items-center gap-2 text-[16px] font-bold"><Smartphone className="h-4 w-4" /> Upload from phone</p>
+        <p className="mt-1 text-[14px] text-muted">Scan with your phone camera and choose your demo videos. They show up here.</p>
+        {error ? <p role="alert" className="mt-2 text-[13px] font-semibold text-red-600">{error}</p> : (
+          <p className="mt-2 text-[13px] font-semibold text-soft">{got ? `${got} ${got === 1 ? "video" : "videos"} added` : "Waiting for your phone"}</p>
+        )}
+      </div>
     </div>
   );
 }
