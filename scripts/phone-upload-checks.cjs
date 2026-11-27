@@ -36,7 +36,7 @@ const rv = fs.readFileSync('src/components/run-view.tsx', 'utf8');
 ok(/placedPhone\.current\.has\(x\.key\)/.test(rv) && /if \(i < empty\.length\) placeClip\(empty\[i\]\.id, c\)/.test(rv) && /phone-inbox`, \{ method: "POST"/.test(rv), 'computer: fills the shots still to film, then new clips, each note once, then clears them');
 ok(/setInterval\(async \(\) => \{/.test(rv) && /QR\.toString\(json\.url, \{ type: "svg"/.test(rv), 'QR code drawn on the page; checks for new videos every few seconds while open');
 const ed = fs.readFileSync('src/components/editor-tools.tsx', 'utf8');
-ok(/Upload from phone/.test(ed) && /\{phonePanel \? "Upload from computer" : "Upload your demo"\}/.test(ed) && /Plan it shot by shot/.test(ed) && /Check library/.test(ed), 'Add your demo: Upload from phone and Upload from computer first, today\'s buttons kept');
+ok(/From your phone/.test(ed) && /From this computer/.test(ed) && /\{uploadOpen && uploadWays\}/.test(ed), 'Add your demo: Upload your demo opens From this computer and From your phone');
 
 const pl2 = fs.readFileSync('src/lib/server/phone-link.ts', 'utf8');
 ok(/like\("id", `phone:\$\{run\}:%:\$\{mediaId\}:%`\)/.test(pl2) && /\(count \?\? 0\) >= 60\) return "full"/.test(pl2) && /=== "full"\) return Response\.json\(\{ error: "Too many videos/.test(api), 'the same video once per video; at most 60 an hour (Codex)');

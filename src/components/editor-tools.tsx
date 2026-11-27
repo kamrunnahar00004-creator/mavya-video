@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { memo, useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 
 
-import { ArrowLeftRight, Check, ClipboardPaste, Copy, Diamond, Film, FolderOpen, ListOrdered, Loader2, Magnet, Music, Pause, Play, Plus, Redo2, Scissors, SlidersHorizontal, Smartphone, Undo2, Volume1, Volume2, VolumeX, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeftRight, Check, ClipboardPaste, Copy, Diamond, Film, FolderOpen, ListOrdered, Loader2, Magnet, Monitor, Music, Pause, Play, Plus, Redo2, Scissors, SlidersHorizontal, Smartphone, Undo2, Volume1, Volume2, VolumeX, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from "lucide-react";
 import { frameAt } from "@/lib/filmstrip";
 import { waveform } from "@/lib/waveform";
 
@@ -2268,6 +2268,8 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
   const openId = openPick === undefined ? (clips.find((c) => clipSrc(c))?.id ?? null) : openPick;
   const [error, setError] = useState<string | null>(null);
   const [phoneOpen, setPhoneOpen] = useState(false);
+  // "Upload your demo" opens its two ways: from this computer or from your phone (founder 2026-11-27).
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   async function take(id: string, f: File | undefined, upload: (f: File) => Promise<void>) {
     if (!f) return;
@@ -2363,33 +2365,48 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
     </li>
   ));
 
+  // Upload your demo, opened: this computer (the file picker) or your phone (the QR code).
+  const firstEmpty = clips.find((c) => !clipSrc(c))?.id;
+  const uploadWays = (
+    <div className="mt-3 space-y-3">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <label className={`${optionBtn(false)} cursor-pointer`}>
+          <Monitor className="h-4 w-4" />
+          From this computer
+          <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => void takeMany(e.target.files, mode ? firstEmpty : undefined).then(() => (e.target.value = ""))} />
+        </label>
+        {phonePanel && (
+          <button type="button" aria-pressed={phoneOpen} onClick={() => setPhoneOpen((o) => !o)} className={optionBtn(phoneOpen)}>
+            <Smartphone className="h-4 w-4" />
+            From your phone
+          </button>
+        )}
+      </div>
+      {phoneOpen && phonePanel}
+    </div>
+  );
+
   if (!mode) {
     // One box of choices, like step 2: upload, plan it shot by shot, or reuse a demo from My files.
     return (
       <div {...dropZone} className={`rounded-2xl border border-line bg-panel p-4 ${dropRing}`}>
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Two ways in first (founder 2026-11-27): the phone (QR code) or the computer (the file picker). */}
-          {phonePanel && (
-            <button type="button" aria-pressed={phoneOpen} onClick={() => setPhoneOpen((o) => !o)} className="btn-primary px-4 py-2.5 text-[14px]">
-              <Smartphone className="h-4 w-4" />
-              Upload from phone
-            </button>
-          )}
-          <label className={`btn-primary cursor-pointer px-4 py-2.5 text-[14px] ${busy ? "pointer-events-none opacity-60" : ""}`}>
+          {/* Three choices (founder 2026-11-27): upload (then: this computer or your phone), the viral script, My files. */}
+          <button type="button" aria-expanded={uploadOpen} onClick={() => setUploadOpen((o) => !o)} className={`btn-primary px-4 py-2.5 text-[14px] ${busy ? "pointer-events-none opacity-60" : ""}`}>
             {busy === "single" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            {phonePanel ? "Upload from computer" : "Upload your demo"}
-            <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => void takeMany(e.target.files).then(() => (e.target.value = ""))} />
-          </label>
+            Upload your demo
+          </button>
           <button type="button" onClick={onClips} disabled={copying} className={`${optionBtn(false)} disabled:opacity-70`}>
             {copying ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListOrdered className="h-4 w-4" />}
-            Plan it shot by shot
+            Get viral script
           </button>
           <button type="button" onClick={onCheckLibrary} className={optionBtn(false)}>
             <FolderOpen className="h-4 w-4" />
-            Check library
+            From My files
           </button>
         </div>
-        {phoneOpen && phonePanel && <div className="mt-4">{phonePanel}</div>}
+        {uploadOpen && uploadWays}
+        {!uploadOpen && <p className="mt-3 text-[13px] text-soft">or drop your videos here</p>}
         {pending.length > 0 && (
           <>
             <ol className="mt-3 flex flex-wrap gap-3" aria-label="Uploading clips">{uploadingTiles}</ol>
@@ -2418,23 +2435,14 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
   const selIndex = selected ? tiles.findIndex((g) => g.includes(selected)) : -1;
   return (
     <div {...dropZone} className={`space-y-4 rounded-xl ${dropRing}`}>
-      {phonePanel && (
-        // The same two ways in once there are clips: fill the shots still to film, in order.
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button type="button" aria-pressed={phoneOpen} onClick={() => setPhoneOpen((o) => !o)} className={optionBtn(phoneOpen)}>
-              <Smartphone className="h-4 w-4" />
-              Upload from phone
-            </button>
-            <label className={`${optionBtn(false)} cursor-pointer ${busy ? "pointer-events-none opacity-60" : ""}`}>
-              {busy === "single" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              Upload from computer
-              <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => void takeMany(e.target.files, clips.find((c) => !clipSrc(c))?.id).then(() => (e.target.value = ""))} />
-            </label>
-          </div>
-          {phoneOpen && phonePanel}
-        </div>
-      )}
+      {/* The same upload once there are clips: fills the shots still to film, in order (drop works too). */}
+      <div>
+        <button type="button" aria-expanded={uploadOpen} onClick={() => setUploadOpen((o) => !o)} className={`${optionBtn(uploadOpen)} ${busy ? "pointer-events-none opacity-60" : ""}`}>
+          {busy && busy !== "single" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          Upload your demo
+        </button>
+        {uploadOpen ? uploadWays : <span className="ml-3 text-[13px] text-soft">or drop your videos here</span>}
+      </div>
       <ol className="flex flex-wrap gap-3" aria-label="Demo clips">
         {tiles.map((group, i) => {
           const c = group[0];

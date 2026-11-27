@@ -4,7 +4,7 @@ import { RouteSkeleton } from "@/components/route-skeleton";
 import { MediaVideo } from "@/components/media-video";
 import { ThumbImg } from "@/components/thumb-img";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "@/components/pending-link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Check, ChevronDown, Film, FolderOpen, Loader2, PenLine, RefreshCw, Replace, SlidersHorizontal, Sparkles, ThumbsDown, ThumbsUp, Trash2, Upload, X , Smartphone } from "lucide-react";
@@ -29,8 +29,7 @@ import { AvatarPlaceholder } from "@/components/frames";
 import { ExportButton } from "@/components/export-button";
 import { pollDelay, waitForPoll } from "@/lib/polling";
 import dynamic from "next/dynamic";
-import { SourcePicker, UploadDrop, Thumb, HookCard, HookPreview } from "@/components/source-picker";
-import { suggestHooks } from "@/lib/suggest-hooks";
+import { SourcePicker, UploadDrop, Thumb } from "@/components/source-picker";
 import { libraryMore, loadLibrary } from "@/lib/library-cache";
 import { fetchPage } from "@/lib/list-client";
 const loadHistoryPanel = () => import("@/components/history-panel");
@@ -1019,10 +1018,7 @@ export function RunView() {
                   )}
                 </>
               ) : (
-                <>
-                {/* Three hooks to start from (founder 2026-11-27); clicking one opens it big, with its numbers. */}
-                <SuggestedHooks refs={refs ?? []} seed={run.id} onPick={pickHook} />
-                {/* One box: the library is the main path; upload and describe open right below, on the same page. */}
+                // One box: the library is the main path; upload and describe open right below, on the same page.
                 <div className="rounded-2xl border border-line bg-panel">
                   <div className="flex flex-wrap items-center gap-2.5 p-4">
                     <button type="button" onClick={() => setPickerOpen(true)} className="btn-primary px-4 py-2.5 text-[14px]">
@@ -1096,7 +1092,6 @@ export function RunView() {
                     </div>
                   )}
                 </div>
-                </>
               )}
               {source?.analysis && <HookTiming duration={source.analysis.duration} start={hook.start ?? 0} end={hook.end ?? 3} onChange={(start, end) => save({ hook: { ...hook, start, end } })} />}
             </Block>
@@ -1439,9 +1434,6 @@ function CharacterStep({ face, mode, onMode, onFace }: { face: Hook["face"] | nu
   }
 
   return (
-    <>
-    {/* Three characters to start from (founder 2026-11-27); clicking one shows it big. */}
-    <SuggestedCharacters onPick={(id) => pick({ kind: "character", id })} />
     <div className="rounded-2xl border border-line bg-panel">
       <div className="flex flex-wrap items-center gap-2.5 p-4">
         <button type="button" onClick={() => setBrowsing(true)} className="btn-primary px-4 py-2.5 text-[14px]">
@@ -1512,41 +1504,6 @@ function CharacterStep({ face, mode, onMode, onFace }: { face: Hook["face"] | nu
 
       {browsing && <CharacterBrowser current={face} onPick={(id) => pick({ kind: "character", id })} onPickFace={pick} onClose={() => setBrowsing(false)} />}
     </div>
-    </>
-  );
-}
-
-/** Three characters on the character step (founder 2026-11-27). Clicking one shows it big, with "Use this character". */
-function SuggestedCharacters({ onPick }: { onPick: (id: string) => void }) {
-  const [view, setView] = useState<(typeof CHARACTERS)[number] | null>(null);
-  const three = CHARACTERS.slice(0, 3);
-  return (
-    <>
-      <div className="grid grid-cols-3 gap-3">
-        {three.map((c) => (
-          <button key={c.id} type="button" onClick={() => setView(c)} className="group relative aspect-[3/4] overflow-hidden rounded-xl bg-raised outline-2 outline-offset-2 outline-transparent transition-[outline-color] hover:outline-accent">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={c.view} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
-            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-3 pb-2 pt-6 text-left text-[14px] font-bold text-white">{c.name}</span>
-          </button>
-        ))}
-      </div>
-      {view && (
-        <div role="dialog" aria-modal="true" aria-label={view.name} className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" onClick={() => setView(null)}>
-          <div className="fade-in w-full max-w-[420px] overflow-hidden rounded-2xl bg-panel shadow-[0_24px_64px_rgba(0,0,0,0.35)]" onClick={(e) => e.stopPropagation()}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={view.view} alt="" className="aspect-[3/4] w-full object-cover object-top" />
-            <div className="flex items-center justify-between gap-3 p-4">
-              <span className="text-[17px] font-extrabold">{view.name}</span>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setView(null)} className="rounded-lg px-3 py-2 text-[13.5px] font-bold text-soft hover:bg-raised hover:text-text">Close</button>
-                <button type="button" onClick={() => { onPick(view.id); setView(null); }} className="btn-primary px-4 py-2.5 text-[14px]">Use this character</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
   );
 }
 
@@ -2044,12 +2001,13 @@ function Block({ n, title, done, pending = false, children, open = true, summary
   const [seen, setSeen] = useState(open);
   if (open && !seen) setSeen(true);
   return (
-    // Each step is a white card (founder 2026-11-27): a square number box (blue with a check when done) and a black
-    // border on the open step. Any step opens at any time.
-    <section className={`border-2 bg-panel px-5 transition-colors ${open ? "space-y-4 border-line py-5" : "border-line py-4 hover:border-line-strong"}`}>
+    // The open step is white with a dark border; the others sit on a light shade with no border, so the open one
+    // stands out (founder 2026-11-27). Any step opens at any time.
+    <section className={`px-5 transition-colors ${open ? "space-y-4 border-2 border-ink bg-panel py-5" : "bg-raised py-4 hover:bg-line/60"}`}>
       <button type="button" onClick={onToggle} aria-expanded={open} aria-busy={pending || undefined} className="flex w-full items-center gap-3 text-left">
-        <span className={`relative flex h-8 w-8 shrink-0 items-center justify-center text-[13.5px] font-bold ${done ? "bg-accent text-white" : open ? "bg-ink text-white" : "bg-raised text-soft"}`}>
-          {done ? <Check className="h-4 w-4" strokeWidth={3} /> : n}
+        {/* Small and quiet (founder: the full blue check was too loud): done is a light blue square with a blue check. */}
+        <span className={`relative flex h-6 w-6 shrink-0 items-center justify-center text-[12.5px] font-bold ${done ? "bg-accent-tint text-accent" : open ? "bg-ink text-white" : "bg-panel text-soft"}`}>
+          {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : n}
           {done && pending && <span aria-hidden className="absolute -inset-[3px] border-2 border-accent/20 border-t-accent motion-safe:animate-spin" />}
         </span>
         <h2 className={`shrink-0 text-[17px] font-extrabold tracking-tight ${open || done ? "text-text" : "text-soft"}`}>{title}</h2>
@@ -2426,21 +2384,6 @@ function HookRating({ runId, src }: { runId: string; src: string }) {
       {button(1, "Good hook", ThumbsUp)}
       {button(-1, "Bad hook", ThumbsDown)}
     </div>
-  );
-}
-
-
-function SuggestedHooks({ refs, seed, onPick }: { refs: Reference[]; seed: string; onPick: (r: Reference) => void | Promise<void> }) {
-  const [view, setView] = useState<Reference | null>(null);
-  const three = useMemo(() => suggestHooks(refs, seed), [refs, seed]);
-  if (!three.length) return null;
-  return (
-    <>
-      <div className="grid grid-cols-3 gap-3">
-        {three.map((r, i) => <HookCard key={r.id} index={i} r={r} busy={false} disabled={false} onPick={() => setView(r)} />)}
-      </div>
-      {view && <HookPreview r={view} onClose={() => setView(null)} onUse={() => { const r = view; setView(null); void onPick(r); }} />}
-    </>
   );
 }
 
