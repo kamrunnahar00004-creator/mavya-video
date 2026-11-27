@@ -1176,11 +1176,11 @@ function WholeTransport({ playback, total, playing, pieces, onPlay, onSplit, onA
         <div className="ml-auto flex flex-wrap items-center justify-end">
           {toolbar ?? (
             <>
-              <button type="button" disabled={!underPlayhead} onClick={onSplit} title="Cut the sound in two at the playhead (S)" className="flex items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-1 text-[12px] font-bold text-text hover:bg-raised hover:text-accent disabled:text-soft disabled:hover:bg-transparent">
+              <button type="button" disabled={!underPlayhead} onClick={onSplit} title="Cut the sound in two here (S)" className="flex items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-1 text-[12px] font-bold text-text hover:bg-raised hover:text-accent disabled:text-soft disabled:hover:bg-transparent">
                 <Scissors className="h-3.5 w-3.5" />
                 Cut
               </button>
-              <button type="button" onClick={onAdd} title="Add a sound at the playhead" className="flex items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-1 text-[12px] font-bold text-text hover:bg-raised hover:text-accent">
+              <button type="button" onClick={onAdd} title="Add a sound here" className="flex items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-1 text-[12px] font-bold text-text hover:bg-raised hover:text-accent">
                 <Plus className="h-3.5 w-3.5" />
                 Sound
               </button>
@@ -1865,22 +1865,22 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
         <Redo2 className="h-4 w-4" />
       </button>
       <span className="mx-1 h-4 w-px bg-line" />
-      <button type="button" onClick={() => cut(time())} title="Cut at the playhead (S)" className={tool}>
+      <button type="button" onClick={() => cut(time())} title="Cut here (S)" className={tool}>
         <Scissors className="h-3.5 w-3.5" />
         Cut
       </button>
-      <button type="button" disabled={!canDelete} onClick={remove} title="Delete the selection (Delete)" className={tool}>
+      <button type="button" disabled={!canDelete} onClick={remove} title="Delete what you picked (Delete)" className={tool}>
         <Trash2 className="h-3.5 w-3.5" />
         Delete
       </button>
       <button type="button" disabled={!canCopy} onClick={copy} title="Copy the selected clip or text (Ctrl+C)" aria-label="Copy" className={tool}>
         <Copy className="h-4 w-4" />
       </button>
-      <button type="button" disabled={!copied} onClick={() => paste(time())} title="Paste at the playhead (Ctrl+V)" aria-label="Paste" className={tool}>
+      <button type="button" disabled={!copied} onClick={() => paste(time())} title="Paste here (Ctrl+V)" aria-label="Paste" className={tool}>
         <ClipboardPaste className="h-4 w-4" />
       </button>
       <span className="mx-1 h-4 w-px bg-line" />
-      <label title="Add video clips at the playhead (between clips)" className={`${tool} cursor-pointer ${uploading ? "pointer-events-none text-soft" : ""}`}>
+      <label title="Add a video clip here" className={`${tool} cursor-pointer ${uploading ? "pointer-events-none text-soft" : ""}`}>
         {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Film className="h-3.5 w-3.5" />}
         Clips
         <input
@@ -1905,7 +1905,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
       </label>
       <button
         type="button"
-        title="Add a text at the playhead"
+        title="Add text here"
         onClick={() => {
           const at = r3(Math.max(0, Math.min(time(), videoLen - 0.5)));
           remember();
@@ -1918,7 +1918,7 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
       </button>
       <button
         type="button"
-        title="Add a sound at the playhead"
+        title="Add a sound here"
         onClick={() => {
           clearSel();
           sounds.addAt(time());
@@ -1932,8 +1932,8 @@ export function VideoEditor({ run, source, segs, texts, videoLen, onClose, onRes
       <button
         type="button"
         aria-pressed={magnet}
-        aria-label="Magnet"
-        title={magnet ? "Magnet on: clips stay joined. Turn off to move clips freely and leave empty space." : "Magnet off: drag clips anywhere. Turn on to close the empty spaces."}
+        aria-label="Stick clips together"
+        title={magnet ? "Clips stick together. Click to move them freely." : "Clips move freely. Click to stick them together."}
         onClick={() => {
           if (!magnet && segs.some((x) => x.gap > 0)) {
             remember();
@@ -2534,8 +2534,8 @@ function AdvancedSettings({ value, disabled, onChange, motion, keyOn, onMotion, 
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        aria-label="Advanced settings"
-        title="Advanced settings"
+        aria-label="More settings"
+        title="More settings"
         className={`flex h-10 w-10 items-center justify-center rounded-xl border ${open || isAdjusted(value) ? "border-accent bg-accent-tint text-accent" : "border-line bg-panel text-muted hover:border-line-strong hover:text-text"}`}
       >
         <SlidersHorizontal className="h-[18px] w-[18px]" />
@@ -2630,8 +2630,8 @@ function AdjustmentControl({ r, v, motion, keyOn, onMotion, onChange, onKey }: {
                     <button
                       type="button"
                       onClick={onKey}
-                      aria-label={keyOn ? "Remove keyframe" : "Add keyframe"}
-                      title={keyOn ? "Remove keyframe" : "Add keyframe at the playhead"}
+                      aria-label={keyOn ? "Remove this zoom point" : "Add a zoom point here"}
+                      title={keyOn ? "Remove this zoom point" : "Add a zoom point here"}
                       className={`-mx-1 flex h-6 w-6 items-center justify-center rounded-md hover:bg-raised ${hasKeys ? "text-accent" : "text-soft hover:text-text"}`}
                     >
                       <Diamond className="h-3.5 w-3.5" fill={keyOn ? "currentColor" : "none"} strokeWidth={2.2} />
@@ -2891,7 +2891,7 @@ function ClipControls({ label, src, speed = 1, playing, onPlay, t, len, pieces, 
             type="button"
             disabled={!canCut}
             onClick={onCut}
-            title="Cut the clip in two at the playhead"
+            title="Cut the clip in two here"
             className="flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-[12px] font-bold text-text hover:border-accent hover:text-accent disabled:border-transparent disabled:text-soft"
           >
             <Scissors className="h-3.5 w-3.5" />
@@ -2955,7 +2955,7 @@ function ClipControls({ label, src, speed = 1, playing, onPlay, t, len, pieces, 
               key={k.i}
               role="button"
               tabIndex={0}
-              aria-label={`Keyframe at ${k.at.toFixed(1)}s`}
+              aria-label={`Zoom point at ${k.at.toFixed(1)}s`}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onSeek(k.at); }
                 if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); onKeyMove(k.i, Math.max(0, Math.min(len, k.at + (e.key === "ArrowRight" ? 0.1 : -0.1)))); }

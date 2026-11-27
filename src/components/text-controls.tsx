@@ -60,7 +60,7 @@ export function TextRow({ t, placeholder, onPatch, onAdd, onRemove, onApplyAll, 
             });
           }}
         />
-        <button type="button" aria-label="Text style" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="rounded-lg p-2 text-muted hover:bg-raised hover:text-text">
+        <button type="button" aria-label="Font, color and style" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="rounded-lg p-2 text-muted hover:bg-raised hover:text-text">
           <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
         <span className="mx-0.5 h-5 w-px bg-line" aria-hidden />
@@ -169,7 +169,7 @@ function EmojiMenu({ onPick }: { onPick: (emoji: string) => void }) {
   }, [open]);
   return (
     <div ref={ref} className="relative">
-      <button type="button" aria-label="Emoji" aria-expanded={open} onClick={() => { const r = ref.current?.getBoundingClientRect(); setUp(Boolean(r && window.innerHeight - r.bottom < 340 && r.top > 340)); setOpen((o) => !o); }} className="rounded-lg p-2 text-muted hover:bg-raised hover:text-text">
+      <button type="button" aria-label="Add emoji" aria-expanded={open} onClick={() => { const r = ref.current?.getBoundingClientRect(); setUp(Boolean(r && window.innerHeight - r.bottom < 340 && r.top > 340)); setOpen((o) => !o); }} className="rounded-lg p-2 text-muted hover:bg-raised hover:text-text">
         <Smile className="h-4 w-4" />
       </button>
       {open && (

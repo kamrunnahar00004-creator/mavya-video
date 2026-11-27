@@ -339,7 +339,7 @@ export function HookPreview({ r, onClose, onUse }: { r: Reference; onClose: () =
                 <span className="rounded-md border border-line bg-panel px-2 py-0.5 text-[12px] font-semibold text-muted">{r.ai.style === "talking" ? "Voiceover" : "Text + music"}</span>
               )}
               {boosted && (
-                <span title="Most views likely came from ads. Instagram's API leaves out likes and comments on ads, so these counts are organic only." className="cursor-help rounded-md border border-line bg-panel px-2 py-0.5 text-[12px] font-semibold text-muted">
+                <span title="Most of these views came from ads, so likes and comments are lower than you would expect." className="cursor-help rounded-md border border-line bg-panel px-2 py-0.5 text-[12px] font-semibold text-muted">
                   Likely Boosted
                 </span>
               )}
