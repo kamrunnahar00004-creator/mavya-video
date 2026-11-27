@@ -131,8 +131,11 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/runs/[id]/
   if (!who) return signInFirst();
   const run = await getRun(id, who);
   if (!run) return Response.json({ error: "Not found" }, { status: 404 });
-  const brief = run.product?.brief;
-  if (!brief) return Response.json({ error: "Add your product first (step 1)." }, { status: 400 });
+  // The website's reading, or only the founder's own description from step 1 (founder 2026-11-27: website or
+  // description, either is enough to write a real script).
+  const typed = run.productNotes?.trim() ?? "";
+  const brief = run.product?.brief ?? (typed ? { name: "", oneLiner: typed.slice(0, 200), audience: "", problem: "", features: [], wowMoment: "", demoFlow: [] } : null);
+  if (!brief) return Response.json({ error: "Add your website or a description in step 1." }, { status: 400 });
 
   const [refs, source] = await Promise.all([listReferences(who), run.sourceRefId ? getReference(run.sourceRefId, who) : null]);
   const described = !source && run.hook.source === "describe" ? run.hook.describe?.trim() : "";

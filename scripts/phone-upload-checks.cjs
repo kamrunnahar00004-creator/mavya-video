@@ -33,10 +33,10 @@ const page = fs.readFileSync('src/app/phone/[token]/phone-upload.tsx', 'utf8');
 ok(/accept="video\/\*" multiple/.test(page) && !/capture=/.test(page) && /Upload from phone/.test(page), 'phone: one button, several videos at once from the library (no filming step)');
 ok(/for \(let i = 0; i < list\.length; i\+\+\)/.test(page) && /order \}\)/.test(page), 'uploads in the order picked');
 const rv = fs.readFileSync('src/components/run-view.tsx', 'utf8');
-ok(/placedPhone\.current\.has\(x\.key\)/.test(rv) && /if \(i < empty\.length\) placeClip\(empty\[i\]\.id, c\)/.test(rv) && /phone-inbox`, \{ method: "POST"/.test(rv), 'computer: fills the shots still to film, then new clips, each note once, then clears them');
+ok(/placedPhone\.current\.has\(x\.key\)/.test(rv) && /placeInSlots\(got, phoneTarget\.current\)/.test(rv) && /phone-inbox`, \{ method: "POST"/.test(rv), 'computer: fills from the slot, then empty ones, then new clips; each note once; then clears them');
 ok(/setInterval\(async \(\) => \{/.test(rv) && /QR\.toString\(json\.url, \{ type: "svg"/.test(rv), 'QR code drawn on the page; checks for new videos every few seconds while open');
 const ed = fs.readFileSync('src/components/editor-tools.tsx', 'utf8');
-ok(/From your phone/.test(ed) && /From this computer/.test(ed) && /\{uploadOpen && uploadWays\}/.test(ed), 'Add your demo: Upload your demo opens From this computer and From your phone');
+ok(/onPhoneFor\?\.\(selected\.id\)/.test(ed) && /\{phoneOpen && phonePanel && <div className="px-4 pt-3">\{phonePanel\}<\/div>\}/.test(ed), 'a slot\'s Phone option shows the QR code there');
 
 const pl2 = fs.readFileSync('src/lib/server/phone-link.ts', 'utf8');
 ok(/like\("id", `phone:\$\{run\}:%:\$\{mediaId\}:%`\)/.test(pl2) && /\(count \?\? 0\) >= 60\) return "full"/.test(pl2) && /=== "full"\) return Response\.json\(\{ error: "Too many videos/.test(api), 'the same video once per video; at most 60 an hour (Codex)');

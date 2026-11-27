@@ -78,11 +78,17 @@ export function RunView() {
   const [refs, setRefs] = useState<Reference[] | null>(null);
   /** Phone uploads already placed in this video (Upload from phone), so a note is never placed twice. */
   const placedPhone = useRef(new Set<string>());
+  /** The slot the phone's videos go into first (a slot's Phone button). */
+  const phoneTarget = useRef<string | null>(null);
   const [missing, setMissing] = useState<string | null>(null);
   /** A video New video opened before the server finished creating it, and the create failed: offer to retry. */
   const [createFailed, setCreateFailed] = useState<{ id: string; sourceRefId?: string } | null>(null);
   const [loadKey, setLoadKey] = useState(0);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  /** Why Get viral script cannot start yet (step 1 or step 2 missing), shown in Add your demo. */
+  const [viralNotice, setViralNotice] = useState<string | null>(null);
+  /** The demo slot a pick from My files goes into first (a slot's From My files). */
+  const filesTarget = useRef<string | null>(null);
   /** The My files tab to open on ("Check library": step 4 opens Generated, step 5 Demos). */
   const [libraryTab, setLibraryTab] = useState<"generated" | "demos" | undefined>(undefined);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -226,7 +232,12 @@ export function RunView() {
         const { run: r, error } = saved ? await writeScript(id) : { run: undefined, error: "Couldn't save your changes. Try again." };
         if (liveId.current !== id) return;
         setPlanning(null);
-        if (!r?.script) { setToast(error ?? "Couldn't write the script. Try again."); continue; }
+        if (!r?.script) {
+          setToast(error ?? "Couldn't write the script. Try again.");
+          // Get viral script was waiting for it: stop waiting, so the button works again.
+          if (copyPending.current === id) { copyPending.current = null; setCopyWaiting(false); }
+          continue;
+        }
         takeAI(r);
         const cur = runRef.current;
         const source = refsRef.current?.find((x) => x.id === cur?.sourceRefId);
@@ -540,7 +551,7 @@ export function RunView() {
   /** A clip was chosen (an explicit click): write the script now, or as soon as the site has been read. */
   const requestScript = () => {
     if (productReading) wantPlan.current = run.id;
-    else if (run.product?.brief) void writePlan();
+    else if (run.product?.brief || run.productNotes?.trim()) void writePlan();
   };
   /** An uploaded reference video: read its cuts in the browser, then use it as the hook source. */
   const takeUpload = async (ref: Reference) => {
@@ -782,6 +793,27 @@ export function RunView() {
    * Videos sent from the phone (Upload from phone): placed like several videos from the computer, in the order the
    * phone picked them: the shots still to film first, then new clips. Each note is placed once.
    */
+  /**
+   * Clips placed in the shots still empty, starting at slot `from` (then wrapping round); more clips than empty slots
+   * become new clips at the end, with no instruction (founder 2026-11-27).
+   */
+  const placeInSlots = (got: Awaited<ReturnType<typeof clipFromFile>>[], from?: string | null) => {
+    const all = demoClips(runRef.current ?? run);
+    const empty = all.filter((c) => !clipSrc(c));
+    const start = from ? all.findIndex((c) => c.id === from) : -1;
+    // The chosen slot itself first, even if it already has a clip (replaced), then the empty ones after it.
+    const target = start >= 0 ? all[start] : null;
+    const rest = target ? [...empty.filter((c) => all.indexOf(c) > start), ...empty.filter((c) => all.indexOf(c) < start)].filter((c) => c.id !== target.id) : empty;
+    const slots = target ? [target, ...rest] : rest;
+    got.forEach((c, i) => {
+      if (i < slots.length) placeClip(slots[i].id, c);
+      else {
+        const seconds = clipSeconds(c.length);
+        const count = demoClips(runRef.current ?? run).length;
+        insertClips([{ id: uid(), label: `Clip ${count + 1}`, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds }]);
+      }
+    });
+  };
   const placePhoneClips = async (list: { key: string; mediaId: string; seconds: number | null }[]) => {
     // Already in the video (placed before a reload, or a note sent twice): only cleared, never placed again (Codex).
     const inVideo = new Set(demoClips(runRef.current ?? run).map((c) => c.mediaId).filter(Boolean));
@@ -797,15 +829,7 @@ export function RunView() {
     const got = await Promise.all(fresh.map((x) => (x.seconds ? Promise.resolve({ mediaId: x.mediaId, name: "Phone video", kind: "video" as const, offset: 0, length: x.seconds }) : clipFromAsset({ mediaId: x.mediaId, name: "Phone video", kind: "video" }))));
     setPicked((p) => Array.from(new Set([...(p ?? openSteps), 5])));
     setLibraryKey((k) => k + 1);
-    const empty = demoClips(runRef.current ?? run).filter((c) => !clipSrc(c));
-    got.forEach((c, i) => {
-      if (i < empty.length) placeClip(empty[i].id, c);
-      else {
-        const seconds = clipSeconds(c.length);
-        const count = demoClips(runRef.current ?? run).length;
-        insertClips([{ id: uid(), label: `Clip ${count + 1}`, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds }]);
-      }
-    });
+    placeInSlots(got, phoneTarget.current);
     // Cleared only once the clips are saved; a failed save keeps the notes, and the next check places them again (Codex).
     if (!(await waitRunSaves(id))) { fresh.forEach((x) => placedPhone.current.delete(x.key)); return; }
     await clear(list.map((x) => x.key));
@@ -960,7 +984,7 @@ export function RunView() {
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:grid xl:grid-cols-[minmax(0,1fr)_400px] xl:overflow-hidden">
         <div className="shrink-0 xl:min-h-0 xl:overflow-y-auto">
-          <div className="mx-auto max-w-[760px] space-y-3 px-8">
+          <div className="mx-auto max-w-[760px] divide-y divide-line px-8">
             <Block n={1} title="Your product" done={stepDone[0]} pending={stepPending[0]} open={openSteps.includes(1)} summary={stepSummary[0]} onToggle={() => toggleStep(1)}>
               <ProductStep
                 key={job?.error ? `failed:${job.url}` : "product"}
@@ -1161,15 +1185,22 @@ export function RunView() {
                 }}
                 copying={copyWaiting}
                 onCheckLibrary={() => { setLibraryTab("demos"); setLibraryOpen(true); }}
+                notice={viralNotice}
+                onOwn={() => { setViralNotice(null); save({ demo: { ...run.demo, mode: "clips", clips: [{ id: uid(), label: "Clip 1" }] } }); }}
                 onClips={() => {
-                  // The script is the copy of the stolen video for this product; while it is being written, wait for it.
-                  const coming = planningHere || (productReading && wantPlan.current === run.id);
-                  if (coming && !(run.script?.shots.length && run.script.refId === (run.sourceRefId ?? null))) {
-                    copyPending.current = run.id;
-                    setCopyWaiting(true);
+                  // Get viral script (founder 2026-11-27): always a real script for this app and this hook, never
+                  // placeholder shots. It needs step 1 (website or description) and a hook.
+                  if (!run.product?.brief && !run.productNotes?.trim()) return setViralNotice("Add your website or a description in step 1.");
+                  if (!run.sourceRefId && !(run.hook.source === "describe" && run.hook.describe?.trim())) return setViralNotice("Pick a hook first (step 2).");
+                  setViralNotice(null);
+                  if (run.script?.shots.length && run.script.refId === (run.sourceRefId ?? null)) {
+                    save({ demo: { ...run.demo, mode: "clips", clips: shotList(source, run).map((x) => ({ ...x, id: uid() })) } });
                     return;
                   }
-                  save({ demo: { ...run.demo, mode: "clips", clips: shotList(source, run).map((x) => ({ ...x, id: uid() })) } });
+                  // Written now (or already being written): the clips come in as soon as it lands.
+                  copyPending.current = run.id;
+                  setCopyWaiting(true);
+                  if (!(planningHere || (productReading && wantPlan.current === run.id))) requestScript();
                 }}
                 onUpload={async (cid, f) => {
                   setPicked((p) => Array.from(new Set([...(p ?? openSteps), 5])));
@@ -1181,6 +1212,8 @@ export function RunView() {
                 onSwap={swapClips}
                 onReset={resetDemo}
                 phonePanel={<PhonePanel runId={run.id} onClips={placePhoneClips} />}
+                onPhoneFor={(target) => { phoneTarget.current = target ?? null; }}
+                onFilesFor={(target) => { filesTarget.current = target; setLibraryTab(undefined); setLibraryOpen(true); }}
               />
             </Block>
 
@@ -1280,11 +1313,10 @@ export function RunView() {
                 // One or several uploads (My files' multi-select): added at the end, in the order they were listed.
                 setLibraryOpen(false);
                 void Promise.all(assets.map((asset) => clipFromAsset({ ...asset, kind: asset.kind === "image" ? "image" : "video" }))).then((cs) => {
-                  const count = demoClips(runRef.current ?? run).length;
-                  insertClips(cs.map((c, i) => {
-                    const seconds = clipSeconds(c.length);
-                    return { id: uid(), label: `Clip ${count + i + 1}`, mediaId: c.mediaId ?? undefined, name: c.name, seconds, start: 0, end: seconds };
-                  }));
+                  // From a slot's From My files: that slot first, then the next empty ones; the rest at the end.
+                  const target = filesTarget.current;
+                  filesTarget.current = null;
+                  placeInSlots(cs, target);
                   setPicked([5]);
                   setToast(cs.length > 1 ? `${cs.length} clips added` : "Clip added");
                 }).catch(() => setToast(assets.length > 1 ? "Couldn't add the clips. Try again." : "Couldn't add the clip. Try again."));
@@ -2001,14 +2033,11 @@ function Block({ n, title, done, pending = false, children, open = true, summary
   const [seen, setSeen] = useState(open);
   if (open && !seen) setSeen(true);
   return (
-    // The open step is white with a dark border; the others sit on a light shade with no border, so the open one
-    // stands out (founder 2026-11-27). Any step opens at any time.
-    <section className={`px-5 transition-colors ${open ? "space-y-4 border-2 border-ink bg-panel py-5" : "bg-raised py-4 hover:bg-line/60"}`}>
+    <section className={open ? "space-y-4 py-6" : "py-4"}>
       <button type="button" onClick={onToggle} aria-expanded={open} aria-busy={pending || undefined} className="flex w-full items-center gap-3 text-left">
-        {/* Small and quiet (founder: the full blue check was too loud): done is a light blue square with a blue check. */}
-        <span className={`relative flex h-6 w-6 shrink-0 items-center justify-center text-[12.5px] font-bold ${done ? "bg-accent-tint text-accent" : open ? "bg-ink text-white" : "bg-panel text-soft"}`}>
-          {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : n}
-          {done && pending && <span aria-hidden className="absolute -inset-[3px] border-2 border-accent/20 border-t-accent motion-safe:animate-spin" />}
+        <span className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${done ? "bg-accent text-white" : open ? "bg-accent-tint text-accent" : "bg-raised text-soft"}`}>
+          {done ? <Check className="h-4 w-4" strokeWidth={3} /> : n}
+          {done && pending && <span aria-hidden className="absolute -inset-[3px] rounded-full border-2 border-accent/20 border-t-accent motion-safe:animate-spin" />}
         </span>
         <h2 className={`shrink-0 text-[17px] font-extrabold tracking-tight ${open || done ? "text-text" : "text-soft"}`}>{title}</h2>
         {!open && summary && <span className="min-w-0 truncate text-[13.5px] text-muted">{summary}</span>}
