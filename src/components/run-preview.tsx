@@ -49,8 +49,11 @@ export function RunPreview({ run, source, texts, hookCover }: { run: Run; source
       if (m && m.v.readyState >= 2) {
         const vt = m.time(m.v.currentTime);
         // Follow the video when it is near the clock; a video stuck for over a second is left behind.
-        if (vt <= tNow.current && held < 1) { held += dt; next = tNow.current; }
-        else if (vt < tNow.current + 0.5) { held = 0; next = vt; }
+        // A video that stopped (its end comes a moment before the video's full length) must not hold the clock for
+        // good: after a second the wall clock carries it to the end, where playing stops and the sound with it
+        // (founder 2026-11-27: the sound kept playing at 0:09 / 0:09). Only a video moving forward is followed.
+        if (vt <= tNow.current && held < 1 && !m.v.ended) { held += dt; next = tNow.current; }
+        else if (vt > tNow.current && vt < tNow.current + 0.5) { held = 0; next = vt; }
       }
       if (next >= total) {
         tNow.current = 0;

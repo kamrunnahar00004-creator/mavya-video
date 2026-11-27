@@ -425,6 +425,16 @@ export function reelCode(link: string | undefined): string {
   return /^[A-Za-z0-9_-]{5,40}$/.test(code) ? code : "";
 }
 
+/** The library reel's demo shots as "Like this" moments, in order (shots without times are skipped as undefined). */
+export function exampleShots(source: Reference | null): ((NonNullable<DemoClip["example"]> & { label?: string }) | undefined)[] {
+  const code = reelCode(source?.sourceUrl);
+  if (!code) return [];
+  return (source?.recipe?.demo?.shots ?? []).map((s) => {
+    const t = s as { start?: number; end?: number; label?: string };
+    return typeof t.start === "number" && typeof t.end === "number" && t.end > t.start ? { code, start: t.start, end: t.end, label: t.label } : undefined;
+  });
+}
+
 /** Shot list for "Build it clip by clip": from the hook's analysis when there is one, else a proven default
  *  for the reaction + demo format (phone filming the laptop). Suggested texts are samples until the AI writes them per product. */
 export function shotList(source: Reference | null, run?: Run): Omit<DemoClip, "id">[] {

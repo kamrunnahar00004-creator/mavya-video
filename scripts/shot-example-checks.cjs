@@ -31,12 +31,14 @@ ok(run({ code: 'DcOiTp0xxTK', start: 3.3, end: 6.5 }) && !run({ code: '../x', st
 
 const ed = fs.readFileSync('src/components/editor-tools.tsx', 'utf8');
 ok(/src=\{`\/api\/examples\/\$\{code\}#t=/.test(ed) && /v\.currentTime >= end/.test(ed) && /Like this<\/figcaption>/.test(ed), '"Like this" plays only the moment, on a loop');
-ok(/selected\.camera \|\| selected\.steps\?\.length \|\| selected\.example/.test(ed) && /<ExampleClip example=\{clip\.example\} \/>/.test(ed), 'shown beside the shot to film');
+ok(/brief\.camera \|\| brief\.steps\?\.length \|\| brief\.example/.test(ed) && /<ExampleClip example=\{clip\.example\} \/>/.test(ed), 'shown beside the shot to film');
 const ex = fs.readFileSync('src/app/api/examples/[code]/route.ts', 'utf8');
 ok(/\^\[A-Za-z0-9_-\]\{5,40\}\$/.test(ex) && /currentUser\(\)\)\) return signInFirst/.test(ex) && /libraryLink\("sources", code\)/.test(ex), 'example route: valid codes only, signed in, the library reel');
 
 ok(edit.reelCode('https://www.instagram.com/reel/ABC123x/?igsh=xyz') === 'ABC123x' && edit.reelCode('https://www.instagram.com/reel/ABC123x/') === 'ABC123x' && edit.reelCode('not a url') === '' && edit.reelCode('https://x.com/a/../') === '', 'reel code from the link path, ?igsh ignored (Codex)');
 ok(/: <p className="text-\[13\.5px\] text-muted">\{clip\.hint\}<\/p>/.test(ed), 'a shot with only a hint still shows it beside the example (Codex)');
-const EXPECTED = 13;
+const shots = edit.exampleShots({ sourceUrl: 'https://www.instagram.com/reel/DcOiTp0xxTK/', recipe: { demo: { shots: [{ start: 3.3, end: 6.5 }, { label: 'no times' }, { start: 9, end: 12 }] } } });
+ok(shots.length === 3 && shots[0].start === 3.3 && shots[1] === undefined && shots[2].end === 12 && edit.exampleShots(null).length === 0, 'the reel\'s shots as examples, by position (gaps stay gaps)');
+const EXPECTED = 14;
 assert.equal(checks, EXPECTED, `shot-example-checks: ${checks} of ${EXPECTED}`);
 console.log(`shot-example-checks: ${checks} checks pass`);

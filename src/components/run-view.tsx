@@ -18,7 +18,7 @@ import { reconcileGeneration } from "@/lib/generation-edit";
 import { soundPieces } from "@/lib/sound";
 import { deleteSelection, insertClipsChange, partsChange } from "@/lib/edit-ops";
 
-import { type Seg, clipGroup, clipSrc, containTexts, demoClips, moveClipPiece, removeDemoClip, roomForHook, videoLength, remapTexts, retimeTexts, runSteps, shotList, snapTexts, timeline } from "@/lib/edit";
+import { type Seg, clipGroup, clipSrc, exampleShots, containTexts, demoClips, moveClipPiece, removeDemoClip, roomForHook, videoLength, remapTexts, retimeTexts, runSteps, shotList, snapTexts, timeline } from "@/lib/edit";
 
 import { loadFiles } from "@/lib/files-client";
 import { AVATAR_TONES, STALE_RUN_EVENT, abandonCopy, adoptGeneratedVersion, generationFollows, refusedByGeneration, setEditVersion, takeRefusedSections, unsavedSections, TEXT_Y, clipFromAsset, clipFromFile, saveStateOf, saveErrorOf, subscribeSaves, flushRunSaves, waitRunSaves, patchRun, remixHook, round1, runTexts, uid, uploadFile } from "@/lib/client";
@@ -1213,6 +1213,8 @@ export function RunView() {
                 onReset={resetDemo}
                 phonePanel={<PhonePanel runId={run.id} onClips={placePhoneClips} />}
                 onPhoneFor={(target) => { phoneTarget.current = target ?? null; }}
+                fallbackExamples={exampleShots(source)}
+                onAddSlot={(nid) => insertClips([{ id: nid, label: `Clip ${demoClips(runRef.current ?? run).length + 1}` }])}
                 onFilesFor={(target) => { filesTarget.current = target; setLibraryTab(undefined); setLibraryOpen(true); }}
               />
             </Block>
