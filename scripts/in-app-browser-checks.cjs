@@ -55,5 +55,6 @@ ok(/skipBrowserRedirect: true/.test(modal) && /if \(gone\.current\) return;\s*wi
 ok(/if \(auth\) stay\.searchParams\.set\("auth", auth\);/.test(modal), 'blocked jump never changes auth in the address (no popup reset)');
 ok(/addEventListener\("pageshow", back\)/.test(modal) && /if \(e\.persisted\) setLoading\(false\)/.test(modal), 'Back from Google: buttons work again');
 ok(/env\.app === "Instagram" && env\.os === "ios" \? 4000 : 1200/.test(modal), 'Instagram\'s confirm box gets time before the tip shows');
-assert.equal(checks, 34);
+ok(!/onClick=\{\(\) => !loading && onClose\(\)\}/.test(modal) && /aria-label="Close"/.test(modal), 'sign-up popup: a click outside never closes it (only X or Esc)');
+assert.equal(checks, 35);
 console.log(`in-app-browser-checks: ${checks} checks pass`);

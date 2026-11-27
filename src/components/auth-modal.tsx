@@ -274,9 +274,10 @@ function AuthModal({ initialMode, next, autoGoogle, error: initialError, onClose
       aria-modal="true"
       aria-label={isSignup ? "Create your account" : isForgot ? "Reset your password" : "Log in"}
       className="landing-theme fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,13,11,0.55)] px-4 py-8 backdrop-blur-sm"
-      onClick={() => !loading && onClose()}
+      // No close on a click outside (founder 2026-11-27: "clicking anywhere closes that popup", losing what was typed).
+      // Only the X button or Esc closes it.
     >
-      <div className="relative max-h-full w-full max-w-[460px] overflow-y-auto rounded-2xl border border-line bg-panel p-6 shadow-[0_24px_64px_-16px_rgba(21,18,31,0.45)] sm:p-8" onClick={(e) => e.stopPropagation()}>
+      <div className="relative max-h-full w-full max-w-[460px] overflow-y-auto rounded-2xl border border-line bg-panel p-6 shadow-[0_24px_64px_-16px_rgba(21,18,31,0.45)] sm:p-8">
         <button
           type="button"
           onClick={onClose}
