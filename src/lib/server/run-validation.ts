@@ -53,6 +53,7 @@ function demo(v: unknown): boolean {
     for (const key of ["name", "hint", "camera", "text"]) if (!optional(c[key], string)) return false;
     for (const key of ["seconds", "start", "end", "target"]) if (!optional(c[key], number)) return false;
     if (!optional(c.gap, (g) => number(g, 0))) return false;
+    if (!optional(c.example, (x) => object(x) && typeof x.code === "string" && /^[A-Za-z0-9_-]{5,40}$/.test(x.code) && number(x.start, 0) && number(x.end, 0) && (x.end as number) > (x.start as number))) return false;
     return within(c, c.seconds) && optional(c.steps, (s) => Array.isArray(s) && s.every(string)) && !(typeof c.start === "number" && typeof c.end === "number" && c.end <= c.start);
   }));
 }

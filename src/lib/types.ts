@@ -205,8 +205,11 @@ export type ProductBrief = {
   uiWords?: string[];
 };
 
+/** The moment of a library reel a demo shot copies: shown beside it as "Like this" (founder 2026-11-27). */
+export type ShotExample = { code: string; start: number; end: number };
+
 /** One demo shot to film (same shape the "Film your demo" clips use). */
-export type ScriptShot = { label: string; hint: string; steps: string[]; camera: string; text: string; seconds: number };
+export type ScriptShot = { label: string; hint: string; steps: string[]; camera: string; text: string; seconds: number; example?: ShotExample };
 
 /** A video script for one product and one hook: the hook's on-screen text and action, then the demo shot by shot. */
 export type VideoScript = {
@@ -341,6 +344,8 @@ export type DemoClip = {
   text?: string;
   /** Suggested on-screen length, seconds. */
   target?: number;
+  /** The viral reel's matching moment, played beside the shot as "Like this". */
+  example?: ShotExample;
   mediaId?: string;
   /** Clips cut from one clip share this: side by side they show as one tile, each half with its own settings. */
   group?: string;

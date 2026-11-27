@@ -24,7 +24,7 @@ ok(/Keep the viral reel's own story shape/.test(route) && /BEFORE \(the pain; sk
 ok(!/3 to 7 shots/.test(route) && /There is no default count; it can be 2 or 9/.test(route) && /exactly as many shots as shotPlan says/.test(route), 'shot count is the model\'s judgment, no fixed range');
 ok(/"shotPlan"/.test(route) && /required: \["payoff", "story", "shotPlan"/.test(route) && /shotPlan: s\(out\.shotPlan, 300\)/.test(route), 'the reason for the count is asked for and kept on the script');
 ok(/maxItems: 10/.test(route) && /capShots\(Array\.isArray\(out\.shots\)/.test(route) && !/\.slice\(0, 7\)/.test(route), 'only a safety cap of 10 shots');
-{ const r = load('src/app/api/runs/[id]/script/route.ts', { '@/lib/server/ai-budget': {}, '@/lib/server/gemini': {}, '@/lib/server/store': {}, '@/lib/server/who': {}, '@/lib/script-rules': rules, 'node:fs/promises': {}, 'node:os': {}, 'node:path': {} });
+{ const r = load('src/app/api/runs/[id]/script/route.ts', { '@/lib/edit': { reelCode: () => '' }, '@/lib/server/ai-budget': {}, '@/lib/server/gemini': {}, '@/lib/server/store': {}, '@/lib/server/who': {}, '@/lib/script-rules': rules, 'node:fs/promises': {}, 'node:os': {}, 'node:path': {} });
   const many = Array.from({ length: 12 }, (_, i) => i); const capped = r.capShots(many);
   ok(capped.length === 10 && capped[9] === 11 && r.capShots([1, 2, 3]).length === 3, 'past 10 shots, the last (payoff) shot is kept'); }
 ok(/shotPlan\?: string;/.test(fs.readFileSync('src/lib/types.ts', 'utf8')), 'VideoScript keeps shotPlan (optional, older scripts have none)');

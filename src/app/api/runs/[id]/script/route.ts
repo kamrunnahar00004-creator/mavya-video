@@ -5,8 +5,9 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { currentUser, signInFirst } from "@/lib/server/who";
-import type { Reference, VideoScript } from "@/lib/types";
+import type { Reference, ShotExample, VideoScript } from "@/lib/types";
 import { scriptRulesText } from "@/lib/script-rules";
+import { reelCode } from "@/lib/edit";
 
 /**
  * Write the video script for this run's product and hook (on the "Write my script" click):
@@ -25,6 +26,15 @@ type Recipe = {
 /** At most 10 shots; when there are more, the first 9 and the last (the payoff). */
 export const capShots = <T,>(shots: T[]): T[] => (shots.length > 10 ? [...shots.slice(0, 9), shots[shots.length - 1]] : shots);
 const recipeOf = (r: Reference) => (r as Reference & { recipe?: Recipe }).recipe;
+/** The library reel's code (its Instagram shortcode), used to play its moments as examples. */
+const codeOf = (r: Reference | null) => reelCode(r?.sourceUrl);
+/** The stolen shot `n` (1-based) as a "Like this" example, when its times are known. */
+export function exampleOf(source: Reference | null, n: unknown): ShotExample | undefined {
+  const code = codeOf(source);
+  const shot = typeof n === "number" && Number.isInteger(n) && n >= 1 && source ? recipeOf(source)?.demo?.shots?.[n - 1] as { start?: number; end?: number } | undefined : undefined;
+  if (!shot || !/^[A-Za-z0-9_-]{5,40}$/.test(code) || typeof shot.start !== "number" || typeof shot.end !== "number" || shot.end <= shot.start) return undefined;
+  return { code, start: shot.start, end: shot.end };
+}
 
 /** The stolen hook in full: its demo shot by shot (camera, actions, captions, timing) is the template for the new one. */
 function template(r: Reference) {
@@ -33,7 +43,8 @@ function template(r: Reference) {
     ...sample(r),
     demoMethod: rc.demo?.method ?? "",
     demoPacing: rc.demo?.pacing ?? "",
-    demo: (rc.demo?.shots ?? []).map((s) => ({ label: s.label, seconds: s.seconds, camera: s.camera, steps: s.steps, hint: s.hint, text: s.text })),
+    // n numbers the shots, so each new shot can say which one it copies (its "Like this" example).
+    demo: (rc.demo?.shots ?? []).map((s, i) => ({ n: i + 1, label: s.label, seconds: s.seconds, camera: s.camera, steps: s.steps, hint: s.hint, text: s.text })),
     onScreenText: ((rc.onScreenText ?? []) as NonNullable<Recipe["onScreenText"]>).map((t) => ({ text: t.text, style: t.style, position: t.position })),
   };
 }
@@ -103,8 +114,9 @@ const SCHEMA = {
           camera: { type: "STRING" },
           text: { type: "STRING" },
           seconds: { type: "NUMBER" },
+          copies: { type: "INTEGER", description: "n of the stolen video's demo shot this shot recreates (shown beside it as the example); 0 if none" },
         },
-        required: ["label", "hint", "steps", "camera", "text", "seconds"],
+        required: ["label", "hint", "steps", "camera", "text", "seconds", "copies"],
       },
     },
   },
@@ -174,7 +186,8 @@ Write:
   SECONDS come from THIS product's action, never from the viral reel's shot lengths: a tap or a pick 1 to 2 seconds, a scroll 2 to 3, the result 2 to 4. A demo is fast; a 6 second shot needs a real reason.
   CAPTIONS (text): every shot has one, even when the viral reel's demo has none: 2 to 5 words in the hook's voice, telling the story shot by shot, so the captions read alone make sense ("my app demo flopped💀", "found a 5.6M hook👀", "picked an AI face", "went viral🚀"). Never empty, never a repeat of the hook text.
   The last shot shows the RESULT the product promises (the finished thing working, or the founder's real numbers if the notes give them), not just the app's last screen.
-  For each: label (2 to 4 plain words, no marketing jargon such as CTA), hint (one short sentence saying exactly what is on screen, naming the real screen, button or label, e.g. "Tap Use this hook under a reel with 5M views."), steps (1 to 3 short, specific on-screen actions in the real product: name the screen and the button, never "record your app" or "use the app"; when the brief, notes or screenshots do not name a button, describe what is visibly on screen instead, and never invent one such as a record or export button), camera (how to hold the phone and what to point it at), text (the caption), seconds.
+  ${stolen ? `COPIES: each shot recreates one shot of the stolen demo (its n), the one it matches most closely, as close to it as THIS product allows (same kind of action, same framing, same moment in the story), so the founder sees that original moment beside it and copies it. Say which in copies.
+  ` : ""}For each: label (2 to 4 plain words, no marketing jargon such as CTA), hint (one short sentence saying exactly what is on screen, naming the real screen, button or label, e.g. "Tap Use this hook under a reel with 5M views."), steps (1 to 3 short, specific on-screen actions in the real product: name the screen and the button, never "record your app" or "use the app"; when the brief, notes or screenshots do not name a button, describe what is visibly on screen instead, and never invent one such as a record or export button), camera (how to hold the phone and what to point it at), text (the caption), seconds, copies.
 
 BE EXTREMELY SPECIFIC TO THIS PRODUCT (founder's rule): every hint and step names the real screen and, where the product shows one, quotes the
 real button, tab or field in double quotes (where none is known, say exactly what is visible instead), using the words in the brief's uiWords (each says in brackets what it is: only tap what is a button, only pick what is a choice) and demoFlow${screens.length ? ", the screenshots" : ""}${notes ? " and the notes" : ""}
@@ -222,6 +235,7 @@ step "Tap the big camera button".`;
       camera: s(x?.camera, 160),
       text: s(x?.text, 200),
       seconds: num(x?.seconds, 0.5, 15, 3),
+      ...(exampleOf(source, (x as { copies?: unknown })?.copies) ? { example: exampleOf(source, (x as { copies?: unknown })?.copies) } : {}),
     })),
     ...(s(out.shotPlan, 300) ? { shotPlan: s(out.shotPlan, 300) } : {}),
     refId: source?.id ?? null,

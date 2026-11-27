@@ -238,7 +238,7 @@ export function RunView() {
         if (copyPending.current === id && cur && r.script.shots.length && !demoClips(cur).some((c) => clipSrc(c))) {
           copyPending.current = null;
           setCopyWaiting(false);
-          save({ demo: { ...cur.demo, mode: "clips", clips: r.script.shots.map((s) => ({ id: uid(), label: s.label, hint: s.hint, target: s.seconds, camera: s.camera, steps: s.steps, text: s.text })) } });
+          save({ demo: { ...cur.demo, mode: "clips", clips: r.script.shots.map((s) => ({ id: uid(), label: s.label, hint: s.hint, target: s.seconds, camera: s.camera, steps: s.steps, text: s.text, ...(s.example ? { example: s.example } : {}) })) } });
         }
       } while (wantPlan.current === id);
       // No script came (failed): copy the stolen video's own shots rather than leave the click hanging.

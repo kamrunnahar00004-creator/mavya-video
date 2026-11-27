@@ -2157,9 +2157,47 @@ function VolumeButton({ value, onChange }: { value: number; onChange: (v: number
 
 
 /** How to film one demo clip: camera setup and steps in order. Its on-screen text is not shown: it goes on with the upload. */
-function ShotBrief({ clip }: { clip: DemoClip }) {
+/**
+ * "Like this" (founder 2026-11-27): the viral reel's matching moment beside the shot to film, on a loop. Only that
+ * moment plays (start to end of the reel's shot), muted.
+ */
+export function ExampleClip({ example }: { example: NonNullable<DemoClip["example"]> }) {
+  const { code, start, end } = example;
   return (
-    <div className="space-y-1.5 pb-4 pl-[62px] pr-4">
+    <figure className="shrink-0">
+      <video
+        src={`/api/examples/${code}#t=${start.toFixed(2)},${end.toFixed(2)}`}
+        muted
+        autoPlay
+        playsInline
+        preload="metadata"
+        onLoadedMetadata={(e) => { e.currentTarget.currentTime = start; }}
+        onTimeUpdate={(e) => { const v = e.currentTarget; if (v.currentTime >= end || v.currentTime < start - 0.5) { v.currentTime = start; void v.play().catch(() => undefined); } }}
+        onPause={(e) => { const v = e.currentTarget; if (v.currentTime >= end - 0.05) { v.currentTime = start; void v.play().catch(() => undefined); } }}
+        className="aspect-[9/16] w-[84px] rounded-lg bg-raised object-cover"
+      />
+      <figcaption className="mt-1 text-center text-[11.5px] font-bold text-soft">Like this</figcaption>
+    </figure>
+  );
+}
+
+function ShotBrief({ clip }: { clip: DemoClip }) {
+  if (clip.example)
+    return (
+      <div className="flex gap-4 px-4 pb-4">
+        <ExampleClip example={clip.example} />
+        <div className="min-w-0 flex-1">
+          {/* A shot with no camera or steps still says what to film, beside its example (Codex 2026-11-27). */}
+          {clip.camera || clip.steps?.length ? <ShotLines clip={clip} /> : <p className="text-[13.5px] text-muted">{clip.hint}</p>}
+        </div>
+      </div>
+    );
+  return <div className="pb-4 pl-[62px] pr-4"><ShotLines clip={clip} /></div>;
+}
+
+function ShotLines({ clip }: { clip: DemoClip }) {
+  return (
+    <div className="space-y-1.5">
       {clip.camera && (
         <div className="flex items-start gap-2 text-[13px] text-text">
           <Smartphone className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
@@ -2494,7 +2532,7 @@ export function DemoStep({ run, segs, copying = false, renderEditor, onFiles, on
           )}
           {clipSrc(selected) && selSeg ? (
             <div className="p-3">{renderEditor(selSeg)}</div>
-          ) : selected.camera || selected.steps?.length ? (
+          ) : selected.camera || selected.steps?.length || selected.example ? (
             <div className="pt-3"><ShotBrief clip={selected} /></div>
           ) : (
             <p className="px-4 py-3 text-[13.5px] text-muted">{selected.hint}</p>

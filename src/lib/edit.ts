@@ -417,15 +417,26 @@ export function moveClipPiece(run: Run, texts: TextLayer[], segId: string, partI
   return { hook, demo, texts: mapped };
 }
 
+/** A library reel's Instagram shortcode, from the path of its link (a "?igsh=" or "#" after it is ignored). */
+export function reelCode(link: string | undefined): string {
+  let pathname = "";
+  try { pathname = new URL(link ?? "").pathname; } catch { return ""; }
+  const code = pathname.replace(/\/+$/, "").split("/").pop() ?? "";
+  return /^[A-Za-z0-9_-]{5,40}$/.test(code) ? code : "";
+}
+
 /** Shot list for "Build it clip by clip": from the hook's analysis when there is one, else a proven default
  *  for the reaction + demo format (phone filming the laptop). Suggested texts are samples until the AI writes them per product. */
 export function shotList(source: Reference | null, run?: Run): Omit<DemoClip, "id">[] {
   // The script written for this product and this hook comes first; then the hook's own recipe; then a default.
   const script = run?.script;
   if (script?.shots.length && script.refId === (source?.id ?? null))
-    return script.shots.map((s) => ({ label: s.label, hint: s.hint, target: s.seconds, camera: s.camera, steps: s.steps, text: s.text }));
+    return script.shots.map((s) => ({ label: s.label, hint: s.hint, target: s.seconds, camera: s.camera, steps: s.steps, text: s.text, ...(s.example ? { example: s.example } : {}) }));
   const fromRecipe = source?.recipe?.demo?.shots;
-  if (fromRecipe?.length) return fromRecipe.map((s) => ({ label: s.label, hint: s.hint, target: s.seconds, camera: s.camera, steps: s.steps, text: s.text }));
+  // With no script yet, each recipe shot is its own "Like this" example (its moment in the library reel).
+  const code = reelCode(source?.sourceUrl);
+  const own = (s: { start?: number; end?: number }) => (code && typeof s.start === "number" && typeof s.end === "number" && s.end > s.start ? { example: { code, start: s.start, end: s.end } } : {});
+  if (fromRecipe?.length) return fromRecipe.map((s) => ({ label: s.label, hint: s.hint, target: s.seconds, camera: s.camera, steps: s.steps, text: s.text, ...own(s as { start?: number; end?: number }) }));
   return [
     { label: "Show the problem", target: 2, camera: "Over your shoulder, screen fills the frame", steps: ["Open the old, messy way", "Scroll so it looks endless"], text: "doing this by hand again 😩" },
     { label: "Open your product", target: 1.5, camera: "Same angle, phone steady", steps: ["Open your site or app", "Let it fully load"], text: "then I found this" },
