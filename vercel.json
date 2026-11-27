@@ -1,5 +1,5 @@
 {
-  "crons": [{ "path": "/api/internal/generations", "schedule": "* * * * *" }, { "path": "/api/internal/hook-eval", "schedule": "*/5 * * * *" }],
+  "crons": [{ "path": "/api/internal/generations", "schedule": "* * * * *" }, { "path": "/api/internal/hook-eval", "schedule": "*/5 * * * *" }, { "path": "/api/internal/recovery", "schedule": "*/15 * * * *" }],
   "functions": {
     "src/app/api/internal/export-step/route.ts": { "memory": 3009 },
     "src/app/api/internal/export-run/route.ts": { "memory": 3009 }
