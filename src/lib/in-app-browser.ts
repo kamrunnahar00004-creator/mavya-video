@@ -21,15 +21,18 @@ export function inAppBrowser(ua: string): InApp | null {
 
 /**
  * A link that leaves the in-app browser for the real one, keeping the page and its query (the ad's fbclid and UTMs, so
- * the visit still counts for the ad). Android: Chrome by intent, falling back to the same page. iOS: Safari's own
- * scheme (opens Safari on iOS 17 and later where the app allows it). Null for an address that isn't http(s).
+ * the visit still counts for the ad). Android: Chrome by intent, falling back to the same page. iPhone Instagram:
+ * Instagram's own "open outside" link (founder 2026-11-27: Instagram blocks Safari's scheme since about March 2026;
+ * this one shows Instagram's confirm box, one tap opens the default browser; it must come from a tap). Other iPhone
+ * apps: Safari's own scheme (iOS 17 and later where the app allows it). Null for an address that isn't http(s).
  */
-export function openInBrowserUrl(href: string, os: InApp["os"]): string | null {
+export function openInBrowserUrl(href: string, os: InApp["os"], app?: InApp["app"]): string | null {
   let u: URL;
   try { u = new URL(href); } catch { return null; }
   if (u.protocol !== "https:" && u.protocol !== "http:") return null;
   const rest = `${u.host}${u.pathname}${u.search}`;
   if (os === "android") return `intent://${rest}#Intent;scheme=${u.protocol.slice(0, -1)};package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(u.toString())};end`;
+  if (os === "ios" && app === "Instagram") return `instagram://extbrowser/?url=${encodeURIComponent(u.toString())}`;
   if (os === "ios") return `x-safari-${u.protocol.slice(0, -1)}://${rest}`;
   return null;
 }

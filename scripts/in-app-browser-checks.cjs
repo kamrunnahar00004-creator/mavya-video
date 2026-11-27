@@ -27,6 +27,9 @@ const href = 'https://mavya.app/?utm_source=meta&fbclid=abc123';
 const android = b.openInBrowserUrl(href, 'android');
 ok(android.startsWith('intent://mavya.app/?utm_source=meta&fbclid=abc123#Intent;scheme=https;package=com.android.chrome;') && android.includes('S.browser_fallback_url=' + encodeURIComponent(href)), 'Android: Chrome by intent, keeping the page, the ad\'s fbclid and UTMs, with a fallback');
 eq(b.openInBrowserUrl(href, 'ios'), 'x-safari-https://mavya.app/?utm_source=meta&fbclid=abc123', 'iPhone: Safari\'s own link, keeping the fbclid and UTMs');
+eq(b.openInBrowserUrl(href, 'ios', 'Instagram'), 'instagram://extbrowser/?url=' + encodeURIComponent(href), 'iPhone Instagram: Instagram\'s own open-outside link (Safari\'s is blocked there), whole address encoded, ad codes kept');
+eq(b.openInBrowserUrl(href, 'ios', 'Facebook'), 'x-safari-https://mavya.app/?utm_source=meta&fbclid=abc123', 'iPhone Facebook: still Safari\'s link');
+ok(b.openInBrowserUrl(href, 'android', 'Instagram').startsWith('intent://'), 'Android Instagram: still Chrome by intent');
 eq(b.openInBrowserUrl(href, 'other'), null, 'unknown system: no jump, the manual tip instead');
 eq(b.openInBrowserUrl('javascript:alert(1)', 'ios'), null, 'never a script link');
 // Founder 2026-11-27: no banner (looked suspicious, cost taps). The Google button itself opens the real browser.
@@ -34,7 +37,7 @@ const modal = fs.readFileSync('src/components/auth-modal.tsx', 'utf8');
 const layout = fs.readFileSync('src/app/layout.tsx', 'utf8');
 ok(!/OpenInBrowser/.test(layout) && !fs.existsSync('src/components/open-in-browser.tsx'), 'no open-in-browser banner on any page');
 ok(/inAppBrowser\(navigator\.userAgent\)/.test(modal) && /if \(env\) return googleInBrowser\(env\);/.test(modal), 'in-app: the Google button never starts Google there (403), it jumps out');
-ok(/searchParams\.set\("google", "1"\)/.test(modal) && /searchParams\.set\("next", next\)/.test(modal) && /openInBrowserUrl\(here\.toString\(\), env\.os\)/.test(modal), 'the jump reopens this popup with google=1 and the same next, keeping the ad\'s fbclid and UTMs');
+ok(/searchParams\.set\("google", "1"\)/.test(modal) && /searchParams\.set\("next", next\)/.test(modal) && /openInBrowserUrl\(here\.toString\(\), env\.os, env\.app\)/.test(modal), 'the jump reopens this popup with google=1 and the same next, keeping the ad\'s fbclid and UTMs');
 ok(/autoGoogle && !initialError && !autoStarted\.current/.test(modal) && /else if \(autoGoogle/.test(modal), 'real browser: Google starts once by itself, never inside the app, never again after a failed sign-in');
 ok(/setJumpFailed\(true\)/.test(modal) && /inApp\.os === "android" \? "Open in Chrome" : "Open in external browser"/.test(modal) && /" \(or your browser\)"/.test(modal) && /Or sign up with email below\./.test(modal), 'blocked jump: shows the app menu way and points to email');
 ok(!/[\u2014\u2013]/.test(modal + fs.readFileSync('src/lib/in-app-browser.ts', 'utf8')), 'no em or en dashes');
@@ -51,5 +54,6 @@ ok(!/replaceState\(window\.history\.state/.test(modal), 'address changes use rep
 ok(/skipBrowserRedirect: true/.test(modal) && /if \(gone\.current\) return;\s*window\.location\.assign\(data\.url\);/.test(modal), 'Mavya goes to Google itself, only while the popup is still open');
 ok(/if \(auth\) stay\.searchParams\.set\("auth", auth\);/.test(modal), 'blocked jump never changes auth in the address (no popup reset)');
 ok(/addEventListener\("pageshow", back\)/.test(modal) && /if \(e\.persisted\) setLoading\(false\)/.test(modal), 'Back from Google: buttons work again');
-assert.equal(checks, 30);
+ok(/env\.app === "Instagram" && env\.os === "ios" \? 4000 : 1200/.test(modal), 'Instagram\'s confirm box gets time before the tip shows');
+assert.equal(checks, 34);
 console.log(`in-app-browser-checks: ${checks} checks pass`);

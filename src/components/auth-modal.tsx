@@ -177,7 +177,7 @@ function AuthModal({ initialMode, next, autoGoogle, error: initialError, onClose
     here.searchParams.set("auth", mode === "signup" ? "signup" : "login");
     here.searchParams.set("google", "1");
     here.searchParams.set("next", next);
-    const target = openInBrowserUrl(here.toString(), env.os);
+    const target = openInBrowserUrl(here.toString(), env.os, env.app);
     if (target) window.location.href = target;
     // Still here a moment later: the app blocked the jump; show the manual way. The address bar takes the full
     // handoff (ad codes and google=1), so opening it from the app's menu also counts for the ad and starts Google.
@@ -189,7 +189,7 @@ function AuthModal({ initialMode, next, autoGoogle, error: initialError, onClose
       if (auth) stay.searchParams.set("auth", auth);
       try { window.history.replaceState(null, "", stay); } catch {}
       setJumpFailed(true);
-    }, target ? 1200 : 0);
+    }, !target ? 0 : env.app === "Instagram" && env.os === "ios" ? 4000 : 1200); // Instagram asks first: give the box time
   }
 
   async function handleGoogle() {
