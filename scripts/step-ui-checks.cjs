@@ -10,7 +10,7 @@ process.chdir(path.join(__dirname, '..'));
 let checks = 0;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 const rv = fs.readFileSync('src/components/run-view.tsx', 'utf8');
-ok(/border-2 bg-panel px-5 transition-colors \$\{open \? "space-y-4 border-ink py-5" : "border-line py-4/.test(rv), 'each step is a card; the open one has a black border');
+ok(/border-2 bg-panel px-5 transition-colors \$\{open \? "space-y-4 border-line py-5" : "border-line py-4/.test(rv) && !/border-ink py-5/.test(rv), 'each step is a card; no black border on the open one (founder: not a good addition)');
 ok(/relative flex h-8 w-8 shrink-0 items-center justify-center text-\[13\.5px\]/.test(rv) && !/h-7 w-7 shrink-0 items-center justify-center rounded-full/.test(rv), 'square number box, not a circle');
 ok(/max-w-\[760px\] space-y-3 px-8/.test(rv) && !/Next: pick/.test(rv), 'cards stacked; no Next buttons (steps open any time)');
 ok(rv.indexOf('<SuggestedHooks') < rv.indexOf('Browse hooks') && /"Upload a video" : "Describe your own"/.test(rv), '3 hooks above today\'s buttons, same wording');

@@ -2046,7 +2046,7 @@ function Block({ n, title, done, pending = false, children, open = true, summary
   return (
     // Each step is a white card (founder 2026-11-27): a square number box (blue with a check when done) and a black
     // border on the open step. Any step opens at any time.
-    <section className={`border-2 bg-panel px-5 transition-colors ${open ? "space-y-4 border-ink py-5" : "border-line py-4 hover:border-line-strong"}`}>
+    <section className={`border-2 bg-panel px-5 transition-colors ${open ? "space-y-4 border-line py-5" : "border-line py-4 hover:border-line-strong"}`}>
       <button type="button" onClick={onToggle} aria-expanded={open} aria-busy={pending || undefined} className="flex w-full items-center gap-3 text-left">
         <span className={`relative flex h-8 w-8 shrink-0 items-center justify-center text-[13.5px] font-bold ${done ? "bg-accent text-white" : open ? "bg-ink text-white" : "bg-raised text-soft"}`}>
           {done ? <Check className="h-4 w-4" strokeWidth={3} /> : n}
