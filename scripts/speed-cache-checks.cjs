@@ -24,6 +24,7 @@ finish('speed-cache-checks', EXPECTED, () => checks, async () => {
     },
     'next/server': { connection: async () => undefined },
     '@/lib/server/store': { createReference: async () => ({}), mediaAccess: async () => null },
+    '@/lib/server/user-recipe': { analyzeUpload: async () => 'done' },
     '@/lib/server/who': { currentUser: async () => who, signInFirst: () => Response.json({ error: 'Sign in first.' }, { status: 401 }) },
     '@/lib/taxonomy': { HOOK_STYLES: [], NICHES: [] },
   });

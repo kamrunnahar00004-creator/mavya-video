@@ -31,9 +31,12 @@ const codeOf = (r: Reference | null) => reelCode(r?.sourceUrl);
 /** The stolen shot `n` (1-based) as a "Like this" example, when its times are known. */
 export function exampleOf(source: Reference | null, n: unknown): ShotExample | undefined {
   const code = codeOf(source);
+  // The user's own uploaded reel (founder 2026-11-28): its moments play from their own file.
+  // Always their own file, even when they also pasted a reel link: the times describe that file (Codex 2026-11-28).
+  const media = source?.owner === "user" && /^[0-9a-f-]{36}\.(mp4|mov|webm)$/.test(source.mediaId ?? "") ? source.mediaId : "";
   const shot = typeof n === "number" && Number.isInteger(n) && n >= 1 && source ? recipeOf(source)?.demo?.shots?.[n - 1] as { start?: number; end?: number } | undefined : undefined;
-  if (!shot || !/^[A-Za-z0-9_-]{5,40}$/.test(code) || typeof shot.start !== "number" || typeof shot.end !== "number" || shot.end <= shot.start) return undefined;
-  return { code, start: shot.start, end: shot.end };
+  if (!shot || !(media || /^[A-Za-z0-9_-]{5,40}$/.test(code)) || typeof shot.start !== "number" || typeof shot.end !== "number" || shot.end <= shot.start) return undefined;
+  return media ? { code: "", media, start: shot.start, end: shot.end } : { code, start: shot.start, end: shot.end };
 }
 
 /** The stolen hook in full: its demo shot by shot (camera, actions, captions, timing) is the template for the new one. */
@@ -154,7 +157,7 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/runs/[id]/
 copy what already went viral, adapted to this product. Never invent features, numbers or results the brief and the founder's notes do not support.
 
 PRIORITY, in this order (founder's rule):
-1. ${stolen ? "THE VIRAL REEL THE FOUNDER PICKED leads: most of the script is its format copied to this product (its hook structure, rhythm, tone, length, caption style and story shape). Only the subject changes." : "THE HOOK THE FOUNDER DESCRIBED leads, shaped like the strongest library reels."}
+1. ${stolen ? "THE VIRAL REEL THE FOUNDER PICKED leads: most of the script is its format copied to this product (its hook structure, rhythm, tone, length, caption style and story shape). Only the subject changes." : described ? "THE HOOK THE FOUNDER DESCRIBED leads, shaped like the strongest library reels." : "THE FOUNDER'S OWN HOOK leads (its breakdown is not ready yet): shape the script like the strongest library reels."}
 2. THE TRUTH ABOUT THIS PRODUCT: only its real features, flow and results.
 3. HOUSE RULES (learned from reels that got views): apply them only where the reel does not already decide, or where copying it would not work for an app. Never let them override the reel's voice.
 ${scriptRulesText()}

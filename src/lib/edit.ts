@@ -428,10 +428,14 @@ export function reelCode(link: string | undefined): string {
 /** The library reel's demo shots as "Like this" moments, in order (shots without times are skipped as undefined). */
 export function exampleShots(source: Reference | null): ((NonNullable<DemoClip["example"]> & { label?: string }) | undefined)[] {
   const code = reelCode(source?.sourceUrl);
-  if (!code) return [];
+  // The user's own uploaded reel (founder 2026-11-28): its moments play from their own file.
+  // Always their own file, even when they also pasted a reel link: the times describe that file (Codex 2026-11-28).
+  const media = source?.owner === "user" && /^[0-9a-f-]{36}\.(mp4|mov|webm)$/.test(source.mediaId ?? "") ? source.mediaId : "";
+  if (!code && !media) return [];
   return (source?.recipe?.demo?.shots ?? []).map((s) => {
     const t = s as { start?: number; end?: number; label?: string };
-    return typeof t.start === "number" && typeof t.end === "number" && t.end > t.start ? { code, start: t.start, end: t.end, label: t.label } : undefined;
+    if (typeof t.start !== "number" || typeof t.end !== "number" || t.end <= t.start) return undefined;
+    return media ? { code: "", media, start: t.start, end: t.end, label: t.label } : { code, start: t.start, end: t.end, label: t.label };
   });
 }
 

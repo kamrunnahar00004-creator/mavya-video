@@ -1,10 +1,14 @@
 import { readResponse } from "@/lib/server/read-timing";
 import { listPage, pageResponse, listError } from "@/lib/server/list-pages";
-import { connection } from "next/server";
+import { after, connection } from "next/server";
+import { analyzeUpload } from "@/lib/server/user-recipe";
 import { createReference, mediaAccess } from "@/lib/server/store";
 import { currentUser, signInFirst } from "@/lib/server/who";
 import { HOOK_STYLES, NICHES } from "@/lib/taxonomy";
 import type { Platform, Reference } from "@/lib/types";
+
+/** Room for the background breakdown of an uploaded reel (Gemini, up to about 3 minutes) after the answer. */
+export const maxDuration = 300;
 
 const PLATFORMS = new Set<Platform>(["tiktok", "instagram", "youtube", "other"]);
 const pick = <T extends readonly string[]>(list: T, v: unknown) => (typeof v === "string" && (list as readonly string[]).includes(v) ? v : undefined);
@@ -83,5 +87,8 @@ export async function POST(request: Request) {
     niche: pick(NICHES, body?.niche),
     hookStyle: pick(HOOK_STYLES, body?.hookStyle),
   }, who);
+  // A user's own reel gets the library breakdown in the background (founder 2026-11-28): its script and "Like this"
+  // moments then come from it. The upload never waits for it or fails because of it.
+  if (ref.owner === "user") after(() => analyzeUpload(ref, who));
   return Response.json(ref, { status: 201 });
 }

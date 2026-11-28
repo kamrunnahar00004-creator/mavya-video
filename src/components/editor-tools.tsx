@@ -2163,10 +2163,10 @@ function VolumeButton({ value, onChange }: { value: number; onChange: (v: number
  */
 /** Plays only the shot's moment of the reel, on a loop. */
 function MomentVideo({ example, className }: { example: NonNullable<DemoClip["example"]>; className: string }) {
-  const { code, start, end } = example;
+  const { code, media, start, end } = example;
   return (
     <video
-      src={`/api/examples/${code}#t=${start.toFixed(2)},${end.toFixed(2)}`}
+      src={`${media ? `/api/media/${media}` : `/api/examples/${code}`}#t=${start.toFixed(2)},${end.toFixed(2)}`}
       muted
       autoPlay
       playsInline

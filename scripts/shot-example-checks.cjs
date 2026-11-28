@@ -30,7 +30,7 @@ const run = (ex) => v.validRunPatch({ demo: { clip: null, frame: 'none', clips: 
 ok(run({ code: 'DcOiTp0xxTK', start: 3.3, end: 6.5 }) && !run({ code: '../x', start: 1, end: 2 }) && !run({ code: 'DcOiTp0xxTK', start: 5, end: 4 }), 'saved examples are checked (real code, end after start)');
 
 const ed = fs.readFileSync('src/components/editor-tools.tsx', 'utf8');
-ok(/src=\{`\/api\/examples\/\$\{code\}#t=/.test(ed) && /v\.currentTime >= end/.test(ed) && /Like this<\/figcaption>/.test(ed), '"Like this" plays only the moment, on a loop');
+ok(/`\/api\/examples\/\$\{code\}`\}#t=/.test(ed) && /v\.currentTime >= end/.test(ed) && /Like this<\/figcaption>/.test(ed), '"Like this" plays only the moment, on a loop');
 ok(/brief\.camera \|\| brief\.steps\?\.length \|\| brief\.example/.test(ed) && /<ExampleClip example=\{clip\.example\} \/>/.test(ed), 'shown beside the shot to film');
 const ex = fs.readFileSync('src/app/api/examples/[code]/route.ts', 'utf8');
 ok(/\^\[A-Za-z0-9_-\]\{5,40\}\$/.test(ex) && /currentUser\(\)\)\) return signInFirst/.test(ex) && /libraryLink\("sources", code\)/.test(ex), 'example route: valid codes only, signed in, the library reel');

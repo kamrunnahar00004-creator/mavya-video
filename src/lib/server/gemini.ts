@@ -10,8 +10,8 @@ export const PRO_MODEL = "gemini-pro-latest";
 
 export class GeminiError extends Error {}
 
-/** A prompt part: text, or a file sent inline (a short video or an image, base64). */
-export type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
+/** A prompt part: text, a file sent inline (a short video or an image, base64), or one uploaded to Gemini's Files API. */
+export type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } } | { file_data: { mime_type: string; file_uri: string } };
 
 export async function geminiJSON<T>(prompt: string | GeminiPart[], opts: { schema?: object; urlContext?: boolean; temperature?: number; signal?: AbortSignal; model?: string; timeoutMs?: number } = {}): Promise<T> {
   const key = process.env.GEMINI_API_KEY;

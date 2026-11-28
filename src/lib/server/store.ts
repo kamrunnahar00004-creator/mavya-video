@@ -126,7 +126,7 @@ export async function createReference(input: Omit<Reference, "id" | "createdAt" 
   return ref;
 }
 
-export async function updateReference(id: string, patch: Partial<Pick<Reference, "title" | "platform" | "sourceUrl" | "views" | "analysis" | "pending" | "review">>, who: string): Promise<Reference | null> {
+export async function updateReference(id: string, patch: Partial<Pick<Reference, "title" | "platform" | "sourceUrl" | "views" | "analysis" | "pending" | "review" | "recipe">>, who: string): Promise<Reference | null> {
   if (!cloud()) {
     let updated: Reference | null = null;
     await writeDb((d) => {

@@ -56,7 +56,7 @@ export type Reference = {
     onScreenText?: { text: string }[];
     hook?: { end?: number };
     /** The demo split into steps a founder films for their own app ("Film your demo"). */
-    demo?: { shots?: { label: string; hint?: string; seconds?: number; camera?: string; steps?: string[]; text?: string }[] };
+    demo?: { shots?: { label: string; hint?: string; seconds?: number; camera?: string; steps?: string[]; text?: string; start?: number; end?: number }[] };
     /** Prompt for generating a new hook in the same style; {CHARACTER} marks the person. */
     hookPrompt?: string;
   };
@@ -206,7 +206,8 @@ export type ProductBrief = {
 };
 
 /** The moment of a library reel a demo shot copies: shown beside it as "Like this" (founder 2026-11-27). */
-export type ShotExample = { code: string; start: number; end: number };
+/** A moment of the copied reel: a library reel by its code, or (code "") the user's own uploaded reel by its media id. */
+export type ShotExample = { code: string; start: number; end: number; media?: string };
 
 /** One demo shot to film (same shape the "Film your demo" clips use). */
 export type ScriptShot = { label: string; hint: string; steps: string[]; camera: string; text: string; seconds: number; example?: ShotExample };
